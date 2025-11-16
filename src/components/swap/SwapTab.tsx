@@ -20,7 +20,6 @@ import { TokenInputSection } from "./TokenInputSection"
 import { TokenOutputSection } from "./TokenOutputSection"
 import { QuoteDisplay } from "./QuoteDisplay"
 import ExecuteButton from "./ExecuteButton"
-import { MoonbeamActionsPanel } from "./MoonbeamActionsPanel"
 import { formatDisplayAmount, pickPreferredToken } from "./swapUtils"
 import type { DestinationActionConfig } from "../../lib/types/destinationAction"
 
@@ -420,23 +419,6 @@ export function SwapTab({ userAddress, onResetStateChange }: Props) {
                 onQueryChange={setModalBuyQuery}
                 userAddress={userAddress}
                 excludeAddresses={srcChainId === dstChainId && srcToken ? [srcToken] : []}
-            />
-            <MoonbeamActionsPanel
-                dstChainId={dstChainId}
-                dstToken={dstToken}
-                userAddress={userAddress}
-                currentChainId={currentChainId}
-                isEncoding={isEncoding}
-                setIsEncoding={setIsEncoding}
-                attachedMessage={attachedMessage}
-                setAttachedMessage={setAttachedMessage}
-                attachedGasLimit={attachedGasLimit}
-                setAttachedGasLimit={setAttachedGasLimit}
-                attachedValue={attachedValue}
-                setAttachedValue={setAttachedValue}
-                actions={actions}
-                setActions={setActions}
-                onRefreshQuotes={refreshQuotes}
             />
             {quotes.length > 0 && selectedTrade && (
                 <div className="mt-4">
