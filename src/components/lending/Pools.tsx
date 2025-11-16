@@ -123,7 +123,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = () => {
 
     const minApr = parseFloat(minAprPct)
     if (!Number.isNaN(minApr)) {
-      result = result.filter((p) => (p.apr ?? 0) * 100 >= minApr)
+      result = result.filter((p) => (p.apr ?? 0) >= minApr)
     }
 
     // sort
