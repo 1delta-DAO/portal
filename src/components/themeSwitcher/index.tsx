@@ -4,7 +4,6 @@
 import { useEffect, useState } from 'react'
 
 const THEMES = [
-  'allocator',
   'terminal',
   'light',
   'dark',
@@ -23,7 +22,8 @@ export function ThemeSwitcher() {
     if (typeof window === 'undefined') return
 
     const stored = window.localStorage.getItem('theme')
-    const initial = stored && THEMES.includes(stored as any) ? stored : 'synthwave'
+    const initial =
+      stored && THEMES.includes(stored as any) ? stored : 'synthwave'
 
     setTheme(initial)
     document.documentElement.setAttribute('data-theme', initial)
@@ -38,7 +38,7 @@ export function ThemeSwitcher() {
 
   return (
     <select
-      className="select select-bordered select-sm"
+      className="select select-bordered select-sm pr-10"
       value={theme}
       onChange={(e) => setTheme(e.target.value)}
     >

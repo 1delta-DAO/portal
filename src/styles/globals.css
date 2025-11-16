@@ -2,7 +2,6 @@
 
 @plugin "daisyui" {
   themes: 
-    allocator, 
     terminal, 
     light --default, 
     dark --prefersdark, 

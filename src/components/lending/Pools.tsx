@@ -376,7 +376,10 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = () => {
                 const utilPct = (p.utilitzation ?? 0) * 100
                 const aprPct = p.apr ?? 0
                 return (
-                  <tr key={`${p.chainId}-${p.lender}-${p.poolId}`}>
+                  <tr
+                    key={`${p.chainId}-${p.lender}-${p.poolId}`}
+                    className="h-[75px]"
+                  >
                     <td>{renderCurrency(p.asset as RawCurrency)}</td>
                     <td>
                       <div className="flex flex-col text-xs">
