@@ -1,7 +1,8 @@
 // src/components/LendingPoolsTable.tsx
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { RawCurrency } from '@1delta/lib-utils'
 import { useFlattenedPools } from '../../hooks/lending/useEarnData.js'
+import { createPortal } from 'react-dom'
 
 type SortKey = 'apr' | 'utilitzation' | 'totalLiquidityUSD' | 'totalDepositsUSD'
 
@@ -315,280 +316,310 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = () => {
       </div>
 
       {/* table */}
-      <div className="overflow-x-auto rounded-box border border-base-300">
-        <table className="table table-zebra table-sm">
-          <thead>
-            <tr>
-              <th>Asset</th>
-              <th>Chain / Lender</th>
-              <th className="cursor-pointer" onClick={() => toggleSort('apr')}>
-                APR
-                {sortKey === 'apr' && (
-                  <span className="ml-1 text-xs">
-                    {sortDir === 'asc' ? '↑' : '↓'}
-                  </span>
-                )}
-              </th>
-              <th
-                className="cursor-pointer"
-                onClick={() => toggleSort('utilitzation')}
-              >
-                Utilization
-                {sortKey === 'utilitzation' && (
-                  <span className="ml-1 text-xs">
-                    {sortDir === 'asc' ? '↑' : '↓'}
-                  </span>
-                )}
-              </th>
-              <th
-                className="cursor-pointer"
-                onClick={() => toggleSort('totalDepositsUSD')}
-              >
-                Deposits (USD)
-                {sortKey === 'totalDepositsUSD' && (
-                  <span className="ml-1 text-xs">
-                    {sortDir === 'asc' ? '↑' : '↓'}
-                  </span>
-                )}
-              </th>
-              <th
-                className="cursor-pointer"
-                onClick={() => toggleSort('totalLiquidityUSD')}
-              >
-                Liquidity (USD)
-                {sortKey === 'totalLiquidityUSD' && (
-                  <span className="ml-1 text-xs">
-                    {sortDir === 'asc' ? '↑' : '↓'}
-                  </span>
-                )}
-              </th>
-              <th>Exposure</th>
-              <th>Price</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedPools.map((p) => {
-              const utilPct = (p.utilitzation ?? 0) * 100
-              const aprPct = (p.apr ?? 0)
-              return (
-                <tr key={`${p.chainId}-${p.lender}-${p.poolId}`}>
-                  <td>{renderCurrency(p.asset as RawCurrency)}</td>
-                  <td>
-                    <div className="flex flex-col text-xs">
-                      <span className="font-semibold">
-                        {getLenderName(p.lender)}
-                      </span>
-                      <span className="text-base-content/60">
-                        Chain {p.chainId}
-                      </span>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex flex-col text-xs">
-                      <span className="font-semibold">
-                        {aprPct.toFixed(2)}%
-                      </span>
-                      {/* <span className="text-base-content/60">
+      <div className="rounded-box border border-base-300 overflow-visible">
+        <div className="overflow-x-auto">
+          <table className="table table-zebra table-sm table-fixed w-full">
+            <thead>
+              <tr>
+                <th>Asset</th>
+                <th>Chain / Lender</th>
+                <th
+                  className="cursor-pointer"
+                  onClick={() => toggleSort('apr')}
+                >
+                  APR
+                  {sortKey === 'apr' && (
+                    <span className="ml-1 text-xs">
+                      {sortDir === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </th>
+                <th
+                  className="cursor-pointer"
+                  onClick={() => toggleSort('utilitzation')}
+                >
+                  Utilization
+                  {sortKey === 'utilitzation' && (
+                    <span className="ml-1 text-xs">
+                      {sortDir === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </th>
+                <th
+                  className="cursor-pointer"
+                  onClick={() => toggleSort('totalDepositsUSD')}
+                >
+                  Deposits (USD)
+                  {sortKey === 'totalDepositsUSD' && (
+                    <span className="ml-1 text-xs">
+                      {sortDir === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </th>
+                <th
+                  className="cursor-pointer"
+                  onClick={() => toggleSort('totalLiquidityUSD')}
+                >
+                  Liquidity (USD)
+                  {sortKey === 'totalLiquidityUSD' && (
+                    <span className="ml-1 text-xs">
+                      {sortDir === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </th>
+                <th>Exposure</th>
+                <th>Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedPools.map((p) => {
+                const utilPct = (p.utilitzation ?? 0) * 100
+                const aprPct = p.apr ?? 0
+                return (
+                  <tr key={`${p.chainId}-${p.lender}-${p.poolId}`}>
+                    <td>{renderCurrency(p.asset as RawCurrency)}</td>
+                    <td>
+                      <div className="flex flex-col text-xs">
+                        <span className="font-semibold">
+                          {getLenderName(p.lender)}
+                        </span>
+                        <span className="text-base-content/60">
+                          Chain {p.chainId}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="flex flex-col text-xs">
+                        <span className="font-semibold">
+                          {aprPct.toFixed(2)}%
+                        </span>
+                        {/* <span className="text-base-content/60">
                         Deposit: {(p.depositRate * 100).toFixed(2)}%
                       </span>
                       <span className="text-base-content/60">
                         Var borrow: {(p.variableBorrowRate * 100).toFixed(2)}%
                       </span> */}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex items-center gap-2">
-                      <progress
-                        className="progress progress-primary w-24"
-                        value={utilPct}
-                        max={100}
-                      />
-                      <span className="text-xs font-medium">
-                        {utilPct.toFixed(1)}%
-                      </span>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex flex-col text-xs">
-                      <span className="font-semibold">
-                        $
-                        {p.totalDepositsUSD.toLocaleString(undefined, {
-                          maximumFractionDigits: 0,
-                        })}
-                      </span>
-                      <span className="text-base-content/60">
-                        Debt: $
-                        {p.totalDebtUSD.toLocaleString(undefined, {
-                          maximumFractionDigits: 0,
-                        })}
-                      </span>
-                    </div>
-                  </td>
-                  <td>
-                    <span className="text-xs font-semibold">
-                      $
-                      {p.totalLiquidityUSD.toLocaleString(undefined, {
-                        maximumFractionDigits: 0,
-                      })}
-                    </span>
-                  </td>
-                  <td>
-                    {/* exposure with "+N more" dropdown, as you already added */}
-                    <div className="flex flex-wrap items-center gap-1 max-w-[14rem]">
-                      {(() => {
-                        const maxInline = 5
-                        const exposures = p.exposure as any[]
-                        const inline = exposures.slice(0, maxInline)
-                        const remaining = exposures.slice(maxInline)
-
-                        return (
-                          <>
-                            {inline.map((ex, i) => {
-                              const exSymbol =
-                                ex.asset?.symbol ?? ex.asset?.ticker ?? ''
-                              return (
-                                <span
-                                  key={`${exSymbol}-${i}`}
-                                  className="badge badge-outline badge-sm"
-                                  title={`Collateral factor: ${
-                                    ex.collateralFactor * 100
-                                  }%`}
-                                >
-                                  {exSymbol || 'UNKNOWN'}{' '}
-                                  <span className="opacity-60">
-                                    ({(ex.collateralFactor * 100).toFixed(0)}%)
-                                  </span>
-                                </span>
-                              )
-                            })}
-
-                            {remaining.length > 0 && (
-                              <div className="dropdown dropdown-end">
-                                <label
-                                  tabIndex={0}
-                                  className="badge badge-ghost badge-sm cursor-pointer"
-                                >
-                                  +{remaining.length} more
-                                </label>
-                                <div
-                                  tabIndex={0}
-                                  className="dropdown-content z-[1] shadow bg-base-100 rounded-box p-2 max-w-xs max-h-60 overflow-auto"
-                                >
-                                  <div className="flex flex-wrap gap-1">
-                                    {remaining.map((ex, i) => {
-                                      const exSymbol =
-                                        ex.asset?.symbol ??
-                                        ex.asset?.ticker ??
-                                        ''
-                                      return (
-                                        <span
-                                          key={`${exSymbol}-more-${i}`}
-                                          className="badge badge-outline badge-sm"
-                                          title={`Collateral factor: ${
-                                            ex.collateralFactor * 100
-                                          }%`}
-                                        >
-                                          {exSymbol || 'UNKNOWN'}{' '}
-                                          <span className="opacity-60">
-                                            (
-                                            {(
-                                              ex.collateralFactor * 100
-                                            ).toFixed(0)}
-                                            %)
-                                          </span>
-                                        </span>
-                                      )
-                                    })}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </>
-                        )
-                      })()}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex flex-col text-xs">
-                      {p.price != null && (
+                      </div>
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        <progress
+                          className="progress progress-primary w-24"
+                          value={utilPct}
+                          max={100}
+                        />
+                        <span className="text-xs font-medium">
+                          {utilPct.toFixed(1)}%
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="flex flex-col text-xs">
                         <span className="font-semibold">
-                          ${p.price?.toFixed(4)}
+                          $
+                          {p.totalDepositsUSD.toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })}
                         </span>
-                      )}
-                      {p.histPrice != null && (
                         <span className="text-base-content/60">
-                          24h: ${p.histPrice?.toFixed(4)}
+                          Debt: $
+                          {p.totalDebtUSD.toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })}
                         </span>
-                      )}
-                      {p.price != null &&
-                        p.histPrice != null &&
-                        p.histPrice !== 0 && (
-                          <span
-                            className={`text-xs ${
-                              p.price >= p.histPrice
-                                ? 'text-success'
-                                : 'text-error'
-                            }`}
-                          >
-                            {(
-                              ((p.price - p.histPrice) / p.histPrice) *
-                              100
-                            ).toFixed(2)}
-                            %
+                      </div>
+                    </td>
+                    <td>
+                      <span className="text-xs font-semibold">
+                        $
+                        {p.totalLiquidityUSD.toLocaleString(undefined, {
+                          maximumFractionDigits: 0,
+                        })}
+                      </span>
+                    </td>
+                    {/* Exposure cell replaced with ExposureCell */}
+                    <td className="align-top">
+                      <ExposureCell exposures={p.exposure as any[]} />
+                    </td>
+
+                    <td>
+                      <div className="flex flex-col text-xs">
+                        {p.price != null && (
+                          <span className="font-semibold">
+                            ${p.price?.toFixed(4)}
                           </span>
                         )}
-                    </div>
+                        {p.histPrice != null && (
+                          <span className="text-base-content/60 whitespace-nowrap">
+                            24h: ${p.histPrice?.toFixed(4)}
+                          </span>
+                        )}
+                        {p.price != null &&
+                          p.histPrice != null &&
+                          p.histPrice !== 0 && (
+                            <span
+                              className={`text-xs whitespace-nowrap ${
+                                p.price >= p.histPrice
+                                  ? 'text-success'
+                                  : 'text-error'
+                              }`}
+                            >
+                              {(
+                                ((p.price - p.histPrice) / p.histPrice) *
+                                100
+                              ).toFixed(2)}
+                              %
+                            </span>
+                          )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+
+              {filteredAndSortedPools.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="text-center py-6 text-sm">
+                    No pools match your filters.
                   </td>
                 </tr>
-              )
-            })}
-
-            {filteredAndSortedPools.length === 0 && (
-              <tr>
-                <td colSpan={8} className="text-center py-6 text-sm">
-                  No pools match your filters.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* pagination footer */}
-      <div className="flex flex-col gap-2 items-center justify-between md:flex-row">
-        <div className="text-xs text-base-content/70">
-          {totalItems === 0 ? (
-            'No results'
-          ) : (
-            <>
-              Showing{' '}
-              <span className="font-semibold">
-                {startIndex + 1}–{endIndex}
-              </span>{' '}
-              of <span className="font-semibold">{totalItems}</span> pools
-            </>
-          )}
+              )}
+            </tbody>
+          </table>
         </div>
-        <div className="join">
-          <button
-            className="btn btn-xs join-item"
-            disabled={currentPage === 1}
-            onClick={() => goToPage(currentPage - 1)}
-          >
-            « Prev
-          </button>
-          <button className="btn btn-xs join-item" disabled>
-            Page {currentPage} / {totalPages}
-          </button>
-          <button
-            className="btn btn-xs join-item"
-            disabled={currentPage === totalPages}
-            onClick={() => goToPage(currentPage + 1)}
-          >
-            Next »
-          </button>
+
+        {/* pagination footer */}
+        <div className="flex flex-col gap-2 items-center justify-between md:flex-row px-4 py-2">
+          <div className="text-xs text-base-content/70">
+            {totalItems === 0 ? (
+              'No results'
+            ) : (
+              <>
+                Showing{' '}
+                <span className="font-semibold">
+                  {startIndex + 1}–{endIndex}
+                </span>{' '}
+                of <span className="font-semibold">{totalItems}</span> pools
+              </>
+            )}
+          </div>
+          <div className="join">
+            <button
+              className="btn btn-xs join-item"
+              disabled={currentPage === 1}
+              onClick={() => goToPage(currentPage - 1)}
+            >
+              « Prev
+            </button>
+            <button className="btn btn-xs join-item" disabled>
+              Page {currentPage} / {totalPages}
+            </button>
+            <button
+              className="btn btn-xs join-item"
+              disabled={currentPage === totalPages}
+              onClick={() => goToPage(currentPage + 1)}
+            >
+              Next »
+            </button>
+          </div>
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * Exposure cell with inline badges + N-more popover rendered via portal.
+ */
+const ExposureCell: React.FC<{ exposures: any[] }> = ({ exposures }) => {
+  const maxInline = 2
+  const inline = exposures.slice(0, maxInline)
+  const remaining = exposures.slice(maxInline)
+
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const triggerRef = useRef<HTMLSpanElement | null>(null)
+
+  const openPopover = () => {
+    if (!triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    setPos({
+      top: rect.bottom + 8, // a bit below
+      left: rect.right, // right-aligned
+    })
+    setOpen(true)
+  }
+
+  const closePopover = () => {
+    setOpen(false)
+  }
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-1 max-w-[14rem]">
+        {inline.map((ex, i) => {
+          const exSymbol = ex.asset?.symbol ?? ex.asset?.ticker ?? ''
+          return (
+            <span
+              key={`${exSymbol}-${i}`}
+              className="badge badge-outline badge-sm"
+              title={`Collateral factor: ${ex.collateralFactor * 100}%`}
+            >
+              {exSymbol || 'UNKNOWN'}{' '}
+              <span className="opacity-60">
+                ({(ex.collateralFactor * 100).toFixed(0)}%)
+              </span>
+            </span>
+          )
+        })}
+
+        {remaining.length > 0 && (
+          <span
+            ref={triggerRef}
+            tabIndex={0}
+            className="badge badge-ghost badge-sm cursor-pointer"
+            onClick={openPopover}
+          >
+            +{remaining.length} more
+          </span>
+        )}
+      </div>
+
+      {open &&
+        pos &&
+        createPortal(
+          <>
+            {/* backdrop to close on click */}
+            <div className="fixed inset-0 z-[90]" onClick={closePopover} />
+
+            <div
+              className="fixed z-[100] shadow bg-base-100 rounded-box p-2 max-w-xs max-h-60 overflow-auto"
+              style={{
+                top: pos.top,
+                left: pos.left,
+              }}
+            >
+              <div className="flex flex-wrap gap-1">
+                {remaining.map((ex, i) => {
+                  const exSymbol = ex.asset?.symbol ?? ex.asset?.ticker ?? ''
+                  return (
+                    <span
+                      key={`${exSymbol}-more-${i}`}
+                      className="badge badge-outline badge-sm"
+                      title={`Collateral factor: ${ex.collateralFactor * 100}%`}
+                    >
+                      {exSymbol || 'UNKNOWN'}{' '}
+                      <span className="opacity-60">
+                        {(ex.collateralFactor * 100).toFixed(0)}%
+                      </span>
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          </>,
+          document.body
+        )}
+    </>
   )
 }
