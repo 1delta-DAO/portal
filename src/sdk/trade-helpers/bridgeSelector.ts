@@ -92,4 +92,3 @@ export async function fetchAllBridgeTrades(
 
     return trades.sort((a, b) => b.trade.outputAmountRealized - a.trade.outputAmountRealized)
 }
-

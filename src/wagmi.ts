@@ -14,21 +14,6 @@ export const config = getDefaultConfig({
         [avalanche.id]: http("https://avalanche.drpc.org"),
         [mantle.id]: http("https://mantle.drpc.org"),
         [plasma.id]: http("https://plasma.drpc.org"),
-        [moonbeam.id]: fallback(
-            [
-                http("https://moonbeam.unitedbloc.com"),
-                http("https://1rpc.io/glmr"),
-                http("https://moonbeam-rpc.dwellir.com"),
-                http("https://moonbeam-rpc.publicnode.com"),
-                http("https://moonbeam.drpc.org"),
-                http("https://endpoints.omniatech.io/v1/moonbeam/mainnet/public"),
-                http("https://rpc.api.moonbeam.network"),
-                http("https://rpc.poolz.finance/moonbeam"),
-                http("https://moonbeam.rpc.grove.city/v1/01fdb492"),
-                http("https://moonbeam.api.onfinality.io/public"),
-            ],
-            { rank: true, retryCount: 2 }
-        ),
     },
     ssr: false,
 })

@@ -11,4 +11,3 @@ export function TradeSdkWalletSync() {
 
     return null
 }
-
