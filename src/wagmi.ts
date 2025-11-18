@@ -1,19 +1,50 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit"
-import { arbitrum, avalanche, base, mainnet, mantle, moonbeam, plasma, polygon } from "wagmi/chains"
+import { moonbeam } from "wagmi/chains"
 import { fallback, http } from "wagmi"
+import { getAvailableChainIds, SupportedChainId } from "@1delta/lib-utils"
+import { getEvmChain } from "@1delta/providers"
+
+// auto-inititalize chains based on state
+export const evmChainWagmi: any[] = getAvailableChainIds()
+    .filter((a) => a !== SupportedChainId.FUEL)
+    .map((chainId) => getEvmChain(chainId))
+
+const RPC_OVERRIDES = {
+    [SupportedChainId.BNB_SMART_CHAIN_MAINNET]: "https://bsc-dataseed1.bnbchain.org",
+    [SupportedChainId.METIS_ANDROMEDA_MAINNET]: "https://metis-andromeda.rpc.thirdweb.com",
+}
+
+export const evmTransportsWagmi = Object.assign(
+    {},
+    ...evmChainWagmi.map(({ id }) => {
+        return {
+            // @ts-ignore
+            [id]: http(RPC_OVERRIDES[String(id)]),
+        }
+    })
+)
 
 export const config = getDefaultConfig({
-    appName: "Moonbeamer",
+    appName: "Allocator",
     projectId: "id",
-    chains: [arbitrum, avalanche, base, mainnet, mantle, moonbeam, plasma, polygon],
+    chains: evmChainWagmi as any,
     transports: {
-        [mainnet.id]: http("https://ethereum-rpc.publicnode.com"),
-        [base.id]: http("https://base-rpc.publicnode.com"),
-        [polygon.id]: http("https://polygon-bor-rpc.publicnode.com"),
-        [arbitrum.id]: http("https://arbitrum-one-rpc.publicnode.com"),
-        [avalanche.id]: http("https://avalanche.drpc.org"),
-        [mantle.id]: http("https://mantle.drpc.org"),
-        [plasma.id]: http("https://plasma.drpc.org"),
+        ...evmTransportsWagmi,
+        [moonbeam.id]: fallback(
+            [
+                http("https://moonbeam.unitedbloc.com"),
+                http("https://1rpc.io/glmr"),
+                http("https://moonbeam-rpc.dwellir.com"),
+                http("https://moonbeam-rpc.publicnode.com"),
+                http("https://moonbeam.drpc.org"),
+                http("https://endpoints.omniatech.io/v1/moonbeam/mainnet/public"),
+                http("https://rpc.api.moonbeam.network"),
+                http("https://rpc.poolz.finance/moonbeam"),
+                http("https://moonbeam.rpc.grove.city/v1/01fdb492"),
+                http("https://moonbeam.api.onfinality.io/public"),
+            ],
+            { rank: true, retryCount: 2 }
+        ),
     },
     ssr: false,
 })
