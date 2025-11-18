@@ -1,7 +1,7 @@
 // src/components/LendingPoolsTable.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react"
 import { getChainName, lenderDisplayName, lenderDisplayNameFull, RawCurrency } from "@1delta/lib-utils"
-import { useFlattenedPools } from "../../hooks/lending/useEarnData.js"
+import { useFlattenedPools } from "../../hooks/lending/usePoolData.js"
 import { createPortal } from "react-dom"
 
 type SortKey = "apr" | "utilitzation" | "totalLiquidityUSD" | "totalDepositsUSD"

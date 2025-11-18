@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { fetchChainDataWithChunking } from "./utils"
 
-import { useMarginPublicData } from "./useEarnData"
+import { useMarginPublicData } from "./usePoolData"
 import { useMainPrices, useMainPricesHist } from "../prices/useMainPrices"
 
 export interface MinimalPositionInfo {

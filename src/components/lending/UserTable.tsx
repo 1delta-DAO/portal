@@ -1,31 +1,11 @@
 // src/components/UserLenderPositionsTable.tsx
-import React, { useMemo, useState } from "react"
-import { getChainName, lenderDisplayName, RawCurrency } from "@1delta/lib-utils"
-import { ChainFilterSelect } from "./ChainFilter"
+import React from "react"
+import { lenderDisplayName } from "@1delta/lib-utils"
 import { LenderUiSummary, MinimalPositionInfo, useMarginData } from "../../hooks/lending/useMarginData"
 
 interface UserLenderPositionsTableProps {
     account?: string
     chainId: string
-}
-
-function renderCurrency(asset: RawCurrency) {
-    const symbol = asset?.symbol ?? (asset as any)?.ticker ?? ""
-    const name = asset?.name ?? (asset as any)?.label ?? symbol
-
-    return (
-        <div className="flex items-center gap-2">
-            <div className="avatar placeholder">
-                <div className="bg-base-300 text-base-content rounded-full w-7 flex items-center justify-center overflow-hidden">
-                    {asset.logoURI && <img src={asset.logoURI} width={20} height={20} alt={symbol} />}
-                </div>
-            </div>
-            <div className="flex flex-col">
-                <span className="font-medium">{symbol || name}</span>
-                {name && symbol && name !== symbol && <span className="text-xs text-base-content/60">{name}</span>}
-            </div>
-        </div>
-    )
 }
 
 function formatUsd(v: number) {

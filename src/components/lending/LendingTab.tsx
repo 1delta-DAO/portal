@@ -4,7 +4,7 @@ import { useAccount } from 'wagmi'
 import { UserLenderPositionsTable } from './UserTable'
 import { LendingPoolsTable } from './PoolsTable'
 import { ChainFilterSelect } from './ChainFilter'
-import { useFlattenedPools } from '../../hooks/lending/useEarnData.js'
+import { useFlattenedPools } from '../../hooks/lending/usePoolData.js'
 
 export function LenderTab() {
   const { address: account } = useAccount()
