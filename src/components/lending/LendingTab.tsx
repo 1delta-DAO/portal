@@ -76,20 +76,14 @@ export function LenderTab() {
             )}
 
             {activeTab === "operations" && (
-                <div>
-                    {account ? (
-                        <LenderOperationsBuilder
-                            chainId={effectiveChainId}
-                            userPositions={userPositions}
-                            lenderData={lenderData}
-                            isLoading={Boolean(isLoading)}
-                            error={error}
-                            refetch={refetch}
-                        />
-                    ) : (
-                        <div className="alert alert-info text-sm">Connect your wallet to create lender operations.</div>
-                    )}
-                </div>
+                <LenderOperationsBuilder
+                    chainId={effectiveChainId}
+                    userPositions={userPositions}
+                    lenderData={lenderData}
+                    isLoading={Boolean(isLoading)}
+                    error={error}
+                    refetch={refetch}
+                />
             )}
         </div>
     )
