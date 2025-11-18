@@ -64,11 +64,7 @@ const PositionsList: React.FC<{
 export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> = ({ account, chainId }) => {
     const { userPositions, isLoading, error, refetch } = useMarginData(chainId, account)
 
-
     const lenderTotals = (userPositions?.lenderTotals ?? []) as LenderUiSummary[]
-
-
-    const chains = useMemo(() => lenderTotals.map((l) => l.chain), [lenderTotals])
 
     const visibleLenders = lenderTotals
 
@@ -153,7 +149,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                 {totalApr != null && (
                     <div className="stat">
                         <div className="stat-title">Portfolio APR</div>
-                        <div className="stat-value text-lg">{(totalApr ).toFixed(2)}%</div>
+                        <div className="stat-value text-lg">{totalApr.toFixed(2)}%</div>
                     </div>
                 )}
             </div>
@@ -202,7 +198,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                                             </div>
                                         </td>
                                         <td>
-                                            <span className="text-xs font-semibold">{(lender.apr).toFixed(2)}%</span>
+                                            <span className="text-xs font-semibold">{lender.apr.toFixed(2)}%</span>
                                         </td>
                                         <td>
                                             {worstHealth != null ? (
