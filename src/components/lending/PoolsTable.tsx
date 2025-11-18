@@ -430,7 +430,7 @@ const ExposureCell: React.FC<{ exposures: any[] }> = ({ exposures }) => {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-1 max-w-[14rem]">
+      <div className="flex flex-wrap items-center gap-1 max-w-56">
         {inline.map((ex, i) => {
           const exSymbol = ex.asset?.symbol ?? ex.asset?.ticker ?? ""
           const symbolLabel = exSymbol || "UNKNOWN"
@@ -439,10 +439,10 @@ const ExposureCell: React.FC<{ exposures: any[] }> = ({ exposures }) => {
           return (
             <span
               key={`${symbolLabel}-${i}`}
-              className="badge badge-outline badge-sm text-xs max-w-[7rem] overflow-hidden"
+              className="badge badge-outline badge-sm text-xs max-w-28 overflow-hidden"
               title={`${symbolLabel} – Collateral factor: ${cfPct.toFixed(2)}%`}
             >
-              <span className="truncate max-w-[4rem] inline-block align-middle">
+              <span className="truncate max-w-16 inline-block align-middle">
                 {symbolLabel}
               </span>
               <span className="opacity-60 inline-block align-middle">
@@ -478,10 +478,10 @@ const ExposureCell: React.FC<{ exposures: any[] }> = ({ exposures }) => {
         createPortal(
           <>
             {/* backdrop to close on click */}
-            <div className="fixed inset-0 z-[90]" onClick={closePopover} />
+            <div className="fixed inset-0 z-90" onClick={closePopover} />
 
             <div
-              className="fixed z-[100] shadow bg-base-100 rounded-box p-2 max-w-xs max-h-60 overflow-auto"
+              className="fixed z-100 shadow bg-base-100 rounded-box p-2 max-w-xs max-h-60 overflow-auto"
               style={{
                 top: pos.top,
                 left: pos.left,
@@ -496,10 +496,10 @@ const ExposureCell: React.FC<{ exposures: any[] }> = ({ exposures }) => {
                   return (
                     <span
                       key={`${symbolLabel}-more-${i}`}
-                      className="badge badge-outline badge-sm text-xs max-w-[7rem] overflow-hidden"
+                      className="badge badge-outline badge-sm text-xs max-w-28 overflow-hidden"
                       title={`${symbolLabel} – Collateral factor: ${cfPct.toFixed(2)}%`}
                     >
-                      <span className="truncate max-w-[4rem] inline-block align-middle">
+                      <span className="truncate max-w-16 inline-block align-middle">
                         {symbolLabel}
                       </span>
                       <span className="opacity-60 inline-block align-middle">
