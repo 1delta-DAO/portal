@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react"
 import { getChainName, lenderDisplayName, lenderDisplayNameFull, RawCurrency } from "@1delta/lib-utils"
 import { useFlattenedPools } from "../../hooks/lending/usePoolData.js"
 import { createPortal } from "react-dom"
+import { getFormattedPrice } from "../../utils/price.js"
 
 type SortKey = "apr" | "utilitzation" | "totalLiquidityUSD" | "totalDepositsUSD"
 
@@ -340,9 +341,11 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({ chainId })
                                         </td>
                                         <td>
                                             <div className="flex flex-col text-xs">
-                                                {p.price != null && <span className="font-semibold">${p.price?.toFixed(4)}</span>}
+                                                {p.price != null && <span className="font-semibold">${getFormattedPrice(p.price)}</span>}
                                                 {p.histPrice != null && (
-                                                    <span className="text-base-content/60 whitespace-nowrap">24h: ${p.histPrice?.toFixed(4)}</span>
+                                                    <span className="text-base-content/60 whitespace-nowrap">
+                                                        24h: ${getFormattedPrice(p.histPrice)}
+                                                    </span>
                                                 )}
                                                 {p.price != null && p.histPrice != null && p.histPrice !== 0 && (
                                                     <span
@@ -406,114 +409,104 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({ chainId })
  * Badges are width-limited and truncated, with full info in native tooltips.
  */
 const ExposureCell: React.FC<{ exposures: any[] }> = ({ exposures }) => {
-  const maxInline = 2
-  const inline = exposures.slice(0, maxInline)
-  const remaining = exposures.slice(maxInline)
+    const maxInline = 2
+    const inline = exposures.slice(0, maxInline)
+    const remaining = exposures.slice(maxInline)
 
-  const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
-  const triggerRef = useRef<HTMLSpanElement | null>(null)
+    const [open, setOpen] = useState(false)
+    const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+    const triggerRef = useRef<HTMLSpanElement | null>(null)
 
-  const openPopover = () => {
-    if (!triggerRef.current) return
-    const rect = triggerRef.current.getBoundingClientRect()
-    setPos({
-      top: rect.bottom + 8, // a bit below
-      left: rect.right,     // right-aligned
-    })
-    setOpen(true)
-  }
+    const openPopover = () => {
+        if (!triggerRef.current) return
+        const rect = triggerRef.current.getBoundingClientRect()
+        setPos({
+            top: rect.bottom + 8, // a bit below
+            left: rect.right, // right-aligned
+        })
+        setOpen(true)
+    }
 
-  const closePopover = () => {
-    setOpen(false)
-  }
+    const closePopover = () => {
+        setOpen(false)
+    }
 
-  return (
-    <>
-      <div className="flex flex-wrap items-center gap-1 max-w-56">
-        {inline.map((ex, i) => {
-          const exSymbol = ex.asset?.symbol ?? ex.asset?.ticker ?? ""
-          const symbolLabel = exSymbol || "UNKNOWN"
-          const cfPct = (ex.collateralFactor * 100) || 0
+    return (
+        <>
+            <div className="flex flex-wrap items-center gap-1 max-w-56">
+                {inline.map((ex, i) => {
+                    const exSymbol = ex.asset?.symbol ?? ex.asset?.ticker ?? ""
+                    const symbolLabel = exSymbol || "UNKNOWN"
+                    const cfPct = ex.collateralFactor * 100 || 0
 
-          return (
-            <span
-              key={`${symbolLabel}-${i}`}
-              className="badge badge-outline badge-sm text-xs max-w-28 overflow-hidden"
-              title={`${symbolLabel} – Collateral factor: ${cfPct.toFixed(2)}%`}
-            >
-              <span className="truncate max-w-16 inline-block align-middle">
-                {symbolLabel}
-              </span>
-              <span className="opacity-60 inline-block align-middle">
-                {" "}
-                ({cfPct.toFixed(0)}%)
-              </span>
-            </span>
-          )
-        })}
-
-        {remaining.length > 0 && (
-          <span
-            ref={triggerRef}
-            tabIndex={0}
-            className="badge badge-ghost badge-sm cursor-pointer text-xs"
-            onClick={openPopover}
-            title={remaining
-              .map((ex: any) => {
-                const exSymbol = ex.asset?.symbol ?? ex.asset?.ticker ?? ""
-                const symbolLabel = exSymbol || "UNKNOWN"
-                const cfPct = (ex.collateralFactor * 100) || 0
-                return `${symbolLabel}: ${cfPct.toFixed(2)}%`
-              })
-              .join("\n")}
-          >
-            +{remaining.length} more
-          </span>
-        )}
-      </div>
-
-      {open &&
-        pos &&
-        createPortal(
-          <>
-            {/* backdrop to close on click */}
-            <div className="fixed inset-0 z-90" onClick={closePopover} />
-
-            <div
-              className="fixed z-100 shadow bg-base-100 rounded-box p-2 max-w-xs max-h-60 overflow-auto"
-              style={{
-                top: pos.top,
-                left: pos.left,
-              }}
-            >
-              <div className="flex flex-wrap gap-1">
-                {remaining.map((ex, i) => {
-                  const exSymbol = ex.asset?.symbol ?? ex.asset?.ticker ?? ""
-                  const symbolLabel = exSymbol || "UNKNOWN"
-                  const cfPct = (ex.collateralFactor * 100) || 0
-
-                  return (
-                    <span
-                      key={`${symbolLabel}-more-${i}`}
-                      className="badge badge-outline badge-sm text-xs max-w-28 overflow-hidden"
-                      title={`${symbolLabel} – Collateral factor: ${cfPct.toFixed(2)}%`}
-                    >
-                      <span className="truncate max-w-16 inline-block align-middle">
-                        {symbolLabel}
-                      </span>
-                      <span className="opacity-60 inline-block align-middle">
-                        {" "}
-                        ({cfPct.toFixed(0)}%)
-                      </span>
-                    </span>
-                  )
+                    return (
+                        <span
+                            key={`${symbolLabel}-${i}`}
+                            className="badge badge-outline badge-sm text-xs max-w-28 overflow-hidden"
+                            title={`${symbolLabel} – Collateral factor: ${cfPct.toFixed(2)}%`}
+                        >
+                            <span className="truncate max-w-16 inline-block align-middle">{symbolLabel}</span>
+                            <span className="opacity-60 inline-block align-middle"> ({cfPct.toFixed(0)}%)</span>
+                        </span>
+                    )
                 })}
-              </div>
+
+                {remaining.length > 0 && (
+                    <span
+                        ref={triggerRef}
+                        tabIndex={0}
+                        className="badge badge-ghost badge-sm cursor-pointer text-xs"
+                        onClick={openPopover}
+                        title={remaining
+                            .map((ex: any) => {
+                                const exSymbol = ex.asset?.symbol ?? ex.asset?.ticker ?? ""
+                                const symbolLabel = exSymbol || "UNKNOWN"
+                                const cfPct = ex.collateralFactor * 100 || 0
+                                return `${symbolLabel}: ${cfPct.toFixed(2)}%`
+                            })
+                            .join("\n")}
+                    >
+                        +{remaining.length} more
+                    </span>
+                )}
             </div>
-          </>,
-          document.body,
-        )}
-    </>
-  )
+
+            {open &&
+                pos &&
+                createPortal(
+                    <>
+                        {/* backdrop to close on click */}
+                        <div className="fixed inset-0 z-90" onClick={closePopover} />
+
+                        <div
+                            className="fixed z-100 shadow bg-base-100 rounded-box p-2 max-w-xs max-h-60 overflow-auto"
+                            style={{
+                                top: pos.top,
+                                left: pos.left,
+                            }}
+                        >
+                            <div className="flex flex-wrap gap-1">
+                                {remaining.map((ex, i) => {
+                                    const exSymbol = ex.asset?.symbol ?? ex.asset?.ticker ?? ""
+                                    const symbolLabel = exSymbol || "UNKNOWN"
+                                    const cfPct = ex.collateralFactor * 100 || 0
+
+                                    return (
+                                        <span
+                                            key={`${symbolLabel}-more-${i}`}
+                                            className="badge badge-outline badge-sm text-xs max-w-28 overflow-hidden"
+                                            title={`${symbolLabel} – Collateral factor: ${cfPct.toFixed(2)}%`}
+                                        >
+                                            <span className="truncate max-w-16 inline-block align-middle">{symbolLabel}</span>
+                                            <span className="opacity-60 inline-block align-middle"> ({cfPct.toFixed(0)}%)</span>
+                                        </span>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </>,
+                    document.body
+                )}
+        </>
+    )
 }
