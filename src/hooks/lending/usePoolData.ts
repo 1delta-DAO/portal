@@ -1,4 +1,3 @@
-import { getAvailableMarginChainIds } from "@1delta/lib-utils"
 import { LenderData, PoolWithMeta } from "@1delta/margin-fetcher"
 import { useQuery } from "@tanstack/react-query"
 

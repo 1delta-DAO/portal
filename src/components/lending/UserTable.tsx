@@ -1,11 +1,18 @@
 // src/components/UserLenderPositionsTable.tsx
 import React from "react"
 import { lenderDisplayName } from "@1delta/lib-utils"
-import { LenderUiSummary, MinimalPositionInfo, useMarginData } from "../../hooks/lending/useMarginData"
+import { LenderUiSummary, MinimalPositionInfo, UserPositions } from "../../hooks/lending/useMarginData"
+import { LenderData } from "@1delta/margin-fetcher"
 
 interface UserLenderPositionsTableProps {
     account?: string
     chainId: string
+    userPositions?: UserPositions
+    // account: string
+    lenderData?: LenderData
+    isLoading: boolean
+    error: any
+    refetch: () => void
 }
 
 function formatUsd(v: number) {
@@ -41,9 +48,7 @@ const PositionsList: React.FC<{
     )
 }
 
-export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> = ({ account, chainId }) => {
-    const { userPositions, isLoading, error, refetch } = useMarginData(chainId, account)
-
+export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> = ({ account, chainId, userPositions, isLoading, error, refetch }) => {
     const lenderTotals = (userPositions?.lenderTotals ?? []) as LenderUiSummary[]
 
     const visibleLenders = lenderTotals

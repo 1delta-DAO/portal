@@ -1,7 +1,7 @@
 import { getAvailableMarginChainIds, RawCurrency } from "@1delta/lib-utils"
 import { AprData } from "@1delta/lib-utils"
-import { convertLenderUserDataResult } from "@1delta/margin-fetcher"
-import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
+import { BasicReserveResponse, convertLenderUserDataResult } from "@1delta/margin-fetcher"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { fetchChainDataWithChunking } from "./utils"
@@ -26,6 +26,20 @@ export interface LenderUiSummary {
     assetsShort?: MinimalPositionInfo[]
     healthFactors?: number[]
     leverages?: number[]
+}
+
+export interface UserPositions {
+    userData:
+        | {
+              [chainId: string]: {
+                  [lender: string]: BasicReserveResponse
+              }
+          }
+        | undefined
+    lenderTotals: LenderUiSummary[]
+    total: number
+    total24h: number
+    apr?: number
 }
 
 /**
@@ -116,7 +130,7 @@ export function useMarginData(chainId: string, account?: string) {
     }, [mainData, prices, histPrices, lenderData, query])
 
     // 2️⃣ Convert raw -> enriched data when pricing or state changes
-    const userPositions = useMemo(() => {
+    const userPositions: UserPositions = useMemo(() => {
         let total = 0
         let total24h = 0
         let wApr = 0
