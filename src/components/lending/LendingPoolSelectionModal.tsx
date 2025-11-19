@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react"
 import { FixedSizeList, ListChildComponentProps } from "react-window"
 import { lenderDisplayName, type RawCurrency } from "@1delta/lib-utils"
 import { FlattenedPoolWithUserData } from "../../hooks/lending/prepareMixedData"
+import { ValuePill } from "./Pill"
 
 interface LendingPoolSelectionModalProps {
     open: boolean
@@ -37,7 +38,62 @@ interface LendingPoolRowData {
     onClose: () => void
 }
 
-const ROW_HEIGHT = 72 // px – tweak if needed
+// a bit taller to accommodate user position badges
+const ROW_HEIGHT = 96 // px – tweak if needed
+
+const renderUserPositionBadges = (p: FlattenedPoolWithUserData) => {
+    const userPositionsMap = (p.userPosition as Record<string, any> | undefined) ?? undefined
+
+    if (!userPositionsMap) return null
+
+    const entries = Object.entries(userPositionsMap).filter(([, pos]) => {
+        const dep = pos?.depositsUSD ?? 0
+        const debt = pos?.debtUSD ?? 0
+        const debtStable = pos?.debtStableUSD ?? 0
+        return dep > 0 || debt > 0 || debtStable > 0
+    })
+
+    if (entries.length === 0) return null
+
+    const singleZeroOnly = entries.length === 1 && entries[0][0] === "0"
+
+    return (
+        <div className="flex flex-wrap gap-1 mt-1">
+            {entries.map(([subId, pos]) => {
+                const dep = pos.depositsUSD ?? 0
+                const debtTotal = (pos.debtUSD ?? 0) + (pos.debtStableUSD ?? 0)
+
+                const label = singleZeroOnly && subId === "0" ? undefined : `Sub ${subId}`
+
+                return (
+                    <div key={subId} title={`Deposits: $${dep.toLocaleString()} | Debt: $${debtTotal.toLocaleString()}`}>
+                        {label && <span className="font-semibold uppercase truncate w-full">{label}</span>}
+                        {dep > 0 && (
+                            <ValuePill
+                                label="Dep"
+                                value={dep.toLocaleString(undefined, {
+                                    maximumFractionDigits: 2,
+                                })}
+                                prefix="$"
+                                tone="success"
+                            />
+                        )}
+                        {debtTotal > 0 && (
+                            <ValuePill
+                                label="Debt"
+                                value={debtTotal.toLocaleString(undefined, {
+                                    maximumFractionDigits: 2,
+                                })}
+                                prefix="$"
+                                tone="error"
+                            />
+                        )}
+                    </div>
+                )
+            })}
+        </div>
+    )
+}
 
 const LendingPoolRow: React.FC<ListChildComponentProps<LendingPoolRowData>> = ({ index, style, data }) => {
     const p = data.pools[index]
@@ -66,7 +122,7 @@ const LendingPoolRow: React.FC<ListChildComponentProps<LendingPoolRowData>> = ({
                     <span className="text-[11px] text-base-content/50 truncate">Pool: {p.poolId}</span>
                 </div>
 
-                {/* 25% – TVL + APR */}
+                {/* 25% – TVL + APR + user data */}
                 <div className="flex flex-col text-xs min-w-0 md:basis-1/4 md:max-w-[25%] md:items-end">
                     <span className="font-semibold truncate">
                         TVL $
@@ -75,6 +131,9 @@ const LendingPoolRow: React.FC<ListChildComponentProps<LendingPoolRowData>> = ({
                         })}
                     </span>
                     <span className="text-base-content/70 truncate">APR {apr.toFixed(2)}%</span>
+
+                    {/* user position badges (if any) */}
+                    {renderUserPositionBadges(p)}
                 </div>
             </div>
         </button>
@@ -126,7 +185,7 @@ const LendingPoolList: React.FC<LendingPoolListProps> = ({ pools, onSelect, onCl
                                     <span className="text-[11px] text-base-content/50 truncate">Pool: {p.poolId}</span>
                                 </div>
 
-                                {/* 25% – TVL + APR */}
+                                {/* 25% – TVL + APR + user data */}
                                 <div className="flex flex-col text-xs min-w-0 md:basis-1/4 md:max-w-[25%] md:items-end">
                                     <span className="font-semibold truncate">
                                         TVL $
@@ -135,6 +194,8 @@ const LendingPoolList: React.FC<LendingPoolListProps> = ({ pools, onSelect, onCl
                                         })}
                                     </span>
                                     <span className="text-base-content/70 truncate">APR {apr.toFixed(2)}%</span>
+
+                                    {renderUserPositionBadges(p)}
                                 </div>
                             </div>
                         </button>

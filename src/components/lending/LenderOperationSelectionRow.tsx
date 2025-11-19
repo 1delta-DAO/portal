@@ -4,6 +4,7 @@ import { lenderDisplayName, type RawCurrency } from "@1delta/lib-utils"
 import { useLenderSelection, type LenderOperationSelection, type LenderOperationKind } from "../../contexts/LenderSelectionContext"
 import { LendingPoolSelectionModal } from "./LendingPoolSelectionModal"
 import { FlattenedPoolWithUserData } from "../../hooks/lending/prepareMixedData"
+import { ValuePill } from "./Pill"
 
 interface LenderOperationSelectionRowProps {
     selection: LenderOperationSelection
@@ -41,6 +42,21 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
     const handleOperationChange = (op: LenderOperationKind) => {
         setSelectionOperation(selection.id, op)
     }
+
+    // --- user data projection ---
+    const userPositionsMap = (pool?.userPosition as Record<string, any> | undefined) ?? undefined
+
+    const userEntries =
+        userPositionsMap != null
+            ? Object.entries(userPositionsMap).filter(([, pos]) => {
+                  const dep = pos?.depositsUSD ?? 0
+                  const debt = pos?.debtUSD ?? 0
+                  const debtStable = pos?.debtStableUSD ?? 0
+                  return dep > 0 || debt > 0 || debtStable > 0
+              })
+            : []
+
+    const singleZeroOnly = userEntries.length === 1 && userEntries[0]?.[0] === "0"
 
     return (
         <>
@@ -111,10 +127,10 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                         </select>
                     </div>
 
-                    {/* 25% – Info */}
+                    {/* 25% – Info + user position */}
                     <div className="min-w-0">
                         {pool && (
-                            <div className="flex flex-col text-[11px] text-base-content/60">
+                            <div className="flex flex-col text-[11px] text-base-content/60 gap-1">
                                 <span className="truncate">
                                     TVL $
                                     {tvl.toLocaleString(undefined, {
@@ -122,6 +138,48 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                                     })}
                                 </span>
                                 <span className="truncate">APR {apr}%</span>
+
+                                {/* user position blocks */}
+                                {userEntries.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                        {userEntries.map(([subId, pos]) => {
+                                            const dep = pos.depositsUSD ?? 0
+                                            const debtTotal = (pos.debtUSD ?? 0) + (pos.debtStableUSD ?? 0)
+
+                                            const label = singleZeroOnly && subId === "0" ? undefined : `Sub ${subId}`
+
+                                            return (
+                                                <div
+                                                    key={subId}
+                                                    // className="badge badge-outline badge-sm px-2 py-2 flex flex-col items-start gap-0.5 text-[10px] leading-tight max-w-36"
+                                                    title={`Deposits: $${dep.toLocaleString()} | Debt: $${debtTotal.toLocaleString()}`}
+                                                >
+                                                    {label && <span className="font-semibold uppercase truncate w-full">{label}</span>}
+                                                    {dep > 0 && (
+                                                        <ValuePill
+                                                            label="Dep"
+                                                            value={dep.toLocaleString(undefined, {
+                                                                maximumFractionDigits: 2,
+                                                            })}
+                                                            prefix="$"
+                                                            tone="success"
+                                                        />
+                                                    )}
+                                                    {debtTotal > 0 && (
+                                                        <ValuePill
+                                                            label="Debt"
+                                                            value={debtTotal.toLocaleString(undefined, {
+                                                                maximumFractionDigits: 2,
+                                                            })}
+                                                            prefix="$"
+                                                            tone="error"
+                                                        />
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

@@ -32,7 +32,7 @@ export interface UserPositions {
     userData:
         | {
               [chainId: string]: {
-                  [lender: string]: BasicReserveResponse
+                  [lender: string]: { [account: string]: BasicReserveResponse }
               }
           }
         | undefined

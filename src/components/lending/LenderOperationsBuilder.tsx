@@ -7,7 +7,7 @@ import { LenderSelectionProvider, useLenderSelection } from "../../contexts/Lend
 import { LenderOperationSelectionRow } from "./LenderOperationSelectionRow"
 import { useMarginData, UserPositions } from "../../hooks/lending/useMarginData" // adjust path
 import { FlattenedPoolWithUserData, flattenLenderDataWithUser } from "../../hooks/lending/prepareMixedData"
-import { LenderData } from "@1delta/margin-fetcher"
+import { BaseLendingPosition, LenderData } from "@1delta/margin-fetcher"
 
 interface LenderOperationsBuilderProps {
     chainId: string
@@ -90,7 +90,12 @@ export const LenderOperationsBuilder: React.FC<LenderOperationsBuilderProps> = (
 
     // Flatten per-chain lender data and attach user positions
     const flattenedPools: FlattenedPoolWithUserData[] = useMemo(
-        () => flattenLenderDataWithUser(lenderData, userPositions, chainId),
+        () =>
+            flattenLenderDataWithUser(lenderData, userPositions, chainId).sort((a, b) => {
+                const aVal = getPrimaryExposureUSD(a)
+                const bVal = getPrimaryExposureUSD(b)
+                return bVal - aVal // largest first
+            }),
         [lenderData, userPositions, chainId]
     )
 
@@ -98,13 +103,13 @@ export const LenderOperationsBuilder: React.FC<LenderOperationsBuilderProps> = (
     const initialSelections = useMemo(
         () =>
             flattenedPools
-                .filter((p) => !!p.userPosition)
+                .filter((p) => !!p.userPosition && Object.values(p.userPosition ?? {}).length > 0)
                 .map((p) => ({
                     pool: p,
                     amount: "", // empty default amount – user fills it
                     operation: "deposit" as const, // sensible default, user can change
                 })),
-        [flattenedPools]
+        [flattenedPools, chainId]
     )
 
     return (
@@ -112,4 +117,21 @@ export const LenderOperationsBuilder: React.FC<LenderOperationsBuilderProps> = (
             <LenderOperationsBuilderInner flattenedPools={flattenedPools} />
         </LenderSelectionProvider>
     )
+}
+
+// helper: max(depositsUSD, totalBorrowUSD) from FIRST sub-account only
+function getPrimaryExposureUSD(pool: FlattenedPoolWithUserData): number {
+    const map = pool.userPosition as Record<string, BaseLendingPosition> | undefined
+    if (!map) return 0
+
+    const firstKey = Object.keys(map)[0]
+    if (!firstKey) return 0
+
+    const pos = map[firstKey]
+    if (!pos) return 0
+
+    const deposits = pos.depositsUSD ?? 0
+    const borrow = (pos.debtUSD ?? 0) + (pos.debtStableUSD ?? 0)
+
+    return Math.max(deposits, borrow)
 }

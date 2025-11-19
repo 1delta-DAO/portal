@@ -14,7 +14,7 @@ export interface FlattenedPoolWithUserData {
     asset: RawCurrency
     poolData: PoolData
     /** The user's position for this pool (if any) */
-    userPosition?: BaseLendingPosition
+    userPosition?: { [accountId: string]: BaseLendingPosition }
 }
 
 /**
@@ -41,30 +41,31 @@ export function flattenLenderDataWithUser(
 
     const userDataForChain:
         | {
-              [lender: string]: BasicReserveResponse
+              [lender: string]: { [a: string]: BasicReserveResponse }
           }
         | undefined = userPositions?.userData?.[chainId]
 
     // lenderData[chainId].data: { [lender: string]: { data: { [poolId]: PoolData } } }
     for (const [lender, lenderEntry] of Object.entries(chainEntry.data)) {
         const poolsMap = lenderEntry.data
-        const userForLender: BasicReserveResponse | undefined = userDataForChain?.[lender]
-
-        const lendingPositions = userForLender?.lendingPositions ?? {}
+        const userForLender: { [a: string]: BasicReserveResponse } | undefined = userDataForChain?.[lender]
 
         for (const [poolId, poolData] of Object.entries(poolsMap)) {
             // Find per-pool user position in BasicReserveResponse.lendingPositions
-            let userPosition: BaseLendingPosition | undefined
+            let userPosition: { [accountId: string]: BaseLendingPosition } = {}
 
-            // lendingPositions: { [subAccountId: string]: { [poolId: string]: BaseLendingPosition } }
-            for (const subAccountId of Object.keys(lendingPositions)) {
-                const byPool = lendingPositions[subAccountId]
-                const pos = byPool[poolId]
-                if (pos) {
-                    userPosition = pos
-                    break
+            // over accounts - expect only one here
+            Object.entries(userForLender ?? {}).forEach(([account, d]) => {
+                // lendingPositions: { [subAccountId: string]: { [poolId: string]: BaseLendingPosition } }
+                for (const subAccountId of Object.keys(d.lendingPositions)) {
+                    const byPool = d.lendingPositions[subAccountId]
+                    const pos = byPool[poolId]
+                    if (pos && (Number(pos.debt) !== 0 || Number(pos.deposits) !== 0)) {
+                        userPosition = { ...userPosition, [subAccountId]: pos }
+                        break
+                    }
                 }
-            }
+            })
 
             result.push({
                 chainId,

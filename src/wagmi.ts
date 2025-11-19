@@ -1,6 +1,5 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit"
-import { moonbeam } from "wagmi/chains"
-import { fallback, http } from "wagmi"
+import { http } from "wagmi"
 import { getAvailableChainIds, SupportedChainId } from "@1delta/lib-utils"
 import { getEvmChain } from "@1delta/providers"
 
@@ -28,23 +27,6 @@ export const config = getDefaultConfig({
     appName: "Allocator",
     projectId: "id",
     chains: evmChainWagmi as any,
-    transports: {
-        ...evmTransportsWagmi,
-        [moonbeam.id]: fallback(
-            [
-                http("https://moonbeam.unitedbloc.com"),
-                http("https://1rpc.io/glmr"),
-                http("https://moonbeam-rpc.dwellir.com"),
-                http("https://moonbeam-rpc.publicnode.com"),
-                http("https://moonbeam.drpc.org"),
-                http("https://endpoints.omniatech.io/v1/moonbeam/mainnet/public"),
-                http("https://rpc.api.moonbeam.network"),
-                http("https://rpc.poolz.finance/moonbeam"),
-                http("https://moonbeam.rpc.grove.city/v1/01fdb492"),
-                http("https://moonbeam.api.onfinality.io/public"),
-            ],
-            { rank: true, retryCount: 2 }
-        ),
-    },
+    transports: evmTransportsWagmi,
     ssr: false,
 })
