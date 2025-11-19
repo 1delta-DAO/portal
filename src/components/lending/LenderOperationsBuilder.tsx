@@ -53,7 +53,13 @@ const LenderOperationsBuilderInner: React.FC<{
             {selections.length === 0 && <div className="text-xs text-base-content/60">No operations yet. Use the button below to add one.</div>}
 
             {selections.map((sel) => (
-                <LenderOperationSelectionRow key={sel.id} selection={sel} pools={flattenedPools} simulated={stepsBySelectionId[sel.id]} />
+                <LenderOperationSelectionRow
+                    key={sel.id}
+                    selection={sel}
+                    pools={flattenedPools}
+                    simulated={stepsBySelectionId[sel.id]}
+                    price={prices?.[sel.pool?.asset.assetGroup ?? ""]}
+                />
             ))}
 
             {/* Add operation button */}

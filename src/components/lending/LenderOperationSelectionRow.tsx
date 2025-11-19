@@ -6,11 +6,13 @@ import { LendingPoolSelectionModal } from "./LendingPoolSelectionModal"
 import { FlattenedPoolWithUserData } from "../../hooks/lending/prepareMixedData"
 import { ValuePill } from "./Pill"
 import type { SimulatedActionState } from "../../contexts/Simulation/simulateLenderSelections"
+import { AmountUsdHint } from "./UsdAmount"
 
 interface LenderOperationSelectionRowProps {
     selection: LenderOperationSelection
     pools: FlattenedPoolWithUserData[]
     simulated?: SimulatedActionState
+    price?: number
 }
 
 const renderAssetCompact = (asset: RawCurrency) => {
@@ -31,7 +33,7 @@ const renderAssetCompact = (asset: RawCurrency) => {
     )
 }
 
-export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowProps> = ({ selection, pools, simulated }) => {
+export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowProps> = ({ selection, pools, simulated, price = 0 }) => {
     const { setSelectionPool, setSelectionAmount, setSelectionOperation, removeSelection } = useLenderSelection()
 
     const [modalOpen, setModalOpen] = useState(false)
@@ -66,6 +68,11 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
 
     const borrowCapacityAfter =
         simulated != null ? simulated.balanceAfter.borrowDiscountedCollateral - simulated.balanceAfter.adjustedDebt : undefined
+
+    const depositsAfter = simulated != null ? simulated.balanceAfter.deposits : undefined
+
+    const numberAm = Number(selection.amount) * price
+    const amountUsd = isNaN(numberAm) ? 0 : numberAm
 
     return (
         <>
@@ -104,19 +111,24 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                 </div>
 
                 {/* Amount + operation + info */}
-                <div className="grid gap-2 items-end grid-cols-1 md:grid-cols-[25%_25%_50%]">
+                <div className="grid gap-2 items-end grid-cols-1 md:grid-cols-[25%_10%_65%]">
                     {/* 25% – Amount */}
                     <div className="form-control min-w-0">
                         <label className="label py-0">
                             <span className="label-text text-xs">Amount</span>
                         </label>
-                        <input
-                            type="text"
-                            className="input input-bordered input-sm w-full"
-                            placeholder="0.0"
-                            value={selection.amount}
-                            onChange={(e) => setSelectionAmount(selection.id, e.target.value)}
-                        />
+
+                        <div className="relative">
+                            <input
+                                type="text"
+                                className="input input-bordered input-sm w-full text-right pr-20"
+                                placeholder="0.0"
+                                value={selection.amount}
+                                onChange={(e) => setSelectionAmount(selection.id, e.target.value)}
+                            />
+
+                            <AmountUsdHint amountUsd={amountUsd} />
+                        </div>
                     </div>
 
                     {/* 50% – Operation */}
@@ -140,14 +152,6 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                     <div className="min-w-0">
                         {pool && (
                             <div className="flex flex-col text-[11px] text-base-content/60 gap-1">
-                                <span className="truncate">
-                                    TVL $
-                                    {tvl.toLocaleString(undefined, {
-                                        maximumFractionDigits: 0,
-                                    })}
-                                </span>
-                                <span className="truncate">APR {apr}%</span>
-
                                 {/* user position blocks */}
                                 {userEntries.length > 0 && (
                                     <div className="flex flex-wrap gap-1 mt-1">
@@ -164,8 +168,11 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                                                     className="flex flex-col gap-0.5 max-w-36"
                                                 >
                                                     {label && <span className="font-semibold uppercase truncate w-full">{label}</span>}
+                                                    {(dep > 0 || debtTotal > 0) && (
+                                                        <span className="font-semibold uppercase truncate w-full">Position</span>
+                                                    )}
                                                     {dep > 0 && (
-                                                        <ValuePill label="Dep" value={dep} prefix="$" tone="success" maximumFractionDigits={0} />
+                                                        <ValuePill label="Deposits" value={dep} prefix="$" tone="success" maximumFractionDigits={0} />
                                                     )}
                                                     {debtTotal > 0 && (
                                                         <ValuePill label="Debt" value={debtTotal} prefix="$" tone="error" maximumFractionDigits={0} />
@@ -179,30 +186,33 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                                 {/* simulated balances summary */}
                                 {simulated && (
                                     <div className="mt-1 flex flex-col gap-0.5">
-                                        <span className="uppercase text-[10px] text-base-content/50">Simulated totals</span>
+                                        <span className="font-semibold uppercase truncate w-full">Simulated totals</span>
                                         <div className="flex flex-wrap gap-1">
                                             <ValuePill
                                                 label="NAV"
                                                 value={simulated.balanceAfter.nav}
                                                 prefix="$"
                                                 tone="neutral"
-                                                maximumFractionDigits={0}
+                                                maximumFractionDigits={1}
                                             />
                                             <ValuePill
                                                 label="Debt"
                                                 value={simulated.balanceAfter.debt}
                                                 prefix="$"
                                                 tone="error"
-                                                maximumFractionDigits={0}
+                                                maximumFractionDigits={1}
                                             />
                                             {borrowCapacityAfter !== undefined && (
                                                 <ValuePill
-                                                    label="Borrow cap"
+                                                    label="Borrow capacity"
                                                     value={borrowCapacityAfter}
                                                     prefix="$"
                                                     tone="info"
-                                                    maximumFractionDigits={0}
+                                                    maximumFractionDigits={1}
                                                 />
+                                            )}
+                                            {depositsAfter !== undefined && (
+                                                <ValuePill label="Deposits" value={depositsAfter} prefix="$" tone="info" maximumFractionDigits={1} />
                                             )}
                                         </div>
                                     </div>
