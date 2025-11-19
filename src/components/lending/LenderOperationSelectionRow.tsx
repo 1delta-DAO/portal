@@ -7,6 +7,10 @@ import { FlattenedPoolWithUserData } from "../../hooks/lending/prepareMixedData"
 import { ValuePill } from "./Pill"
 import type { SimulatedActionState } from "../../contexts/Simulation/simulateLenderSelections"
 import { AmountUsdHint } from "./UsdAmount"
+import { DepositAmountInput } from "./Actions/Deposit"
+import { WithdrawAmountInput } from "./Actions/Withdraw"
+import { RepayAmountInput } from "./Actions/Repay"
+import { BorrowAmountInput } from "./Actions/Borrow"
 
 interface LenderOperationSelectionRowProps {
     selection: LenderOperationSelection
@@ -112,23 +116,44 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
 
                 {/* Amount + operation + info */}
                 <div className="grid gap-2 items-end grid-cols-1 md:grid-cols-[25%_10%_65%]">
-                    {/* 25% – Amount */}
-                    <div className="form-control min-w-0">
-                        <label className="label py-0">
-                            <span className="label-text text-xs">Amount</span>
-                        </label>
-
-                        <div className="relative">
-                            <input
-                                type="text"
-                                className="input input-bordered input-sm w-full text-right pr-20"
-                                placeholder="0.0"
-                                value={selection.amount}
-                                onChange={(e) => setSelectionAmount(selection.id, e.target.value)}
+                    {/* 25% – Amount (action-specific) */}
+                    <div className="min-w-0">
+                        {selection.operation === "deposit" && (
+                            <DepositAmountInput
+                                selection={selection}
+                                pool={pool}
+                                price={price}
+                                simulated={simulated}
+                                onChangeAmount={(val) => setSelectionAmount(selection.id, val)}
                             />
-
-                            <AmountUsdHint amountUsd={amountUsd} />
-                        </div>
+                        )}
+                        {selection.operation === "withdraw" && (
+                            <WithdrawAmountInput
+                                selection={selection}
+                                pool={pool}
+                                price={price}
+                                simulated={simulated}
+                                onChangeAmount={(val) => setSelectionAmount(selection.id, val)}
+                            />
+                        )}
+                        {selection.operation === "repay" && (
+                            <RepayAmountInput
+                                selection={selection}
+                                pool={pool}
+                                price={price}
+                                simulated={simulated}
+                                onChangeAmount={(val) => setSelectionAmount(selection.id, val)}
+                            />
+                        )}
+                        {selection.operation === "borrow" && (
+                            <BorrowAmountInput
+                                selection={selection}
+                                pool={pool}
+                                price={price}
+                                simulated={simulated}
+                                onChangeAmount={(val) => setSelectionAmount(selection.id, val)}
+                            />
+                        )}
                     </div>
 
                     {/* 50% – Operation */}
@@ -192,9 +217,12 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                                                 label="NAV"
                                                 value={simulated.balanceAfter.nav}
                                                 prefix="$"
-                                                tone="neutral"
+                                                tone="primary"
                                                 maximumFractionDigits={1}
                                             />
+                                            {depositsAfter !== undefined && (
+                                                <ValuePill label="Deposits" value={depositsAfter} prefix="$" tone="success" maximumFractionDigits={1} />
+                                            )}
                                             <ValuePill
                                                 label="Debt"
                                                 value={simulated.balanceAfter.debt}
@@ -207,12 +235,9 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                                                     label="Borrow capacity"
                                                     value={borrowCapacityAfter}
                                                     prefix="$"
-                                                    tone="info"
+                                                    tone="warning"
                                                     maximumFractionDigits={1}
                                                 />
-                                            )}
-                                            {depositsAfter !== undefined && (
-                                                <ValuePill label="Deposits" value={depositsAfter} prefix="$" tone="info" maximumFractionDigits={1} />
                                             )}
                                         </div>
                                     </div>
