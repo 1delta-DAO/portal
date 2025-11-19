@@ -1,0 +1,160 @@
+// src/utils/simulateLenderSelections.ts
+import { BalanceData, PoolData, UserConfig } from "@1delta/margin-fetcher"
+import { type LenderOperationSelection, type LenderOperationKind } from "../LenderSelectionContext"
+import { FlattenedPoolWithUserData, PositionTotals, UserConfigs } from "../../hooks/lending/prepareMixedData"
+
+export interface SimulatedActionState {
+    selectionId: string
+    lender: string
+    subAccount: string
+    poolId: string
+    operation: LenderOperationKind
+    amount: string
+    amountUsd: number
+    balanceBefore: BalanceData
+    balanceAfter: BalanceData
+}
+
+export interface SimulationResult {
+    steps: SimulatedActionState[]
+    finalByLender: {
+        [lender: string]: {
+            [subAccount: string]: BalanceData
+        }
+    }
+}
+
+export type AmountUsdResolver = (selection: LenderOperationSelection, pool: FlattenedPoolWithUserData) => number
+
+export type AdjustForActionFn = (
+    balanceIn: BalanceData,
+    pool: PoolData,
+    amountUsd: number,
+    action: LenderOperationKind,
+    userConfig: UserConfig
+) => BalanceData
+
+// helper: empty balance (if lender/subAccount not present in PositionTotals)
+function createEmptyBalanceData(): BalanceData {
+    return {
+        rewards: undefined,
+        borrowDiscountedCollateral: 0,
+        borrowDiscountedCollateralAllActive: 0,
+        collateral: 0,
+        collateralAllActive: 0,
+        deposits: 0,
+        debt: 0,
+        adjustedDebt: 0,
+        nav: 0,
+        deposits24h: 0,
+        debt24h: 0,
+        nav24h: 0,
+    }
+}
+
+/**
+ * Simulate a sequence of lender operations, threaded through BalanceData
+ * per lender and subAccount.
+ *
+ * - Uses positionTotals as the starting state
+ * - Applies selections in order
+ * - Only operations on the same lender share & mutate the same BalanceData
+ * - Returns per-step before/after and final balances per lender/subAccount
+ *
+ * NOTE: For now we assume all actions target subAccount "0".
+ *       Later you can add a subAccount field to selection if needed.
+ */
+export function simulateLenderSelections(
+    selections: LenderOperationSelection[],
+    positionTotals: PositionTotals,
+    userConfigs: UserConfigs,
+    adjustForAction: AdjustForActionFn,
+    resolveAmountUsd: AmountUsdResolver,
+    opts?: {
+        /** Which subAccount do these operations target? Default "0". */
+        defaultSubAccount?: string
+    }
+): SimulationResult {
+    const defaultSubAccount = opts?.defaultSubAccount ?? "0"
+
+    // mutable running state while we simulate
+    const runningBalances: SimulationResult["finalByLender"] = {}
+
+    // initialize runningBalances from positionTotals
+    for (const [lender, subMap] of Object.entries(positionTotals)) {
+        if (!runningBalances[lender]) runningBalances[lender] = {}
+        for (const [subId, { balanceData }] of Object.entries(subMap)) {
+            runningBalances[lender][subId] = { ...balanceData }
+        }
+    }
+
+    const steps: SimulatedActionState[] = []
+
+    for (const sel of selections) {
+        const pool = sel.pool
+        if (!pool) {
+            // skip selections without a chosen pool
+            continue
+        }
+
+        const lender = pool.lender
+        const subAccount = defaultSubAccount
+
+        // ensure lender/subAccount entry exists
+        if (!runningBalances[lender]) {
+            runningBalances[lender] = {}
+        }
+        if (!runningBalances[lender][subAccount]) {
+            runningBalances[lender][subAccount] = createEmptyBalanceData()
+        }
+
+        const balanceBefore = runningBalances[lender][subAccount]
+        const amountUsd = resolveAmountUsd(sel, pool)
+
+        // no-op if amount resolves to NaN or <= 0
+        if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
+            steps.push({
+                selectionId: sel.id,
+                lender,
+                subAccount,
+                poolId: pool.poolId,
+                operation: sel.operation,
+                amount: sel.amount,
+                amountUsd: 0,
+                balanceBefore,
+                balanceAfter: balanceBefore,
+            })
+            continue
+        }
+
+        // apply your black-box adjustor
+        const balanceAfter = adjustForAction(
+            balanceBefore,
+            pool.poolData as PoolData,
+            amountUsd,
+            sel.operation,
+            userConfigs[lender]?.[subAccount] ?? { selectedMode: 0, id: "0" }
+        )
+
+        // store new running balance
+        runningBalances[lender][subAccount] = balanceAfter
+
+        // push step record
+        steps.push({
+            selectionId: sel.id,
+            lender,
+            subAccount,
+            poolId: pool.poolId,
+            operation: sel.operation,
+            amount: sel.amount,
+            amountUsd,
+            balanceBefore,
+            balanceAfter,
+        })
+    }
+
+    return {
+        steps,
+        finalByLender: runningBalances,
+    }
+}

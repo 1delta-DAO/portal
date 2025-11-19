@@ -2,31 +2,50 @@
 import React, { useMemo } from "react"
 import type { Chain } from "viem" // if you use it, otherwise remove
 import { LenderSelectionProvider, useLenderSelection } from "../../contexts/LenderSelectionContext"
-// import type { FlattenedPoolWithUserData } from "../../utils/flattenLenderDataWithUser"
-// import { flattenLenderDataWithUser } from "../../utils/flattenLenderDataWithUser"
 import { LenderOperationSelectionRow } from "./LenderOperationSelectionRow"
-import { useMarginData, UserPositions } from "../../hooks/lending/useMarginData" // adjust path
-import { FlattenedPoolWithUserData, flattenLenderDataWithUser } from "../../hooks/lending/prepareMixedData"
+import type { UserPositions } from "../../hooks/lending/useMarginData" // type-only
+import { FlattenedPoolWithUserData, flattenLenderDataWithUser, type PositionTotals, type UserConfigs } from "../../hooks/lending/prepareMixedData"
 import { BaseLendingPosition, LenderData } from "@1delta/margin-fetcher"
+import { useSimulatedLenderSelections } from "../../hooks/lending/useSimulatedLenderSelections"
+import type { SimulatedActionState } from "../../contexts/Simulation/simulateLenderSelections"
 
 interface LenderOperationsBuilderProps {
     chainId: string
     userPositions?: UserPositions
-    // account: string
     lenderData?: LenderData
     isLoading: boolean
     error: any
     refetch: () => void
+    prices?: { [k: string]: number }
 }
 
 /**
  * Inner content that assumes LenderSelectionProvider is already mounted.
- * Gets flattened pool data from props and renders the dynamic rows.
+ * Gets flattened pool data + simulation info from props and renders the rows.
  */
 const LenderOperationsBuilderInner: React.FC<{
     flattenedPools: FlattenedPoolWithUserData[]
-}> = ({ flattenedPools }) => {
+    positionTotals: PositionTotals
+    userConfigs: UserConfigs
+    prices?: { [k: string]: number }
+}> = ({ flattenedPools, positionTotals, userConfigs, prices }) => {
     const { selections, addSelection } = useLenderSelection()
+
+    // Run the simulation based on current selections
+    const { steps } = useSimulatedLenderSelections(
+        positionTotals,
+        userConfigs,
+        "0", // default subaccount
+        prices
+    )
+
+    const stepsBySelectionId = useMemo(() => {
+        const map: Record<string, SimulatedActionState> = {}
+        for (const s of steps) {
+            map[s.selectionId] = s
+        }
+        return map
+    }, [steps])
 
     return (
         <div className="space-y-3">
@@ -34,13 +53,20 @@ const LenderOperationsBuilderInner: React.FC<{
             {selections.length === 0 && <div className="text-xs text-base-content/60">No operations yet. Use the button below to add one.</div>}
 
             {selections.map((sel) => (
-                <LenderOperationSelectionRow key={sel.id} selection={sel} pools={flattenedPools} />
+                <LenderOperationSelectionRow key={sel.id} selection={sel} pools={flattenedPools} simulated={stepsBySelectionId[sel.id]} />
             ))}
 
             {/* Add operation button */}
-            <div className="pt-2">
+            <div className="pt-2 flex gap-2">
                 <button type="button" className="btn btn-outline btn-sm" onClick={() => addSelection()}>
                     + Add operation
+                </button>
+            </div>
+
+            {/* Execute button – hook your tx logic here later */}
+            <div className="pt-2">
+                <button type="button" className="btn btn-primary btn-sm">
+                    Execute
                 </button>
             </div>
         </div>
@@ -49,22 +75,19 @@ const LenderOperationsBuilderInner: React.FC<{
 
 /**
  * High-level component:
- *  - Depends only on chainId & account
- *  - Uses useMarginData to fetch user + public data
+ *  - Depends only on chainId & externally provided userPositions/lenderData
  *  - Flattens and wires into LenderSelectionProvider
  *  - By default shows one selection per pool where the user has a position
  */
 export const LenderOperationsBuilder: React.FC<LenderOperationsBuilderProps> = ({
     chainId,
-    // account,
+    prices,
     userPositions,
     lenderData,
     isLoading,
     error,
     refetch,
 }) => {
-    // const { userPositions, lenderData, isLoading, error, refetch } = useMarginData(chainId, account)
-
     // If still loading basic data
     if (isLoading) {
         return (
@@ -88,16 +111,20 @@ export const LenderOperationsBuilder: React.FC<LenderOperationsBuilderProps> = (
         )
     }
 
-    // Flatten per-chain lender data and attach user positions
-    const flattenedPools: FlattenedPoolWithUserData[] = useMemo(
-        () =>
-            flattenLenderDataWithUser(lenderData, userPositions, chainId).sort((a, b) => {
+    // Flatten per-chain lender data and attach user positions + configs
+    const { flattenedPools, positionTotals, userConfigs } = useMemo(() => {
+        const { result, positionTotals, userConfigs } = flattenLenderDataWithUser(lenderData, userPositions, chainId)
+
+        return {
+            flattenedPools: result.sort((a, b) => {
                 const aVal = getPrimaryExposureUSD(a)
                 const bVal = getPrimaryExposureUSD(b)
                 return bVal - aVal // largest first
             }),
-        [lenderData, userPositions, chainId]
-    )
+            positionTotals,
+            userConfigs,
+        }
+    }, [lenderData, userPositions, chainId])
 
     // Default selections: all pools where user has any position
     const initialSelections = useMemo(
@@ -109,19 +136,19 @@ export const LenderOperationsBuilder: React.FC<LenderOperationsBuilderProps> = (
                     amount: "", // empty default amount – user fills it
                     operation: "deposit" as const, // sensible default, user can change
                 })),
-        [flattenedPools, chainId]
+        [flattenedPools, chainId, isLoading]
     )
 
     return (
         <LenderSelectionProvider initialSelections={initialSelections}>
-            <LenderOperationsBuilderInner flattenedPools={flattenedPools} />
+            <LenderOperationsBuilderInner prices={prices} flattenedPools={flattenedPools} positionTotals={positionTotals} userConfigs={userConfigs} />
         </LenderSelectionProvider>
     )
 }
 
 // helper: max(depositsUSD, totalBorrowUSD) from FIRST sub-account only
 function getPrimaryExposureUSD(pool: FlattenedPoolWithUserData): number {
-    const map = pool.userPosition as Record<string, BaseLendingPosition> | undefined
+    const map = (pool.userPosition as Record<string, BaseLendingPosition> | undefined) ?? undefined
     if (!map) return 0
 
     const firstKey = Object.keys(map)[0]

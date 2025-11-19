@@ -277,6 +277,7 @@ export function useMarginData(chainId: string, account?: string) {
 
     return {
         lenderData,
+        prices,
         userPositions,
         isLoading,
         error,

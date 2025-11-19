@@ -5,10 +5,12 @@ import { useLenderSelection, type LenderOperationSelection, type LenderOperation
 import { LendingPoolSelectionModal } from "./LendingPoolSelectionModal"
 import { FlattenedPoolWithUserData } from "../../hooks/lending/prepareMixedData"
 import { ValuePill } from "./Pill"
+import type { SimulatedActionState } from "../../contexts/Simulation/simulateLenderSelections"
 
 interface LenderOperationSelectionRowProps {
     selection: LenderOperationSelection
     pools: FlattenedPoolWithUserData[]
+    simulated?: SimulatedActionState
 }
 
 const renderAssetCompact = (asset: RawCurrency) => {
@@ -29,7 +31,7 @@ const renderAssetCompact = (asset: RawCurrency) => {
     )
 }
 
-export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowProps> = ({ selection, pools }) => {
+export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowProps> = ({ selection, pools, simulated }) => {
     const { setSelectionPool, setSelectionAmount, setSelectionOperation, removeSelection } = useLenderSelection()
 
     const [modalOpen, setModalOpen] = useState(false)
@@ -57,6 +59,13 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
             : []
 
     const singleZeroOnly = userEntries.length === 1 && userEntries[0]?.[0] === "0"
+
+    // --- simulated totals for this row ---
+    const borrowCapacityBefore =
+        simulated != null ? simulated.balanceBefore.borrowDiscountedCollateral - simulated.balanceBefore.adjustedDebt : undefined
+
+    const borrowCapacityAfter =
+        simulated != null ? simulated.balanceAfter.borrowDiscountedCollateral - simulated.balanceAfter.adjustedDebt : undefined
 
     return (
         <>
@@ -95,7 +104,7 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                 </div>
 
                 {/* Amount + operation + info */}
-                <div className="grid gap-2 items-end grid-cols-1 md:grid-cols-[25%_50%_25%]">
+                <div className="grid gap-2 items-end grid-cols-1 md:grid-cols-[25%_25%_50%]">
                     {/* 25% – Amount */}
                     <div className="form-control min-w-0">
                         <label className="label py-0">
@@ -127,7 +136,7 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                         </select>
                     </div>
 
-                    {/* 25% – Info + user position */}
+                    {/* 25% – Info + user position + simulated totals */}
                     <div className="min-w-0">
                         {pool && (
                             <div className="flex flex-col text-[11px] text-base-content/60 gap-1">
@@ -151,33 +160,51 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                                             return (
                                                 <div
                                                     key={subId}
-                                                    // className="badge badge-outline badge-sm px-2 py-2 flex flex-col items-start gap-0.5 text-[10px] leading-tight max-w-36"
                                                     title={`Deposits: $${dep.toLocaleString()} | Debt: $${debtTotal.toLocaleString()}`}
+                                                    className="flex flex-col gap-0.5 max-w-36"
                                                 >
                                                     {label && <span className="font-semibold uppercase truncate w-full">{label}</span>}
                                                     {dep > 0 && (
-                                                        <ValuePill
-                                                            label="Dep"
-                                                            value={dep.toLocaleString(undefined, {
-                                                                maximumFractionDigits: 2,
-                                                            })}
-                                                            prefix="$"
-                                                            tone="success"
-                                                        />
+                                                        <ValuePill label="Dep" value={dep} prefix="$" tone="success" maximumFractionDigits={0} />
                                                     )}
                                                     {debtTotal > 0 && (
-                                                        <ValuePill
-                                                            label="Debt"
-                                                            value={debtTotal.toLocaleString(undefined, {
-                                                                maximumFractionDigits: 2,
-                                                            })}
-                                                            prefix="$"
-                                                            tone="error"
-                                                        />
+                                                        <ValuePill label="Debt" value={debtTotal} prefix="$" tone="error" maximumFractionDigits={0} />
                                                     )}
                                                 </div>
                                             )
                                         })}
+                                    </div>
+                                )}
+
+                                {/* simulated balances summary */}
+                                {simulated && (
+                                    <div className="mt-1 flex flex-col gap-0.5">
+                                        <span className="uppercase text-[10px] text-base-content/50">Simulated totals</span>
+                                        <div className="flex flex-wrap gap-1">
+                                            <ValuePill
+                                                label="NAV"
+                                                value={simulated.balanceAfter.nav}
+                                                prefix="$"
+                                                tone="neutral"
+                                                maximumFractionDigits={0}
+                                            />
+                                            <ValuePill
+                                                label="Debt"
+                                                value={simulated.balanceAfter.debt}
+                                                prefix="$"
+                                                tone="error"
+                                                maximumFractionDigits={0}
+                                            />
+                                            {borrowCapacityAfter !== undefined && (
+                                                <ValuePill
+                                                    label="Borrow cap"
+                                                    value={borrowCapacityAfter}
+                                                    prefix="$"
+                                                    tone="info"
+                                                    maximumFractionDigits={0}
+                                                />
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>

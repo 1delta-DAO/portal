@@ -25,7 +25,7 @@ export function LenderTab() {
 
     const effectiveChainId = selectedChain
 
-    const { userPositions, lenderData, isLoading, error, refetch } = useMarginData(effectiveChainId, account)
+    const { userPositions, lenderData, isLoading, error, refetch, prices } = useMarginData(effectiveChainId, account)
 
     return (
         <div className="space-y-4">
@@ -77,6 +77,7 @@ export function LenderTab() {
 
             {activeTab === "operations" && (
                 <LenderOperationsBuilder
+                    prices={prices}
                     chainId={effectiveChainId}
                     userPositions={userPositions}
                     lenderData={lenderData}
