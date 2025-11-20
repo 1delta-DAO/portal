@@ -10,6 +10,7 @@ import { DepositAmountInput } from "./Actions/Deposit"
 import { WithdrawAmountInput } from "./Actions/Withdraw"
 import { RepayAmountInput } from "./Actions/Repay"
 import { BorrowAmountInput } from "./Actions/Borrow"
+import { OperationSelect } from "./OperationSelect"
 
 interface LenderOperationSelectionRowProps {
     selection: LenderOperationSelection
@@ -47,7 +48,6 @@ const renderAssetMini = (asset: RawCurrency) => {
                     {asset.logoURI && <img src={asset.logoURI} alt={symbol} width={16} height={16} />}
                 </div>
             </div>
-            {symbol && <span className="text-[11px] font-medium truncate">{symbol}</span>}
         </div>
     )
 }
@@ -174,21 +174,8 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                     </div>
 
                     {/* 10% – Operation */}
-                    <div className="form-control min-w-0">
-                        <label className="label py-0">
-                            <span className="label-text text-xs">Operation</span>
-                        </label>
-                        <select
-                            className="select select-bordered select-sm w-full"
-                            value={selection.operation}
-                            onChange={(e) => handleOperationChange(e.target.value as any)}
-                        >
-                            <option value="deposit">Deposit</option>
-                            <option value="withdraw">Withdraw</option>
-                            <option value="borrow">Borrow</option>
-                            <option value="repay">Repay</option>
-                        </select>
-                    </div>
+
+                    <OperationSelect value={selection.operation} onChange={(op) => handleOperationChange(op)} />
 
                     {/* 65% – Info + user position + simulated totals + per-asset balance */}
                     <div className="min-w-0">
@@ -268,23 +255,26 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
 
                                 {/* per-step asset running balance (token + USD) */}
                                 {asset && assetBalanceAfter && (
-                                    <div className="mt-2 flex items-center gap-2 p-1 rounded-md bg-base-200/60">
-                                        {renderAssetMini(asset)}
-                                        <div className="flex flex-col min-w-0">
-                                            <span className="text-[11px] font-semibold truncate">
-                                                {assetBalanceAfter.amount.toLocaleString(undefined, {
-                                                    maximumFractionDigits: 6,
-                                                })}{" "}
-                                                {(asset.symbol ?? (asset as any)?.ticker ?? "") as string}
-                                            </span>
-                                            <span className="text-[10px] text-base-content/70 truncate">
-                                                ≈{" "}
-                                                {assetBalanceAfter.amountUsd.toLocaleString(undefined, {
-                                                    style: "currency",
-                                                    currency: "USD",
-                                                    maximumFractionDigits: 2,
-                                                })}
-                                            </span>
+                                    <div className="mt-1 flex flex-col gap-0.5">
+                                        <span className="font-semibold uppercase truncate">Running Balance</span>
+                                        <div className="flex items-center gap-2 p-1 ">
+                                            {renderAssetMini(asset)}
+                                            <div className="flex flex-row min-w-0">
+                                                <span className="text-[11px] font-semibold truncate">
+                                                    {assetBalanceAfter.amount.toLocaleString(undefined, {
+                                                        maximumFractionDigits: 6,
+                                                    })}{" "}
+                                                    {(asset.symbol ?? (asset as any)?.ticker ?? "") as string}
+                                                </span>
+                                                <span className="text-[10px] text-base-content/70 truncate">
+                                                    ≈{" "}
+                                                    {assetBalanceAfter.amountUsd.toLocaleString(undefined, {
+                                                        style: "currency",
+                                                        currency: "USD",
+                                                        maximumFractionDigits: 2,
+                                                    })}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 )}

@@ -23,12 +23,7 @@ export const parseAmount = (v: string): number => {
 /** make a nice token string for "max" buttons: 6 decimals, no trailing zeros */
 export const formatTokenForInput = (v: number): string => {
     if (!Number.isFinite(v)) return ""
-    return v
-        .toLocaleString("en-US", {
-            maximumFractionDigits: 6,
-            useGrouping: false,
-        })
-        .replace(/\.?0+$/, "")
+    return v.toString()
 }
 
 /** aggregate user token stats (sum deposits, debt+debtStable across all sub-accounts) */

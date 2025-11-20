@@ -8,6 +8,7 @@ import { FlattenedPoolWithUserData, flattenLenderDataWithUser, type PositionTota
 import { BaseLendingPosition, LenderData } from "@1delta/margin-fetcher"
 import { useSimulatedLenderSelections } from "../../hooks/lending/useSimulatedLenderSelections"
 import type { SimulatedActionState } from "../../contexts/Simulation/simulateLenderSelections"
+import { RunningBalancesOverview } from "./RunningBlanacesOverview"
 
 interface LenderOperationsBuilderProps {
     chainId: string
@@ -32,7 +33,7 @@ const LenderOperationsBuilderInner: React.FC<{
     const { selections, addSelection } = useLenderSelection()
 
     // Run the simulation based on current selections
-    const { steps } = useSimulatedLenderSelections(
+    const { steps, finalAssetBalances } = useSimulatedLenderSelections(
         positionTotals,
         userConfigs,
         "0", // default subaccount
@@ -68,6 +69,8 @@ const LenderOperationsBuilderInner: React.FC<{
                     + Add operation
                 </button>
             </div>
+
+            <RunningBalancesOverview items={Object.values(finalAssetBalances)} />
 
             {/* Execute button – hook your tx logic here later */}
             <div className="pt-2">

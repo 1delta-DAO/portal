@@ -2,8 +2,10 @@
 import { BalanceData, PoolData, UserConfig } from "@1delta/margin-fetcher"
 import { type LenderOperationSelection, type LenderOperationKind } from "../LenderSelectionContext"
 import { FlattenedPoolWithUserData, PositionTotals, UserConfigs } from "../../hooks/lending/prepareMixedData"
+import { RawCurrency } from "@1delta/lib-utils"
 
 export interface AssetBalanceSnapshot {
+    asset: RawCurrency
     /** Running raw token balance for this asset at this point in the sequence */
     amount: number
     /** Running USD value of that balance (signed, same direction as amount) */
@@ -152,7 +154,14 @@ export function simulateLenderSelections(
         const assetKey = chainId != null && address ? `${chainId}:${address}` : undefined
 
         // read current asset balance before this step
-        const assetBefore = assetKey && runningAssetBalances[assetKey] ? runningAssetBalances[assetKey] : { amount: 0, amountUsd: 0 }
+        const assetBefore =
+            assetKey && runningAssetBalances[assetKey]
+                ? runningAssetBalances[assetKey]
+                : {
+                      asset: pool.asset,
+                      amount: 0,
+                      amountUsd: 0,
+                  }
 
         // no-op if amount resolves to NaN or <= 0
         if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
@@ -201,6 +210,7 @@ export function simulateLenderSelections(
         }
 
         const assetAfter: AssetBalanceSnapshot = {
+            asset: pool?.asset!,
             amount: assetBefore.amount + tokenDelta,
             amountUsd: assetBefore.amountUsd + usdDelta,
         }
