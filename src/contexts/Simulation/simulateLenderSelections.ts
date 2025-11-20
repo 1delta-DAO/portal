@@ -3,6 +3,13 @@ import { BalanceData, PoolData, UserConfig } from "@1delta/margin-fetcher"
 import { type LenderOperationSelection, type LenderOperationKind } from "../LenderSelectionContext"
 import { FlattenedPoolWithUserData, PositionTotals, UserConfigs } from "../../hooks/lending/prepareMixedData"
 
+export interface AssetBalanceSnapshot {
+    /** Running raw token balance for this asset at this point in the sequence */
+    amount: number
+    /** Running USD value of that balance (signed, same direction as amount) */
+    amountUsd: number
+}
+
 export interface SimulatedActionState {
     selectionId: string
     lender: string
@@ -13,6 +20,13 @@ export interface SimulatedActionState {
     amountUsd: number
     balanceBefore: BalanceData
     balanceAfter: BalanceData
+
+    /** Optional asset identifier for this step (chainId:address) */
+    assetKey?: string
+    /** Running single-asset balance before this step (if assetKey present) */
+    assetBalanceBefore?: AssetBalanceSnapshot
+    /** Running single-asset balance after this step (if assetKey present) */
+    assetBalanceAfter?: AssetBalanceSnapshot
 }
 
 export interface SimulationResult {
@@ -21,6 +35,13 @@ export interface SimulationResult {
         [lender: string]: {
             [subAccount: string]: BalanceData
         }
+    }
+    /**
+     * Final running balances per asset across the whole sequence.
+     * Keyed as `${chainId}:${address.toLowerCase()}`.
+     */
+    finalAssetBalances: {
+        [assetKey: string]: AssetBalanceSnapshot
     }
 }
 
@@ -52,14 +73,23 @@ function createEmptyBalanceData(): BalanceData {
     }
 }
 
+/** parse token amount string like "1.23" or "1,23" into a number */
+function parseTokenAmount(raw: string): number {
+    if (!raw) return 0
+    const normalized = raw.replace(/,/g, "")
+    const n = parseFloat(normalized)
+    return Number.isFinite(n) ? n : 0
+}
+
 /**
  * Simulate a sequence of lender operations, threaded through BalanceData
- * per lender and subAccount.
+ * per lender and subAccount, and track running single-asset balances.
  *
  * - Uses positionTotals as the starting state
  * - Applies selections in order
  * - Only operations on the same lender share & mutate the same BalanceData
- * - Returns per-step before/after and final balances per lender/subAccount
+ * - Tracks running balances per asset: `${chainId}:${address}`
+ * - Returns per-step before/after and final balances
  *
  * NOTE: For now we assume all actions target subAccount "0".
  *       Later you can add a subAccount field to selection if needed.
@@ -77,7 +107,7 @@ export function simulateLenderSelections(
 ): SimulationResult {
     const defaultSubAccount = opts?.defaultSubAccount ?? "0"
 
-    // mutable running state while we simulate
+    // mutable running lender balances while we simulate
     const runningBalances: SimulationResult["finalByLender"] = {}
 
     // initialize runningBalances from positionTotals
@@ -87,6 +117,9 @@ export function simulateLenderSelections(
             runningBalances[lender][subId] = { ...balanceData }
         }
     }
+
+    // mutable running per-asset balances (raw & USD)
+    const runningAssetBalances: SimulationResult["finalAssetBalances"] = {}
 
     const steps: SimulatedActionState[] = []
 
@@ -111,6 +144,16 @@ export function simulateLenderSelections(
         const balanceBefore = runningBalances[lender][subAccount]
         const amountUsd = resolveAmountUsd(sel, pool)
 
+        // determine asset identity (chainId + address) if possible
+        const asset = pool.asset as any
+        const chainId = asset?.chainId ?? pool.chainId
+        const addressRaw = asset?.address ?? asset?.addr
+        const address = typeof addressRaw === "string" ? addressRaw.toLowerCase() : undefined
+        const assetKey = chainId != null && address ? `${chainId}:${address}` : undefined
+
+        // read current asset balance before this step
+        const assetBefore = assetKey && runningAssetBalances[assetKey] ? runningAssetBalances[assetKey] : { amount: 0, amountUsd: 0 }
+
         // no-op if amount resolves to NaN or <= 0
         if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
             steps.push({
@@ -123,17 +166,59 @@ export function simulateLenderSelections(
                 amountUsd: 0,
                 balanceBefore,
                 balanceAfter: balanceBefore,
+                assetKey,
+                assetBalanceBefore: assetKey ? assetBefore : undefined,
+                assetBalanceAfter: assetKey ? assetBefore : undefined,
             })
             continue
         }
 
-        // apply your black-box adjustor
+        // --- per-asset running balance update ---
+        const tokenAmount = parseTokenAmount(sel.amount)
+
+        // direction:
+        // - deposits & repays DECREASE the user's external balance of that asset
+        // - borrows & withdrawals INCREASE it
+        let tokenDelta = 0
+        let usdDelta = 0
+
+        if (tokenAmount > 0) {
+            switch (sel.operation) {
+                case "deposit":
+                case "repay":
+                    tokenDelta = -tokenAmount
+                    usdDelta = -amountUsd
+                    break
+                case "borrow":
+                case "withdraw":
+                    tokenDelta = tokenAmount
+                    usdDelta = amountUsd
+                    break
+                default:
+                    tokenDelta = 0
+                    usdDelta = 0
+            }
+        }
+
+        const assetAfter: AssetBalanceSnapshot = {
+            amount: assetBefore.amount + tokenDelta,
+            amountUsd: assetBefore.amountUsd + usdDelta,
+        }
+
+        if (assetKey) {
+            runningAssetBalances[assetKey] = assetAfter
+        }
+
+        // --- lender/subAccount balance update via adjustor ---
         const balanceAfter = adjustForAction(
             balanceBefore,
             pool.poolData as PoolData,
             amountUsd,
             sel.operation,
-            userConfigs[lender]?.[subAccount] ?? { selectedMode: 0, id: "0" }
+            userConfigs[lender]?.[subAccount] ?? {
+                selectedMode: 0,
+                id: "0",
+            }
         )
 
         // store new running balance
@@ -150,11 +235,15 @@ export function simulateLenderSelections(
             amountUsd,
             balanceBefore,
             balanceAfter,
+            assetKey,
+            assetBalanceBefore: assetKey ? assetBefore : undefined,
+            assetBalanceAfter: assetKey ? assetAfter : undefined,
         })
     }
 
     return {
         steps,
         finalByLender: runningBalances,
+        finalAssetBalances: runningAssetBalances,
     }
 }

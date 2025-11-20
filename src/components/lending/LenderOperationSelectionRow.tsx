@@ -6,7 +6,6 @@ import { LendingPoolSelectionModal } from "./LendingPoolSelectionModal"
 import { FlattenedPoolWithUserData } from "../../hooks/lending/prepareMixedData"
 import { ValuePill } from "./Pill"
 import type { SimulatedActionState } from "../../contexts/Simulation/simulateLenderSelections"
-import { AmountUsdHint } from "./UsdAmount"
 import { DepositAmountInput } from "./Actions/Deposit"
 import { WithdrawAmountInput } from "./Actions/Withdraw"
 import { RepayAmountInput } from "./Actions/Repay"
@@ -16,6 +15,7 @@ interface LenderOperationSelectionRowProps {
     selection: LenderOperationSelection
     pools: FlattenedPoolWithUserData[]
     simulated?: SimulatedActionState
+    /** spot price of the asset in USD, used by action inputs */
     price?: number
 }
 
@@ -33,6 +33,21 @@ const renderAssetCompact = (asset: RawCurrency) => {
                 <span className="font-medium text-sm truncate">{symbol || name}</span>
                 {name && symbol && name !== symbol && <span className="text-[11px] text-base-content/60 truncate">{name}</span>}
             </div>
+        </div>
+    )
+}
+
+/** Even more compact: icon + symbol only, for inline balance display */
+const renderAssetMini = (asset: RawCurrency) => {
+    const symbol = asset?.symbol ?? (asset as any)?.ticker ?? ""
+    return (
+        <div className="flex items-center gap-1 min-w-0">
+            <div className="avatar placeholder">
+                <div className="bg-base-300 text-base-content rounded-full w-5 h-5 flex items-center justify-center overflow-hidden">
+                    {asset.logoURI && <img src={asset.logoURI} alt={symbol} width={16} height={16} />}
+                </div>
+            </div>
+            {symbol && <span className="text-[11px] font-medium truncate">{symbol}</span>}
         </div>
     )
 }
@@ -75,8 +90,8 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
 
     const depositsAfter = simulated != null ? simulated.balanceAfter.deposits : undefined
 
-    const numberAm = Number(selection.amount) * price
-    const amountUsd = isNaN(numberAm) ? 0 : numberAm
+    // per-step asset balance (if the simulation tracked it)
+    const assetBalanceAfter = simulated?.assetBalanceAfter
 
     return (
         <>
@@ -95,8 +110,10 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                                 <div className="flex flex-col text-[11px] text-base-content/60 truncate">
                                     <span className="truncate">{lenderDisplayName(pool.lender)}</span>
                                     <span className="truncate">
-                                        TVL $
+                                        TVL{" "}
                                         {tvl.toLocaleString(undefined, {
+                                            style: "currency",
+                                            currency: "USD",
                                             maximumFractionDigits: 0,
                                         })}{" "}
                                         · APR {apr}%
@@ -115,7 +132,7 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                 </div>
 
                 {/* Amount + operation + info */}
-                <div className="grid gap-2 items-end grid-cols-1 md:grid-cols-[25%_10%_65%]">
+                <div className="grid gap-2 items-start grid-cols-1 md:grid-cols-[25%_10%_65%]">
                     {/* 25% – Amount (action-specific) */}
                     <div className="min-w-0">
                         {selection.operation === "deposit" && (
@@ -156,7 +173,7 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                         )}
                     </div>
 
-                    {/* 50% – Operation */}
+                    {/* 10% – Operation */}
                     <div className="form-control min-w-0">
                         <label className="label py-0">
                             <span className="label-text text-xs">Operation</span>
@@ -173,7 +190,7 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                         </select>
                     </div>
 
-                    {/* 25% – Info + user position + simulated totals */}
+                    {/* 65% – Info + user position + simulated totals + per-asset balance */}
                     <div className="min-w-0">
                         {pool && (
                             <div className="flex flex-col text-[11px] text-base-content/60 gap-1">
@@ -221,7 +238,13 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                                                 maximumFractionDigits={1}
                                             />
                                             {depositsAfter !== undefined && (
-                                                <ValuePill label="Deposits" value={depositsAfter} prefix="$" tone="success" maximumFractionDigits={1} />
+                                                <ValuePill
+                                                    label="Deposits"
+                                                    value={depositsAfter}
+                                                    prefix="$"
+                                                    tone="success"
+                                                    maximumFractionDigits={1}
+                                                />
                                             )}
                                             <ValuePill
                                                 label="Debt"
@@ -239,6 +262,29 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                                                     maximumFractionDigits={1}
                                                 />
                                             )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* per-step asset running balance (token + USD) */}
+                                {asset && assetBalanceAfter && (
+                                    <div className="mt-2 flex items-center gap-2 p-1 rounded-md bg-base-200/60">
+                                        {renderAssetMini(asset)}
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="text-[11px] font-semibold truncate">
+                                                {assetBalanceAfter.amount.toLocaleString(undefined, {
+                                                    maximumFractionDigits: 6,
+                                                })}{" "}
+                                                {(asset.symbol ?? (asset as any)?.ticker ?? "") as string}
+                                            </span>
+                                            <span className="text-[10px] text-base-content/70 truncate">
+                                                ≈{" "}
+                                                {assetBalanceAfter.amountUsd.toLocaleString(undefined, {
+                                                    style: "currency",
+                                                    currency: "USD",
+                                                    maximumFractionDigits: 2,
+                                                })}
+                                            </span>
                                         </div>
                                     </div>
                                 )}

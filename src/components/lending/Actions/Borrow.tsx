@@ -2,14 +2,26 @@ import { AmountUsdHint } from "../UsdAmount"
 import { ActionAmountInputProps, formatTokenForInput, parseAmount } from "./common"
 import { AmountQuickButtons } from "./QuickButton"
 
-export const BorrowAmountInput: React.FC<ActionAmountInputProps> = ({ selection, pool, simulated, onChangeAmount, price }) => {
+export const BorrowAmountInput: React.FC<ActionAmountInputProps> = ({
+    selection,
+    pool,
+    simulated,
+    onChangeAmount,
+    price,
+}) => {
     const amountUsd = simulated?.amountUsd
 
-    const borrowCapacityBefore = simulated != null ? simulated.balanceBefore.borrowDiscountedCollateral - simulated.balanceBefore.adjustedDebt : 0
+    const borrowCapacityBefore =
+        simulated != null
+            ? simulated.balanceBefore.borrowDiscountedCollateral - simulated.balanceBefore.adjustedDebt
+            : 0
 
     const priceValidated = price ?? 0
 
-    const maxBorrowToken = borrowCapacityBefore > 0 && priceValidated > 0 ? borrowCapacityBefore / priceValidated : 0
+    const maxBorrowToken =
+        borrowCapacityBefore > 0 && priceValidated > 0
+            ? borrowCapacityBefore / priceValidated
+            : 0
 
     const currentAmount = parseAmount(selection.amount)
     const overMax = maxBorrowToken > 0 && currentAmount > maxBorrowToken + 1e-9
@@ -23,7 +35,10 @@ export const BorrowAmountInput: React.FC<ActionAmountInputProps> = ({ selection,
         <div className="form-control min-w-0">
             <div className="flex justify-between items-center mb-1">
                 <span className="label-text text-xs">Amount</span>
-                <AmountQuickButtons maxAmount={maxBorrowToken} onSelect={(val) => onChangeAmount(val)} />
+                <AmountQuickButtons
+                    maxAmount={maxBorrowToken}
+                    onSelect={(val) => onChangeAmount(val)}
+                />
             </div>
 
             <div className="relative">
@@ -37,19 +52,24 @@ export const BorrowAmountInput: React.FC<ActionAmountInputProps> = ({ selection,
                 <AmountUsdHint amountUsd={amountUsd} />
             </div>
 
-            {overMax && (
-                <div className="mt-1 text-[10px] text-error">
-                    Exceeds borrowable capacity (
-                    {maxBorrowToken.toLocaleString(undefined, {
-                        maximumFractionDigits: 4,
-                    })}
-                    ).
-                </div>
-            )}
+            {/* -------------------------------
+                Reserve space for validation messages
+               ------------------------------- */}
+            <div className="min-h-4 mt-1 text-[10px]">
+                {overMax && (
+                    <div className="text-error">
+                        Exceeds borrowable capacity (
+                        {maxBorrowToken.toLocaleString(undefined, {
+                            maximumFractionDigits: 4,
+                        })}
+                        ).
+                    </div>
+                )}
 
-            {maxBorrowToken <= 0 && borrowCapacityBefore <= 0 && (
-                <div className="mt-1 text-[10px] text-base-content/60">No remaining borrowable capacity.</div>
-            )}
+                {!overMax && maxBorrowToken <= 0 && borrowCapacityBefore <= 0 && (
+                    <div className="text-base-content/60">No remaining borrowable capacity.</div>
+                )}
+            </div>
         </div>
     )
 }

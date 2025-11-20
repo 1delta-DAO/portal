@@ -15,6 +15,16 @@ export interface LenderOperationSelection {
     amount: string
     /** Operation type */
     operation: LenderOperationKind
+    /**
+     * If true, the amount is conceptually "use the maximum".
+     * This lets you distinguish intent even when floating point math is approximate.
+     */
+    useMax?: boolean
+    /**
+     * If true, this selection should use the running balance of this asset
+     * (e.g. "use all USDC I have at this step" in a multi-step sequence).
+     */
+    useCurrentBalance?: boolean
 }
 
 // ---- context shape ----
@@ -31,6 +41,8 @@ interface LenderSelectionContextValue {
     setSelectionPool: (id: string, pool: FlattenedPoolWithUserData | undefined) => void
     setSelectionAmount: (id: string, amount: string) => void
     setSelectionOperation: (id: string, op: LenderOperationKind) => void
+    setSelectionUseMax: (id: string, useMax: boolean) => void
+    setSelectionUseCurrentBalance: (id: string, useCurrentBalance: boolean) => void
 
     // Generic update in case you want to patch multiple fields
     updateSelection: (id: string, patch: Partial<Omit<LenderOperationSelection, "id">>) => void
@@ -69,6 +81,8 @@ export const LenderSelectionProvider: React.FC<LenderSelectionProviderProps> = (
             pool: sel.pool,
             amount: sel.amount ?? "",
             operation: sel.operation ?? "deposit",
+            useMax: sel.useMax ?? false,
+            useCurrentBalance: sel.useCurrentBalance ?? false,
         }))
     })
 
@@ -80,6 +94,8 @@ export const LenderSelectionProvider: React.FC<LenderSelectionProviderProps> = (
                 pool: initial?.pool,
                 amount: initial?.amount ?? "",
                 operation: initial?.operation ?? "deposit",
+                useMax: initial?.useMax ?? false,
+                useCurrentBalance: initial?.useCurrentBalance ?? false,
             },
         ])
     }, [])
@@ -105,6 +121,8 @@ export const LenderSelectionProvider: React.FC<LenderSelectionProviderProps> = (
 
     const setSelectionAmount = useCallback(
         (id: string, amount: string) => {
+            // You *could* auto-clear useMax/useCurrentBalance here on manual edit,
+            // but that's a UX decision – for now we just set the amount.
             updateSelection(id, { amount })
         },
         [updateSelection]
@@ -113,6 +131,20 @@ export const LenderSelectionProvider: React.FC<LenderSelectionProviderProps> = (
     const setSelectionOperation = useCallback(
         (id: string, op: LenderOperationKind) => {
             updateSelection(id, { operation: op })
+        },
+        [updateSelection]
+    )
+
+    const setSelectionUseMax = useCallback(
+        (id: string, useMax: boolean) => {
+            updateSelection(id, { useMax })
+        },
+        [updateSelection]
+    )
+
+    const setSelectionUseCurrentBalance = useCallback(
+        (id: string, useCurrentBalance: boolean) => {
+            updateSelection(id, { useCurrentBalance })
         },
         [updateSelection]
     )
@@ -126,9 +158,22 @@ export const LenderSelectionProvider: React.FC<LenderSelectionProviderProps> = (
             setSelectionPool,
             setSelectionAmount,
             setSelectionOperation,
+            setSelectionUseMax,
+            setSelectionUseCurrentBalance,
             updateSelection,
         }),
-        [selections, addSelection, removeSelection, clearSelections, setSelectionPool, setSelectionAmount, setSelectionOperation, updateSelection]
+        [
+            selections,
+            addSelection,
+            removeSelection,
+            clearSelections,
+            setSelectionPool,
+            setSelectionAmount,
+            setSelectionOperation,
+            setSelectionUseMax,
+            setSelectionUseCurrentBalance,
+            updateSelection,
+        ]
     )
 
     return <LenderSelectionContext.Provider value={value}>{children}</LenderSelectionContext.Provider>

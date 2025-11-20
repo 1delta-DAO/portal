@@ -30,16 +30,7 @@ const renderAsset = (asset: RawCurrency) => {
     )
 }
 
-/* ---------- Virtualized list plumbing ---------- */
-
-interface LendingPoolRowData {
-    pools: FlattenedPoolWithUserData[]
-    onSelect: (pool: FlattenedPoolWithUserData) => void
-    onClose: () => void
-}
-
-// a bit taller to accommodate user position badges
-const ROW_HEIGHT = 96 // px – tweak if needed
+/* ---------- User position badges ---------- */
 
 const renderUserPositionBadges = (p: FlattenedPoolWithUserData) => {
     const userPositionsMap = (p.userPosition as Record<string, any> | undefined) ?? undefined
@@ -94,6 +85,17 @@ const renderUserPositionBadges = (p: FlattenedPoolWithUserData) => {
         </div>
     )
 }
+
+/* ---------- Virtualized list plumbing ---------- */
+
+interface LendingPoolRowData {
+    pools: FlattenedPoolWithUserData[]
+    onSelect: (pool: FlattenedPoolWithUserData) => void
+    onClose: () => void
+}
+
+// a bit taller to accommodate user position badges
+const ROW_HEIGHT = 96 // px – tweak if needed
 
 const LendingPoolRow: React.FC<ListChildComponentProps<LendingPoolRowData>> = ({ index, style, data }) => {
     const p = data.pools[index]
@@ -228,23 +230,55 @@ const LendingPoolList: React.FC<LendingPoolListProps> = ({ pools, onSelect, onCl
 /* ---------- Modal component ---------- */
 
 export const LendingPoolSelectionModal: React.FC<LendingPoolSelectionModalProps> = ({ open, onClose, pools, onSelect }) => {
-    const [search, setSearch] = useState("")
+    // Separate search fields
+    const [assetSearch, setAssetSearch] = useState("")
+    const [lenderSearch, setLenderSearch] = useState("")
+    const [poolIdSearch, setPoolIdSearch] = useState("")
 
+    // Lender suggestions dropdown state
+    const [showLenderSuggestions, setShowLenderSuggestions] = useState(false)
+
+    // Unique lenders derived from all pools (for suggestions)
+    const lenders = useMemo(() => {
+        const set = new Set<string>()
+        for (const p of pools) {
+            if (p.lender) set.add(p.lender)
+        }
+        return Array.from(set).sort()
+    }, [pools])
+
+    // Filtered suggestions based on current lenderSearch
+    const lenderSuggestions = useMemo(() => {
+        const q = lenderSearch.trim().toLowerCase()
+        if (!q) {
+            // default: top N lenders if nothing typed
+            return lenders.slice(0, 10)
+        }
+        return lenders.filter((l) => l.toLowerCase().includes(q)).slice(0, 10)
+    }, [lenders, lenderSearch])
+
+    // Combined filtering logic using the three fields
     const filtered = useMemo(() => {
-        if (!search.trim()) return pools
-        const q = search.toLowerCase()
+        const assetQ = assetSearch.trim().toLowerCase()
+        const lenderQ = lenderSearch.trim().toLowerCase()
+        const poolQ = poolIdSearch.trim().toLowerCase()
+
+        if (!assetQ && !lenderQ && !poolQ) return pools
+
         return pools.filter((p) => {
             const asset = p.asset as RawCurrency
-            const symbol = asset?.symbol ?? (asset as any)?.ticker ?? ""
-            const name = asset?.name ?? (asset as any)?.label ?? ""
-            return (
-                symbol.toLowerCase().includes(q) ||
-                name.toLowerCase().includes(q) ||
-                p.lender.toLowerCase().includes(q) ||
-                p.poolId.toLowerCase().includes(q)
-            )
+            const symbol = (asset?.symbol ?? (asset as any)?.ticker ?? "").toLowerCase()
+            const name = (asset?.name ?? (asset as any)?.label ?? "").toLowerCase()
+            const lender = p.lender.toLowerCase()
+            const poolId = p.poolId.toLowerCase()
+
+            if (assetQ && !(symbol.includes(assetQ) || name.includes(assetQ))) return false
+            if (lenderQ && !lender.includes(lenderQ)) return false
+            if (poolQ && !poolId.includes(poolQ)) return false
+
+            return true
         })
-    }, [pools, search])
+    }, [pools, assetSearch, lenderSearch, poolIdSearch])
 
     if (!open) return null
 
@@ -262,18 +296,69 @@ export const LendingPoolSelectionModal: React.FC<LendingPoolSelectionModalProps>
                     </button>
                 </div>
 
-                <div className="px-4 py-2 border-b border-base-300">
-                    <input
-                        type="text"
-                        className="input input-bordered input-sm w-full"
-                        placeholder="Search by asset, lender or pool id"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
+                {/* Search controls */}
+                <div className="px-4 py-3 border-b border-base-300 space-y-2">
+                    <div className="text-[11px] uppercase tracking-wide text-base-content/60">Filter by asset, lender, or pool id</div>
+
+                    <div className="flex flex-col md:flex-row gap-2">
+                        {/* Asset search */}
+                        <input
+                            type="text"
+                            className="input input-bordered input-sm w-full md:flex-1"
+                            placeholder="Asset (symbol or name)"
+                            value={assetSearch}
+                            onChange={(e) => setAssetSearch(e.target.value)}
+                        />
+
+                        {/* Lender search with suggestions */}
+                        <div className="relative w-full md:flex-1">
+                            <input
+                                type="text"
+                                className="input input-bordered input-sm w-full"
+                                placeholder="Lender"
+                                value={lenderSearch}
+                                onChange={(e) => setLenderSearch(e.target.value)}
+                                onFocus={() => setShowLenderSuggestions(true)}
+                                onBlur={() => {
+                                    // small delay so clicks on suggestions still register
+                                    setTimeout(() => setShowLenderSuggestions(false), 120)
+                                }}
+                            />
+                            {showLenderSuggestions && lenderSuggestions.length > 0 && (
+                                <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-box border border-base-300 bg-base-100 shadow-lg text-sm">
+                                    {lenderSuggestions.map((l) => (
+                                        <button
+                                            key={l}
+                                            type="button"
+                                            className="w-full px-3 py-1.5 text-left hover:bg-base-200"
+                                            onMouseDown={(e) => {
+                                                // prevent blur before click
+                                                e.preventDefault()
+                                                setLenderSearch(l)
+                                                setShowLenderSuggestions(false)
+                                            }}
+                                        >
+                                            {lenderDisplayName(l as any) ?? l}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Pool id search */}
+                        <input
+                            type="text"
+                            className="input input-bordered input-sm w-full md:flex-1"
+                            placeholder="Pool ID"
+                            value={poolIdSearch}
+                            onChange={(e) => setPoolIdSearch(e.target.value)}
+                        />
+                    </div>
                 </div>
 
+                {/* List */}
                 <div className="overflow-y-auto py-2">
-                    {filtered.length === 0 && <div className="px-4 py-6 text-sm text-base-content/70">No pools match your search.</div>}
+                    {filtered.length === 0 && <div className="px-4 py-6 text-sm text-base-content/70">No pools match your filters.</div>}
 
                     {filtered.length > 0 && <LendingPoolList pools={filtered} onSelect={onSelect} onClose={onClose} />}
                 </div>
