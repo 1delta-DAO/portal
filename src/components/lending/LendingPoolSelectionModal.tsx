@@ -216,13 +216,12 @@ const LendingPoolList: React.FC<LendingPoolListProps> = ({ pools, onSelect, onCl
 
     return (
         <List
+            height={600}
             defaultHeight={600} // fits inside max-h-[80vh] of modal; tweak if needed
-            rowHeight={600}
+            rowHeight={ROW_HEIGHT}
             rowCount={pools.length}
             rowProps={{} as any}
-            style={{ width: "100%", height: ROW_HEIGHT }}
-            width="100%"
-            itemData={itemData} // @ts-ignore
+            style={{ width: "100%", height: 600 }} // @ts-ignore
             rowComponent={LendingPoolRow}
         />
     )
