@@ -1,8 +1,6 @@
-import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { useAccount } from "wagmi"
 import { useEffect, useState } from "react"
 import type { Hex } from "viem"
-import { TradeSdkWalletSync } from "./sdk/trade-helpers/walletClient"
 import { LenderTab } from "./components/lending/LendingTab"
 import { ThemeSwitcher } from "./components/themeSwitcher"
 import { WalletConnect } from "./components/connect"
@@ -24,7 +22,6 @@ export default function App() {
 
     return (
         <div className="min-h-screen bg-base-200 text-base-content">
-            <TradeSdkWalletSync />
 
             <div className="navbar bg-base-100 shadow-lg">
                 <div className="flex flex-row p-2 flex-grow">

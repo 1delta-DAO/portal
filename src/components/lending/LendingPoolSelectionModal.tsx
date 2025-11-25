@@ -1,6 +1,6 @@
 // src/components/lending/LendingPoolSelectionModal.tsx
 import React, { useMemo, useState } from "react"
-import { FixedSizeList, ListChildComponentProps } from "react-window"
+import { List } from "react-window"
 import { lenderDisplayName, type RawCurrency } from "@1delta/lib-utils"
 import { FlattenedPoolWithUserData } from "../../hooks/lending/prepareMixedData"
 import { ValuePill } from "./Pill"
@@ -97,51 +97,6 @@ interface LendingPoolRowData {
 // a bit taller to accommodate user position badges
 const ROW_HEIGHT = 96 // px – tweak if needed
 
-const LendingPoolRow: React.FC<ListChildComponentProps<LendingPoolRowData>> = ({ index, style, data }) => {
-    const p = data.pools[index]
-    const asset = p.asset as RawCurrency
-    const tvl = p.poolData.totalDepositsUSD
-    const apr = p.poolData.depositRate ?? 0
-
-    return (
-        <button
-            type="button"
-            style={style}
-            className="w-full px-4 py-3 hover:bg-base-200 hover:cursor-pointer text-left border-b border-base-200 last:border-b-0"
-            onClick={() => {
-                data.onSelect(p)
-                data.onClose()
-            }}
-        >
-            {/* Full-width row with 25% / 50% / 25% on md+ */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 w-full">
-                {/* 25% – Asset */}
-                <div className="min-w-0 md:basis-1/4 md:max-w-[25%]">{renderAsset(asset)}</div>
-
-                {/* 50% – Lender + Pool */}
-                <div className="flex flex-col min-w-0 md:basis-1/2 md:max-w-[50%]">
-                    <span className="text-xs text-base-content/70 truncate">{lenderDisplayName(p.lender)}</span>
-                    <span className="text-[11px] text-base-content/50 truncate">Pool: {p.poolId}</span>
-                </div>
-
-                {/* 25% – TVL + APR + user data */}
-                <div className="flex flex-col text-xs min-w-0 md:basis-1/4 md:max-w-[25%] md:items-end">
-                    <span className="font-semibold truncate">
-                        TVL $
-                        {tvl.toLocaleString(undefined, {
-                            maximumFractionDigits: 0,
-                        })}
-                    </span>
-                    <span className="text-base-content/70 truncate">APR {apr.toFixed(2)}%</span>
-
-                    {/* user position badges (if any) */}
-                    {renderUserPositionBadges(p)}
-                </div>
-            </div>
-        </button>
-    )
-}
-
 interface LendingPoolListProps {
     pools: FlattenedPoolWithUserData[]
     onSelect: (pool: FlattenedPoolWithUserData) => void
@@ -151,7 +106,7 @@ interface LendingPoolListProps {
 /**
  * List wrapper that:
  *  - Uses simple map for small lists
- *  - Switches to react-window FixedSizeList for large lists
+ *  - Switches to react-window List for large lists
  */
 const VIRTUALIZATION_THRESHOLD = 40
 
@@ -214,16 +169,62 @@ const LendingPoolList: React.FC<LendingPoolListProps> = ({ pools, onSelect, onCl
         onClose,
     }
 
+    const LendingPoolRow: React.FC<{ index: number; style: any }> = ({ index, style }) => {
+        const p = itemData.pools[index]
+        const asset = p.asset as RawCurrency
+        const tvl = p.poolData.totalDepositsUSD
+        const apr = p.poolData.depositRate ?? 0
+
+        return (
+            <button
+                type="button"
+                style={style}
+                className="w-full px-4 py-3 hover:bg-base-200 hover:cursor-pointer text-left border-b border-base-200 last:border-b-0"
+                onClick={() => {
+                    itemData.onSelect(p)
+                    itemData.onClose()
+                }}
+            >
+                {/* Full-width row with 25% / 50% / 25% on md+ */}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 w-full">
+                    {/* 25% – Asset */}
+                    <div className="min-w-0 md:basis-1/4 md:max-w-[25%]">{renderAsset(asset)}</div>
+
+                    {/* 50% – Lender + Pool */}
+                    <div className="flex flex-col min-w-0 md:basis-1/2 md:max-w-[50%]">
+                        <span className="text-xs text-base-content/70 truncate">{lenderDisplayName(p.lender)}</span>
+                        <span className="text-[11px] text-base-content/50 truncate">Pool: {p.poolId}</span>
+                    </div>
+
+                    {/* 25% – TVL + APR + user data */}
+                    <div className="flex flex-col text-xs min-w-0 md:basis-1/4 md:max-w-[25%] md:items-end">
+                        <span className="font-semibold truncate">
+                            TVL $
+                            {tvl.toLocaleString(undefined, {
+                                maximumFractionDigits: 0,
+                            })}
+                        </span>
+                        <span className="text-base-content/70 truncate">APR {apr.toFixed(2)}%</span>
+
+                        {/* user position badges (if any) */}
+                        {renderUserPositionBadges(p)}
+                    </div>
+                </div>
+            </button>
+        )
+    }
+
     return (
-        <FixedSizeList
-            height={600} // fits inside max-h-[80vh] of modal; tweak if needed
-            itemCount={pools.length}
-            itemSize={ROW_HEIGHT}
+        <List
+            defaultHeight={600} // fits inside max-h-[80vh] of modal; tweak if needed
+            rowHeight={600}
+            rowCount={pools.length}
+            rowProps={{} as any}
+            style={{ width: "100%", height: ROW_HEIGHT }}
             width="100%"
-            itemData={itemData}
-        >
-            {LendingPoolRow}
-        </FixedSizeList>
+            itemData={itemData} // @ts-ignore
+            rowComponent={LendingPoolRow}
+        />
     )
 }
 
