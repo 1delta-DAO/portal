@@ -1,4 +1,3 @@
-import { useAccount } from "wagmi"
 import { useEffect, useState } from "react"
 import type { Hex } from "viem"
 import { LenderTab } from "./components/lending/LendingTab"
@@ -8,11 +7,9 @@ import { fetchLenderMetaFromDirAndInitialize } from "@1delta/margin-fetcher"
 import { fetchLenderLabels } from "@1delta/lib-utils"
 
 export default function App() {
-    const { address, isConnected } = useAccount()
     const [activeTab, setActiveTab] = useState<"transactions" | "lending">("lending")
     const [transactionHash, setTransactionHash] = useState<Hex | null>(null)
 
-    const handleTransactionExecuted = (hash: Hex) => setTransactionHash(hash)
     const handleReset = () => setTransactionHash(null)
 
     useEffect(() => {
@@ -24,7 +21,7 @@ export default function App() {
         <div className="min-h-screen bg-base-200 text-base-content">
 
             <div className="navbar bg-base-100 shadow-lg">
-                <div className="flex flex-row p-2 flex-grow">
+                <div className="flex flex-row p-2 grow">
                     <div className="flex-1">
                         <div className="flex items-center space-x-2">
                             {/* Use theme primary instead of fixed gradient */}
