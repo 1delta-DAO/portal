@@ -1,27 +1,28 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @plugin "daisyui" {
-  themes: 
-    terminal, 
-    light --default, 
-    dark --prefersdark, 
-    forest, 
-    corporate, 
-    synthwave, 
-    cyberpunk, 
+  themes:
+    terminal,
+    light --default,
+    dark --prefersdark,
+    forest,
+    corporate,
+    synthwave,
+    cyberpunk,
     luxury;
 }
 
 @plugin "daisyui/theme" {
-  name: "terminal";
+  name: 'terminal';
   color-scheme: dark;
 
   /* Global font for this theme (optional, but nice for terminal feel) */
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    "Liberation Mono", "Courier New", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
 
   /* Base background + text */
-  --color-base-100: #020617;   /* main background (near black) */
+  --color-base-100: #020617; /* main background (near black) */
   --color-base-200: #020617;
   --color-base-300: #0b1120;
   --color-base-content: #bbf7d0; /* soft green-ish text */
@@ -62,5 +63,3 @@
   --depth: 0.5;
   --noise: 0;
 }
-
-

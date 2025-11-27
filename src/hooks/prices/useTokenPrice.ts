@@ -1,21 +1,25 @@
-import { useQuery } from "@tanstack/react-query"
-import type { Address } from "viem"
-import { useDexscreenerPrices } from "./useDexscreenerPrices"
+import { useQuery } from '@tanstack/react-query'
+import type { Address } from 'viem'
+import { useDexscreenerPrices } from './useDexscreenerPrices'
 
-export function useTokenPrice(params: { chainId: string; tokenAddress?: Address; enabled?: boolean }) {
-    const { chainId, tokenAddress, enabled = true } = params
+export function useTokenPrice(params: {
+  chainId: string
+  tokenAddress?: Address
+  enabled?: boolean
+}) {
+  const { chainId, tokenAddress, enabled = true } = params
 
-    const { data, isLoading, ...rest } = useDexscreenerPrices({
-        chainId,
-        addresses: tokenAddress ? [tokenAddress] : [],
-        enabled: enabled && Boolean(chainId && tokenAddress),
-    })
+  const { data, isLoading, ...rest } = useDexscreenerPrices({
+    chainId,
+    addresses: tokenAddress ? [tokenAddress] : [],
+    enabled: enabled && Boolean(chainId && tokenAddress),
+  })
 
-    const price = tokenAddress && data?.[chainId]?.[tokenAddress.toLowerCase()]?.usd
+  const price = tokenAddress && data?.[chainId]?.[tokenAddress.toLowerCase()]?.usd
 
-    return {
-        price,
-        isLoading,
-        ...rest,
-    }
+  return {
+    price,
+    isLoading,
+    ...rest,
+  }
 }

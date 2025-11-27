@@ -27,7 +27,7 @@ export const ChainFilterSelect: React.FC<ChainFilterSelectProps> = ({
       <option value="all">All chains</option>
       {uniqueChains.map((c) => (
         <option key={c} value={c}>
-          {getChainName( c)}
+          {getChainName(c)}
         </option>
       ))}
     </select>

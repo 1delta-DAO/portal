@@ -1,5 +1,5 @@
 // src/components/common/ValuePill.tsx
-import React from "react"
+import React from 'react'
 
 interface ValuePillProps {
   /** Display label (e.g. "Dep", "Debt", "APR") */
@@ -9,7 +9,7 @@ interface ValuePillProps {
   /** Optional prefix to show before the formatted value (e.g. "$") */
   prefix?: string
   /** Background color keyword (success, error, warning, primary, etc) */
-  tone?: "success" | "error" | "warning" | "info" | "primary" | "neutral"
+  tone?: 'success' | 'error' | 'warning' | 'info' | 'primary' | 'neutral'
   /** Additional tailwind classes */
   className?: string
   /** Maximum decimals in displayed value */
@@ -19,9 +19,9 @@ interface ValuePillProps {
 export const ValuePill: React.FC<ValuePillProps> = ({
   label,
   value,
-  prefix = "$",
-  tone = "success",
-  className = "",
+  prefix = '$',
+  tone = 'success',
+  className = '',
   maximumFractionDigits = 0,
 }) => {
   const formatted = value.toLocaleString(undefined, {
@@ -37,7 +37,7 @@ export const ValuePill: React.FC<ValuePillProps> = ({
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full 
       text-[10px] font-medium border ${bg} ${text} ${border} ${className}`}
-      title={`${label ? label + ": " : ""}${prefix}${value.toLocaleString(undefined, {
+      title={`${label ? label + ': ' : ''}${prefix}${value.toLocaleString(undefined, {
         maximumFractionDigits: 4,
       })}`}
     >
