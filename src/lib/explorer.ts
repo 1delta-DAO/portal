@@ -1,17 +1,14 @@
-import { ChainsRegistryRecord } from '../sdk/hooks/useChainsRegistry'
-
-function getPrimaryExplorerBase(
-  chain: ChainsRegistryRecord[string] | undefined
-): string | undefined {
+function getPrimaryExplorerBase(chain: any[string] | undefined): string | undefined {
   if (!chain) return undefined
   // Prefer first EIP3091 explorer
   const explorers = Object.values(chain.explorers)
-  const eip3091 = explorers.find((e) => (e.standard || '').toUpperCase() === 'EIP3091')
+  const eip3091 = explorers.find((e: any) => (e.standard || '').toUpperCase() === 'EIP3091')
+  //@ts-ignore
   return (eip3091 || explorers[0])?.url
 }
 
 export function buildAddressUrl(
-  registry: ChainsRegistryRecord,
+  registry: any,
   chainId: string,
   address: string
 ): string | undefined {
@@ -21,11 +18,7 @@ export function buildAddressUrl(
   return `${base.replace(/\/$/, '')}/address/${address}`
 }
 
-export function buildTokenUrl(
-  registry: ChainsRegistryRecord,
-  chainId: string,
-  token: string
-): string | undefined {
+export function buildTokenUrl(registry: any, chainId: string, token: string): string | undefined {
   const chain = registry[chainId]
   const base = getPrimaryExplorerBase(chain)
   if (!base) return undefined
@@ -33,7 +26,7 @@ export function buildTokenUrl(
 }
 
 export function buildTransactionUrl(
-  registry: ChainsRegistryRecord,
+  registry: any,
   chainId: string,
   txHash: string
 ): string | undefined {
