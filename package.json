@@ -11,14 +11,16 @@
   },
   "dependencies": {
     "@1delta/bridge-configs": "^0.1.6",
+    "@1delta/calldata-sdk": "^0.0.131",
     "@1delta/data-sdk": "^0.0.10",
+    "@1delta/lender-registry": "^0.0.13",
     "@1delta/lib-utils": "^0.1.6",
-    "@1delta/margin-fetcher": "^0.0.138",
+    "@1delta/margin-fetcher": "^0.0.139",
     "@1delta/providers": "^0.0.40",
-    "@1delta/trade-sdk": "^0.1.5",
+    "@1delta/trade-sdk": "^0.1.6",
     "@rainbow-me/rainbowkit": "^2.2.9",
     "@tailwindcss/postcss": "^4.1.17",
-    "@tanstack/react-query": "^5.90.10",
+    "@tanstack/react-query": "^5.90.11",
     "@vitejs/plugin-react": "^5.1.1",
     "async-retry": "^1.3.3",
     "lodash": "^4.17.21",
@@ -28,9 +30,9 @@
     "react-dom": "^19.2.0",
     "react-window": "2.2.3",
     "tailwindcss": "^4.1.17",
-    "viem": "^2.40.2",
+    "viem": "^2.40.3",
     "vite": "^7.2.4",
-    "wagmi": "^3.0.1"
+    "wagmi": "^3.0.2"
   },
   "devDependencies": {
     "@types/async-retry": "^1.4.9",

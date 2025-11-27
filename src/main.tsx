@@ -8,11 +8,9 @@ import { RainbowKitProvider } from "@rainbow-me/rainbowkit"
 import { config } from "./wagmi"
 import App from "./App"
 import { ToastProvider } from "./components/common/ToastHost"
-import { SlippageProvider } from "./contexts/SlippageContext"
 import { rainbowDaisyTheme } from "./rainbowkitTheme"
 
 const client = new QueryClient()
-
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
@@ -20,9 +18,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <QueryClientProvider client={client}>
                 <RainbowKitProvider theme={rainbowDaisyTheme}>
                     <ToastProvider>
-                        <SlippageProvider>
-                            <App />
-                        </SlippageProvider>
+                        <App />
                     </ToastProvider>
                 </RainbowKitProvider>
             </QueryClientProvider>
