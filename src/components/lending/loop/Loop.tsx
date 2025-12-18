@@ -1,8 +1,15 @@
-import { isWNative, lenderDisplayNameFull, RawCurrency } from '@1delta/lib-utils'
+import {
+  CurrencyHandler,
+  isWNative,
+  lenderDisplayNameFull,
+  LendingMode,
+  RawCurrency,
+} from '@1delta/lib-utils'
 import { LenderData, PoolData } from '@1delta/margin-fetcher'
 import { useMemo, useState } from 'react'
 import { useTokenLists } from '../../../hooks/useTokenLists'
-import { zeroAddress } from 'viem'
+import { parseUnits, zeroAddress } from 'viem'
+import { ExecuteLoopButton } from './Execute'
 
 /* ---------- Currency Renderer ---------- */
 
@@ -277,6 +284,21 @@ export const Loop = ({ lenderData, chainId }: Props) => {
           />
         </div>
       </div>
+
+      <ExecuteLoopButton
+        params={{
+          chainId,
+          collateralAsset: toPool?.asset.address!,
+          debtAsset: fromPool?.asset.address!,
+          payAsset: payCurrency?.address!,
+          lender: selectedLender,
+          payAmount: parseUnits(payAmount, payCurrency?.decimals!),
+          debtAmount: parseUnits(fromAmount, fromPool?.asset?.decimals!),
+          slippage: 0.3,
+          borrowMode: LendingMode.VARIABLE,
+          usePendleMintRedeem: false,
+        }}
+      />
     </div>
   )
 }
