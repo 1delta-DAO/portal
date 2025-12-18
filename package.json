@@ -19,6 +19,7 @@
     "@1delta/margin-fetcher": "^0.0.139",
     "@1delta/providers": "^0.0.40",
     "@1delta/trade-sdk": "^0.1.6",
+    "@1delta/wnative": "^0.0.6",
     "@rainbow-me/rainbowkit": "^2.2.9",
     "@tailwindcss/postcss": "^4.1.17",
     "@tanstack/react-query": "^5.90.11",

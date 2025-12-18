@@ -1,5 +1,5 @@
 // src/components/lending/LenderOperationsBuilder.tsx
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import type { Chain } from 'viem' // if you use it, otherwise remove
 import { LenderSelectionProvider, useLenderSelection } from '../../contexts/LenderSelectionContext'
 import { LenderOperationSelectionRow } from './LenderOperationSelectionRow'
@@ -14,6 +14,9 @@ import { BaseLendingPosition, LenderData } from '@1delta/margin-fetcher'
 import { useSimulatedLenderSelections } from '../../hooks/lending/useSimulatedLenderSelections'
 import type { SimulatedActionState } from '../../contexts/Simulation/simulateLenderSelections'
 import { RunningBalancesOverview } from './RunningBlanacesOverview'
+import { generateAllocationActionsForApi } from '../../sdk/lending-helper/toApiParams'
+import { useConnection } from 'wagmi'
+import { fetchTransactionData } from '../../sdk/lending-helper/fetchFromApi'
 
 interface LenderOperationsBuilderProps {
   chainId: string
@@ -25,16 +28,19 @@ interface LenderOperationsBuilderProps {
   prices?: { [k: string]: number }
 }
 
+const CALLDATA_ENDPOINT = `https://transaction.1delta.io/allocate`
+
 /**
  * Inner content that assumes LenderSelectionProvider is already mounted.
  * Gets flattened pool data + simulation info from props and renders the rows.
  */
 const LenderOperationsBuilderInner: React.FC<{
+  chainId: string
   flattenedPools: FlattenedPoolWithUserData[]
   positionTotals: PositionTotals
   userConfigs: UserConfigs
   prices?: { [k: string]: number }
-}> = ({ flattenedPools, positionTotals, userConfigs, prices }) => {
+}> = ({ flattenedPools, positionTotals, userConfigs, prices, chainId }) => {
   const { selections, addSelection } = useLenderSelection()
 
   // Run the simulation based on current selections
@@ -52,6 +58,35 @@ const LenderOperationsBuilderInner: React.FC<{
     }
     return map
   }, [steps])
+
+  const [txn, setTxn] = useState<any>({})
+
+  const { address: account } = useConnection()
+  useEffect(() => {
+    if (account) {
+      async function getCalldata() {
+        const params = generateAllocationActionsForApi({
+          selections,
+          finalAssetBalances,
+          receiver: account,
+        })
+        const response = await fetchTransactionData(CALLDATA_ENDPOINT, {
+          chainId,
+          operator: account!,
+          actions: params,
+        })
+
+        if (!response.success) {
+          console.error('Error:', response.error)
+          return
+        }
+
+        setTxn(response.data)
+      }
+      getCalldata()
+    }
+  }, [account, selections, finalAssetBalances])
+
 
   return (
     <div className="space-y-3">
@@ -164,6 +199,7 @@ export const LenderOperationsBuilder: React.FC<LenderOperationsBuilderProps> = (
   return (
     <LenderSelectionProvider initialSelections={initialSelections}>
       <LenderOperationsBuilderInner
+        chainId={chainId}
         prices={prices}
         flattenedPools={flattenedPools}
         positionTotals={positionTotals}

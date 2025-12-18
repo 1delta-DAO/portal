@@ -7,8 +7,9 @@ import { ChainFilterSelect } from './ChainFilter'
 import { useFlattenedPools } from '../../hooks/lending/usePoolData.js'
 import { LenderOperationsBuilder } from './LenderOperationsBuilder' // adjust path if needed
 import { useMarginData } from '../../hooks/lending/useMarginData'
+import { Loop } from './loop/Loop'
 
-type SubTab = 'markets' | 'operations'
+type SubTab = 'markets' | 'operations' | 'loop'
 
 export function LenderTab() {
   const { address: account } = useAccount()
@@ -34,25 +35,33 @@ export function LenderTab() {
     <div className="space-y-4">
       {/* Top bar: chain selector + sub-tabs */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex justify-start md:justify-start">
-          <div role="tablist" className="tabs tabs-bordered">
-            <button
-              type="button"
-              role="tab"
-              className={`tab tab-sm ${activeTab === 'markets' ? 'tab-active' : ''}`}
-              onClick={() => setActiveTab('markets')}
-            >
-              Markets
-            </button>
-            <button
-              type="button"
-              role="tab"
-              className={`tab tab-sm ${activeTab === 'operations' ? 'tab-active' : ''}`}
-              onClick={() => setActiveTab('operations')}
-            >
-              Operations
-            </button>
-          </div>
+        <div role="tablist" className="tabs tabs-bordered">
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'markets' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('markets')}
+          >
+            Markets
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'operations' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('operations')}
+          >
+            Operations
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'loop' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('loop')}
+          >
+            Loop
+          </button>
         </div>
 
         <div className="flex justify-end">
@@ -88,6 +97,11 @@ export function LenderTab() {
           error={error}
           refetch={refetch}
         />
+      )}
+      {activeTab === 'loop' && (
+        <div className="flex justify-center">
+          {lenderData && <Loop lenderData={lenderData} chainId={effectiveChainId} />}
+        </div>
       )}
     </div>
   )
