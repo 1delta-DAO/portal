@@ -8,8 +8,9 @@ import { useFlattenedPools } from '../../hooks/lending/usePoolData.js'
 import { LenderOperationsBuilder } from './LenderOperationsBuilder' // adjust path if needed
 import { useMarginData } from '../../hooks/lending/useMarginData'
 import { Loop } from './loop/Loop'
+import { Swap } from './swap/Swap'
 
-type SubTab = 'markets' | 'operations' | 'loop'
+type SubTab = 'markets' | 'operations' | 'loop' | 'swap'
 
 export function LenderTab() {
   const { address: account } = useAccount()
@@ -62,6 +63,15 @@ export function LenderTab() {
           >
             Loop
           </button>
+
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'swap' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('swap')}
+          >
+            Swap
+          </button>
         </div>
 
         <div className="flex justify-end">
@@ -101,6 +111,11 @@ export function LenderTab() {
       {activeTab === 'loop' && (
         <div className="flex justify-center">
           {lenderData && <Loop lenderData={lenderData} chainId={effectiveChainId} />}
+        </div>
+      )}
+      {activeTab === 'swap' && (
+        <div className="flex justify-center">
+          {lenderData && <Swap lenderData={lenderData} chainId={effectiveChainId} />}
         </div>
       )}
     </div>
