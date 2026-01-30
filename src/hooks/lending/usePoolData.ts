@@ -1,94 +1,163 @@
-import { LenderData, PoolWithMeta } from '@1delta/margin-fetcher'
 import { useQuery } from '@tanstack/react-query'
 
-type PoolsApiResponse = {
-  fetchedAt: number | string
-  chainIds: string[]
-  pools: PoolWithMeta[]
-}
-
 // @ts-ignore
-const BACKEND_BASE_URL = `https://margin-data.staging.1delta.io` // import.meta.env.VITE_MARGIN_API_URL
-const endpointPools = `${BACKEND_BASE_URL}/lending-pools-fast`
+const BACKEND_BASE_URL = `https://beta.data.1delta.io` // import.meta.env.VITE_MARGIN_API_URL
+const endpointLendingLatest = `${BACKEND_BASE_URL}/lending/latest?chains=`
 
-/**
- * Helper to build URL with multi-value params (?chainId=1&chainId=10&protocol=aave ...)
- * If you prefer comma-separated, toggle the commented line in appendArray().
- */
-function buildPoolsUrl(base: string, chainIds?: (number | string)[], protocols?: string[]) {
-  const url = new URL(base)
+// ============================================================================
+// Types for the /lending/latest API response
+// ============================================================================
 
-  const appendArray = (key: string, values?: (string | number)[]) => {
-    if (!values || values.length === 0) return
-    values.forEach((v) => url.searchParams.append(key, String(v)))
-    // If your server expects comma-separated instead of repeated keys:
-    // url.searchParams.set(key, values.map(String).join(','))
+interface LendingLatestApiResponse {
+  ok: boolean
+  data: {
+    [chainId: string]: ChainLendingDataRaw
   }
-
-  appendArray('chainId', chainIds)
-  appendArray('protocol', protocols)
-
-  return url.toString()
+  fetchedAt: number
 }
 
-/**
- * useFlattenedPools
- * Fetches from the Worker endpoint that returns flattened PoolWithMeta[] from KV,
- * filtered by chainId[] and protocol[].
- */
-export function useFlattenedPools(params?: {
-  chainIds?: string[]
-  protocols?: string[]
-  enabled?: boolean
-}) {
-  const chainIds = params?.chainIds
-  const protocols = params?.protocols
-  const enabled = params?.enabled ?? true
-
-  const url = buildPoolsUrl(endpointPools, chainIds, protocols)
-
-  const { data, isLoading, isFetching, error } = useQuery<PoolsApiResponse>({
-    queryKey: ['flattenedPools', url],
-    enabled,
-    queryFn: async () => {
-      const r = await fetch(url)
-      if (!r.ok) {
-        const text = await r.text().catch(() => '')
-        throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
-      }
-      const json = (await r.json()) as PoolsApiResponse
-
-      // Defensive narrowing
-      const pools = Array.isArray(json?.pools) ? json.pools : []
-      const chainIdsResp = Array.isArray(json?.chainIds) ? json.chainIds.map(String) : []
-
-      return {
-        fetchedAt: json?.fetchedAt ?? 0,
-        chainIds: chainIdsResp,
-        pools,
-      }
-    },
-    // Your KV is updated via cron every ~7 minutes:
-    // poll slightly less frequently to avoid waste (e.g., 8 minutes)
-    refetchInterval: 8 * 60 * 1000,
-    staleTime: 30_000, // tweak as you like
-    retry: 1,
-    // If you want steady UI between refetches:
-    // keepPreviousData: true,
-    refetchOnWindowFocus: false,
-  })
-
-  return {
-    pools: data?.pools ?? [],
-    fetchedAt: data?.fetchedAt,
-    chainIds: data?.chainIds ?? [],
-    isPoolsLoading: isLoading, // initial load only
-    isPoolsFetching: isFetching, // any in-flight fetch
-    error,
+interface ChainLendingDataRaw {
+  data: {
+    [lender: string]: LenderPoolDataRaw
   }
+  lastFetched: number
 }
-const endpointLenderData = `${BACKEND_BASE_URL}/lending-multi-fast?chains=`
 
+interface LenderPoolDataRaw {
+  poolData: PoolDataItem[]
+  chainId: string
+}
+
+// ============================================================================
+// Transformed types for internal use (pools indexed by poolId)
+// ============================================================================
+
+export type LenderData = {
+  [chainId: string]: ChainLendingData
+}
+
+export interface ChainLendingData {
+  data: {
+    [lender: string]: LenderPoolData
+  }
+  lastFetched: number
+}
+
+export interface LenderPoolData {
+  data: {
+    [poolId: string]: PoolDataItem
+  }
+  chainId: string
+}
+
+export interface PoolDataItem {
+  poolId: string
+  underlying: string
+  asset: PoolAsset
+  totalDeposits: number
+  totalDebtStable: number
+  totalDebt: number
+  totalLiquidity: number
+  totalDepositsUSD: number
+  totalDebtStableUSD: number
+  totalDebtUSD: number
+  totalLiquidityUSD: number
+  depositRate: number
+  variableBorrowRate: number
+  stableBorrowRate: number
+  intrinsicYield: number
+  rewards: Record<string, unknown>
+  config: Record<string, PoolConfig>
+  borrowCap: number
+  supplyCap: number
+  debtCeiling: number
+  collateralActive: boolean
+  borrowingEnabled: boolean
+  hasStable: boolean
+  isActive: boolean
+  isFrozen: boolean
+  params?: any
+}
+
+export interface PoolAsset {
+  chainId: string
+  decimals: number
+  name: string
+  address: string
+  symbol: string
+  logoURI: string
+  assetGroup: string
+  currencyId: string
+  pendle?: PendleAssetData
+}
+
+export interface PendleAssetData {
+  expiry: number
+  syAddress: string
+  tokenType: string
+  ytAddress: string
+  marketAddress: string
+}
+
+export interface PoolConfig {
+  label: string
+  category: number
+  borrowFactor: number
+  debtDisabled: boolean
+  collateralFactor: number
+  collateralDisabled: boolean
+  borrowCollateralFactor: number
+}
+
+export interface FlattenedPool {
+  chainId: string
+  lender: string
+  poolId: string
+  pool: PoolDataItem
+}
+
+// ============================================================================
+// Helper functions
+// ============================================================================
+
+/**
+ * Flattens LenderData into an array for display in tables/lists.
+ * Optionally filter by chainId.
+ */
+export function flattenLenderData(
+  lenderData: LenderData | undefined,
+  filterChainId?: string
+): FlattenedPool[] {
+  if (!lenderData) return []
+
+  const result: FlattenedPool[] = []
+
+  for (const [chainId, chainData] of Object.entries(lenderData)) {
+    if (filterChainId && chainId !== filterChainId) continue
+
+    for (const [lender, lenderPoolData] of Object.entries(chainData.data)) {
+      for (const [poolId, pool] of Object.entries(lenderPoolData.data)) {
+        result.push({
+          chainId,
+          lender,
+          poolId,
+          pool,
+        })
+      }
+    }
+  }
+
+  return result
+}
+
+// ============================================================================
+// Hooks
+// ============================================================================
+
+/**
+ * Fetches public lending data for a specific chain.
+ * Returns data indexed by poolId for easy lookup.
+ */
 export function useMarginPublicData(chainId: string) {
   const {
     data: lenderData,
@@ -98,19 +167,48 @@ export function useMarginPublicData(chainId: string) {
   } = useQuery<LenderData>({
     queryKey: ['lendingPublic', chainId],
     queryFn: async () => {
-      const r = await fetch(endpointLenderData + chainId)
+      const r = await fetch(endpointLendingLatest + chainId)
       if (!r.ok) {
         const text = await r.text().catch(() => '')
         throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
       }
-      const json = await r.json()
-      // Optionally validate json.data here
-      return json.data as LenderData
+      const json = (await r.json()) as LendingLatestApiResponse
+      if (!json.ok) {
+        throw new Error('API returned ok: false')
+      }
+
+      // Transform API response: convert poolData array to object keyed by poolId
+      const transformed: LenderData = {}
+
+      for (const [cId, chainData] of Object.entries(json.data)) {
+        const lenderDataMap: Record<string, LenderPoolData> = {}
+
+        for (const [lender, lenderPoolDataRaw] of Object.entries(chainData.data)) {
+          const poolDataByKey: Record<string, PoolDataItem> = {}
+
+          for (const pool of lenderPoolDataRaw.poolData) {
+            poolDataByKey[pool.poolId] = pool
+          }
+
+          lenderDataMap[lender] = {
+            data: poolDataByKey,
+            chainId: lenderPoolDataRaw.chainId,
+          }
+        }
+
+        transformed[cId] = {
+          data: lenderDataMap,
+          lastFetched: chainData.lastFetched,
+        }
+      }
+
+      return transformed
     },
     refetchInterval: 5 * 60 * 1000,
     staleTime: 5_000,
     retry: 1,
   })
+
   return {
     lenderData,
     isPublicDataLoading: isLoading,

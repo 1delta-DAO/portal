@@ -6,14 +6,12 @@ import {
   MinimalPositionInfo,
   UserPositions,
 } from '../../hooks/lending/useMarginData'
-import { LenderData } from '@1delta/margin-fetcher'
 
 interface UserLenderPositionsTableProps {
   account?: string
   chainId: string
   userPositions?: UserPositions
   // account: string
-  lenderData?: LenderData
   isLoading: boolean
   error: any
   refetch: () => void

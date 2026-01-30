@@ -1,6 +1,7 @@
-import { PoolData, UserConfig, ConfigEntry } from '@1delta/margin-fetcher'
+import { UserConfig, ConfigEntry } from '@1delta/margin-fetcher'
+import { PoolDataItem } from '../../hooks/lending/usePoolData'
 
-export function resolveConfigEntry(pool: PoolData, userConfig: UserConfig): ConfigEntry {
+export function resolveConfigEntry(pool: PoolDataItem, userConfig: UserConfig): ConfigEntry {
   const cfg = pool.config || {}
 
   // user-selected category takes precedence
@@ -9,13 +10,7 @@ export function resolveConfigEntry(pool: PoolData, userConfig: UserConfig): Conf
     return cfg[catFromUser]
   }
 
-  // otherwise, try the pool's eMode category
-  const catFromEmode = pool.eMode?.category
-  if (catFromEmode != null && cfg[catFromEmode]) {
-    return cfg[catFromEmode]
-  }
-
-  // fallback: category 0 if present
+  // fallback: category 0 if present (default/disabled mode)
   if (cfg[0]) return cfg[0]
 
   // final fallback: first config entry or zeros

@@ -1,11 +1,12 @@
-import { BalanceData, PoolData, UserConfig } from '@1delta/margin-fetcher'
+import { BalanceData, UserConfig } from '@1delta/margin-fetcher'
+import { PoolDataItem } from '../../hooks/lending/usePoolData'
 import { resolveConfigEntry } from './configs'
 
 export const positivePart = (n: number) => (n < 0 ? 0 : n)
 
 export function applyRepayDelta(
   balanceData: BalanceData,
-  pool: PoolData,
+  pool: PoolDataItem,
   amountUsd: number,
   userConfig: UserConfig
 ): BalanceData {

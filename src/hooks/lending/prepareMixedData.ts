@@ -3,13 +3,12 @@ import type { RawCurrency } from '@1delta/lib-utils'
 import {
   BaseLendingPosition,
   BasicReserveResponse,
-  LenderData,
-  PoolData,
   BalanceData,
   AprData,
   UserConfig,
 } from '@1delta/margin-fetcher'
 import { UserPositions } from './useMarginData'
+import { LenderData, PoolDataItem } from './usePoolData'
 
 /**
  * One flattened entry: a single pool for a specific chain & lender,
@@ -20,7 +19,7 @@ export interface FlattenedPoolWithUserData {
   lender: string
   poolId: string
   asset: RawCurrency
-  poolData: PoolData
+  poolData: PoolDataItem
   /** The user's position for this pool (if any) */
   userPosition?: { [accountId: string]: BaseLendingPosition }
 }

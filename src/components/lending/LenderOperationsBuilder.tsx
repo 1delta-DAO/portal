@@ -10,7 +10,8 @@ import {
   type PositionTotals,
   type UserConfigs,
 } from '../../hooks/lending/prepareMixedData'
-import { BaseLendingPosition, LenderData } from '@1delta/margin-fetcher'
+import { BaseLendingPosition } from '@1delta/margin-fetcher'
+import { LenderData } from '../../hooks/lending/usePoolData'
 import { useSimulatedLenderSelections } from '../../hooks/lending/useSimulatedLenderSelections'
 import type { SimulatedActionState } from '../../contexts/Simulation/simulateLenderSelections'
 import { RunningBalancesOverview } from './RunningBlanacesOverview'

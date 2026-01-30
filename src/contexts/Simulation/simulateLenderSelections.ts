@@ -1,5 +1,5 @@
 // src/utils/simulateLenderSelections.ts
-import { BalanceData, PoolData, UserConfig } from '@1delta/margin-fetcher'
+import { BalanceData, UserConfig } from '@1delta/margin-fetcher'
 import { type LenderOperationSelection, type LenderOperationKind } from '../LenderSelectionContext'
 import {
   FlattenedPoolWithUserData,
@@ -7,6 +7,7 @@ import {
   UserConfigs,
 } from '../../hooks/lending/prepareMixedData'
 import { RawCurrency } from '@1delta/lib-utils'
+import { PoolDataItem } from '../../hooks/lending/usePoolData'
 
 export interface AssetBalanceSnapshot {
   asset: RawCurrency
@@ -58,7 +59,7 @@ export type AmountUsdResolver = (
 
 export type AdjustForActionFn = (
   balanceIn: BalanceData,
-  pool: PoolData,
+  pool: PoolDataItem,
   amountUsd: number,
   action: LenderOperationKind,
   userConfig: UserConfig
@@ -229,7 +230,7 @@ export function simulateLenderSelections(
     // --- lender/subAccount balance update via adjustor ---
     const balanceAfter = adjustForAction(
       balanceBefore,
-      pool.poolData as PoolData,
+      pool.poolData,
       amountUsd,
       sel.operation,
       userConfigs[lender]?.[subAccount] ?? {

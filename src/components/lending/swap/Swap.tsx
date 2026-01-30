@@ -3,7 +3,7 @@ import {
   LendingMode,
   RawCurrency,
 } from '@1delta/lib-utils'
-import { LenderData, PoolData } from '@1delta/margin-fetcher'
+import { LenderData, PoolDataItem } from '../../../hooks/lending/usePoolData'
 import { useMemo, useState } from 'react'
 import { parseUnits } from 'viem'
 import { ExecuteSwapButton } from './Execute'
@@ -48,8 +48,8 @@ export const Swap = ({ lenderData, chainId }: Props) => {
 
   const poolList = useMemo(() => Object.values(pools), [pools])
 
-  const [assetInPool, setAssetInPool] = useState<PoolData | null>(null)
-  const [assetOutPool, setAssetOutPool] = useState<PoolData | null>(null)
+  const [assetInPool, setAssetInPool] = useState<PoolDataItem | null>(null)
+  const [assetOutPool, setAssetOutPool] = useState<PoolDataItem | null>(null)
   const [amount, setAmount] = useState<string>('')
   const [slippage, setSlippage] = useState<string>('0.3')
   const [irModeIn, setIrModeIn] = useState<LendingMode>(LendingMode.VARIABLE)
