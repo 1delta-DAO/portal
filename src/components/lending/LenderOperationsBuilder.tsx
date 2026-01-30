@@ -3,14 +3,13 @@ import React, { useEffect, useMemo, useState } from 'react'
 import type { Chain } from 'viem' // if you use it, otherwise remove
 import { LenderSelectionProvider, useLenderSelection } from '../../contexts/LenderSelectionContext'
 import { LenderOperationSelectionRow } from './LenderOperationSelectionRow'
-import type { UserPositions } from '../../hooks/lending/useMarginData' // type-only
+import type { UserDataResult } from '../../hooks/lending/useUserData'
 import {
   FlattenedPoolWithUserData,
   flattenLenderDataWithUser,
   type PositionTotals,
   type UserConfigs,
 } from '../../hooks/lending/prepareMixedData'
-import { BaseLendingPosition } from '@1delta/margin-fetcher'
 import { LenderData } from '../../hooks/lending/usePoolData'
 import { useSimulatedLenderSelections } from '../../hooks/lending/useSimulatedLenderSelections'
 import type { SimulatedActionState } from '../../contexts/Simulation/simulateLenderSelections'
@@ -21,7 +20,7 @@ import { fetchTransactionData } from '../../sdk/lending-helper/fetchFromApi'
 
 interface LenderOperationsBuilderProps {
   chainId: string
-  userPositions?: UserPositions
+  userDataResult?: UserDataResult
   lenderData?: LenderData
   isLoading: boolean
   error: any
@@ -136,7 +135,7 @@ const LenderOperationsBuilderInner: React.FC<{
 export const LenderOperationsBuilder: React.FC<LenderOperationsBuilderProps> = ({
   chainId,
   prices,
-  userPositions,
+  userDataResult,
   lenderData,
   isLoading,
   error,
@@ -151,7 +150,7 @@ export const LenderOperationsBuilder: React.FC<LenderOperationsBuilderProps> = (
     )
   }
 
-  if (error || !lenderData || !userPositions) {
+  if (error || !lenderData || !userDataResult) {
     return (
       <div className="alert alert-error flex items-center justify-between">
         <div className="text-sm">
@@ -169,7 +168,7 @@ export const LenderOperationsBuilder: React.FC<LenderOperationsBuilderProps> = (
   const { flattenedPools, positionTotals, userConfigs } = useMemo(() => {
     const { result, positionTotals, userConfigs } = flattenLenderDataWithUser(
       lenderData,
-      userPositions,
+      userDataResult,
       chainId
     )
 
@@ -182,7 +181,7 @@ export const LenderOperationsBuilder: React.FC<LenderOperationsBuilderProps> = (
       positionTotals,
       userConfigs,
     }
-  }, [lenderData, userPositions, chainId])
+  }, [lenderData, userDataResult, chainId])
 
   // Default selections: all pools where user has any position
   const initialSelections = useMemo(
@@ -212,7 +211,7 @@ export const LenderOperationsBuilder: React.FC<LenderOperationsBuilderProps> = (
 
 // helper: max(depositsUSD, totalBorrowUSD) from FIRST sub-account only
 function getPrimaryExposureUSD(pool: FlattenedPoolWithUserData): number {
-  const map = (pool.userPosition as Record<string, BaseLendingPosition> | undefined) ?? undefined
+  const map = pool.userPosition
   if (!map) return 0
 
   const firstKey = Object.keys(map)[0]

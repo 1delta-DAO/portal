@@ -5,8 +5,10 @@ import { getAvailableMarginChainIds } from '@1delta/lib-utils'
 import { UserLenderPositionsTable } from './UserTable'
 import { LendingPoolsTable } from './PoolsTable'
 import { ChainFilterSelect } from './ChainFilter'
-import { LenderOperationsBuilder } from './LenderOperationsBuilder' // adjust path if needed
-import { useMarginData } from '../../hooks/lending/useMarginData'
+import { LenderOperationsBuilder } from './LenderOperationsBuilder'
+import { useUserData } from '../../hooks/lending/useUserData'
+import { useMarginPublicData } from '../../hooks/lending/usePoolData'
+import { useMainPrices } from '../../hooks/prices/useMainPrices'
 import { Loop } from './loop/Loop'
 import { Swap } from './swap/Swap'
 
@@ -25,10 +27,14 @@ export function LenderTab() {
 
   const effectiveChainId = selectedChain
 
-  const { userPositions, lenderData, isLoading, error, refetch, prices } = useMarginData(
-    effectiveChainId,
-    account
-  )
+  const { lenderData, isPublicDataLoading } = useMarginPublicData(effectiveChainId)
+  const { userData, isUserDataLoading, error, refetch } = useUserData({
+    chainId: effectiveChainId,
+    account,
+  })
+  const { data: prices } = useMainPrices()
+
+  const isLoading = isPublicDataLoading || isUserDataLoading
 
   return (
     <div className="space-y-4">
@@ -84,8 +90,8 @@ export function LenderTab() {
             <UserLenderPositionsTable
               account={account}
               chainId={effectiveChainId}
-              userPositions={userPositions}
-              isLoading={Boolean(isLoading)}
+              userData={userData}
+              isLoading={isLoading}
               error={error}
               refetch={refetch}
             />
@@ -98,9 +104,9 @@ export function LenderTab() {
         <LenderOperationsBuilder
           prices={prices}
           chainId={effectiveChainId}
-          userPositions={userPositions}
+          userDataResult={userData}
           lenderData={lenderData}
-          isLoading={Boolean(isLoading)}
+          isLoading={isLoading}
           error={error}
           refetch={refetch}
         />
