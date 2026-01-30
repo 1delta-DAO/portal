@@ -1,10 +1,10 @@
 // src/components/LenderTab.tsx
-import React, { useMemo, useState } from 'react'
+import React, { useState } from 'react'
 import { useAccount } from 'wagmi'
+import { getAvailableMarginChainIds } from '@1delta/lib-utils'
 import { UserLenderPositionsTable } from './UserTable'
 import { LendingPoolsTable } from './PoolsTable'
 import { ChainFilterSelect } from './ChainFilter'
-import { useFlattenedPools } from '../../hooks/lending/usePoolData.js'
 import { LenderOperationsBuilder } from './LenderOperationsBuilder' // adjust path if needed
 import { useMarginData } from '../../hooks/lending/useMarginData'
 import { Loop } from './loop/Loop'
@@ -12,18 +12,16 @@ import { Swap } from './swap/Swap'
 
 type SubTab = 'markets' | 'operations' | 'loop' | 'swap'
 
+const chains = getAvailableMarginChainIds()
+
 export function LenderTab() {
   const { address: account } = useAccount()
-  const { pools } = useFlattenedPools()
 
   // shared chain filter state
   const [selectedChain, setSelectedChain] = useState<string>('1')
 
   // sub-tab state
   const [activeTab, setActiveTab] = useState<SubTab>('markets')
-
-  // derive available chains from pools (unique + sorted)
-  const chains = useMemo(() => Array.from(new Set(pools.map((p) => p.chainId))).sort(), [pools])
 
   const effectiveChainId = selectedChain
 
