@@ -1,43 +1,32 @@
 // src/components/LendingPoolsTable.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   getChainName,
   lenderDisplayName,
   lenderDisplayNameFull,
-  RawCurrency,
 } from '@1delta/lib-utils'
-import { useFlattenedPools } from '../../hooks/lending/usePoolData.js'
-import { createPortal } from 'react-dom'
+import { useFlattenedPools, PoolEntry, PoolExposure } from '../../hooks/lending/useFlattenedPools.js'
 import { getFormattedPrice } from '../../utils/price.js'
 
-type SortKey = 'apr' | 'utilitzation' | 'totalLiquidityUSD' | 'totalDepositsUSD'
+type SortKey = 'apr' | 'utilization' | 'totalLiquidityUSD' | 'totalDepositsUSD'
 
 interface LendingPoolsTableProps {
   /** Chain to display. Required – we do not allow "all chains" here. */
   chainId?: string
 }
 
-/**
- * Utility to render a GenericCurrency nicely even if the shape differs.
- */
-const renderCurrency = (asset: RawCurrency) => {
-  const symbol = asset?.symbol ?? (asset as any)?.ticker ?? ''
-  const name = asset?.name ?? (asset as any)?.label ?? symbol
-  return (
-    <div className="flex items-center gap-2">
-      <div className="avatar placeholder">
-        <div className="bg-base-300 text-base-content rounded-full w-7 flex items-center justify-center overflow-hidden">
-          {asset.logoURI && <img src={asset.logoURI} width="20" height="20" alt={symbol} />}
-        </div>
-      </div>
-      <div className="flex flex-col">
-        <span className="font-medium">{symbol || name}</span>
-        {name && symbol && name !== symbol && (
-          <span className="text-xs text-base-content/60">{name}</span>
-        )}
-      </div>
-    </div>
-  )
+/** Compute derived values from pool data */
+function computePoolMetrics(pool: PoolEntry) {
+  const totalDeposits = parseFloat(pool.total_deposits) || 0
+  const totalDebt = parseFloat(pool.total_debt) || 0
+  const totalDepositsUSD = parseFloat(pool.total_deposits_usd) || 0
+
+  const utilization = totalDeposits > 0 ? totalDebt / totalDeposits : 0
+  const apr = (parseFloat(pool.deposit_rate) || 0) * 100
+  const price = totalDeposits > 0 ? totalDepositsUSD / totalDeposits : 0
+
+  return { utilization, apr, price }
 }
 
 export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({ chainId }) => {
@@ -55,9 +44,12 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({ chainId })
   const [maxUtilPct, setMaxUtilPct] = useState<string>('90') // %
   const [minDepositsUsd, setMinDepositsUsd] = useState<string>('10000') // USD
   const [minAprPct, setMinAprPct] = useState<string>('1') // %
-  const [assetFilter, setAssetFilter] = useState<string>('USD') // address / symbol / name
+  const [assetFilter, setAssetFilter] = useState<string>('') // address / symbol / name
 
-  const { pools, isPoolsLoading: loading } = useFlattenedPools()
+  const { pools, isPoolsLoading: loading } = useFlattenedPools({
+    chainId,
+    enabled: !!chainId,
+  })
 
   // If no chainId is provided, we do NOT allow "all chains"
   if (!chainId) {
@@ -68,49 +60,38 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({ chainId })
     )
   }
 
-  // Restrict to the selected chain
-  const poolsForChain = useMemo(() => pools.filter((p) => p.chainId === chainId), [pools, chainId])
-
   const lenders = useMemo(
-    () => Array.from(new Set(poolsForChain.map((p) => p.lender))).sort(),
-    [poolsForChain]
+    () => Array.from(new Set(pools.map((p) => p.lender_key))).sort(),
+    [pools]
   )
 
   const filteredAndSortedPools = useMemo(() => {
-    let result = poolsForChain
+    let result = pools
 
     // lender
     if (selectedLender !== 'all') {
-      result = result.filter((p) => p.lender === selectedLender)
+      result = result.filter((p) => p.lender_key === selectedLender)
     }
 
-    // generic search (pool / lender / asset symbol / name)
+    // generic search (underlying address / lender / asset group)
     if (search.trim()) {
       const q = search.toLowerCase()
       result = result.filter((p) => {
-        const symbol = (p.asset as any)?.symbol ?? (p.asset as any)?.ticker ?? ''
-        const name = (p.asset as any)?.name ?? ''
         return (
-          p.poolId.toLowerCase().includes(q) ||
-          p.lender.toLowerCase().includes(q) ||
-          symbol.toLowerCase().includes(q) ||
-          name.toLowerCase().includes(q)
+          p.underlying_address.toLowerCase().includes(q) ||
+          p.lender_key.toLowerCase().includes(q) ||
+          p.asset_group.toLowerCase().includes(q)
         )
       })
     }
 
-    // asset filter (address / symbol / name)
+    // asset filter (address / asset group)
     if (assetFilter.trim()) {
       const q = assetFilter.toLowerCase()
       result = result.filter((p) => {
-        const asset = p.asset as any
-        const symbol = asset?.symbol ?? asset?.ticker ?? ''
-        const name = asset?.name ?? ''
-        const address = asset?.address ?? asset?.addr ?? ''
         return (
-          symbol.toLowerCase().includes(q) ||
-          name.toLowerCase().includes(q) ||
-          address.toLowerCase().includes(q)
+          p.asset_group.toLowerCase().includes(q) ||
+          p.underlying_address.toLowerCase().includes(q)
         )
       })
     }
@@ -118,31 +99,62 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({ chainId })
     // numeric filters
     const maxUtil = parseFloat(maxUtilPct)
     if (!Number.isNaN(maxUtil)) {
-      result = result.filter((p) => (p.utilitzation ?? 0) * 100 <= maxUtil)
+      result = result.filter((p) => {
+        const { utilization } = computePoolMetrics(p)
+        return utilization * 100 <= maxUtil
+      })
     }
 
     const minDeps = parseFloat(minDepositsUsd)
     if (!Number.isNaN(minDeps)) {
-      result = result.filter((p) => p.totalDepositsUSD >= minDeps)
+      result = result.filter((p) => (parseFloat(p.total_deposits_usd) || 0) >= minDeps)
     }
 
     const minApr = parseFloat(minAprPct)
     if (!Number.isNaN(minApr)) {
-      // note: apr is already a percentage in your code (no *100)
-      result = result.filter((p) => (p.apr ?? 0) >= minApr)
+      result = result.filter((p) => {
+        const { apr } = computePoolMetrics(p)
+        return apr >= minApr
+      })
     }
 
     // sort
     result = [...result].sort((a, b) => {
-      const aVal = (a as any)[sortKey] ?? 0
-      const bVal = (b as any)[sortKey] ?? 0
+      const metricsA = computePoolMetrics(a)
+      const metricsB = computePoolMetrics(b)
+
+      let aVal: number
+      let bVal: number
+
+      switch (sortKey) {
+        case 'apr':
+          aVal = metricsA.apr
+          bVal = metricsB.apr
+          break
+        case 'utilization':
+          aVal = metricsA.utilization
+          bVal = metricsB.utilization
+          break
+        case 'totalDepositsUSD':
+          aVal = parseFloat(a.total_deposits_usd) || 0
+          bVal = parseFloat(b.total_deposits_usd) || 0
+          break
+        case 'totalLiquidityUSD':
+          aVal = parseFloat(a.total_liquidity_usd) || 0
+          bVal = parseFloat(b.total_liquidity_usd) || 0
+          break
+        default:
+          aVal = 0
+          bVal = 0
+      }
+
       const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
       return sortDir === 'asc' ? cmp : -cmp
     })
 
     return result
   }, [
-    poolsForChain,
+    pools,
     search,
     selectedLender,
     sortKey,
@@ -214,7 +226,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({ chainId })
         <div className="flex flex-wrap gap-2 md:justify-end">
           <input
             type="text"
-            placeholder="Search asset / pool / lender"
+            placeholder="Search asset / lender"
             className="input input-bordered input-sm w-full md:w-64"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -294,7 +306,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({ chainId })
 
         <div className="form-control w-36">
           <label className="label py-0">
-            <span className="label-text text-xs">Asset (addr / symbol / name)</span>
+            <span className="label-text text-xs">Asset (addr / symbol)</span>
           </label>
           <input
             type="text"
@@ -320,9 +332,9 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({ chainId })
                     <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </th>
-                <th className="cursor-pointer" onClick={() => toggleSort('utilitzation')}>
+                <th className="cursor-pointer" onClick={() => toggleSort('utilization')}>
                   Utilization
-                  {sortKey === 'utilitzation' && (
+                  {sortKey === 'utilization' && (
                     <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </th>
@@ -338,25 +350,38 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({ chainId })
                     <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </th>
-                <th>Exposure</th>
                 <th>Price</th>
+                <th>Exposures</th>
               </tr>
             </thead>
             <tbody>
               {paginatedPools.map((p) => {
-                const utilPct = (p.utilitzation ?? 0) * 100
-                const aprPct = p.apr ?? 0
+                const { utilization, apr, price } = computePoolMetrics(p)
+                const utilPct = utilization * 100
+                const totalDepositsUSD = parseFloat(p.total_deposits_usd) || 0
+                const totalDebtUSD = parseFloat(p.total_debt_usd) || 0
+                const totalLiquidityUSD = parseFloat(p.total_liquidity_usd) || 0
+
                 return (
-                  <tr key={`${p.chainId}-${p.lender}-${p.poolId}`} className="h-[75px]">
-                    <td>{renderCurrency(p.asset as RawCurrency)}</td>
+                  <tr key={`${p.chain_id}-${p.lender_key}-${p.underlying_address}`} className="h-[75px]">
                     <td>
-                      <div className="flex flex-col text-xs">
-                        <span className="font-semibold">{lenderDisplayName(p.lender)}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{p.asset_group}</span>
+                          <span className="text-xs text-base-content/60 font-mono">
+                            {p.underlying_address.slice(0, 6)}...{p.underlying_address.slice(-4)}
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td>
                       <div className="flex flex-col text-xs">
-                        <span className="font-semibold">{aprPct.toFixed(2)}%</span>
+                        <span className="font-semibold">{lenderDisplayName(p.lender_key)}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="flex flex-col text-xs">
+                        <span className="font-semibold">{apr.toFixed(2)}%</span>
                       </div>
                     </td>
                     <td>
@@ -373,13 +398,13 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({ chainId })
                       <div className="flex flex-col text-xs">
                         <span className="font-semibold">
                           $
-                          {p.totalDepositsUSD.toLocaleString(undefined, {
+                          {totalDepositsUSD.toLocaleString(undefined, {
                             maximumFractionDigits: 0,
                           })}
                         </span>
                         <span className="text-base-content/60">
                           Debt: $
-                          {p.totalDebtUSD.toLocaleString(undefined, {
+                          {totalDebtUSD.toLocaleString(undefined, {
                             maximumFractionDigits: 0,
                           })}
                         </span>
@@ -388,34 +413,20 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({ chainId })
                     <td>
                       <span className="text-xs font-semibold">
                         $
-                        {p.totalLiquidityUSD.toLocaleString(undefined, {
+                        {totalLiquidityUSD.toLocaleString(undefined, {
                           maximumFractionDigits: 0,
                         })}
                       </span>
                     </td>
-                    <td className="align-top">
-                      <ExposureCell exposures={p.exposure as any[]} />
-                    </td>
                     <td>
                       <div className="flex flex-col text-xs">
-                        {p.price != null && (
-                          <span className="font-semibold">${getFormattedPrice(p.price)}</span>
-                        )}
-                        {p.histPrice != null && (
-                          <span className="text-base-content/60 whitespace-nowrap">
-                            24h: ${getFormattedPrice(p.histPrice)}
-                          </span>
-                        )}
-                        {p.price != null && p.histPrice != null && p.histPrice !== 0 && (
-                          <span
-                            className={`text-xs whitespace-nowrap ${
-                              p.price >= p.histPrice ? 'text-success' : 'text-error'
-                            }`}
-                          >
-                            {(((p.price - p.histPrice) / p.histPrice) * 100).toFixed(2)}%
-                          </span>
+                        {price > 0 && (
+                          <span className="font-semibold">${getFormattedPrice(price)}</span>
                         )}
                       </div>
+                    </td>
+                    <td>
+                      <ExposureCell exposures={p.exposures} />
                     </td>
                   </tr>
                 )
@@ -471,14 +482,17 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({ chainId })
     </div>
   )
 }
+
 /**
  * Exposure cell with inline badges + N-more popover rendered via portal.
  * Badges are width-limited and truncated, with full info in native tooltips.
  */
-const ExposureCell: React.FC<{ exposures: any[] }> = ({ exposures }) => {
+const ExposureCell: React.FC<{ exposures: PoolExposure[] }> = ({ exposures }) => {
+  const meaningful = exposures.filter((e) => e.configId !== 0)
+
   const maxInline = 2
-  const inline = exposures.slice(0, maxInline)
-  const remaining = exposures.slice(maxInline)
+  const inline = meaningful.slice(0, maxInline)
+  const remaining = meaningful.slice(maxInline)
 
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
@@ -498,25 +512,25 @@ const ExposureCell: React.FC<{ exposures: any[] }> = ({ exposures }) => {
     setOpen(false)
   }
 
+  if (meaningful.length === 0) {
+    return <span className="text-xs text-base-content/40">—</span>
+  }
+
+  const badgeTitle = (ex: PoolExposure) =>
+    `${ex.label} – collaterals: ${ex.collaterals?.length ?? 0}, debts: ${ex.debts?.length ?? 0} (configId: ${ex.configId})`
+
   return (
     <>
       <div className="flex flex-wrap items-center gap-1 max-w-56">
-        {inline.map((ex, i) => {
-          const exSymbol = ex.asset?.symbol ?? ex.asset?.ticker ?? ''
-          const symbolLabel = exSymbol || 'UNKNOWN'
-          const cfPct = ex.collateralFactor * 100 || 0
-
-          return (
-            <span
-              key={`${symbolLabel}-${i}`}
-              className="badge badge-outline badge-sm text-xs max-w-28 overflow-hidden"
-              title={`${symbolLabel} – Collateral factor: ${cfPct.toFixed(2)}%`}
-            >
-              <span className="truncate max-w-16 inline-block align-middle">{symbolLabel}</span>
-              <span className="opacity-60 inline-block align-middle"> ({cfPct.toFixed(0)}%)</span>
-            </span>
-          )
-        })}
+        {inline.map((ex) => (
+          <span
+            key={ex.configId}
+            className="badge badge-outline badge-sm text-xs max-w-28 overflow-hidden"
+            title={badgeTitle(ex)}
+          >
+            <span className="truncate max-w-24 inline-block align-middle">{ex.label}</span>
+          </span>
+        ))}
 
         {remaining.length > 0 && (
           <span
@@ -524,14 +538,7 @@ const ExposureCell: React.FC<{ exposures: any[] }> = ({ exposures }) => {
             tabIndex={0}
             className="badge badge-ghost badge-sm cursor-pointer text-xs"
             onClick={openPopover}
-            title={remaining
-              .map((ex: any) => {
-                const exSymbol = ex.asset?.symbol ?? ex.asset?.ticker ?? ''
-                const symbolLabel = exSymbol || 'UNKNOWN'
-                const cfPct = ex.collateralFactor * 100 || 0
-                return `${symbolLabel}: ${cfPct.toFixed(2)}%`
-              })
-              .join('\n')}
+            title={remaining.map((ex) => badgeTitle(ex)).join('\n')}
           >
             +{remaining.length} more
           </span>
@@ -553,27 +560,17 @@ const ExposureCell: React.FC<{ exposures: any[] }> = ({ exposures }) => {
               }}
             >
               <div className="flex flex-wrap gap-1">
-                {remaining.map((ex, i) => {
-                  const exSymbol = ex.asset?.symbol ?? ex.asset?.ticker ?? ''
-                  const symbolLabel = exSymbol || 'UNKNOWN'
-                  const cfPct = ex.collateralFactor * 100 || 0
-
-                  return (
-                    <span
-                      key={`${symbolLabel}-more-${i}`}
-                      className="badge badge-outline badge-sm text-xs max-w-28 overflow-hidden"
-                      title={`${symbolLabel} – Collateral factor: ${cfPct.toFixed(2)}%`}
-                    >
-                      <span className="truncate max-w-16 inline-block align-middle">
-                        {symbolLabel}
-                      </span>
-                      <span className="opacity-60 inline-block align-middle">
-                        {' '}
-                        ({cfPct.toFixed(0)}%)
-                      </span>
+                {remaining.map((ex) => (
+                  <span
+                    key={ex.configId}
+                    className="badge badge-outline badge-sm text-xs max-w-28 overflow-hidden"
+                    title={badgeTitle(ex)}
+                  >
+                    <span className="truncate max-w-24 inline-block align-middle">
+                      {ex.label}
                     </span>
-                  )
-                })}
+                  </span>
+                ))}
               </div>
             </div>
           </>,
