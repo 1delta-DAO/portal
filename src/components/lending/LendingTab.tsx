@@ -87,7 +87,6 @@ export function LenderTab() {
               account={account}
               chainId={effectiveChainId}
               userPositions={userPositions}
-              lenderData={lenderData}
               isLoading={Boolean(isLoading)}
               error={error}
               refetch={refetch}
