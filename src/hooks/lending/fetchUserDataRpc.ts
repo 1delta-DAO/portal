@@ -55,6 +55,27 @@ export type UserDataApiResponseData = {
 const BACKEND_BASE_URL = 'https://portal.1delta.io/v1/data'
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+async function fetchApi<T extends { ok: boolean }>(
+  label: string,
+  url: string,
+  init?: RequestInit
+): Promise<T> {
+  const res = await fetch(url, init)
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`${label} HTTP ${res.status}: ${text || res.statusText}`)
+  }
+  const json = (await res.json()) as T
+  if (!json.ok) {
+    throw new Error(`${label} API returned ok: false`)
+  }
+  return json
+}
+
+// ============================================================================
 // Main function
 // ============================================================================
 
@@ -73,19 +94,9 @@ export async function fetchUserDataViaRpc(
     `${BACKEND_BASE_URL}/lending/user-positions/rpc-call` +
     `?chain=${chainId}&account=${account}&batchSize=10`
 
-  console.log("rpcCallUrl", rpcCallUrl)  // --- IGNORE ---
-
-  const step1Res = await fetch(rpcCallUrl)
-  if (!step1Res.ok) {
-    const text = await step1Res.text().catch(() => '')
-    throw new Error(`rpc-call HTTP ${step1Res.status}: ${text || step1Res.statusText}`)
-  }
-  const step1Json = (await step1Res.json()) as RpcCallApiResponse
-  if (!step1Json.ok) {
-    throw new Error('rpc-call API returned ok: false')
-  }
-
-  const { rpcCallId, rpcCalls } = step1Json.data
+  const { data: { rpcCallId, rpcCalls } } = await fetchApi<RpcCallApiResponse>(
+    'rpc-call', rpcCallUrl
+  )
 
   // Step 2: Execute JSON-RPC calls via user's own RPC provider
   const client = await getRpcSelectorEvmClient(chainId, RpcAction.MULTICALL)
@@ -118,23 +129,15 @@ export async function fetchUserDataViaRpc(
 
   // Step 3: Send results to parse endpoint
   const parseUrl = `${BACKEND_BASE_URL}/lending/user-positions/parse`
-  const step3Res = await fetch(parseUrl, {
+  const { data: parseData } = await fetchApi<ParseApiResponse>('parse', parseUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rpcCallId, rawResponses }),
   })
-  if (!step3Res.ok) {
-    const text = await step3Res.text().catch(() => '')
-    throw new Error(`parse HTTP ${step3Res.status}: ${text || step3Res.statusText}`)
-  }
-  const step3Json = (await step3Res.json()) as ParseApiResponse
-  if (!step3Json.ok) {
-    throw new Error('parse API returned ok: false')
-  }
 
   // Step 4: Normalize flat-by-lender response to { [chainId]: { [lender]: ... } }
   const normalized: UserDataApiResponseData = {}
-  for (const [lender, entry] of Object.entries(step3Json.data)) {
+  for (const [lender, entry] of Object.entries(parseData)) {
     const cId = entry.chainId || chainId
     if (!normalized[cId]) normalized[cId] = {}
     normalized[cId][lender] = entry
