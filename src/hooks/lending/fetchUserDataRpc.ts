@@ -1,5 +1,5 @@
-import { getRpcSelectorEvmClient, RpcAction } from '@1delta/lib-utils'
 import type { LenderUserDataEntry } from './useUserData'
+import { executeRpcCallsWithRetry } from './executeRpcCalls'
 
 // ============================================================================
 // Types for the rpc-call endpoint
@@ -99,33 +99,7 @@ export async function fetchUserDataViaRpc(
   )
 
   // Step 2: Execute JSON-RPC calls via user's own RPC provider
-  const client = await getRpcSelectorEvmClient(chainId, RpcAction.MULTICALL)
-  if (!client) {
-    throw new Error(`No RPC client available for chain ${chainId}`)
-  }
-
-  const rpcResults = await Promise.allSettled(
-    rpcCalls.map((call) =>
-      client.request({
-        method: call.method,
-        params: call.params as any,
-      })
-    )
-  )
-
-  const rawResponses: JsonRpcResponse[] = rpcResults.map((settled, i) => {
-    const base = { jsonrpc: '2.0' as const, id: rpcCalls[i].id }
-    if (settled.status === 'fulfilled') {
-      return { ...base, result: settled.value as string }
-    }
-    return {
-      ...base,
-      error: {
-        code: -32000,
-        message: settled.reason?.message ?? 'RPC call failed',
-      },
-    }
-  })
+  const rawResponses = await executeRpcCallsWithRetry(chainId, rpcCalls)
 
   // Step 3: Send results to parse endpoint
   const parseUrl = `${BACKEND_BASE_URL}/lending/user-positions/parse`
