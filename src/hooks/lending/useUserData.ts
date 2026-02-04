@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 
 // ============================================================================
-// Types for the /lending/user-data API response
+// Types for the /lending/user-positions API response
 // ============================================================================
 
 export interface UserPositionEntry {
@@ -119,8 +119,8 @@ export interface UserDataResult {
 // Endpoint
 // ============================================================================
 
-const BACKEND_BASE_URL = 'https://beta.data.1delta.io'
-const endpointUserData = `${BACKEND_BASE_URL}/lending/user-data`
+const BACKEND_BASE_URL = 'https://portal.1delta.io/v1'
+const endpointUserData = `${BACKEND_BASE_URL}/lending/user-positions`
 
 // ============================================================================
 // Helpers
@@ -246,7 +246,7 @@ function buildSummaries(data: UserDataApiResponse['data']): {
 
 /**
  * useUserData
- * Fetches user lending positions from the /lending/user-data endpoint.
+ * Fetches user lending positions from the /lending/user-positions endpoint.
  */
 export function useUserData(params: {
   chainId: string

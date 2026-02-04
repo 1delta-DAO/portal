@@ -9,7 +9,7 @@ type Props = {
 }
 
 const getEndpoint = (swapType: 'debt' | 'collateral') => {
-  const baseUrl = 'https://beta.api.1delta.io'
+  const baseUrl = 'https://portal.1delta.io/v1/actions/lending'
   return swapType === 'debt' ? `${baseUrl}/debt-swap` : `${baseUrl}/collateral-swap`
 }
 

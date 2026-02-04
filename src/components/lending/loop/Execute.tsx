@@ -7,7 +7,7 @@ type Props = {
   params: Record<string, string | number | boolean | bigint>
 }
 
-const endpoint = 'https://beta.api.1delta.io/loop'
+const endpoint = 'https://portal.1delta.io/v1/actions/lending/loop'
 
 export function ExecuteLoopButton({ params }: Props) {
   const { data: signer } = useWalletClient()
