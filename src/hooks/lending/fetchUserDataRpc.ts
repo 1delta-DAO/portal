@@ -92,7 +92,7 @@ export async function fetchUserDataViaRpc(
   // Step 1: Get RPC call descriptors from backend
   const rpcCallUrl =
     `${BACKEND_BASE_URL}/lending/user-positions/rpc-call` +
-    `?chain=${chainId}&account=${account}&batchSize=10`
+    `?chain=${chainId}&account=${account}`
 
   const { data: { rpcCallId, rpcCalls } } = await fetchApi<RpcCallApiResponse>(
     'rpc-call', rpcCallUrl
