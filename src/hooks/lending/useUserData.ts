@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { fetchUserDataViaRpc } from './fetchUserDataRpc'
 
 // ============================================================================
 // Types for the /lending/user-positions API response
@@ -121,6 +122,7 @@ export interface UserDataResult {
 
 const BACKEND_BASE_URL = 'https://portal.1delta.io/v1'
 const endpointUserData = `${BACKEND_BASE_URL}/lending/user-positions`
+const USE_RPC_FETCH = true
 
 // ============================================================================
 // Helpers
@@ -262,20 +264,27 @@ export function useUserData(params: {
     queryKey: ['userData', chainId, account],
     enabled,
     queryFn: async () => {
-      const r = await fetch(url)
-      if (!r.ok) {
-        const text = await r.text().catch(() => '')
-        throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
-      }
-      const json = (await r.json()) as UserDataApiResponse
-      if (!json.ok) {
-        throw new Error('API returned ok: false')
+      let data: UserDataApiResponse['data']
+
+      if (USE_RPC_FETCH) {
+        data = await fetchUserDataViaRpc(chainId, account!)
+      } else {
+        const r = await fetch(url)
+        if (!r.ok) {
+          const text = await r.text().catch(() => '')
+          throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
+        }
+        const json = (await r.json()) as UserDataApiResponse
+        if (!json.ok) {
+          throw new Error('API returned ok: false')
+        }
+        data = json.data
       }
 
-      const { lenderSummaries, total, total24h, apr } = buildSummaries(json.data)
+      const { lenderSummaries, total, total24h, apr } = buildSummaries(data)
 
       return {
-        raw: json.data,
+        raw: data,
         lenderSummaries,
         total,
         total24h,
