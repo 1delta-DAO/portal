@@ -11,8 +11,9 @@ import { useMarginPublicData } from '../../hooks/lending/usePoolData'
 import { useMainPrices } from '../../hooks/prices/useMainPrices'
 import { Loop } from './loop/Loop'
 import { Swap } from './swap/Swap'
+import { Close } from './close/Close'
 
-type SubTab = 'markets' | 'operations' | 'loop' | 'swap'
+type SubTab = 'markets' | 'operations' | 'loop' | 'swap' | 'close'
 
 const chains = getAvailableMarginChainIds()
 
@@ -76,6 +77,15 @@ export function LenderTab() {
           >
             Swap
           </button>
+
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'close' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('close')}
+          >
+            Close
+          </button>
         </div>
 
         <div className="flex justify-end">
@@ -119,6 +129,11 @@ export function LenderTab() {
       {activeTab === 'swap' && (
         <div className="flex justify-center">
           {lenderData && <Swap lenderData={lenderData} chainId={effectiveChainId} />}
+        </div>
+      )}
+      {activeTab === 'close' && (
+        <div className="flex justify-center">
+          {lenderData && <Close lenderData={lenderData} chainId={effectiveChainId} />}
         </div>
       )}
     </div>
