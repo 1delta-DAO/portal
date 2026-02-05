@@ -12,8 +12,9 @@ import { useMainPrices } from '../../hooks/prices/useMainPrices'
 import { Loop } from './loop/Loop'
 import { Swap } from './swap/Swap'
 import { Close } from './close/Close'
+import { LendingActionTab } from './LendingActionTab'
 
-type SubTab = 'markets' | 'operations' | 'loop' | 'swap' | 'close'
+type SubTab = 'markets' | 'operations' | 'deposit' | 'withdraw' | 'borrow' | 'repay' | 'loop' | 'swap' | 'close'
 
 const chains = getAvailableMarginChainIds()
 
@@ -58,6 +59,42 @@ export function LenderTab() {
             onClick={() => setActiveTab('operations')}
           >
             Operations
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'deposit' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('deposit')}
+          >
+            Deposit
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'withdraw' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('withdraw')}
+          >
+            Withdraw
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'borrow' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('borrow')}
+          >
+            Borrow
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'repay' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('repay')}
+          >
+            Repay
           </button>
 
           <button
@@ -120,6 +157,26 @@ export function LenderTab() {
           error={error}
           refetch={refetch}
         />
+      )}
+      {activeTab === 'deposit' && (
+        <div className="flex justify-center">
+          {lenderData && <LendingActionTab lenderData={lenderData} chainId={effectiveChainId} actionType="Deposit" />}
+        </div>
+      )}
+      {activeTab === 'withdraw' && (
+        <div className="flex justify-center">
+          {lenderData && <LendingActionTab lenderData={lenderData} chainId={effectiveChainId} actionType="Withdraw" />}
+        </div>
+      )}
+      {activeTab === 'borrow' && (
+        <div className="flex justify-center">
+          {lenderData && <LendingActionTab lenderData={lenderData} chainId={effectiveChainId} actionType="Borrow" />}
+        </div>
+      )}
+      {activeTab === 'repay' && (
+        <div className="flex justify-center">
+          {lenderData && <LendingActionTab lenderData={lenderData} chainId={effectiveChainId} actionType="Repay" />}
+        </div>
       )}
       {activeTab === 'loop' && (
         <div className="flex justify-center">

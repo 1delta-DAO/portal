@@ -3,6 +3,7 @@ import { AssetBalanceSnapshot } from '../../contexts/Simulation/simulateLenderSe
 import { LenderOperationSelection } from '../../contexts/LenderSelectionContext'
 import { TransferToLenderType } from '@1delta/calldata-sdk'
 import { zeroAddress } from 'viem'
+import type { LendingActionParams } from './fetchLendingAction'
 
 // Convert UI string amount (like "1.23") to bigint respecting decimals
 function parseAmountDecimal(amount: string, decimals: number): bigint {
@@ -163,4 +164,38 @@ export function generateAllocationActionsForApi({
   }
 
   return actions
+}
+
+const ACTION_TYPE_MAP = {
+  deposit: 'Deposit',
+  withdraw: 'Withdraw',
+  borrow: 'Borrow',
+  repay: 'Repay',
+} as const
+
+/**
+ * Converts a single LenderOperationSelection into query params
+ * for the GET /v1/lending endpoint.
+ */
+export function selectionToLendingParams(
+  sel: LenderOperationSelection,
+  opts: { chainId: string; operator: string; receiver: string }
+): LendingActionParams | null {
+  if (!sel.pool) return null
+
+  const { asset, lender } = sel.pool
+  const amount = parseAmountDecimal(sel.amount, asset.decimals)
+  const isAll =
+    sel.useMax && (sel.operation === 'repay' || sel.operation === 'withdraw')
+
+  return {
+    chainId: opts.chainId,
+    operator: opts.operator,
+    amount: amount.toString(),
+    lender,
+    actionType: ACTION_TYPE_MAP[sel.operation],
+    receiver: opts.receiver,
+    underlying: asset.address,
+    isAll: isAll || undefined,
+  }
 }
