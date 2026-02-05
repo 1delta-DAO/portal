@@ -37,7 +37,7 @@ export function generateAllocationActionsForApi({
 
     const useBalance = sel.useCurrentBalance
 
-    const amountBig = parseAmountDecimal(sel.amount, asset.decimals)
+    const amountBig = parseAmountDecimal(sel.amount, asset.decimals).toString()
 
     switch (sel.operation) {
       case 'deposit':
@@ -45,7 +45,7 @@ export function generateAllocationActionsForApi({
           type: AllocationOperation.Deposit,
           params: {
             receiver,
-            amount: useBalance ? 0n : amountBig,
+            amount: useBalance ? '0' : amountBig,
             asset: asset.address,
             lender,
           },
@@ -98,7 +98,7 @@ export function generateAllocationActionsForApi({
 
     if (amt === 0) continue
 
-    const absBig = parseAmountDecimal(Math.abs(amt).toString(), bal.asset.decimals)
+    const absBig = parseAmountDecimal(Math.abs(amt).toString(), bal.asset.decimals).toString()
 
     // --- pay side (negative) ---
     // to the befinning

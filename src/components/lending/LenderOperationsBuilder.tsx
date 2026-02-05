@@ -1,6 +1,6 @@
 // src/components/lending/LenderOperationsBuilder.tsx
-import React, { useEffect, useMemo, useState } from 'react'
-import type { Chain } from 'viem' // if you use it, otherwise remove
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { Address, Hex } from 'viem'
 import { LenderSelectionProvider, useLenderSelection } from '../../contexts/LenderSelectionContext'
 import { LenderOperationSelectionRow } from './LenderOperationSelectionRow'
 import type { UserDataResult } from '../../hooks/lending/useUserData'
@@ -14,9 +14,11 @@ import { LenderData } from '../../hooks/lending/usePoolData'
 import { useSimulatedLenderSelections } from '../../hooks/lending/useSimulatedLenderSelections'
 import type { SimulatedActionState } from '../../contexts/Simulation/simulateLenderSelections'
 import { RunningBalancesOverview } from './RunningBlanacesOverview'
-import { generateAllocationActionsForApi } from '../../sdk/lending-helper/toApiParams'
-import { useConnection } from 'wagmi'
-import { fetchTransactionData } from '../../sdk/lending-helper/fetchFromApi'
+import { useAccount, useWalletClient } from 'wagmi'
+import {
+  fetchAllocateAction,
+  type AllocateResponseData
+} from '../../sdk/lending-helper/fetchAllocateAction'
 
 interface LenderOperationsBuilderProps {
   chainId: string
@@ -28,11 +30,9 @@ interface LenderOperationsBuilderProps {
   prices?: { [k: string]: number }
 }
 
-const CALLDATA_ENDPOINT = `https://transaction.1delta.io/allocate`
-
 /**
  * Inner content that assumes LenderSelectionProvider is already mounted.
- * Gets flattened pool data + simulation info from props and renders the rows.
+ * Uses the batch POST /v1/actions/allocate endpoint.
  */
 const LenderOperationsBuilderInner: React.FC<{
   chainId: string
@@ -42,6 +42,8 @@ const LenderOperationsBuilderInner: React.FC<{
   prices?: { [k: string]: number }
 }> = ({ flattenedPools, positionTotals, userConfigs, prices, chainId }) => {
   const { selections, addSelection } = useLenderSelection()
+  const { data: signer } = useWalletClient()
+  const { address: account } = useAccount()
 
   // Run the simulation based on current selections
   const { steps, finalAssetBalances } = useSimulatedLenderSelections(
@@ -59,38 +61,81 @@ const LenderOperationsBuilderInner: React.FC<{
     return map
   }, [steps])
 
-  const [txn, setTxn] = useState<any>({})
+  const [allocateResult, setAllocateResult] = useState<AllocateResponseData | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [executing, setExecuting] = useState(false)
 
-  const { address: account } = useConnection()
+  // Fetch transaction data via batch allocate endpoint
   useEffect(() => {
-    if (account) {
-      async function getCalldata() {
-        const params = generateAllocationActionsForApi({
-          selections,
-          finalAssetBalances,
-          receiver: account,
-        })
-        const response = await fetchTransactionData(CALLDATA_ENDPOINT, {
-          chainId,
-          operator: account!,
-          actions: params,
-        })
+    if (!account) return
 
-        if (!response.success) {
-          console.error('Error:', response.error)
-          return
-        }
+    const validSelections = selections.filter(
+      (sel) => sel.pool && sel.amount && parseFloat(sel.amount) > 0
+    )
 
-        setTxn(response.data)
-      }
-      getCalldata()
+    if (validSelections.length === 0) {
+      setAllocateResult(null)
+      setFetchError(null)
+      return
     }
-  }, [account, selections, finalAssetBalances])
 
+    let cancelled = false
+
+    async function doFetch() {
+      const response = await fetchAllocateAction({
+        chainId,
+        operator: account!,
+        selections: validSelections,
+        finalAssetBalances,
+      })
+
+      if (cancelled) return
+
+      if (!response.success) {
+        setAllocateResult(null)
+        console.error('Failed to fetch allocate data:', response.error)
+        setFetchError(response.error ?? 'Failed to fetch allocate data')
+        return
+      }
+
+      setAllocateResult(response.data ?? null)
+      setFetchError(null)
+    }
+
+    doFetch()
+    return () => {
+      cancelled = true
+    }
+  }, [account, selections, chainId, finalAssetBalances])
+
+  const executeAll = useCallback(async () => {
+    if (!signer || !account || !allocateResult) return
+
+    setExecuting(true)
+    try {
+      for (const perm of allocateResult.permissionTxns) {
+        await signer.sendTransaction({
+          to: perm.to as Address,
+          data: perm.data as Hex,
+          value: BigInt(perm.value ?? 0),
+        })
+      }
+
+      await signer.sendTransaction({
+        to: account as Address,
+        data: allocateResult.data as Hex,
+        value: BigInt(allocateResult.value ?? 0),
+      })
+    } catch (e: any) {
+      console.error('Execution failed:', e)
+      setFetchError(e.message ?? 'Transaction failed')
+    } finally {
+      setExecuting(false)
+    }
+  }, [signer, account, allocateResult])
 
   return (
     <div className="space-y-3">
-      {/* Dynamic list of rows */}
       {selections.length === 0 && (
         <div className="text-xs text-base-content/60">
           No operations yet. Use the button below to add one.
@@ -116,10 +161,17 @@ const LenderOperationsBuilderInner: React.FC<{
 
       <RunningBalancesOverview items={Object.values(finalAssetBalances)} />
 
-      {/* Execute button – hook your tx logic here later */}
+      {fetchError && <div className="text-error text-sm">{fetchError}</div>}
+
+      {/* Execute button */}
       <div className="pt-2">
-        <button type="button" className="btn btn-primary btn-sm">
-          Execute
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={!allocateResult || executing}
+          onClick={executeAll}
+        >
+          {executing ? 'Executing...' : 'Execute'}
         </button>
       </div>
     </div>

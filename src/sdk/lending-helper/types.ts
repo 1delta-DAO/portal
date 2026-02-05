@@ -2,7 +2,7 @@ import { LendingMode, MorphoParams, SweepType, TransferToLenderType } from '@1de
 
 interface CreateDepositBaseParams {
 	receiver?: string;
-	amount: bigint;
+	amount: string;
 	asset: string;
 	lender: string;
 	morphoParams?: MorphoParams;
@@ -10,15 +10,16 @@ interface CreateDepositBaseParams {
 }
 interface CreateWithdrawBaseParams {
 	receiver?: string;
-	amount: bigint;
+	amount: string;
 	asset: string;
 	lender: string;
 	transferType?: TransferToLenderType;
 	morphoParams?: MorphoParams;
 }
+
 interface CreateBorrowBaseParams {
 	receiver?: string;
-	amount: bigint;
+	amount: string;
 	asset: string;
 	lender: string;
 	lendingMode?: LendingMode;
@@ -26,7 +27,7 @@ interface CreateBorrowBaseParams {
 }
 interface CreateRepayBaseParams {
 	receiver?: string;
-	amount: bigint;
+	amount: string;
 	asset: string;
 	lender: string;
 	lendingMode?: LendingMode;
@@ -36,12 +37,12 @@ interface CreateRepayBaseParams {
 
 export interface CreateTransferBaseParams {
 	asset: string;
-	amount: bigint;
+	amount: string;
 	receiver?: string;
 }
 
 export interface CreateWrapBaseParams {
-	amount: bigint;
+	amount: string;
 }
 
 /** better readable sweep classifier */
@@ -57,7 +58,7 @@ export function toSweepType(sa: SweepAction) {
 }
 
 export interface CreateUnwrapBaseParams {
-	amount: bigint;
+	amount: string;
 	receiver: string;
 	sweepAction: SweepAction;
 }
@@ -65,7 +66,7 @@ export interface CreateUnwrapBaseParams {
 export interface CreateSweepBaseParams {
 	asset: string;
 	receiver: string;
-	amount: bigint;
+	amount: string;
 	sweepAction: SweepAction;
 }
 
