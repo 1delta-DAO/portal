@@ -1,15 +1,17 @@
-import { AllocationAction } from "./types";
+import { AllocationAction } from './types'
+
+// ---- Generic POST helper ----
 
 export interface CreateTxnRequestBody {
-  chainId: string;
-  operator: string;
-  actions: AllocationAction[];
+  chainId: string
+  operator: string
+  actions: AllocationAction[]
 }
 
 export interface CreateTxnResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
+  success: boolean
+  data?: T
+  error?: string
 }
 
 export async function fetchTransactionData<T = any>(
@@ -18,32 +20,26 @@ export async function fetchTransactionData<T = any>(
 ): Promise<CreateTxnResponse<T>> {
   try {
     const res = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+    })
 
     if (!res.ok) {
+      const text = await res.text().catch(() => '')
       return {
         success: false,
-        error: `HTTP ${res.status}: ${res.statusText}`,
-      };
+        error: `HTTP ${res.status}: ${text || res.statusText}`,
+      }
     }
 
-    const json = (await res.json()) as T;
+    const json = (await res.json()) as T
 
-    return {
-      success: true,
-      data: json,
-    };
+    return { success: true, data: json }
   } catch (err: any) {
     return {
       success: false,
-      error: err?.message ?? "Unknown error",
-    };
+      error: err?.message ?? 'Unknown error',
+    }
   }
 }
-
-

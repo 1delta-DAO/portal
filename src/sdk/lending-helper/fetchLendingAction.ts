@@ -21,7 +21,7 @@ export interface LendingTransaction {
 
 export interface LendingActionResponse {
   transaction: LendingTransaction
-  permission: (LendingTransaction & { info?: string })
+  permission: LendingTransaction & { info?: string }
 }
 
 export interface LendingActionResult {
@@ -64,7 +64,6 @@ export async function fetchLendingAction(
     }
 
     const json = (await res.json()) as LendingActionResponse
-    console.log('fetchLendingAction response', { params, json })
     return { success: true, data: json }
   } catch (err: any) {
     return {
