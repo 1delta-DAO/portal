@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Address, Hex } from 'viem'
 import { SwapQuote, SwapQuoteResponse, Tx } from './types'
-import {  useConnection, useWalletClient } from 'wagmi'
+import { useConnection, useWalletClient } from 'wagmi'
 
 type Props = {
   params: Record<string, string | number | boolean | bigint>
@@ -9,7 +9,7 @@ type Props = {
 }
 
 const getEndpoint = (swapType: 'debt' | 'collateral') => {
-  const baseUrl = 'https://portal.1delta.io/v1/actions/lending'
+  const baseUrl = 'https://portal.1delta.io/v1/actions/loop'
   return swapType === 'debt' ? `${baseUrl}/debt-swap` : `${baseUrl}/collateral-swap`
 }
 
@@ -40,9 +40,11 @@ export function ExecuteSwapButton({ params, swapType }: Props) {
       }
 
       const data: SwapQuoteResponse = await res.json()
-      setQuotes(data.quotes)
-      setPermissions(data.permissionTxns)
-      setSelected(0)
+      setQuotes(data.quotes ?? [])
+      setPermissions(data.permissionTxns ?? [])
+      if (data.quotes?.length) {
+        setSelected(0)
+      }
     } catch (e: any) {
       setError(e.message ?? 'Unknown error')
     } finally {
@@ -68,7 +70,9 @@ export function ExecuteSwapButton({ params, swapType }: Props) {
   return (
     <div className="space-y-4">
       <button className="btn btn-primary w-full" disabled={loading} onClick={fetchQuotes}>
-        {loading ? 'Fetching quotes…' : `Get ${swapType === 'debt' ? 'Debt' : 'Collateral'} Swap Quotes`}
+        {loading
+          ? 'Fetching quotes…'
+          : `Get ${swapType === 'debt' ? 'Debt' : 'Collateral'} Swap Quotes`}
       </button>
 
       {error && <div className="text-error text-sm">{error}</div>}
@@ -96,15 +100,13 @@ export function ExecuteSwapButton({ params, swapType }: Props) {
               }`}
             >
               <div className="flex justify-between">
-                <span className="font-medium">{q.position.aggregator}</span>
+                <span className="font-medium">{q.deltas.aggregator ?? 'Unknown'}</span>
                 <span className="text-sm opacity-70">
-                  Out ${q.position.tradeAmountOutUSD.toFixed(2)}
+                  Out ${(q.deltas.tradeOutput ?? 0).toFixed(2)}
                 </span>
               </div>
 
-              <div className="text-sm opacity-70">
-                In ${q.position.tradeAmountInUSD.toFixed(2)}
-              </div>
+              <div className="text-sm opacity-70">In ${(q.deltas.tradeInput ?? 0).toFixed(2)}</div>
             </button>
           ))}
         </div>
@@ -118,4 +120,3 @@ export function ExecuteSwapButton({ params, swapType }: Props) {
     </div>
   )
 }
-

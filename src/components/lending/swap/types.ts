@@ -13,13 +13,17 @@ export interface Tx {
 }
 
 export interface SwapQuote {
-  position: {
+  deltas: {
     aggregator: string
-    tradeAmountIn: string
-    tradeAmountOut: string
-    tradeAmountInUSD: number
-    tradeAmountOutUSD: number
+    tradeInput: number
+    tradeOutput: number
+    deltas: {
+      amount: string
+      amountUSD: number
+      asset: RawCurrency
+      lender: string
+      position: string
+    }
   }
   tx: Tx
 }
-
