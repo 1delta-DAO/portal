@@ -17,7 +17,7 @@ import { RunningBalancesOverview } from './RunningBlanacesOverview'
 import { useAccount, useWalletClient } from 'wagmi'
 import {
   fetchAllocateAction,
-  type AllocateResponseData
+  type AllocateResponseData,
 } from '../../sdk/lending-helper/fetchAllocateAction'
 
 interface LenderOperationsBuilderProps {

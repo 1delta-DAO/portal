@@ -125,11 +125,13 @@ export const LendingActionTab = ({ lenderData, chainId, actionType }: Props) => 
     setError(null)
 
     try {
-      await signer.sendTransaction({
-        to: result.permission.to as Address,
-        data: result.permission.data as Hex,
-        value: BigInt(result.permission.value ?? 0),
-      })
+      if (result.permission) {
+        await signer.sendTransaction({
+          to: result.permission.to as Address,
+          data: result.permission.data as Hex,
+          value: BigInt(result.permission.value ?? 0),
+        })
+      }
 
       await signer.sendTransaction({
         to: result.transaction.to as Address,
@@ -257,27 +259,7 @@ export const LendingActionTab = ({ lenderData, chainId, actionType }: Props) => 
       {/* Permission + execute buttons */}
       {result && (
         <div className="space-y-2">
-          {result.permission && (
-            <button
-              className="btn btn-outline w-full"
-              disabled={executing}
-              onClick={() =>
-                signer?.sendTransaction({
-                  to: result.permission.to as Address,
-                  data: result.permission.data as Hex,
-                  value: BigInt(result.permission.value ?? 0),
-                })
-              }
-            >
-              {'Approve'}
-            </button>
-          )}
-
-          <button
-            className="btn btn-success w-full"
-            disabled={executing}
-            onClick={execute}
-          >
+          <button className="btn btn-success w-full" disabled={executing} onClick={execute}>
             {executing ? 'Executing...' : `Execute ${actionType}`}
           </button>
         </div>
