@@ -1,0 +1,88 @@
+import { useState } from 'react'
+import { Address, Hex, parseUnits } from 'viem'
+import { useWalletClient } from 'wagmi'
+import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
+import {
+  fetchLendingAction,
+  type LendingActionResponse,
+} from '../../../sdk/lending-helper/fetchLendingAction'
+import type { ActionType } from './types'
+
+export function useActionExecution(params: {
+  actionType: ActionType
+  pool: PoolDataItem | null
+  lender: string
+  chainId: string
+  account?: string
+  amount: string
+  isAll: boolean
+}) {
+  const { actionType, pool, lender, chainId, account, amount, isAll } = params
+  const { data: signer } = useWalletClient()
+
+  const [result, setResult] = useState<LendingActionResponse | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [executing, setExecuting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const resetState = () => {
+    setResult(null)
+    setError(null)
+  }
+
+  const fetchAction = async () => {
+    if (!account || !pool) return
+    setLoading(true)
+    setError(null)
+    setResult(null)
+
+    const decimals = pool.asset.decimals ?? 18
+    const parsedAmount = parseUnits(amount || '0', decimals)
+
+    const response = await fetchLendingAction({
+      chainId,
+      operator: account,
+      amount: parsedAmount.toString(),
+      lender,
+      actionType,
+      receiver: account,
+      underlying: pool.asset.address,
+      isAll: isAll || undefined,
+    })
+
+    setLoading(false)
+    if (!response.success) {
+      setError(response.error ?? 'Failed to fetch transaction data')
+      return
+    }
+    setResult(response.data ?? null)
+  }
+
+  const execute = async () => {
+    if (!signer || !result) return
+    setExecuting(true)
+    setError(null)
+
+    try {
+      if (result.permission) {
+        await signer.sendTransaction({
+          to: result.permission.to as Address,
+          data: result.permission.data as Hex,
+          value: BigInt(result.permission.value ?? 0),
+        })
+      }
+      await signer.sendTransaction({
+        to: result.transaction.to as Address,
+        data: result.transaction.data as Hex,
+        value: BigInt(result.transaction.value ?? 0),
+      })
+    } catch (e: any) {
+      console.error('Execution failed:', e)
+      setError(e.message ?? 'Transaction failed')
+    } finally {
+      setExecuting(false)
+    }
+  }
+
+  return { result, loading, executing, error, fetchAction, execute, resetState }
+}

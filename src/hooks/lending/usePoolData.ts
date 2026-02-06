@@ -76,6 +76,8 @@ export interface PoolDataItem {
   hasStable: boolean
   isActive: boolean
   isFrozen: boolean
+  oraclePrice?: number
+  oraclePriceUSD?: number
   params?: any
 }
 

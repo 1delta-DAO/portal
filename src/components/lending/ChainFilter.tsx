@@ -1,6 +1,6 @@
-// src/components/filters/ChainFilterSelect.tsx
 import { getChainName } from '@1delta/lib-utils'
 import React from 'react'
+import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'
 
 interface ChainFilterSelectProps {
   chains: string[]
@@ -15,21 +15,22 @@ export const ChainFilterSelect: React.FC<ChainFilterSelectProps> = ({
   onChange,
   className = '',
 }) => {
-  // ensure unique + sorted
   const uniqueChains = Array.from(new Set(chains)).sort()
+  const options: SearchableSelectOption[] = [
+    { value: 'all', label: 'All chains' },
+    ...uniqueChains.map((c) => ({
+      value: c,
+      label: getChainName(c),
+    })),
+  ]
 
   return (
-    <select
-      className={`select select-bordered select-sm ${className}`}
+    <SearchableSelect
+      options={options}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      <option value="all">All chains</option>
-      {uniqueChains.map((c) => (
-        <option key={c} value={c}>
-          {getChainName(c)}
-        </option>
-      ))}
-    </select>
+      onChange={onChange}
+      placeholder="Search chains..."
+      className={className}
+    />
   )
 }

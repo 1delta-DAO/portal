@@ -13,8 +13,9 @@ import { Loop } from './loop/Loop'
 import { Swap } from './swap/Swap'
 import { Close } from './close/Close'
 import { LendingActionTab } from './LendingActionTab'
+import { LendingDashboard } from './LendingDashboard'
 
-type SubTab = 'markets' | 'operations' | 'deposit' | 'withdraw' | 'borrow' | 'repay' | 'loop' | 'swap' | 'close'
+type SubTab = 'lending' | 'markets' | 'operations' | 'deposit' | 'withdraw' | 'borrow' | 'repay' | 'loop' | 'swap' | 'close'
 
 const chains = getAvailableMarginChainIds()
 
@@ -25,7 +26,7 @@ export function LenderTab() {
   const [selectedChain, setSelectedChain] = useState<string>('1')
 
   // sub-tab state
-  const [activeTab, setActiveTab] = useState<SubTab>('markets')
+  const [activeTab, setActiveTab] = useState<SubTab>('lending')
 
   const effectiveChainId = selectedChain
 
@@ -43,6 +44,15 @@ export function LenderTab() {
       {/* Top bar: chain selector + sub-tabs */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div role="tablist" className="tabs tabs-bordered">
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'lending' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('lending')}
+          >
+            Lending
+          </button>
+
           <button
             type="button"
             role="tab"
@@ -131,6 +141,16 @@ export function LenderTab() {
       </div>
 
       {/* Tab content */}
+      {activeTab === 'lending' && (
+        <LendingDashboard
+          lenderData={lenderData}
+          userData={userData}
+          chainId={effectiveChainId}
+          account={account}
+          isLoading={isLoading}
+        />
+      )}
+
       {activeTab === 'markets' && (
         <div className="space-y-4">
           {account && (
