@@ -34,7 +34,9 @@ interface JsonRpcResponse {
 interface ParseApiResponse {
   ok: boolean
   data: {
-    [lender: string]: LenderUserDataEntry
+    [chainId: string]: {
+      [lender: string]: LenderUserDataEntry
+    }
   }
 }
 
@@ -109,13 +111,6 @@ export async function fetchUserDataViaRpc(
     body: JSON.stringify({ rpcCallId, rawResponses }),
   })
 
-  // Step 4: Normalize flat-by-lender response to { [chainId]: { [lender]: ... } }
-  const normalized: UserDataApiResponseData = {}
-  for (const [lender, entry] of Object.entries(parseData)) {
-    const cId = entry.chainId || chainId
-    if (!normalized[cId]) normalized[cId] = {}
-    normalized[cId][lender] = entry
-  }
-
-  return normalized
+  // The parse endpoint already returns data nested as { [chainId]: { [lender]: ... } }
+  return parseData
 }
