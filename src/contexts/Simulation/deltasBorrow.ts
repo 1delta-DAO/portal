@@ -1,9 +1,10 @@
-import { BalanceData, PoolData, UserConfig } from '@1delta/margin-fetcher'
+import { BalanceData, UserConfig } from '@1delta/margin-fetcher'
+import { PoolDataItem } from '../../hooks/lending/usePoolData'
 import { resolveConfigEntry } from './configs'
 
 export function applyBorrowDelta(
   balanceData: BalanceData,
-  pool: PoolData,
+  pool: PoolDataItem,
   amountUsd: number,
   userConfig: UserConfig
 ): BalanceData {

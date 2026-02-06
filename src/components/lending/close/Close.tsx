@@ -6,7 +6,7 @@ import {
 import { LenderData, PoolDataItem } from '../../../hooks/lending/usePoolData'
 import { useMemo, useState } from 'react'
 import { parseUnits } from 'viem'
-import { ExecuteSwapButton } from './Execute'
+import { ExecuteCloseButton } from './Execute'
 
 const renderCurrency = (asset: RawCurrency) => {
   const symbol = asset?.symbol ?? (asset as any)?.ticker ?? ''
@@ -32,9 +32,7 @@ interface Props {
   chainId: string
 }
 
-export const Swap = ({ lenderData, chainId }: Props) => {
-  const [swapType, setSwapType] = useState<'debt' | 'collateral'>('debt')
-
+export const Close = ({ lenderData, chainId }: Props) => {
   const lenders = useMemo(() => {
     return Object.keys(lenderData?.[chainId]?.data ?? {})
   }, [lenderData, chainId])
@@ -48,20 +46,19 @@ export const Swap = ({ lenderData, chainId }: Props) => {
 
   const poolList = useMemo(() => Object.values(pools), [pools])
 
-  const [assetInPool, setAssetInPool] = useState<PoolDataItem | null>(null)
-  const [assetOutPool, setAssetOutPool] = useState<PoolDataItem | null>(null)
+  const [collateralPool, setCollateralPool] = useState<PoolDataItem | null>(null)
+  const [debtPool, setDebtPool] = useState<PoolDataItem | null>(null)
   const [amount, setAmount] = useState<string>('')
   const [slippage, setSlippage] = useState<string>('0.3')
-  const [irModeIn, setIrModeIn] = useState<LendingMode>(LendingMode.VARIABLE)
   const [irModeOut, setIrModeOut] = useState<LendingMode>(LendingMode.VARIABLE)
   const [tradeType, setTradeType] = useState<number>(0)
   const [usePendleMintRedeem, setUsePendleMintRedeem] = useState<boolean>(false)
-  const [isMax, setIsMax] = useState<boolean>(false)
+  const [isMaxOut, setIsMaxOut] = useState<boolean>(false)
 
   const handleLenderChange = (lender: string) => {
     setSelectedLender(lender)
-    setAssetInPool(null)
-    setAssetOutPool(null)
+    setCollateralPool(null)
+    setDebtPool(null)
     setAmount('')
   }
 
@@ -84,75 +81,31 @@ export const Swap = ({ lenderData, chainId }: Props) => {
     setIsLenderOpen(false)
   }
 
-  const handleSwapTypeChange = (type: 'debt' | 'collateral') => {
-    setSwapType(type)
-    setAssetInPool(null)
-    setAssetOutPool(null)
-    setAmount('')
-    if (type === 'debt') {
-      setIrModeIn(LendingMode.VARIABLE)
-      setIrModeOut(LendingMode.VARIABLE)
-    } else {
-      setIrModeIn(LendingMode.NONE)
-      setIrModeOut(LendingMode.NONE)
-    }
-  }
-
-  const handlePoolChange = (side: 'in' | 'out') => (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handlePoolChange = (side: 'collateral' | 'debt') => (e: React.ChangeEvent<HTMLSelectElement>) => {
     const pool = pools[e.target.value]
 
-    if (side === 'in') setAssetInPool(pool)
-    else setAssetOutPool(pool)
+    if (side === 'collateral') setCollateralPool(pool)
+    else setDebtPool(pool)
   }
 
   const getParams = () => {
-    const baseParams: Record<string, string | number | boolean | bigint> = {
+    return {
       chainId,
       lender: selectedLender,
-      amount: parseUnits(amount || '0', assetInPool?.asset?.decimals || 18),
+      collateralAssetIn: collateralPool?.asset.address!,
+      debtAssetOut: debtPool?.asset.address!,
+      amount: parseUnits(amount || '0', collateralPool?.asset?.decimals || 18),
       slippage: parseFloat(slippage) || 0.3,
-      irModeIn: irModeIn,
-      irModeOut: irModeOut,
+      irModeOut,
       tradeType,
       usePendleMintRedeem,
-    }
-
-    if (swapType === 'debt') {
-      return {
-        ...baseParams,
-        debtAssetIn: assetInPool?.asset.address!,
-        debtAssetOut: assetOutPool?.asset.address!,
-        isMaxOut: isMax,
-      }
-    } else {
-      return {
-        ...baseParams,
-        collateralAssetIn: assetInPool?.asset.address!,
-        collateralAssetOut: assetOutPool?.asset.address!,
-        isMaxIn: isMax,
-      }
+      isMaxOut,
     }
   }
 
   return (
     <div className="w-full max-w-md space-y-4">
-      <div className="flex gap-2">
-        <button
-          type="button"
-          className={`btn flex-1 ${swapType === 'debt' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => handleSwapTypeChange('debt')}
-        >
-          Debt Swap
-        </button>
-        <button
-          type="button"
-          className={`btn flex-1 ${swapType === 'collateral' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => handleSwapTypeChange('collateral')}
-        >
-          Collateral Swap
-        </button>
-      </div>
-
+      {/* Lender selector */}
       <div className="relative">
         <input
           type="text"
@@ -205,15 +158,16 @@ export const Swap = ({ lenderData, chainId }: Props) => {
         )}
       </div>
 
+      {/* Collateral Asset In */}
       <div className="flex items-center gap-3">
         <select
           className="select select-bordered flex-1"
-          onChange={handlePoolChange('in')}
-          value={assetInPool?.poolId ?? ''}
+          onChange={handlePoolChange('collateral')}
+          value={collateralPool?.poolId ?? ''}
           disabled={!selectedLender}
         >
           <option value="" disabled>
-            {swapType === 'debt' ? 'Debt Asset In' : 'Collateral Asset In'}
+            Collateral Asset
           </option>
           {poolList.map((pool) => (
             <option key={pool.poolId} value={pool.poolId}>
@@ -223,7 +177,7 @@ export const Swap = ({ lenderData, chainId }: Props) => {
         </select>
 
         <div className="flex items-center gap-2 min-w-[220px]">
-          {assetInPool && renderCurrency(assetInPool.asset)}
+          {collateralPool && renderCurrency(collateralPool.asset)}
           <input
             type="text"
             inputMode="decimal"
@@ -235,15 +189,16 @@ export const Swap = ({ lenderData, chainId }: Props) => {
         </div>
       </div>
 
+      {/* Debt Asset Out */}
       <div className="flex items-center gap-3">
         <select
           className="select select-bordered flex-1"
-          onChange={handlePoolChange('out')}
-          value={assetOutPool?.poolId ?? ''}
+          onChange={handlePoolChange('debt')}
+          value={debtPool?.poolId ?? ''}
           disabled={!selectedLender}
         >
           <option value="" disabled>
-            {swapType === 'debt' ? 'Debt Asset Out' : 'Collateral Asset Out'}
+            Debt Asset
           </option>
           {poolList.map((pool) => (
             <option key={pool.poolId} value={pool.poolId}>
@@ -253,10 +208,11 @@ export const Swap = ({ lenderData, chainId }: Props) => {
         </select>
 
         <div className="flex items-center gap-2 min-w-[220px]">
-          {assetOutPool && renderCurrency(assetOutPool.asset)}
+          {debtPool && renderCurrency(debtPool.asset)}
         </div>
       </div>
 
+      {/* Slippage */}
       <div className="flex items-center gap-3">
         <label className="label min-w-[120px]">
           <span className="label-text">Slippage %</span>
@@ -271,21 +227,7 @@ export const Swap = ({ lenderData, chainId }: Props) => {
         />
       </div>
 
-      <div className="flex items-center gap-3">
-        <label className="label min-w-[120px]">
-          <span className="label-text">IR Mode In</span>
-        </label>
-        <select
-          className="select select-bordered flex-1"
-          value={irModeIn}
-          onChange={(e) => setIrModeIn(Number(e.target.value) as LendingMode)}
-        >
-          <option value={LendingMode.NONE}>NONE</option>
-          <option value={LendingMode.STABLE}>STABLE</option>
-          <option value={LendingMode.VARIABLE}>VARIABLE</option>
-        </select>
-      </div>
-
+      {/* IR Mode Out */}
       <div className="flex items-center gap-3">
         <label className="label min-w-[120px]">
           <span className="label-text">IR Mode Out</span>
@@ -301,6 +243,7 @@ export const Swap = ({ lenderData, chainId }: Props) => {
         </select>
       </div>
 
+      {/* Trade Type */}
       <div className="flex items-center gap-3">
         <label className="label min-w-[120px]">
           <span className="label-text">Trade Type</span>
@@ -315,6 +258,7 @@ export const Swap = ({ lenderData, chainId }: Props) => {
         </select>
       </div>
 
+      {/* Options */}
       <div className="flex items-center gap-3">
         <label className="label cursor-pointer min-w-[120px]">
           <span className="label-text">Use Pendle</span>
@@ -326,18 +270,17 @@ export const Swap = ({ lenderData, chainId }: Props) => {
           />
         </label>
         <label className="label cursor-pointer flex-1">
-          <span className="label-text">{swapType === 'debt' ? 'Max Out' : 'Max In'}</span>
+          <span className="label-text">Max Out</span>
           <input
             type="checkbox"
             className="checkbox checkbox-primary"
-            checked={isMax}
-            onChange={(e) => setIsMax(e.target.checked)}
+            checked={isMaxOut}
+            onChange={(e) => setIsMaxOut(e.target.checked)}
           />
         </label>
       </div>
 
-      <ExecuteSwapButton params={getParams()} swapType={swapType} />
+      <ExecuteCloseButton params={getParams()} />
     </div>
   )
 }
-

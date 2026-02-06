@@ -1,19 +1,15 @@
 // src/components/UserLenderPositionsTable.tsx
 import React from 'react'
 import { lenderDisplayName } from '@1delta/lib-utils'
-import {
-  LenderUiSummary,
-  MinimalPositionInfo,
-  UserPositions,
-} from '../../hooks/lending/useMarginData'
-import { LenderData } from '@1delta/margin-fetcher'
+import type {
+  UserDataResult,
+  UserPositionInfo,
+} from '../../hooks/lending/useUserData'
 
 interface UserLenderPositionsTableProps {
   account?: string
   chainId: string
-  userPositions?: UserPositions
-  // account: string
-  lenderData?: LenderData
+  userData?: UserDataResult
   isLoading: boolean
   error: any
   refetch: () => void
@@ -27,7 +23,7 @@ function formatUsd(v: number) {
 
 const PositionsList: React.FC<{
   title: string
-  positions?: MinimalPositionInfo[]
+  positions?: UserPositionInfo[]
 }> = ({ title, positions }) => {
   if (!positions || positions.length === 0) return null
 
@@ -37,10 +33,12 @@ const PositionsList: React.FC<{
       <div className="flex flex-wrap gap-2">
         {positions.map((pos) => (
           <div
-            key={`${pos.poolId}-${pos?.asset?.address ?? pos?.asset?.symbol}`}
+            key={`${pos.poolId}-${pos.underlying}`}
             className="badge badge-outline badge-sm flex gap-1 items-center"
           >
-            <span>{(pos?.asset as any)?.symbol ?? (pos?.asset as any)?.name ?? '???'}</span>
+            <span className="font-mono text-[10px]">
+              {pos.underlying.slice(0, 6)}...{pos.underlying.slice(-4)}
+            </span>
             <span className="opacity-70">
               {pos.size.toFixed(4)} ({'$'}
               {formatUsd(pos.sizeUSD)})
@@ -55,18 +53,16 @@ const PositionsList: React.FC<{
 export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> = ({
   account,
   chainId,
-  userPositions,
+  userData,
   isLoading,
   error,
   refetch,
 }) => {
-  const lenderTotals = (userPositions?.lenderTotals ?? []) as LenderUiSummary[]
+  const lenderSummaries = userData?.lenderSummaries ?? []
 
-  const visibleLenders = lenderTotals
-
-  const total = userPositions?.total ?? 0
-  const total24h = userPositions?.total24h ?? 0
-  const totalApr = (userPositions as any)?.apr as number | undefined
+  const total = userData?.total ?? 0
+  const total24h = userData?.total24h ?? 0
+  const totalApr = userData?.apr
 
   if (!account) {
     return (
@@ -99,7 +95,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
     )
   }
 
-  if (!lenderTotals.length) {
+  if (!lenderSummaries.length) {
     return (
       <div className="w-full max-w-4xl mx-auto p-4">
         <div className="alert alert-info">
@@ -168,7 +164,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
               </tr>
             </thead>
             <tbody>
-              {visibleLenders.map((lender) => {
+              {lenderSummaries.map((lender) => {
                 const worstHealth =
                   lender.healthFactors && lender.healthFactors.length
                     ? Math.min(...lender.healthFactors)
@@ -243,8 +239,8 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                     </td>
                     <td>
                       <div className="space-y-2 text-xs">
-                        <PositionsList title="Assets Long" positions={lender.assetsLong!} />
-                        <PositionsList title="Assets Short" positions={lender.assetsShort!} />
+                        <PositionsList title="Assets Long" positions={lender.assetsLong} />
+                        <PositionsList title="Assets Short" positions={lender.assetsShort} />
                       </div>
                     </td>
                   </tr>

@@ -1,20 +1,25 @@
 // src/components/LenderTab.tsx
-import React, { useMemo, useState } from 'react'
+import React, { useState } from 'react'
 import { useAccount } from 'wagmi'
+import { getAvailableMarginChainIds } from '@1delta/lib-utils'
 import { UserLenderPositionsTable } from './UserTable'
 import { LendingPoolsTable } from './PoolsTable'
 import { ChainFilterSelect } from './ChainFilter'
-import { useFlattenedPools } from '../../hooks/lending/usePoolData.js'
-import { LenderOperationsBuilder } from './LenderOperationsBuilder' // adjust path if needed
-import { useMarginData } from '../../hooks/lending/useMarginData'
+import { LenderOperationsBuilder } from './LenderOperationsBuilder'
+import { useUserData } from '../../hooks/lending/useUserData'
+import { useMarginPublicData } from '../../hooks/lending/usePoolData'
+import { useMainPrices } from '../../hooks/prices/useMainPrices'
 import { Loop } from './loop/Loop'
 import { Swap } from './swap/Swap'
+import { Close } from './close/Close'
+import { LendingActionTab } from './LendingActionTab'
 
-type SubTab = 'markets' | 'operations' | 'loop' | 'swap'
+type SubTab = 'markets' | 'operations' | 'deposit' | 'withdraw' | 'borrow' | 'repay' | 'loop' | 'swap' | 'close'
+
+const chains = getAvailableMarginChainIds()
 
 export function LenderTab() {
   const { address: account } = useAccount()
-  const { pools } = useFlattenedPools()
 
   // shared chain filter state
   const [selectedChain, setSelectedChain] = useState<string>('1')
@@ -22,15 +27,16 @@ export function LenderTab() {
   // sub-tab state
   const [activeTab, setActiveTab] = useState<SubTab>('markets')
 
-  // derive available chains from pools (unique + sorted)
-  const chains = useMemo(() => Array.from(new Set(pools.map((p) => p.chainId))).sort(), [pools])
-
   const effectiveChainId = selectedChain
 
-  const { userPositions, lenderData, isLoading, error, refetch, prices } = useMarginData(
-    effectiveChainId,
-    account
-  )
+  const { lenderData, isPublicDataLoading } = useMarginPublicData(effectiveChainId)
+  const { userData, isUserDataLoading, error, refetch } = useUserData({
+    chainId: effectiveChainId,
+    account,
+  })
+  const { data: prices } = useMainPrices()
+
+  const isLoading = isPublicDataLoading || isUserDataLoading
 
   return (
     <div className="space-y-4">
@@ -58,6 +64,42 @@ export function LenderTab() {
           <button
             type="button"
             role="tab"
+            className={`tab tab-sm ${activeTab === 'deposit' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('deposit')}
+          >
+            Deposit
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'withdraw' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('withdraw')}
+          >
+            Withdraw
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'borrow' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('borrow')}
+          >
+            Borrow
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'repay' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('repay')}
+          >
+            Repay
+          </button>
+
+          <button
+            type="button"
+            role="tab"
             className={`tab tab-sm ${activeTab === 'loop' ? 'tab-active' : ''}`}
             onClick={() => setActiveTab('loop')}
           >
@@ -71,6 +113,15 @@ export function LenderTab() {
             onClick={() => setActiveTab('swap')}
           >
             Swap
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'close' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('close')}
+          >
+            Close
           </button>
         </div>
 
@@ -86,9 +137,8 @@ export function LenderTab() {
             <UserLenderPositionsTable
               account={account}
               chainId={effectiveChainId}
-              userPositions={userPositions}
-              lenderData={lenderData}
-              isLoading={Boolean(isLoading)}
+              userData={userData}
+              isLoading={isLoading}
               error={error}
               refetch={refetch}
             />
@@ -101,12 +151,32 @@ export function LenderTab() {
         <LenderOperationsBuilder
           prices={prices}
           chainId={effectiveChainId}
-          userPositions={userPositions}
+          userDataResult={userData}
           lenderData={lenderData}
-          isLoading={Boolean(isLoading)}
+          isLoading={isLoading}
           error={error}
           refetch={refetch}
         />
+      )}
+      {activeTab === 'deposit' && (
+        <div className="flex justify-center">
+          {lenderData && <LendingActionTab lenderData={lenderData} chainId={effectiveChainId} actionType="Deposit" />}
+        </div>
+      )}
+      {activeTab === 'withdraw' && (
+        <div className="flex justify-center">
+          {lenderData && <LendingActionTab lenderData={lenderData} chainId={effectiveChainId} actionType="Withdraw" />}
+        </div>
+      )}
+      {activeTab === 'borrow' && (
+        <div className="flex justify-center">
+          {lenderData && <LendingActionTab lenderData={lenderData} chainId={effectiveChainId} actionType="Borrow" />}
+        </div>
+      )}
+      {activeTab === 'repay' && (
+        <div className="flex justify-center">
+          {lenderData && <LendingActionTab lenderData={lenderData} chainId={effectiveChainId} actionType="Repay" />}
+        </div>
       )}
       {activeTab === 'loop' && (
         <div className="flex justify-center">
@@ -116,6 +186,11 @@ export function LenderTab() {
       {activeTab === 'swap' && (
         <div className="flex justify-center">
           {lenderData && <Swap lenderData={lenderData} chainId={effectiveChainId} />}
+        </div>
+      )}
+      {activeTab === 'close' && (
+        <div className="flex justify-center">
+          {lenderData && <Close lenderData={lenderData} chainId={effectiveChainId} />}
         </div>
       )}
     </div>

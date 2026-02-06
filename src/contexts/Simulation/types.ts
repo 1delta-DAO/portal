@@ -1,6 +1,7 @@
-import { BalanceData, PoolData } from '@1delta/margin-fetcher'
+import { BalanceData } from '@1delta/margin-fetcher'
 import { LenderOperationKind, LenderOperationSelection } from '../LenderSelectionContext'
 import { FlattenedPoolWithUserData } from '../../hooks/lending/prepareMixedData'
+import { PoolDataItem } from '../../hooks/lending/usePoolData'
 
 export interface SimulatedActionState {
   selectionId: string
@@ -39,7 +40,7 @@ export type AmountUsdResolver = (
  */
 export type AdjustForActionFn = (
   balanceIn: BalanceData,
-  pool: PoolData,
+  pool: PoolDataItem,
   amountUsd: number,
   action: LenderOperationKind
 ) => BalanceData

@@ -5,7 +5,7 @@ import {
   LendingMode,
   RawCurrency,
 } from '@1delta/lib-utils'
-import { LenderData, PoolData } from '@1delta/margin-fetcher'
+import { LenderData, PoolDataItem } from '../../../hooks/lending/usePoolData'
 import { useMemo, useState } from 'react'
 import { useTokenLists } from '../../../hooks/useTokenLists'
 import { parseUnits, zeroAddress } from 'viem'
@@ -59,10 +59,10 @@ export const Loop = ({ lenderData, chainId }: Props) => {
 
   const poolList = useMemo(() => Object.values(pools), [pools])
 
-  /* ---------- State keeps FULL PoolData ---------- */
+  /* ---------- State keeps FULL PoolDataItem ---------- */
 
-  const [fromPool, setFromPool] = useState<PoolData | null>(null)
-  const [toPool, setToPool] = useState<PoolData | null>(null)
+  const [fromPool, setFromPool] = useState<PoolDataItem | null>(null)
+  const [toPool, setToPool] = useState<PoolDataItem | null>(null)
 
   const [fromAmount, setFromAmount] = useState<string>('')
   const [toAmount, setToAmount] = useState<string>('')

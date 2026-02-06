@@ -1,4 +1,4 @@
-const WORKER_ENDPOINT = `https://sparklines.1delta.io/prices/latest-asof?hoursAgo=`
+const WORKER_ENDPOINT = `https://portal.1delta.io/v1/data/prices/latest-asof?hoursAgo=`
 
 interface OracleData {
   [key: string]: number

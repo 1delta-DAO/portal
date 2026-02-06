@@ -1,22 +1,18 @@
 import { useState } from 'react'
 import { Address, Hex } from 'viem'
-import { SwapQuote, SwapQuoteResponse, Tx } from './types'
-import { useConnection, useWalletClient } from 'wagmi'
+import { CloseQuote, CloseQuoteResponse, Tx } from './types'
+import { useAccount, useWalletClient } from 'wagmi'
 
 type Props = {
   params: Record<string, string | number | boolean | bigint>
-  swapType: 'debt' | 'collateral'
 }
 
-const getEndpoint = (swapType: 'debt' | 'collateral') => {
-  const baseUrl = 'https://portal.1delta.io/v1/actions/loop'
-  return swapType === 'debt' ? `${baseUrl}/debt-swap` : `${baseUrl}/collateral-swap`
-}
+const endpoint = 'https://portal.1delta.io/v1/actions/lending/close'
 
-export function ExecuteSwapButton({ params, swapType }: Props) {
+export function ExecuteCloseButton({ params }: Props) {
   const { data: signer } = useWalletClient()
-  const { address: account } = useConnection()
-  const [quotes, setQuotes] = useState<SwapQuote[]>([])
+  const { address: account } = useAccount()
+  const [quotes, setQuotes] = useState<CloseQuote[]>([])
   const [permissions, setPermissions] = useState<Tx[]>([])
   const [selected, setSelected] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
@@ -31,7 +27,6 @@ export function ExecuteSwapButton({ params, swapType }: Props) {
         Object.entries(account ? { ...params, account } : params).map(([k, v]) => [k, String(v)])
       )
 
-      const endpoint = getEndpoint(swapType)
       const res = await fetch(`${endpoint}?${qs}`)
 
       if (!res.ok) {
@@ -39,12 +34,10 @@ export function ExecuteSwapButton({ params, swapType }: Props) {
         throw new Error(`Failed to fetch quotes: ${errorText}`)
       }
 
-      const data: SwapQuoteResponse = await res.json()
-      setQuotes(data.quotes ?? [])
-      setPermissions(data.permissionTxns ?? [])
-      if (data.quotes?.length) {
-        setSelected(0)
-      }
+      const data: CloseQuoteResponse = await res.json()
+      setQuotes(data.quotes)
+      setPermissions(data.permissionTxns)
+      setSelected(0)
     } catch (e: any) {
       setError(e.message ?? 'Unknown error')
     } finally {
@@ -70,9 +63,7 @@ export function ExecuteSwapButton({ params, swapType }: Props) {
   return (
     <div className="space-y-4">
       <button className="btn btn-primary w-full" disabled={loading} onClick={fetchQuotes}>
-        {loading
-          ? 'Fetching quotes…'
-          : `Get ${swapType === 'debt' ? 'Debt' : 'Collateral'} Swap Quotes`}
+        {loading ? 'Fetching quotes…' : 'Get Close Quotes'}
       </button>
 
       {error && <div className="text-error text-sm">{error}</div>}
@@ -85,7 +76,7 @@ export function ExecuteSwapButton({ params, swapType }: Props) {
             disabled={loading}
             onClick={() => executePermission(tx)}
           >
-            {(tx as any)?.info || 'Approve'}
+            {tx.info || 'Approve'}
           </button>
         ))}
 
@@ -100,13 +91,15 @@ export function ExecuteSwapButton({ params, swapType }: Props) {
               }`}
             >
               <div className="flex justify-between">
-                <span className="font-medium">{q.deltas.aggregator ?? 'Unknown'}</span>
+                <span className="font-medium">{q.position.aggregator}</span>
                 <span className="text-sm opacity-70">
-                  Out ${(q.deltas.tradeOutput ?? 0).toFixed(2)}
+                  Out ${q.position.tradeAmountOutUSD.toFixed(2)}
                 </span>
               </div>
 
-              <div className="text-sm opacity-70">In ${(q.deltas.tradeInput ?? 0).toFixed(2)}</div>
+              <div className="text-sm opacity-70">
+                In ${q.position.tradeAmountInUSD.toFixed(2)}
+              </div>
             </button>
           ))}
         </div>
@@ -114,7 +107,7 @@ export function ExecuteSwapButton({ params, swapType }: Props) {
 
       {selected !== null && (
         <button className="btn btn-success w-full" onClick={execute}>
-          Execute {swapType === 'debt' ? 'Debt' : 'Collateral'} Swap
+          Execute Close
         </button>
       )}
     </div>

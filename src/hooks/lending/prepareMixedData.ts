@@ -1,15 +1,12 @@
 // src/utils/flattenLenderDataWithUser.ts
 import type { RawCurrency } from '@1delta/lib-utils'
-import {
-  BaseLendingPosition,
-  BasicReserveResponse,
-  LenderData,
-  PoolData,
-  BalanceData,
-  AprData,
-  UserConfig,
-} from '@1delta/margin-fetcher'
-import { UserPositions } from './useMarginData'
+import type { BalanceData, AprData, UserConfig } from '@1delta/margin-fetcher'
+import type {
+  UserDataResult,
+  LenderUserDataEntry,
+  UserPositionEntry,
+} from './useUserData'
+import { LenderData, PoolDataItem } from './usePoolData'
 
 /**
  * One flattened entry: a single pool for a specific chain & lender,
@@ -20,9 +17,9 @@ export interface FlattenedPoolWithUserData {
   lender: string
   poolId: string
   asset: RawCurrency
-  poolData: PoolData
-  /** The user's position for this pool (if any) */
-  userPosition?: { [accountId: string]: BaseLendingPosition }
+  poolData: PoolDataItem
+  /** The user's position for this pool (if any), keyed by sub-account ID */
+  userPosition?: { [accountId: string]: UserPositionEntry }
 }
 
 export type PositionTotals = {
@@ -31,18 +28,19 @@ export type PositionTotals = {
 
 export type UserConfigs = { [lender: string]: { [subAccount: string]: UserConfig } }
 
+/** Extract actual position objects from the positions array (INIT has a leading number) */
+function extractPositions(positions: (UserPositionEntry | number)[]): UserPositionEntry[] {
+  return positions.filter((p): p is UserPositionEntry => typeof p === 'object' && p !== null)
+}
+
 /**
  * Flattens LenderData for a single chain and attaches per-pool user data
- * from UserPositions.userData. If a user position does not exist for a pool,
+ * from UserDataResult.raw. If a user position does not exist for a pool,
  * userPosition will be undefined.
- *
- * Assumptions:
- * - Only one chainId is relevant at a time and is provided explicitly.
- * - All public mappings (chainId, lender, poolId) exist in LenderData.
  */
 export function flattenLenderDataWithUser(
   lenderData: LenderData,
-  userPositions: UserPositions | undefined,
+  userDataResult: UserDataResult | undefined,
   chainId: string
 ): {
   result: FlattenedPoolWithUserData[]
@@ -53,67 +51,55 @@ export function flattenLenderDataWithUser(
 
   const chainEntry = lenderData[chainId]
   if (!chainEntry) {
-    // no data for this chain
     return { result, positionTotals: {}, userConfigs: {} }
   }
 
-  const userDataForChain:
-    | {
-        [lender: string]: { [a: string]: BasicReserveResponse }
-      }
-    | undefined = userPositions?.userData?.[chainId]
+  const userDataForChain: { [lender: string]: LenderUserDataEntry } | undefined =
+    userDataResult?.raw?.[chainId]
 
   let positionTotals: PositionTotals = {}
-  let userConfigs: { [lender: string]: { [subAccount: string]: UserConfig } } = {}
+  let userConfigs: UserConfigs = {}
 
-  // lenderData[chainId].data: { [lender: string]: { data: { [poolId]: PoolData } } }
   for (const [lender, lenderEntry] of Object.entries(chainEntry.data)) {
     const poolsMap = lenderEntry.data
-    const userForLender: { [a: string]: BasicReserveResponse } | undefined =
-      userDataForChain?.[lender]
+    const lenderUserData: LenderUserDataEntry | undefined = userDataForChain?.[lender]
 
-    for (const [poolId, poolData] of Object.entries(poolsMap)) {
-      // Find per-pool user position in BasicReserveResponse.lendingPositions
-      let userPosition: { [accountId: string]: BaseLendingPosition } = {}
+    // Build a lookup: poolId -> { [subAccountId]: UserPositionEntry }
+    const positionsByPool: { [poolId: string]: { [subAccountId: string]: UserPositionEntry } } = {}
 
-      // over accounts - expect only one here
-      Object.entries(userForLender ?? {}).forEach(([account, d]) => {
-        // lendingPositions: { [subAccountId: string]: { [poolId: string]: BaseLendingPosition } }
-        for (const subAccountId of Object.keys(d.lendingPositions)) {
-          const byPool = d.lendingPositions[subAccountId]
-          const pos = byPool[poolId]
-          if (pos && (Number(pos.debt) !== 0 || Number(pos.deposits) !== 0)) {
-            userPosition = { ...userPosition, [subAccountId]: pos }
-            break
-          }
-          // collect totals if nav nonzero
-          if (d.balanceData[subAccountId].nav !== 0) {
-            if (!positionTotals[lender]) positionTotals[lender] = {}
-            positionTotals[lender] = {
-              ...positionTotals[lender],
-              [subAccountId]: {
-                balanceData: d.balanceData[subAccountId],
-                aprData: d.aprData[subAccountId] as any,
-              },
-            }
-          }
-
-          // collect config
-          if (!userConfigs[lender]) userConfigs[lender] = {}
-          userConfigs[lender] = {
-            ...userConfigs[lender],
-            [subAccountId]: d.userConfigs[subAccountId],
+    if (lenderUserData) {
+      for (const sub of lenderUserData.data) {
+        const positions = extractPositions(sub.positions)
+        for (const pos of positions) {
+          if (Number(pos.deposits) !== 0 || Number(pos.debt) !== 0) {
+            if (!positionsByPool[pos.poolId]) positionsByPool[pos.poolId] = {}
+            positionsByPool[pos.poolId][sub.accountId] = pos
           }
         }
-      })
 
+        // collect totals if nav nonzero
+        if (sub.balanceData.nav !== 0) {
+          if (!positionTotals[lender]) positionTotals[lender] = {}
+          positionTotals[lender][sub.accountId] = {
+            balanceData: sub.balanceData as unknown as BalanceData,
+            aprData: sub.aprData as unknown as AprData,
+          }
+        }
+
+        // collect config
+        if (!userConfigs[lender]) userConfigs[lender] = {}
+        userConfigs[lender][sub.accountId] = sub.userConfig as unknown as UserConfig
+      }
+    }
+
+    for (const [poolId, poolData] of Object.entries(poolsMap)) {
       result.push({
         chainId,
         lender,
         poolId,
         asset: poolData.asset as RawCurrency,
         poolData,
-        userPosition, // will be undefined if no user data exists for this pool
+        userPosition: positionsByPool[poolId],
       })
     }
   }
