@@ -3,7 +3,8 @@ import React from 'react'
 import { lenderDisplayName } from '@1delta/lib-utils'
 import type {
   UserDataResult,
-  UserPositionInfo,
+  LenderUserDataEntry,
+  UserPositionEntry,
 } from '../../hooks/lending/useUserData'
 
 interface UserLenderPositionsTableProps {
@@ -21,11 +22,42 @@ function formatUsd(v: number) {
   })
 }
 
+/** Extract actual position objects from the positions array (INIT has a leading number) */
+function extractPositions(positions: (UserPositionEntry | number)[]): UserPositionEntry[] {
+  return positions.filter((p): p is UserPositionEntry => typeof p === 'object' && p !== null)
+}
+
+/** Flatten raw data into a list of { chainId, lender, entry } for table rendering */
+function flattenLenderEntries(raw: UserDataResult['raw']): {
+  chainId: string
+  lender: string
+  entry: LenderUserDataEntry
+}[] {
+  if (!raw) return []
+  const entries: { chainId: string; lender: string; entry: LenderUserDataEntry }[] = []
+  for (const [chainId, lenders] of Object.entries(raw)) {
+    for (const [lender, entry] of Object.entries(lenders)) {
+      // skip lenders with no meaningful position
+      const hasActivity = entry.data.some(
+        (sub) => sub.balanceData.nav !== 0 || extractPositions(sub.positions).length > 0
+      )
+      if (hasActivity) {
+        entries.push({ chainId, lender, entry })
+      }
+    }
+  }
+  return entries.sort((a, b) => {
+    const aNav = a.entry.data.reduce((s, sub) => s + sub.balanceData.nav, 0)
+    const bNav = b.entry.data.reduce((s, sub) => s + sub.balanceData.nav, 0)
+    return bNav - aNav
+  })
+}
+
 const PositionsList: React.FC<{
   title: string
-  positions?: UserPositionInfo[]
+  positions: UserPositionEntry[]
 }> = ({ title, positions }) => {
-  if (!positions || positions.length === 0) return null
+  if (positions.length === 0) return null
 
   return (
     <div className="space-y-1">
@@ -40,8 +72,8 @@ const PositionsList: React.FC<{
               {pos.underlying.slice(0, 6)}...{pos.underlying.slice(-4)}
             </span>
             <span className="opacity-70">
-              {pos.size.toFixed(4)} ({'$'}
-              {formatUsd(pos.sizeUSD)})
+              {Number(pos.deposits || 0).toFixed(4)} ({'$'}
+              {formatUsd(pos.depositsUSD)})
             </span>
           </div>
         ))}
@@ -58,11 +90,8 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
   error,
   refetch,
 }) => {
-  const lenderSummaries = userData?.lenderSummaries ?? []
-
-  const total = userData?.total ?? 0
-  const total24h = userData?.total24h ?? 0
-  const totalApr = userData?.apr
+  const summary = userData?.summary
+  const lenderEntries = flattenLenderEntries(userData?.raw)
 
   if (!account) {
     return (
@@ -95,7 +124,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
     )
   }
 
-  if (!lenderSummaries.length) {
+  if (!lenderEntries.length) {
     return (
       <div className="w-full max-w-4xl mx-auto p-4">
         <div className="alert alert-info">
@@ -124,29 +153,32 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
       </div>
 
       {/* Totals summary */}
-      <div className="stats stats-horizontal shadow w-full overflow-x-auto">
-        <div className="stat">
-          <div className="stat-title">Total Net Worth</div>
-          <div className="stat-value text-lg">${formatUsd(total)}</div>
-        </div>
-        <div className="stat">
-          <div className="stat-title">Net Worth 24h Ago</div>
-          <div className="stat-value text-lg">${formatUsd(total24h)}</div>
-          <div className="stat-desc">
-            {total24h !== 0 && (
-              <span className={total >= total24h ? 'text-success' : 'text-error'}>
-                {(((total - total24h) / total24h) * 100).toFixed(2)}%
-              </span>
-            )}
-          </div>
-        </div>
-        {totalApr != null && (
+      {summary && (
+        <div className="stats stats-horizontal shadow w-full overflow-x-auto">
           <div className="stat">
-            <div className="stat-title">Portfolio APR</div>
-            <div className="stat-value text-lg">{totalApr.toFixed(2)}%</div>
+            <div className="stat-title">Total Net Worth</div>
+            <div className="stat-value text-lg">${formatUsd(summary.totalNetWorth)}</div>
           </div>
-        )}
-      </div>
+          <div className="stat">
+            <div className="stat-title">Total Deposits</div>
+            <div className="stat-value text-lg">${formatUsd(summary.totalDepositsUSD)}</div>
+          </div>
+          <div className="stat">
+            <div className="stat-title">Total Debt</div>
+            <div className="stat-value text-lg">${formatUsd(summary.totalDebtUSD)}</div>
+          </div>
+          <div className="stat">
+            <div className="stat-title">Net APR</div>
+            <div className="stat-value text-lg">{summary.avgNetApr.toFixed(2)}%</div>
+          </div>
+          {summary.overallLeverage > 1 && (
+            <div className="stat">
+              <div className="stat-title">Leverage</div>
+              <div className="stat-value text-lg">{summary.overallLeverage.toFixed(2)}x</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Per-lender grouped table */}
       <div className="rounded-box border border-base-300 overflow-hidden">
@@ -164,40 +196,60 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
               </tr>
             </thead>
             <tbody>
-              {lenderSummaries.map((lender) => {
-                const worstHealth =
-                  lender.healthFactors && lender.healthFactors.length
-                    ? Math.min(...lender.healthFactors)
-                    : undefined
-                const maxLev =
-                  lender.leverages && lender.leverages.length
-                    ? Math.max(...lender.leverages)
-                    : undefined
+              {lenderEntries.map(({ chainId: cId, lender, entry }) => {
+                // Aggregate across sub-accounts
+                let nav = 0
+                let nav24h = 0
+                let deposits = 0
+                let debt = 0
+                const healthFactors: number[] = []
+                const leverages: number[] = []
+                const assetsLong: UserPositionEntry[] = []
+                const assetsShort: UserPositionEntry[] = []
 
-                const pnl24h = lender.netWorth - lender.netWorth24h
+                for (const sub of entry.data) {
+                  const bd = sub.balanceData
+                  nav += bd.nav
+                  nav24h += bd.nav24h
+                  deposits += bd.deposits
+                  debt += bd.debt
+
+                  if (bd.nav !== 0) leverages.push(bd.deposits / bd.nav)
+                  if (sub.health != null) healthFactors.push(sub.health)
+
+                  for (const pos of extractPositions(sub.positions)) {
+                    if (Number(pos.deposits) > 0) assetsLong.push(pos)
+                    if (Number(pos.debt) > 0) assetsShort.push(pos)
+                  }
+                }
+
+                const apr = entry.data[0]?.aprData.apr ?? 0
+                const worstHealth = healthFactors.length ? Math.min(...healthFactors) : undefined
+                const maxLev = leverages.length ? Math.max(...leverages) : undefined
+                const pnl24h = nav - nav24h
 
                 return (
-                  <tr key={`${lender.chain}-${lender.lender}`}>
+                  <tr key={`${cId}-${lender}`}>
                     <td>
                       <div className="flex flex-col text-xs">
-                        <span className="font-semibold">{lenderDisplayName(lender.lender)}</span>
+                        <span className="font-semibold">{lenderDisplayName(lender)}</span>
                       </div>
                     </td>
                     <td>
-                      <div className="text-xs font-semibold">${formatUsd(lender.netWorth)}</div>
+                      <div className="text-xs font-semibold">${formatUsd(nav)}</div>
                     </td>
                     <td>
                       <div className="flex flex-col text-xs">
-                        <span>${formatUsd(lender.netWorth24h)}</span>
-                        {lender.netWorth24h !== 0 && (
+                        <span>${formatUsd(nav24h)}</span>
+                        {nav24h !== 0 && (
                           <span className={pnl24h >= 0 ? 'text-success' : 'text-error'}>
-                            {((pnl24h / lender.netWorth24h) * 100).toFixed(2)}%
+                            {((pnl24h / nav24h) * 100).toFixed(2)}%
                           </span>
                         )}
                       </div>
                     </td>
                     <td>
-                      <span className="text-xs font-semibold">{lender.apr.toFixed(2)}%</span>
+                      <span className="text-xs font-semibold">{apr.toFixed(2)}%</span>
                     </td>
                     <td>
                       {worstHealth != null ? (
@@ -209,11 +261,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                                 ? 'badge-warning'
                                 : 'badge-success'
                           }`}
-                          title={
-                            lender.healthFactors
-                              ? `Health factors: ${lender.healthFactors.map((x) => x.toFixed(2)).join(', ')}`
-                              : ''
-                          }
+                          title={`Health factors: ${healthFactors.map((x) => x.toFixed(2)).join(', ')}`}
                         >
                           {worstHealth.toFixed(2)}
                         </span>
@@ -225,11 +273,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                       {maxLev != null ? (
                         <span
                           className="badge badge-outline badge-sm"
-                          title={
-                            lender.leverages
-                              ? `Leverages: ${lender.leverages.map((x) => `${x.toFixed(2)}x`).join(', ')}`
-                              : ''
-                          }
+                          title={`Leverages: ${leverages.map((x) => `${x.toFixed(2)}x`).join(', ')}`}
                         >
                           {maxLev.toFixed(2)}x
                         </span>
@@ -239,8 +283,8 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                     </td>
                     <td>
                       <div className="space-y-2 text-xs">
-                        <PositionsList title="Assets Long" positions={lender.assetsLong} />
-                        <PositionsList title="Assets Short" positions={lender.assetsShort} />
+                        <PositionsList title="Assets Long" positions={assetsLong} />
+                        <PositionsList title="Assets Short" positions={assetsShort} />
                       </div>
                     </td>
                   </tr>

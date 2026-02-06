@@ -70,50 +70,36 @@ export interface LenderUserDataEntry {
   data: UserSubAccount[]
 }
 
-interface UserDataApiResponse {
-  ok: boolean
-  data: {
-    [chainId: string]: {
-      [lender: string]: LenderUserDataEntry
-    }
-  }
+// ============================================================================
+// Summary from the API
+// ============================================================================
+
+export interface UserDataSummary {
+  totalDepositsUSD: number
+  totalDebtUSD: number
+  totalNetWorth: number
+  avgDepositApr: number
+  avgBorrowApr: number
+  avgNetApr: number
+  totalRewardApr: number
+  overallLeverage: number
+  activeLenders: number
+  activeChains: number
 }
 
 // ============================================================================
-// Derived summary types (for UI consumption)
+// Result type
 // ============================================================================
-
-export interface UserPositionInfo {
-  subAccount: string
-  poolId: string
-  underlying: string
-  size: number
-  sizeUSD: number
-}
-
-export interface UserLenderSummary {
-  lender: string
-  chain: string
-  netWorth: number
-  netWorth24h: number
-  apr: number
-  assetsLong: UserPositionInfo[]
-  assetsShort: UserPositionInfo[]
-  healthFactors: number[]
-  leverages: number[]
-}
 
 export interface UserDataResult {
   /** Raw per-chain, per-lender, sub-account data */
-  raw: UserDataApiResponse['data'] | undefined
-  /** Per-lender summaries for table display */
-  lenderSummaries: UserLenderSummary[]
-  /** Total portfolio net worth (USD) */
-  total: number
-  /** Total portfolio net worth 24h ago (USD) */
-  total24h: number
-  /** Weighted portfolio APR */
-  apr: number
+  raw: {
+    [chainId: string]: {
+      [lender: string]: LenderUserDataEntry
+    }
+  } | undefined
+  /** Pre-computed summary from the API */
+  summary: UserDataSummary | undefined
 }
 
 // ============================================================================
@@ -123,124 +109,6 @@ export interface UserDataResult {
 const BACKEND_BASE_URL = 'https://portal.1delta.io/v1'
 const endpointUserData = `${BACKEND_BASE_URL}/lending/user-positions`
 const USE_RPC_FETCH = true
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-/** Extract actual position objects from the positions array (INIT has a leading number) */
-function extractPositions(positions: (UserPositionEntry | number)[]): UserPositionEntry[] {
-  return positions.filter((p): p is UserPositionEntry => typeof p === 'object' && p !== null)
-}
-
-function calculateNetApr(apr: UserAprData, deposits: number, debt: number): number {
-  const nav = deposits - debt
-  if (nav <= 0) return 0
-
-  const depositApr = apr.depositApr + apr.stakingDepositApr + apr.rewardDepositApr
-  const debtApr = apr.borrowApr + apr.stakingBorrowApr - apr.rewardBorrowApr
-
-  return (depositApr * deposits - debtApr * debt) / nav
-}
-
-function buildSummaries(data: UserDataApiResponse['data']): {
-  lenderSummaries: UserLenderSummary[]
-  total: number
-  total24h: number
-  apr: number
-} {
-  let total = 0
-  let total24h = 0
-  let weightedApr = 0
-  const lenderSummaries: UserLenderSummary[] = []
-
-  for (const [chainId, lenders] of Object.entries(data)) {
-    for (const [lender, lenderEntry] of Object.entries(lenders)) {
-      let lenderNav = 0
-      let lenderNav24h = 0
-      let lenderWeightedApr = 0
-      const healthFactors: number[] = []
-      const leverages: number[] = []
-      const assetsLong: UserPositionInfo[] = []
-      const assetsShort: UserPositionInfo[] = []
-
-      for (const sub of lenderEntry.data) {
-        const bd = sub.balanceData
-        const nav = bd.nav
-        const nav24h = bd.nav24h
-
-        if (nav > 0) {
-          lenderNav += nav
-          total += nav
-        }
-        if (nav24h > 0) {
-          lenderNav24h += nav24h
-          total24h += nav24h
-        }
-
-        if (nav > 0) {
-          const netApr = calculateNetApr(sub.aprData, bd.deposits, bd.debt)
-          const aprTimesNav = nav * netApr
-          weightedApr += aprTimesNav
-          lenderWeightedApr += aprTimesNav
-        }
-
-        // leverage & health
-        if (nav !== 0) leverages.push(bd.deposits / nav)
-        const adjDebt = bd.adjustedDebt ?? 0
-        if (adjDebt !== 0) {
-          healthFactors.push(bd.collateral / adjDebt)
-        }
-
-        // positions
-        const positions = extractPositions(sub.positions)
-        for (const pos of positions) {
-          const depSize = Number(pos.deposits) || 0
-          if (depSize > 0) {
-            assetsLong.push({
-              subAccount: sub.accountId,
-              poolId: pos.poolId,
-              underlying: pos.underlying,
-              size: depSize,
-              sizeUSD: pos.depositsUSD,
-            })
-          }
-          const debtSize = Number(pos.debt) || 0
-          if (debtSize > 0) {
-            assetsShort.push({
-              subAccount: sub.accountId,
-              poolId: pos.poolId,
-              underlying: pos.underlying,
-              size: debtSize,
-              sizeUSD: pos.debtUSD,
-            })
-          }
-        }
-      }
-
-      if (lenderNav !== 0 || assetsLong.length > 0 || assetsShort.length > 0) {
-        lenderSummaries.push({
-          lender,
-          chain: chainId,
-          netWorth: lenderNav,
-          netWorth24h: lenderNav < 0 ? lenderNav : lenderNav24h,
-          apr: lenderNav > 0 ? lenderWeightedApr / lenderNav : 0,
-          assetsLong,
-          assetsShort,
-          healthFactors,
-          leverages,
-        })
-      }
-    }
-  }
-
-  return {
-    lenderSummaries: lenderSummaries.sort((a, b) => b.netWorth - a.netWorth),
-    total,
-    total24h,
-    apr: total > 0 ? weightedApr / total : 0,
-  }
-}
 
 // ============================================================================
 // Hook
@@ -264,32 +132,21 @@ export function useUserData(params: {
     queryKey: ['userData', chainId, account],
     enabled,
     queryFn: async () => {
-      let data: UserDataApiResponse['data']
-
       if (USE_RPC_FETCH) {
-        data = await fetchUserDataViaRpc(chainId, account!)
-      } else {
-        const r = await fetch(url)
-        if (!r.ok) {
-          const text = await r.text().catch(() => '')
-          throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
-        }
-        const json = (await r.json()) as UserDataApiResponse
-        if (!json.ok) {
-          throw new Error('API returned ok: false')
-        }
-        data = json.data
+        const result = await fetchUserDataViaRpc(chainId, account!)
+        return { raw: result.data, summary: result.summary }
       }
 
-      const { lenderSummaries, total, total24h, apr } = buildSummaries(data)
-
-      return {
-        raw: data,
-        lenderSummaries,
-        total,
-        total24h,
-        apr,
+      const r = await fetch(url)
+      if (!r.ok) {
+        const text = await r.text().catch(() => '')
+        throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
       }
+      const json = await r.json() as { ok: boolean; data: UserDataResult['raw']; summary: UserDataSummary }
+      if (!json.ok) {
+        throw new Error('API returned ok: false')
+      }
+      return { raw: json.data, summary: json.summary }
     },
     refetchInterval: 5 * 60 * 1000,
     staleTime: 30_000,
@@ -298,7 +155,7 @@ export function useUserData(params: {
   })
 
   return {
-    userData: data ?? { raw: undefined, lenderSummaries: [], total: 0, total24h: 0, apr: 0 },
+    userData: data ?? { raw: undefined, summary: undefined },
     isUserDataLoading: isLoading,
     isUserDataFetching: isFetching,
     error,
