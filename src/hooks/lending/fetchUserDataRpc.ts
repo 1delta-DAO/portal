@@ -1,4 +1,4 @@
-import type { LenderUserDataEntry } from './useUserData'
+import type { LenderUserDataEntry, UserDataSummary } from './useUserData'
 import { executeRpcCallsWithRetry } from './executeRpcCalls'
 
 // ============================================================================
@@ -33,21 +33,19 @@ interface JsonRpcResponse {
 
 interface ParseApiResponse {
   ok: boolean
-  data: {
-    [chainId: string]: {
-      [lender: string]: LenderUserDataEntry
-    }
-  }
+  data: LenderUserDataEntry[]
+  summary: UserDataSummary
 }
 
 // ============================================================================
-// Output type (matches UserDataApiResponse['data'])
+// Output type
 // ============================================================================
 
-export type UserDataApiResponseData = {
-  [chainId: string]: {
-    [lender: string]: LenderUserDataEntry
-  }
+export type UserDataApiResponseData = LenderUserDataEntry[]
+
+export interface FetchUserDataResult {
+  data: LenderUserDataEntry[]
+  summary: UserDataSummary
 }
 
 // ============================================================================
@@ -90,7 +88,7 @@ async function fetchApi<T extends { ok: boolean }>(
 export async function fetchUserDataViaRpc(
   chainId: string,
   account: string
-): Promise<UserDataApiResponseData> {
+): Promise<FetchUserDataResult> {
   // Step 1: Get RPC call descriptors from backend
   const rpcCallUrl =
     `${BACKEND_BASE_URL}/lending/user-positions/rpc-call` +
@@ -105,12 +103,11 @@ export async function fetchUserDataViaRpc(
 
   // Step 3: Send results to parse endpoint
   const parseUrl = `${BACKEND_BASE_URL}/lending/user-positions/parse`
-  const { data: parseData } = await fetchApi<ParseApiResponse>('parse', parseUrl, {
+  const { data, summary } = await fetchApi<ParseApiResponse>('parse', parseUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rpcCallId, rawResponses }),
   })
 
-  // The parse endpoint already returns data nested as { [chainId]: { [lender]: ... } }
-  return parseData
+  return { data, summary }
 }

@@ -54,15 +54,22 @@ export function flattenLenderDataWithUser(
     return { result, positionTotals: {}, userConfigs: {} }
   }
 
-  const userDataForChain: { [lender: string]: LenderUserDataEntry } | undefined =
-    userDataResult?.raw?.[chainId]
+  // Build a lender->entry map from the flat array, filtering by chainId
+  const userDataForChain = new Map<string, LenderUserDataEntry>()
+  if (userDataResult?.raw) {
+    for (const entry of userDataResult.raw) {
+      if (entry.chainId === chainId) {
+        userDataForChain.set(entry.lender, entry)
+      }
+    }
+  }
 
   let positionTotals: PositionTotals = {}
   let userConfigs: UserConfigs = {}
 
   for (const [lender, lenderEntry] of Object.entries(chainEntry.data)) {
     const poolsMap = lenderEntry.data
-    const lenderUserData: LenderUserDataEntry | undefined = userDataForChain?.[lender]
+    const lenderUserData: LenderUserDataEntry | undefined = userDataForChain.get(lender)
 
     // Build a lookup: poolId -> { [subAccountId]: UserPositionEntry }
     const positionsByPool: { [poolId: string]: { [subAccountId: string]: UserPositionEntry } } = {}
