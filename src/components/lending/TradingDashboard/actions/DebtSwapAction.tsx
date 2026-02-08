@@ -7,6 +7,7 @@ import { PoolSelectorDropdown } from '../PoolSelectorDropdown'
 import { SlippageInput } from '../SlippageInput'
 import { QuoteCard } from '../QuoteCard'
 import { AmountQuickButtons } from '../../DashboardActions/AmountQuickButtons'
+import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes } from '../useTradingQuotes'
 
 export const DebtSwapAction: React.FC<TradingActionProps> = ({
@@ -39,9 +40,9 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
     onPoolSelectionChange(selections)
   }, [debtInPool, debtOutPool, onPoolSelectionChange])
 
-  // Max = debt balance of debt in
-  const debtInPos = debtInPool ? userPositions.get(debtInPool.underlying.toLowerCase()) : null
-  const maxDebt = debtInPos ? Number(debtInPos.debt) + Number(debtInPos.debtStable) : 0
+  // Max = existing debt balance of the asset being repaid (debt out)
+  const debtOutPos = debtOutPool ? userPositions.get(debtOutPool.underlying.toLowerCase()) : null
+  const maxDebt = debtOutPos ? Number(debtOutPos.debt) + Number(debtOutPos.debtStable) : 0
 
   const handleFetchQuotes = () => {
     if (!debtInPool || !debtOutPool) return
@@ -50,7 +51,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
       lender: selectedLender,
       debtAssetIn: debtInPool.asset.address,
       debtAssetOut: debtOutPool.asset.address,
-      amount: parseUnits(amount || '0', debtInPool.asset.decimals).toString(),
+      amount: parseUnits(amount || '0', debtOutPool.asset.decimals).toString(),
       slippage: parseFloat(slippage) || 0.3,
       irModeIn: LendingMode.VARIABLE,
       irModeOut: LendingMode.VARIABLE,
@@ -70,7 +71,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
         value={debtInPool}
         onChange={setDebtInPool}
         userPositions={userPositions}
-        label="Debt In (Repay)"
+        label="Borrow (New Debt)"
         positionType="debt"
       />
 
@@ -79,7 +80,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
         value={debtOutPool}
         onChange={setDebtOutPool}
         userPositions={userPositions}
-        label="Debt Out (Borrow)"
+        label="Repay (Existing Debt)"
         positionType="debt"
       />
 
@@ -97,9 +98,9 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
           value={amount}
           onChange={(e) => { setAmount(e.target.value); reset() }}
         />
-        {debtInPos && maxDebt > 0 && (
+        {debtOutPos && maxDebt > 0 && (
           <span className="text-[10px] text-base-content/50 mt-0.5">
-            Debt Balance: {maxDebt.toFixed(4)}
+            Existing Debt: {maxDebt.toFixed(4)} {debtOutPool?.asset.symbol}
           </span>
         )}
       </div>
@@ -136,7 +137,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
         {loading ? 'Fetching quotes...' : 'Get Debt Swap Quotes'}
       </button>
 
-      {error && <div className="text-error text-xs">{error}</div>}
+      {error && <ErrorDisplay error={error} />}
 
       {permissions.map((tx, i) => (
         <button key={i} type="button" className="btn btn-outline btn-sm w-full" onClick={() => executePermission(tx)}>

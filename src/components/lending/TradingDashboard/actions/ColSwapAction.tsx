@@ -7,6 +7,7 @@ import { PoolSelectorDropdown } from '../PoolSelectorDropdown'
 import { SlippageInput } from '../SlippageInput'
 import { QuoteCard } from '../QuoteCard'
 import { AmountQuickButtons } from '../../DashboardActions/AmountQuickButtons'
+import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes } from '../useTradingQuotes'
 
 export const ColSwapAction: React.FC<TradingActionProps> = ({
@@ -136,7 +137,7 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
         {loading ? 'Fetching quotes...' : 'Get Collateral Swap Quotes'}
       </button>
 
-      {error && <div className="text-error text-xs">{error}</div>}
+      {error && <ErrorDisplay error={error} />}
 
       {permissions.map((tx, i) => (
         <button key={i} type="button" className="btn btn-outline btn-sm w-full" onClick={() => executePermission(tx)}>

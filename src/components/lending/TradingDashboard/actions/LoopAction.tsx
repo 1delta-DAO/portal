@@ -9,6 +9,7 @@ import { SlippageInput } from '../SlippageInput'
 import { QuoteCard } from '../QuoteCard'
 import { AmountQuickButtons } from '../../DashboardActions/AmountQuickButtons'
 import { formatTokenAmount, formatUsd } from '../../DashboardActions/format'
+import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes } from '../useTradingQuotes'
 
 export const LoopAction: React.FC<TradingActionProps> = ({
@@ -217,7 +218,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
       </button>
 
       {/* Error */}
-      {error && <div className="text-error text-xs">{error}</div>}
+      {error && <ErrorDisplay error={error} />}
 
       {/* Permissions */}
       {permissions.map((tx, i) => (
