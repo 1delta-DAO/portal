@@ -116,13 +116,19 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        {highlights.length > 0 && (
-          <div className="flex items-center gap-2 text-[10px] text-base-content/60 shrink-0">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-error inline-block" />In</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-success inline-block" />Out</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-warning inline-block" />Pay</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2 text-[10px] text-base-content/50 shrink-0">
+          {highlights.length > 0 && (
+            <>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-error inline-block" />In</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-success inline-block" />Out</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-warning inline-block" />Pay</span>
+              <span className="mx-0.5">|</span>
+            </>
+          )}
+          <span className="flex items-center gap-1" title="Deposits &amp; borrows are paused">
+            <span className="text-warning text-sm">&#x2744;</span>Paused
+          </span>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -178,7 +184,10 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                         )}
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-medium text-sm">{pool.asset.symbol}</span>
+                        <span className="font-medium text-sm">
+                          {pool.asset.symbol}
+                          {pool.isFrozen && <span className="ml-1 text-warning text-xs" title="Deposits &amp; borrows are paused">&#x2744;</span>}
+                        </span>
                         <span className="text-xs text-base-content/60">{pool.asset.name}</span>
                       </div>
                     </div>

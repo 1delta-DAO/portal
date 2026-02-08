@@ -148,7 +148,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
         <div className="space-y-1.5">
           <span className="text-xs font-medium">Quotes</span>
           {quotes.map((q, i) => (
-            <QuoteCard key={i} quote={q} index={i} isSelected={selectedIndex === i} onClick={() => selectQuote(i)} operation="DebtSwap" />
+            <QuoteCard key={i} quote={q} index={i} isSelected={selectedIndex === i} onClick={() => selectQuote(i)} operation="DebtSwap" inSymbol={debtInPool?.asset.symbol} outSymbol={debtOutPool?.asset.symbol} />
           ))}
         </div>
       )}

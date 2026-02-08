@@ -10,57 +10,39 @@ const ENDPOINTS: Record<TradingOperation, string> = {
   Close: 'https://portal.1delta.io/v1/actions/loop/close',
 }
 
-interface LoopPosition {
-  aggregator: string
-  positionDebtUSD: number
-  positionCollateralUSD: number
-  tradeAmountInUSD: number
-  tradeAmountOutUSD: number
-}
-
-interface SwapDeltas {
+interface QuoteDeltas {
   aggregator: string
   tradeInput: number
   tradeOutput: number
+  deltas?: Array<{ amountUSD: number; position: string }>
 }
 
-interface ClosePosition {
-  aggregator: string
-  tradeAmountInUSD: number
-  tradeAmountOutUSD: number
-}
-
-function normalizeQuotes(operation: TradingOperation, rawQuotes: any[]): TradingQuote[] {
+function normalizeQuotes(_operation: TradingOperation, rawQuotes: any[]): TradingQuote[] {
   return rawQuotes.map((q) => {
     let aggregator = 'Unknown'
-    let tradeAmountInUSD = 0
-    let tradeAmountOutUSD = 0
+    let tradeAmountIn = 0
+    let tradeAmountOut = 0
     let positionCollateralUSD: number | undefined
     let positionDebtUSD: number | undefined
 
-    if (operation === 'Loop') {
-      const pos = q.position as LoopPosition
-      aggregator = pos.aggregator
-      tradeAmountInUSD = pos.tradeAmountInUSD
-      tradeAmountOutUSD = pos.tradeAmountOutUSD
-      positionCollateralUSD = pos.positionCollateralUSD
-      positionDebtUSD = pos.positionDebtUSD
-    } else if (operation === 'ColSwap' || operation === 'DebtSwap') {
-      const deltas = q.deltas as SwapDeltas
+    const deltas = q.deltas as QuoteDeltas | undefined
+    if (deltas) {
       aggregator = deltas.aggregator ?? 'Unknown'
-      tradeAmountInUSD = deltas.tradeInput ?? 0
-      tradeAmountOutUSD = deltas.tradeOutput ?? 0
-    } else {
-      const pos = q.position as ClosePosition
-      aggregator = pos.aggregator
-      tradeAmountInUSD = pos.tradeAmountInUSD
-      tradeAmountOutUSD = pos.tradeAmountOutUSD
+      tradeAmountIn = deltas.tradeInput ?? 0
+      tradeAmountOut = deltas.tradeOutput ?? 0
+      // Loop responses include nested deltas with per-position USD values
+      if (deltas.deltas) {
+        for (const d of deltas.deltas) {
+          if (d.position === 'collateral') positionCollateralUSD = d.amountUSD
+          else if (d.position === 'debt') positionDebtUSD = d.amountUSD
+        }
+      }
     }
 
     return {
       aggregator,
-      tradeAmountInUSD,
-      tradeAmountOutUSD,
+      tradeAmountIn,
+      tradeAmountOut,
       positionCollateralUSD,
       positionDebtUSD,
       tx: q.tx as Tx,

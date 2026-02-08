@@ -24,8 +24,8 @@ export interface Tx {
 
 export interface TradingQuote {
   aggregator: string
-  tradeAmountInUSD: number
-  tradeAmountOutUSD: number
+  tradeAmountIn: number
+  tradeAmountOut: number
   positionCollateralUSD?: number
   positionDebtUSD?: number
   tx: Tx

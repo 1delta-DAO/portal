@@ -134,7 +134,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
   const allPools = useMemo(() => {
     if (!selectedLender || !lenderData) return []
     const poolMap = lenderData[chainId]?.data?.[selectedLender]?.data ?? {}
-    const raw = Object.values(poolMap).filter((p) => !p.isFrozen)
+    const raw = Object.values(poolMap)
     const byUnderlying = new Map<string, PoolDataItem>()
     for (const p of raw) {
       const key = p.underlying.toLowerCase()
@@ -419,15 +419,18 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
       <div className="flex gap-4 items-start">
         {/* Left: Market data table */}
         <div className="flex-1 rounded-box border border-base-300 overflow-hidden">
-          {/* Search */}
-          <div className="p-2 border-b border-base-300">
+          {/* Search + legend */}
+          <div className="p-2 border-b border-base-300 flex items-center gap-3">
             <input
               type="text"
               placeholder="Search by name, symbol or address..."
-              className="input input-bordered input-sm w-full"
+              className="input input-bordered input-sm flex-1"
               value={assetSearch}
               onChange={(e) => setAssetSearch(e.target.value)}
             />
+            <span className="flex items-center gap-1 text-[10px] text-base-content/50 shrink-0" title="Deposits &amp; borrows are paused">
+              <span className="text-warning text-sm">&#x2744;</span> = Paused
+            </span>
           </div>
 
           <div className="overflow-x-auto">
@@ -496,7 +499,10 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
                             )}
                           </div>
                           <div className="flex flex-col">
-                            <span className="font-medium text-sm">{pool.asset.symbol}</span>
+                            <span className="font-medium text-sm">
+                              {pool.asset.symbol}
+                              {pool.isFrozen && <span className="ml-1 text-warning text-xs" title="Deposits &amp; borrows are paused">&#x2744;</span>}
+                            </span>
                             <span className="text-xs text-base-content/60">{pool.asset.name}</span>
                           </div>
                         </div>

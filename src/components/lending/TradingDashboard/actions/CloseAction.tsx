@@ -147,7 +147,7 @@ export const CloseAction: React.FC<TradingActionProps> = ({
         <div className="space-y-1.5">
           <span className="text-xs font-medium">Quotes</span>
           {quotes.map((q, i) => (
-            <QuoteCard key={i} quote={q} index={i} isSelected={selectedIndex === i} onClick={() => selectQuote(i)} operation="Close" />
+            <QuoteCard key={i} quote={q} index={i} isSelected={selectedIndex === i} onClick={() => selectQuote(i)} operation="Close" inSymbol={collateralPool?.asset.symbol} outSymbol={debtPool?.asset.symbol} />
           ))}
         </div>
       )}

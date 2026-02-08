@@ -8,6 +8,7 @@ import { PoolSelectorDropdown } from '../PoolSelectorDropdown'
 import { SlippageInput } from '../SlippageInput'
 import { QuoteCard } from '../QuoteCard'
 import { AmountQuickButtons } from '../../DashboardActions/AmountQuickButtons'
+import { formatTokenAmount, formatUsd } from '../../DashboardActions/format'
 import { useTradingQuotes } from '../useTradingQuotes'
 
 export const LoopAction: React.FC<TradingActionProps> = ({
@@ -146,40 +147,61 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
       {/* Pay currency */}
       <div className="form-control">
-        <label className="label-text text-xs mb-0.5">Pay With (Margin)</label>
-        <select
-          className="select select-bordered select-sm w-full"
-          value={payCurrencyAddress ?? ''}
-          onChange={(e) => { setPayCurrencyAddress(e.target.value); setPayAmount('') }}
-          disabled={payCurrencies.length === 0}
-        >
-          <option value="" disabled>Select pay currency...</option>
-          {payCurrencies.map(c => (
-            <option key={c.address} value={c.address}>{c.symbol}</option>
-          ))}
-        </select>
+        <label className="label-text text-xs mb-1">Pay With (Margin)</label>
+        {payCurrencies.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {payCurrencies.map(c => {
+              const isActive = payCurrencyAddress === c.address
+              return (
+                <button
+                  key={c.address}
+                  type="button"
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors border cursor-pointer ${
+                    isActive
+                      ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                      : 'border-base-300 bg-base-200/50 hover:bg-base-200'
+                  }`}
+                  onClick={() => { setPayCurrencyAddress(c.address); setPayAmount('') }}
+                >
+                  <img src={c.logoURI} width={16} height={16} alt={c.symbol} className="rounded-full object-cover w-4 h-4" />
+                  <span className="font-medium">{c.symbol}</span>
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <span className="text-xs text-base-content/50">Select collateral & debt pools first</span>
+        )}
       </div>
 
-      {/* Pay amount */}
-      {selectedPayCurrency && (
-        <div className="form-control">
-          <div className="flex items-center justify-between mb-0.5">
-            <label className="label-text text-xs">Pay Amount</label>
-            {(() => {
-              const wb = walletBalances.get(selectedPayCurrency.address.toLowerCase())
-              return wb ? <AmountQuickButtons maxAmount={Number(wb.balance)} onSelect={setPayAmount} /> : null
-            })()}
+      {/* Pay amount + wallet balance */}
+      {selectedPayCurrency && (() => {
+        const wb = walletBalances.get(selectedPayCurrency.address.toLowerCase())
+        return (
+          <div className="form-control">
+            {wb && parseFloat(wb.balance) > 0 && (
+              <div className="text-xs flex justify-between px-1 mb-1">
+                <span className="text-base-content/60">Wallet balance:</span>
+                <span className="font-medium">
+                  {formatTokenAmount(wb.balance)} {selectedPayCurrency.symbol} (${formatUsd(wb.balanceUSD)})
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between mb-0.5">
+              <label className="label-text text-xs">Pay Amount</label>
+              {wb ? <AmountQuickButtons maxAmount={Number(wb.balance)} onSelect={setPayAmount} /> : null}
+            </div>
+            <input
+              type="text"
+              inputMode="decimal"
+              className="input input-bordered input-sm w-full"
+              placeholder="0.0"
+              value={payAmount}
+              onChange={(e) => { setPayAmount(e.target.value); reset() }}
+            />
           </div>
-          <input
-            type="text"
-            inputMode="decimal"
-            className="input input-bordered input-sm w-full"
-            placeholder="0.0"
-            value={payAmount}
-            onChange={(e) => { setPayAmount(e.target.value); reset() }}
-          />
-        </div>
-      )}
+        )
+      })()}
 
       {/* Slippage */}
       <SlippageInput value={slippage} onChange={setSlippage} />
@@ -221,6 +243,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               isSelected={selectedIndex === i}
               onClick={() => selectQuote(i)}
               operation="Loop"
+              inSymbol={debtPool?.asset.symbol}
+              outSymbol={collateralPool?.asset.symbol}
             />
           ))}
         </div>

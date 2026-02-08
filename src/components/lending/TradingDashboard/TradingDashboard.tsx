@@ -127,7 +127,7 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isLoa
   const allPools = useMemo(() => {
     if (!selectedLender || !lenderData) return []
     const poolMap = lenderData[chainId]?.data?.[selectedLender]?.data ?? {}
-    const raw = Object.values(poolMap).filter((p) => !p.isFrozen)
+    const raw = Object.values(poolMap)
     const byUnderlying = new Map<string, PoolDataItem>()
     for (const p of raw) {
       const key = p.underlying.toLowerCase()
