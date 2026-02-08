@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
-import { formatTokenAmount, formatUsd } from './format'
+import { formatTokenAmount, formatUsd, parseAmount } from './format'
+import { AmountQuickButtons } from './AmountQuickButtons'
 
 export const BorrowAction: React.FC<ActionPanelProps> = ({
   pool,
   userPosition,
+  walletBalance,
   lender,
   chainId,
   account,
@@ -29,14 +31,46 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
     resetState()
   }, [pool?.poolId])
 
+  const depositsToken = userPosition ? parseAmount(userPosition.deposits) : 0
+  const debtToken = userPosition
+    ? parseAmount(userPosition.debt) + parseAmount(userPosition.debtStable)
+    : 0
+  const borrowableToken = userPosition ? parseAmount(userPosition.borrowable) : 0
+
   return (
     <div className="space-y-3">
+      {/* Wallet balance */}
+      {walletBalance && parseFloat(walletBalance.balance) > 0 && (
+        <div className="text-xs flex justify-between px-1">
+          <span className="text-base-content/60">Wallet balance:</span>
+          <span className="font-medium">
+            {formatTokenAmount(walletBalance.balance)} (${formatUsd(walletBalance.balanceUSD)})
+          </span>
+        </div>
+      )}
+
       {/* User position context */}
-      {userPosition && Number(userPosition.debt) > 0 && (
+      {userPosition && depositsToken > 0 && (
+        <div className="text-xs flex justify-between px-1">
+          <span className="text-base-content/60">Your deposits:</span>
+          <span className="text-success font-medium">
+            {formatTokenAmount(userPosition.deposits)} (${formatUsd(userPosition.depositsUSD)})
+          </span>
+        </div>
+      )}
+      {userPosition && debtToken > 0 && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Current debt:</span>
           <span className="text-error font-medium">
-            {formatTokenAmount(userPosition.debt)} (${formatUsd(userPosition.debtUSD)})
+            {formatTokenAmount(debtToken)} (${formatUsd(userPosition.debtUSD + userPosition.debtStableUSD)})
+          </span>
+        </div>
+      )}
+      {borrowableToken > 0 && (
+        <div className="text-xs flex justify-between px-1">
+          <span className="text-base-content/60">Available to borrow:</span>
+          <span className="text-warning font-medium">
+            {formatTokenAmount(borrowableToken)}
           </span>
         </div>
       )}
@@ -51,6 +85,10 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
 
       {/* Amount input */}
       <div className="form-control">
+        <div className="flex justify-between items-center mb-1">
+          <span className="label-text text-xs">Amount</span>
+          <AmountQuickButtons maxAmount={borrowableToken} onSelect={(val) => setAmount(val)} />
+        </div>
         <input
           type="text"
           inputMode="decimal"

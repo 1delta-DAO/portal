@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
-import { formatTokenAmount, formatUsd } from './format'
+import { formatTokenAmount, formatUsd, parseAmount, formatTokenForInput } from './format'
+import { AmountQuickButtons } from './AmountQuickButtons'
 
 export const RepayAction: React.FC<ActionPanelProps> = ({
   pool,
   userPosition,
+  walletBalance,
   lender,
   chainId,
   account,
@@ -31,27 +33,59 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
     resetState()
   }, [pool?.poolId])
 
+  const debtToken = userPosition
+    ? parseAmount(userPosition.debt) + parseAmount(userPosition.debtStable)
+    : 0
+  const currentAmount = parseAmount(amount)
+  const overMax = debtToken > 0 && currentAmount > debtToken + 1e-9
+
+  const handleQuickSelect = (val: string) => {
+    setIsAll(false)
+    setAmount(val)
+  }
+
+  const handleIsAllChange = (checked: boolean) => {
+    setIsAll(checked)
+    if (checked && debtToken > 0) {
+      setAmount(formatTokenForInput(debtToken))
+    }
+  }
+
   return (
     <div className="space-y-3">
-      {/* User position context */}
-      {userPosition && Number(userPosition.debt) > 0 && (
+      {/* Wallet balance */}
+      {walletBalance && parseFloat(walletBalance.balance) > 0 && (
         <div className="text-xs flex justify-between px-1">
-          <span className="text-base-content/60">Outstanding debt:</span>
-          <span className="text-error font-medium">
-            {formatTokenAmount(userPosition.debt)} (${formatUsd(userPosition.debtUSD)})
+          <span className="text-base-content/60">Wallet balance:</span>
+          <span className="font-medium">
+            {formatTokenAmount(walletBalance.balance)} (${formatUsd(walletBalance.balanceUSD)})
           </span>
         </div>
       )}
 
-      {/* Amount input */}
+      {/* Outstanding debt */}
+      {userPosition && debtToken > 0 && (
+        <div className="text-xs flex justify-between px-1">
+          <span className="text-base-content/60">Outstanding debt:</span>
+          <span className="text-error font-medium">
+            {formatTokenAmount(debtToken)} (${formatUsd(userPosition.debtUSD + userPosition.debtStableUSD)})
+          </span>
+        </div>
+      )}
+
+      {/* Amount input with quick buttons */}
       <div className="form-control">
+        <div className="flex justify-between items-center mb-1">
+          <span className="label-text text-xs">Amount</span>
+          <AmountQuickButtons maxAmount={debtToken} onSelect={handleQuickSelect} />
+        </div>
         <input
           type="text"
           inputMode="decimal"
           className="input input-bordered input-sm w-full"
           placeholder="0.0"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => { setIsAll(false); setAmount(e.target.value) }}
           disabled={!pool}
         />
       </div>
@@ -62,10 +96,16 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
           type="checkbox"
           className="checkbox checkbox-primary checkbox-xs"
           checked={isAll}
-          onChange={(e) => setIsAll(e.target.checked)}
+          onChange={(e) => handleIsAllChange(e.target.checked)}
         />
         <span className="label-text text-xs">Repay full balance</span>
       </label>
+
+      {overMax && !isAll && (
+        <div className="text-[10px] text-error">
+          Exceeds repayable debt ({formatTokenAmount(debtToken)}).
+        </div>
+      )}
 
       {error && <div className="text-error text-xs wrap-break-word">{error}</div>}
 

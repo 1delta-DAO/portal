@@ -9,7 +9,6 @@ export interface UserPositionEntry {
   poolId: string
   underlying: string
   deposits: number | string
-  depositsRaw: string
   debtStable: number | string
   debt: number | string
   depositsUSD: number
@@ -18,6 +17,8 @@ export interface UserPositionEntry {
   stableBorrowRate: string
   collateralEnabled: boolean
   claimableRewards: number
+  withdrawable: number | string
+  borrowable: number | string
   isAllowed?: boolean
 }
 
@@ -57,6 +58,7 @@ export interface UserConfigEntry {
 
 export interface UserSubAccount {
   health: number | null
+  borrowCapacityUSD: number
   accountId: string
   balanceData: UserBalanceData
   aprData: UserAprData
@@ -67,6 +69,18 @@ export interface UserSubAccount {
 export interface LenderUserDataEntry {
   account: string
   chainId: string
+  lender: string
+  totalDepositsUSD: number
+  totalDebtUSD: number
+  netWorth: number
+  netWorth24h: number
+  depositApr: number
+  borrowApr: number
+  netApr: number
+  rewardApr: number
+  healthFactor: number | null
+  leverage: number
+  collateral: number
   data: UserSubAccount[]
 }
 
@@ -74,10 +88,19 @@ export interface LenderUserDataEntry {
 // Summary from the API
 // ============================================================================
 
+export interface ChainSummary {
+  chainId: string
+  totalDepositsUSD: number
+  totalDebtUSD: number
+  netWorth: number
+  lenderCount: number
+}
+
 export interface UserDataSummary {
   totalDepositsUSD: number
   totalDebtUSD: number
   totalNetWorth: number
+  totalNetWorth24h: number
   avgDepositApr: number
   avgBorrowApr: number
   avgNetApr: number
@@ -85,6 +108,7 @@ export interface UserDataSummary {
   overallLeverage: number
   activeLenders: number
   activeChains: number
+  chains: ChainSummary[]
 }
 
 // ============================================================================
@@ -92,12 +116,8 @@ export interface UserDataSummary {
 // ============================================================================
 
 export interface UserDataResult {
-  /** Raw per-chain, per-lender, sub-account data */
-  raw: {
-    [chainId: string]: {
-      [lender: string]: LenderUserDataEntry
-    }
-  } | undefined
+  /** Flat array of per-lender entries */
+  raw: LenderUserDataEntry[] | undefined
   /** Pre-computed summary from the API */
   summary: UserDataSummary | undefined
 }
@@ -142,7 +162,7 @@ export function useUserData(params: {
         const text = await r.text().catch(() => '')
         throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
       }
-      const json = await r.json() as { ok: boolean; data: UserDataResult['raw']; summary: UserDataSummary }
+      const json = await r.json() as { ok: boolean; data: LenderUserDataEntry[]; summary: UserDataSummary }
       if (!json.ok) {
         throw new Error('API returned ok: false')
       }

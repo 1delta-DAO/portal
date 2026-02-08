@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
-import { formatTokenAmount, formatUsd } from './format'
+import { formatTokenAmount, formatUsd, parseAmount, formatTokenForInput } from './format'
+import { AmountQuickButtons } from './AmountQuickButtons'
 
 export const WithdrawAction: React.FC<ActionPanelProps> = ({
   pool,
   userPosition,
+  walletBalance,
   lender,
   chainId,
   account,
@@ -31,27 +33,48 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
     resetState()
   }, [pool?.poolId])
 
+  const withdrawableToken = userPosition ? parseAmount(userPosition.withdrawable) : 0
+  const depositsToken = userPosition ? parseAmount(userPosition.deposits) : 0
+  const currentAmount = parseAmount(amount)
+  const overMax = withdrawableToken > 0 && currentAmount > withdrawableToken + 1e-9
+
+  const handleQuickSelect = (val: string) => {
+    setIsAll(false)
+    setAmount(val)
+  }
+
+  const handleIsAllChange = (checked: boolean) => {
+    setIsAll(checked)
+    if (checked && depositsToken > 0) {
+      setAmount(formatTokenForInput(depositsToken))
+    }
+  }
+
   return (
     <div className="space-y-3">
-      {/* User position context */}
-      {userPosition && Number(userPosition.deposits) > 0 && (
+      {/* Available balance */}
+      {userPosition && depositsToken > 0 && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Available to withdraw:</span>
           <span className="text-success font-medium">
-            {formatTokenAmount(userPosition.deposits)} (${formatUsd(userPosition.depositsUSD)})
+            {formatTokenAmount(userPosition.withdrawable)} (${formatUsd(userPosition.depositsUSD)})
           </span>
         </div>
       )}
 
-      {/* Amount input */}
+      {/* Amount input with quick buttons */}
       <div className="form-control">
+        <div className="flex justify-between items-center mb-1">
+          <span className="label-text text-xs">Amount</span>
+          <AmountQuickButtons maxAmount={withdrawableToken} onSelect={handleQuickSelect} />
+        </div>
         <input
           type="text"
           inputMode="decimal"
           className="input input-bordered input-sm w-full"
           placeholder="0.0"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => { setIsAll(false); setAmount(e.target.value) }}
           disabled={!pool}
         />
       </div>
@@ -62,10 +85,16 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
           type="checkbox"
           className="checkbox checkbox-primary checkbox-xs"
           checked={isAll}
-          onChange={(e) => setIsAll(e.target.checked)}
+          onChange={(e) => handleIsAllChange(e.target.checked)}
         />
         <span className="label-text text-xs">Withdraw full balance</span>
       </label>
+
+      {overMax && !isAll && (
+        <div className="text-[10px] text-error">
+          Exceeds withdrawable balance ({formatTokenAmount(withdrawableToken)}).
+        </div>
+      )}
 
       {error && <div className="text-error text-xs wrap-break-word">{error}</div>}
 

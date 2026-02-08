@@ -9,13 +9,11 @@ import { LenderOperationsBuilder } from './LenderOperationsBuilder'
 import { useUserData } from '../../hooks/lending/useUserData'
 import { useMarginPublicData } from '../../hooks/lending/usePoolData'
 import { useMainPrices } from '../../hooks/prices/useMainPrices'
-import { Loop } from './loop/Loop'
-import { Swap } from './swap/Swap'
-import { Close } from './close/Close'
 import { LendingActionTab } from './LendingActionTab'
 import { LendingDashboard } from './LendingDashboard'
+import { TradingDashboard } from './TradingDashboard'
 
-type SubTab = 'lending' | 'markets' | 'operations' | 'deposit' | 'withdraw' | 'borrow' | 'repay' | 'loop' | 'swap' | 'close'
+type SubTab = 'lending' | 'markets' | 'operations' | 'deposit' | 'withdraw' | 'borrow' | 'repay' | 'trading'
 
 const chains = getAvailableMarginChainIds()
 
@@ -110,28 +108,10 @@ export function LenderTab() {
           <button
             type="button"
             role="tab"
-            className={`tab tab-sm ${activeTab === 'loop' ? 'tab-active' : ''}`}
-            onClick={() => setActiveTab('loop')}
+            className={`tab tab-sm ${activeTab === 'trading' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('trading')}
           >
-            Loop
-          </button>
-
-          <button
-            type="button"
-            role="tab"
-            className={`tab tab-sm ${activeTab === 'swap' ? 'tab-active' : ''}`}
-            onClick={() => setActiveTab('swap')}
-          >
-            Swap
-          </button>
-
-          <button
-            type="button"
-            role="tab"
-            className={`tab tab-sm ${activeTab === 'close' ? 'tab-active' : ''}`}
-            onClick={() => setActiveTab('close')}
-          >
-            Close
+            Looping
           </button>
         </div>
 
@@ -198,20 +178,14 @@ export function LenderTab() {
           {lenderData && <LendingActionTab lenderData={lenderData} chainId={effectiveChainId} actionType="Repay" />}
         </div>
       )}
-      {activeTab === 'loop' && (
-        <div className="flex justify-center">
-          {lenderData && <Loop lenderData={lenderData} chainId={effectiveChainId} />}
-        </div>
-      )}
-      {activeTab === 'swap' && (
-        <div className="flex justify-center">
-          {lenderData && <Swap lenderData={lenderData} chainId={effectiveChainId} />}
-        </div>
-      )}
-      {activeTab === 'close' && (
-        <div className="flex justify-center">
-          {lenderData && <Close lenderData={lenderData} chainId={effectiveChainId} />}
-        </div>
+      {activeTab === 'trading' && (
+        <TradingDashboard
+          lenderData={lenderData}
+          userData={userData}
+          chainId={effectiveChainId}
+          account={account}
+          isLoading={isLoading}
+        />
       )}
     </div>
   )

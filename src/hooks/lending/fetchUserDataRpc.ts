@@ -33,26 +33,18 @@ interface JsonRpcResponse {
 
 interface ParseApiResponse {
   ok: boolean
-  data: {
-    [chainId: string]: {
-      [lender: string]: LenderUserDataEntry
-    }
-  }
+  data: LenderUserDataEntry[]
   summary: UserDataSummary
 }
 
 // ============================================================================
-// Output type (matches UserDataApiResponse['data'])
+// Output type
 // ============================================================================
 
-export type UserDataApiResponseData = {
-  [chainId: string]: {
-    [lender: string]: LenderUserDataEntry
-  }
-}
+export type UserDataApiResponseData = LenderUserDataEntry[]
 
 export interface FetchUserDataResult {
-  data: UserDataApiResponseData
+  data: LenderUserDataEntry[]
   summary: UserDataSummary
 }
 

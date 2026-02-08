@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
-import { formatTokenAmount, formatUsd } from './format'
+import { formatTokenAmount, formatUsd, parseAmount } from './format'
+import { AmountQuickButtons } from './AmountQuickButtons'
 
 export const DepositAction: React.FC<ActionPanelProps> = ({
   pool,
   userPosition,
+  walletBalance,
   lender,
   chainId,
   account,
@@ -29,9 +31,21 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
     resetState()
   }, [pool?.poolId])
 
+  const walletAmount = walletBalance ? parseFloat(walletBalance.balance) : 0
+
   return (
     <div className="space-y-3">
-      {/* User position context */}
+      {/* Wallet balance */}
+      {walletBalance && walletAmount > 0 && (
+        <div className="text-xs flex justify-between px-1">
+          <span className="text-base-content/60">Wallet balance:</span>
+          <span className="font-medium">
+            {formatTokenAmount(walletBalance.balance)} (${formatUsd(walletBalance.balanceUSD)})
+          </span>
+        </div>
+      )}
+
+      {/* Current deposits */}
       {userPosition && Number(userPosition.deposits) > 0 && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Current deposits:</span>
@@ -43,6 +57,10 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
 
       {/* Amount input */}
       <div className="form-control">
+        <div className="flex justify-between items-center mb-1">
+          <span className="label-text text-xs">Amount</span>
+          <AmountQuickButtons maxAmount={walletAmount} onSelect={(val) => setAmount(val)} />
+        </div>
         <input
           type="text"
           inputMode="decimal"

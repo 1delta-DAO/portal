@@ -5,27 +5,19 @@ const BACKEND_BASE_URL = `https://beta.data.1delta.io` // import.meta.env.VITE_M
 const endpointLendingLatest = `${BACKEND_BASE_URL}/lending/latest?chains=`
 
 // ============================================================================
-// Types for the /lending/latest API response
+// Types for the /lending/latest API response (flat array)
 // ============================================================================
 
 interface LendingLatestApiResponse {
   ok: boolean
-  data: {
-    [chainId: string]: ChainLendingDataRaw
-  }
-  fetchedAt: number
+  data: LenderEntryRaw[]
 }
 
-interface ChainLendingDataRaw {
-  data: {
-    [lender: string]: LenderPoolDataRaw
-  }
-  lastFetched: number
-}
-
-interface LenderPoolDataRaw {
-  poolData: PoolDataItem[]
+interface LenderEntryRaw {
   chainId: string
+  lender: string
+  lastFetched: number
+  markets: PoolDataItem[]
 }
 
 // ============================================================================
@@ -179,28 +171,29 @@ export function useMarginPublicData(chainId: string) {
         throw new Error('API returned ok: false')
       }
 
-      // Transform API response: convert poolData array to object keyed by poolId
+      // Transform flat array response into nested LenderData structure
       const transformed: LenderData = {}
 
-      for (const [cId, chainData] of Object.entries(json.data)) {
-        const lenderDataMap: Record<string, LenderPoolData> = {}
+      for (const entry of json.data) {
+        const { chainId: cId, lender, lastFetched, markets } = entry
 
-        for (const [lender, lenderPoolDataRaw] of Object.entries(chainData.data)) {
-          const poolDataByKey: Record<string, PoolDataItem> = {}
-
-          for (const pool of lenderPoolDataRaw.poolData) {
-            poolDataByKey[pool.poolId] = pool
-          }
-
-          lenderDataMap[lender] = {
-            data: poolDataByKey,
-            chainId: lenderPoolDataRaw.chainId,
-          }
+        if (!transformed[cId]) {
+          transformed[cId] = { data: {}, lastFetched }
         }
 
-        transformed[cId] = {
-          data: lenderDataMap,
-          lastFetched: chainData.lastFetched,
+        const poolDataByKey: Record<string, PoolDataItem> = {}
+        for (const pool of markets) {
+          poolDataByKey[pool.poolId] = pool
+        }
+
+        transformed[cId].data[lender] = {
+          data: poolDataByKey,
+          chainId: cId,
+        }
+
+        // Keep the most recent lastFetched
+        if (lastFetched > transformed[cId].lastFetched) {
+          transformed[cId].lastFetched = lastFetched
         }
       }
 

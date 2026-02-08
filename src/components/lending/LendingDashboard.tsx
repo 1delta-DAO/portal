@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react'
 import { lenderDisplayNameFull } from '@1delta/lib-utils'
 import type { LenderData, PoolDataItem } from '../../hooks/lending/usePoolData'
-import type { UserDataResult, UserPositionEntry } from '../../hooks/lending/useUserData'
+import type { UserDataResult, UserPositionEntry, UserSubAccount } from '../../hooks/lending/useUserData'
+import { useTokenBalances } from '../../hooks/lending/useTokenBalances'
+import { useSyncChain } from '../../hooks/useSyncChain'
 import {
   DepositAction,
   WithdrawAction,
@@ -10,6 +12,7 @@ import {
   type ActionType,
 } from './DashboardActions'
 import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'
+import { WalletConnect } from '../connect'
 
 interface Props {
   lenderData: LenderData | undefined
@@ -48,6 +51,9 @@ function formatTokenAmount(v: number | string): string {
 type SortKey = 'symbol' | 'depositApr' | 'borrowApr' | 'totalDepositsUSD' | 'totalDebtUSD' | 'totalLiquidityUSD'
 
 export function LendingDashboard({ lenderData, userData, chainId, account, isLoading }: Props) {
+  const { syncChain, currentChainId } = useSyncChain()
+  const isWrongChain = !!account && currentChainId !== Number(chainId)
+
   // Lender selection
   const allLenderKeys = useMemo(
     () => Object.keys(lenderData?.[chainId]?.data ?? {}),
@@ -55,6 +61,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
   )
 
   const [selectedLender, setSelectedLender] = useState<string>('')
+  const [selectedSubAccountId, setSelectedSubAccountId] = useState<string | null>(null)
   const [selectedPool, setSelectedPool] = useState<PoolDataItem | null>(null)
   const [actionTab, setActionTab] = useState<ActionType>('Deposit')
 
@@ -67,14 +74,10 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
   const lenderBalances = useMemo(() => {
     const map = new Map<string, number>()
     if (!userData.raw) return map
-    const chainData = userData.raw[chainId]
-    if (!chainData) return map
-    for (const [lender, entry] of Object.entries(chainData)) {
-      let total = 0
-      for (const sub of entry.data) {
-        total += sub.balanceData.deposits + sub.balanceData.debt
-      }
-      if (total > 0) map.set(lender, total)
+    for (const entry of userData.raw) {
+      if (entry.chainId !== chainId) continue
+      const total = entry.totalDepositsUSD + entry.totalDebtUSD
+      if (total > 0) map.set(entry.lender, total)
     }
     return map
   }, [userData, chainId])
@@ -105,12 +108,56 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
     }
   }, [lenders, selectedLender])
 
-  // All pools for selected lender
+  // Sub-accounts for the selected lender
+  const subAccounts: UserSubAccount[] = useMemo(() => {
+    if (!selectedLender || !userData.raw) return []
+    const entry = userData.raw.find(e => e.chainId === chainId && e.lender === selectedLender)
+    return entry?.data ?? []
+  }, [userData, chainId, selectedLender])
+
+  // Auto-select first sub-account when lender or sub-accounts change
+  React.useEffect(() => {
+    if (subAccounts.length > 0) {
+      setSelectedSubAccountId(subAccounts[0].accountId)
+    } else {
+      setSelectedSubAccountId(null)
+    }
+  }, [subAccounts])
+
+  // The currently active sub-account (or null)
+  const activeSubAccount = useMemo(
+    () => subAccounts.find(s => s.accountId === selectedSubAccountId) ?? null,
+    [subAccounts, selectedSubAccountId]
+  )
+
+  // All pools for selected lender (deduplicated by underlying — keep highest TVL)
   const allPools = useMemo(() => {
     if (!selectedLender || !lenderData) return []
     const poolMap = lenderData[chainId]?.data?.[selectedLender]?.data ?? {}
-    return Object.values(poolMap).filter((p) => p.isActive)
+    const raw = Object.values(poolMap).filter((p) => !p.isFrozen)
+    const byUnderlying = new Map<string, PoolDataItem>()
+    for (const p of raw) {
+      const key = p.underlying.toLowerCase()
+      const existing = byUnderlying.get(key)
+      if (!existing || p.totalDepositsUSD > existing.totalDepositsUSD) {
+        byUnderlying.set(key, p)
+      }
+    }
+    return [...byUnderlying.values()]
   }, [lenderData, chainId, selectedLender])
+
+  // Unique asset addresses for the current lender's pools
+  const poolAssetAddresses = useMemo(
+    () => [...new Set(allPools.map((p) => p.underlying))],
+    [allPools]
+  )
+
+  // Wallet token balances for these assets
+  const { balances: walletBalances } = useTokenBalances({
+    chainId,
+    account,
+    assets: poolAssetAddresses,
+  })
 
   // Filtered & sorted pools
   const pools = useMemo(() => {
@@ -173,46 +220,31 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
     }
   }
 
-  // User positions for selected lender
+  // User positions scoped to the selected sub-account
   const userPositions = useMemo(() => {
-    if (!selectedLender || !userData.raw) return new Map<string, UserPositionEntry>()
-    const entry = userData.raw[chainId]?.[selectedLender]
-    if (!entry) return new Map<string, UserPositionEntry>()
-
     const map = new Map<string, UserPositionEntry>()
-    for (const sub of entry.data) {
-      for (const pos of sub.positions) {
-        if (typeof pos === 'object' && pos !== null) {
-          map.set(pos.underlying.toLowerCase(), pos)
-        }
+    if (!activeSubAccount) return map
+    for (const pos of activeSubAccount.positions) {
+      if (typeof pos === 'object' && pos !== null) {
+        map.set(pos.underlying.toLowerCase(), pos)
       }
     }
     return map
-  }, [userData, chainId, selectedLender])
+  }, [activeSubAccount])
 
-  // Lender-level balance summary
+  // Balance summary scoped to selected sub-account
   const lenderSummary = useMemo(() => {
-    if (!selectedLender || !userData.raw) return null
-    const entry = userData.raw[chainId]?.[selectedLender]
-    if (!entry) return null
+    if (!activeSubAccount) return null
+    const bd = activeSubAccount.balanceData
+    if (bd.deposits === 0 && bd.debt === 0) return null
 
-    let deposits = 0
-    let debt = 0
-    let nav = 0
-    let health: number | null = null
-
-    for (const sub of entry.data) {
-      deposits += sub.balanceData.deposits
-      debt += sub.balanceData.debt
-      nav += sub.balanceData.nav
-      if (sub.health != null) {
-        health = health == null ? sub.health : Math.min(health, sub.health)
-      }
+    return {
+      deposits: bd.deposits,
+      debt: bd.debt,
+      nav: bd.nav,
+      health: activeSubAccount.health,
     }
-
-    if (deposits === 0 && debt === 0) return null
-    return { deposits, debt, nav, health }
-  }, [userData, chainId, selectedLender])
+  }, [activeSubAccount])
 
   // Active user positions (non-zero deposits or debt) matched with pool data
   const activePositions = useMemo(() => {
@@ -234,6 +266,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
   // Handle lender change
   const handleLenderChange = (lender: string) => {
     setSelectedLender(lender)
+    setSelectedSubAccountId(null)
     setSelectedPool(null)
   }
 
@@ -242,6 +275,12 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
     if (!selectedPool) return null
     return userPositions.get(selectedPool.underlying.toLowerCase()) ?? null
   }, [selectedPool, userPositions])
+
+  // Wallet balance for the currently selected pool's asset
+  const selectedPoolWalletBal = useMemo(() => {
+    if (!selectedPool) return null
+    return walletBalances.get(selectedPool.underlying.toLowerCase()) ?? null
+  }, [selectedPool, walletBalances])
 
   if (isLoading) {
     return (
@@ -267,13 +306,47 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
         )}
       </div>
 
-      {/* User balances for selected lender */}
-      {account && lenderSummary && (
+      {/* User positions grouped by sub-account */}
+      {account && subAccounts.length > 0 && (
         <div className="rounded-box border border-base-300 p-4 space-y-3">
-          {/* Summary stats */}
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <h3 className="text-sm font-semibold">Your Positions</h3>
-            <div className="flex gap-4 items-center text-xs">
+          <h3 className="text-sm font-semibold">Your Positions</h3>
+
+          {/* Sub-account chips */}
+          <div className="flex flex-wrap gap-2">
+            {subAccounts.map((sub, i) => {
+              const isActive = sub.accountId === selectedSubAccountId
+              const healthBadge = sub.health != null
+                ? sub.health < 1.1 ? 'badge-error' : sub.health < 1.3 ? 'badge-warning' : 'badge-success'
+                : null
+
+              return (
+                <button
+                  key={sub.accountId}
+                  type="button"
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer border ${
+                    isActive
+                      ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                      : 'border-base-300 bg-base-200/50 hover:bg-base-200'
+                  }`}
+                  onClick={() => setSelectedSubAccountId(sub.accountId)}
+                >
+                  <span className="font-semibold">#{i + 1}</span>
+                  <span className="text-base-content/70">
+                    NAV: <span className="font-medium">{abbreviateUsd(sub.balanceData.nav)}</span>
+                  </span>
+                  {healthBadge && (
+                    <span className={`badge badge-xs font-semibold ${healthBadge}`}>
+                      {sub.health!.toFixed(2)}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Summary stats for selected sub-account */}
+          {lenderSummary && (
+            <div className="flex gap-4 items-center text-xs flex-wrap">
               <span>
                 Deposits: <span className="font-semibold text-success">${formatUsd(lenderSummary.deposits)}</span>
               </span>
@@ -300,43 +373,45 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
                 </div>
               )}
             </div>
-          </div>
+          )}
 
-          {/* Individual token positions */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-            {activePositions.map(({ position, pool }) => (
-              <div
-                key={position.poolId}
-                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
-                  selectedPool?.poolId === pool.poolId
-                    ? 'bg-primary/15 ring-1 ring-primary'
-                    : 'bg-base-200/50 hover:bg-base-200'
-                }`}
-                onClick={() => handlePoolSelect(pool)}
-              >
-                <img
-                  src={pool.asset.logoURI}
-                  width={32}
-                  height={32}
-                  alt={pool.asset.symbol}
-                  className="rounded-full object-cover w-8 h-8 shrink-0"
-                />
-                <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-medium">{pool.asset.symbol}</span>
-                  {Number(position.deposits) > 0 && (
-                    <span className="text-xs text-success truncate">
-                      +{formatTokenAmount(position.deposits)} (${formatUsd(position.depositsUSD)})
-                    </span>
-                  )}
-                  {Number(position.debt) > 0 && (
-                    <span className="text-xs text-error truncate">
-                      -{formatTokenAmount(position.debt)} (${formatUsd(position.debtUSD)})
-                    </span>
-                  )}
+          {/* Position cards for the selected sub-account */}
+          {activePositions.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+              {activePositions.map(({ position, pool }) => (
+                <div
+                  key={pool.poolId}
+                  className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                    selectedPool?.poolId === pool.poolId
+                      ? 'bg-primary/15 ring-1 ring-primary'
+                      : 'bg-base-200/50 hover:bg-base-200'
+                  }`}
+                  onClick={() => handlePoolSelect(pool)}
+                >
+                  <img
+                    src={pool.asset.logoURI}
+                    width={32}
+                    height={32}
+                    alt={pool.asset.symbol}
+                    className="rounded-full object-cover w-8 h-8 shrink-0"
+                  />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-sm font-medium">{pool.asset.symbol}</span>
+                    {Number(position.deposits) > 0 && (
+                      <span className="text-xs text-success truncate">
+                        +{formatTokenAmount(position.deposits)} (${formatUsd(position.depositsUSD)})
+                      </span>
+                    )}
+                    {Number(position.debt) > 0 && (
+                      <span className="text-xs text-error truncate">
+                        -{formatTokenAmount(position.debt)} (${formatUsd(position.debtUSD)})
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -494,18 +569,34 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
             </div>
           )}
 
-          {/* Action sub-component */}
-          {actionTab === 'Deposit' && (
-            <DepositAction pool={selectedPool} userPosition={selectedPoolUserPos} lender={selectedLender} chainId={chainId} account={account} />
-          )}
-          {actionTab === 'Withdraw' && (
-            <WithdrawAction pool={selectedPool} userPosition={selectedPoolUserPos} lender={selectedLender} chainId={chainId} account={account} />
-          )}
-          {actionTab === 'Borrow' && (
-            <BorrowAction pool={selectedPool} userPosition={selectedPoolUserPos} lender={selectedLender} chainId={chainId} account={account} />
-          )}
-          {actionTab === 'Repay' && (
-            <RepayAction pool={selectedPool} userPosition={selectedPoolUserPos} lender={selectedLender} chainId={chainId} account={account} />
+          {/* Action sub-component — gated by wallet connection & chain */}
+          {!account ? (
+            <div className="w-full flex justify-center">
+              <WalletConnect />
+            </div>
+          ) : isWrongChain ? (
+            <button
+              type="button"
+              className="btn btn-warning btn-sm w-full"
+              onClick={() => syncChain(Number(chainId))}
+            >
+              Switch Wallet Chain
+            </button>
+          ) : (
+            <>
+              {actionTab === 'Deposit' && (
+                <DepositAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} lender={selectedLender} chainId={chainId} account={account} accountId={selectedSubAccountId ?? undefined} />
+              )}
+              {actionTab === 'Withdraw' && (
+                <WithdrawAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} lender={selectedLender} chainId={chainId} account={account} accountId={selectedSubAccountId ?? undefined} />
+              )}
+              {actionTab === 'Borrow' && (
+                <BorrowAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} lender={selectedLender} chainId={chainId} account={account} accountId={selectedSubAccountId ?? undefined} />
+              )}
+              {actionTab === 'Repay' && (
+                <RepayAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} lender={selectedLender} chainId={chainId} account={account} accountId={selectedSubAccountId ?? undefined} />
+              )}
+            </>
           )}
         </div>
       </div>
