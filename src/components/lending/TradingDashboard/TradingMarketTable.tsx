@@ -105,6 +105,12 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
   const sortArrow = (key: SortKey) =>
     sortKey === key ? <span className="ml-1 text-xs">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span> : null
 
+  const MOBILE_ROLE_STYLES: Record<PoolRole, string> = {
+    input: 'border-l-2 border-l-error bg-error/10',
+    output: 'border-l-2 border-l-success bg-success/10',
+    pay: 'border-l-2 border-l-warning bg-warning/10',
+  }
+
   return (
     <div className="rounded-box border border-base-300 overflow-hidden">
       {/* Legend + Search */}
@@ -131,7 +137,8 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="table table-sm w-full">
           <thead>
             <tr>
@@ -219,6 +226,62 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile card list */}
+      <div className="md:hidden divide-y divide-base-300">
+        {sorted.length > 0 && (
+          <div className="flex gap-1 p-2 overflow-x-auto">
+            {(['depositApr', 'borrowApr', 'totalDepositsUSD', 'totalLiquidityUSD'] as SortKey[]).map((key) => {
+              const labels: Record<string, string> = { depositApr: 'Dep APR', borrowApr: 'Bor APR', totalDepositsUSD: 'Deposits', totalLiquidityUSD: 'Liquidity' }
+              return (
+                <button key={key} type="button" className={`btn btn-xs ${sortKey === key ? 'btn-primary' : 'btn-ghost'}`} onClick={() => toggleSort(key)}>
+                  {labels[key]}{sortKey === key && <span className="ml-0.5">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>}
+                </button>
+              )
+            })}
+          </div>
+        )}
+        {sorted.map((pool) => {
+          const role = highlightMap.get(pool.marketUid)
+          const userPos = userPositions.get(pool.marketUid)
+          const hasPosition = userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
+
+          return (
+            <div
+              key={`m-${pool.marketUid}`}
+              className={`p-3 transition-colors ${role ? MOBILE_ROLE_STYLES[role] : ''}`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="relative shrink-0 w-7 h-7">
+                    <img src={pool.asset.logoURI} width={28} height={28} alt={pool.asset.symbol} className="rounded-full object-cover w-7 h-7" />
+                    {hasPosition && <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100" />}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-sm">
+                      {pool.asset.symbol}
+                      {pool.isFrozen && <span className="ml-1 text-warning text-xs">&#x2744;</span>}
+                    </span>
+                    <span className="text-[11px] text-base-content/60">{pool.asset.name}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="font-bold text-sm text-success">{pool.depositRate.toFixed(2)}%</span>
+                  <span className="text-[10px] text-base-content/50 block">Deposit APR</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between mt-2 text-xs text-base-content/70">
+                <span>Borrow: <span className="text-warning font-medium">{pool.variableBorrowRate.toFixed(2)}%</span></span>
+                <span>Dep: {abbreviateUsd(pool.totalDepositsUSD)}</span>
+                <span>Liq: {abbreviateUsd(pool.totalLiquidityUSD)}</span>
+              </div>
+            </div>
+          )
+        })}
+        {sorted.length === 0 && (
+          <div className="text-center py-6 text-sm text-base-content/60">No pools match your search.</div>
+        )}
       </div>
     </div>
   )

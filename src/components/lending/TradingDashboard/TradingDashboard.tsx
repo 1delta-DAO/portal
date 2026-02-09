@@ -68,6 +68,7 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
   const [selectedSubAccountId, setSelectedSubAccountId] = useState<string | null>(null)
   const [activeOperation, setActiveOperation] = useState<TradingOperation>('Loop')
   const [selectedPools, setSelectedPools] = useState<SelectedPool[]>([])
+  const [showMobileAction, setShowMobileAction] = useState(false)
 
   // Lender balances for sorting
   const lenderBalances = useMemo(() => {
@@ -330,8 +331,8 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
           />
         </div>
 
-        {/* Right: Action panel */}
-        <div className="w-96 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
+        {/* Right: Action panel — desktop only */}
+        <div className="hidden md:block w-96 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
           {/* Operation tabs */}
           <div role="tablist" className="tabs tabs-boxed tabs-xs">
             {OPERATIONS.map((op) => (
@@ -370,6 +371,57 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
           )}
         </div>
       </div>
+
+      {/* Mobile action button */}
+      <div className="md:hidden fixed bottom-4 left-0 right-0 flex justify-center z-40">
+        <button
+          type="button"
+          className="btn btn-primary btn-sm shadow-lg"
+          onClick={() => setShowMobileAction(true)}
+        >
+          {OP_LABELS[activeOperation]} Action
+        </button>
+      </div>
+
+      {/* Mobile action panel modal */}
+      {showMobileAction && (
+        <div className="modal modal-open md:hidden" onClick={() => setShowMobileAction(false)}>
+          <div className="modal-box max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => setShowMobileAction(false)}>✕</button>
+
+            <div className="space-y-3">
+              {/* Operation tabs */}
+              <div role="tablist" className="tabs tabs-boxed tabs-xs">
+                {OPERATIONS.map((op) => (
+                  <button
+                    key={op}
+                    type="button"
+                    role="tab"
+                    className={`tab ${activeOperation === op ? 'tab-active' : ''}`}
+                    onClick={() => { setActiveOperation(op); setSelectedPools([]) }}
+                  >
+                    {OP_LABELS[op]}
+                  </button>
+                ))}
+              </div>
+
+              {/* Wallet / chain guards */}
+              {!account ? (
+                <div className="w-full flex justify-center"><WalletConnect /></div>
+              ) : isWrongChain ? (
+                <button type="button" className="btn btn-warning btn-sm w-full" onClick={() => syncChain(Number(chainId))}>Switch Wallet Chain</button>
+              ) : (
+                <>
+                  {activeOperation === 'Loop' && <LoopAction {...actionProps} />}
+                  {activeOperation === 'ColSwap' && <ColSwapAction {...actionProps} />}
+                  {activeOperation === 'DebtSwap' && <DebtSwapAction {...actionProps} />}
+                  {activeOperation === 'Close' && <CloseAction {...actionProps} />}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

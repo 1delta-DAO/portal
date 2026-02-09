@@ -45,6 +45,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
   const [assetSearch, setAssetSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('totalDepositsUSD')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [showMobileAction, setShowMobileAction] = useState(false)
 
   // Per-lender user balance (deposits USD) for sorting & markers
   const lenderBalances = useMemo(() => {
@@ -226,7 +227,9 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
 
   // Handle market row click - toggles asset selection
   const handlePoolSelect = (pool: PoolDataItem) => {
-    setSelectedPool((prev) => (prev?.marketUid === pool.marketUid ? null : pool))
+    const deselecting = selectedPool?.marketUid === pool.marketUid
+    setSelectedPool(deselecting ? null : pool)
+    if (!deselecting) setShowMobileAction(true)
   }
 
   // Handle lender change
@@ -405,7 +408,8 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
             </span>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="table table-sm w-full">
               <thead>
                 <tr>
@@ -507,10 +511,67 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
               </tbody>
             </table>
           </div>
+
+          {/* Mobile card list */}
+          <div className="md:hidden divide-y divide-base-300">
+            {pools.length > 0 && (
+              <div className="flex gap-1 p-2 overflow-x-auto">
+                {(['depositApr', 'borrowApr', 'totalDepositsUSD', 'totalLiquidityUSD'] as SortKey[]).map((key) => {
+                  const labels: Record<string, string> = { depositApr: 'Dep APR', borrowApr: 'Bor APR', totalDepositsUSD: 'Deposits', totalLiquidityUSD: 'Liquidity' }
+                  return (
+                    <button key={key} type="button" className={`btn btn-xs ${sortKey === key ? 'btn-primary' : 'btn-ghost'}`} onClick={() => toggleSort(key)}>
+                      {labels[key]}{sortKey === key && <span className="ml-0.5">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {pools.map((pool) => {
+              const isSelected = selectedPool?.marketUid === pool.marketUid
+              const userPos = userPositions.get(pool.marketUid)
+              const hasPosition = userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
+
+              return (
+                <div
+                  key={`m-${pool.marketUid}`}
+                  className={`p-3 cursor-pointer transition-colors ${isSelected ? 'bg-primary/10' : 'active:bg-base-200'}`}
+                  onClick={() => handlePoolSelect(pool)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="relative shrink-0 w-7 h-7">
+                        <img src={pool.asset.logoURI} width={28} height={28} alt={pool.asset.symbol} className="rounded-full object-cover w-7 h-7" />
+                        {hasPosition && <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100" />}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-sm">
+                          {pool.asset.symbol}
+                          {pool.isFrozen && <span className="ml-1 text-warning text-xs">&#x2744;</span>}
+                        </span>
+                        <span className="text-[11px] text-base-content/60">{pool.asset.name}</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-sm text-success">{pool.depositRate.toFixed(2)}%</span>
+                      <span className="text-[10px] text-base-content/50 block">Deposit APR</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-2 text-xs text-base-content/70">
+                    <span>Borrow: <span className="text-warning font-medium">{pool.variableBorrowRate.toFixed(2)}%</span></span>
+                    <span>Dep: {abbreviateUsd(pool.totalDepositsUSD)}</span>
+                    <span>Liq: {abbreviateUsd(pool.totalLiquidityUSD)}</span>
+                  </div>
+                </div>
+              )
+            })}
+            {pools.length === 0 && (
+              <div className="text-center py-6 text-sm text-base-content/60">No pools match your search.</div>
+            )}
+          </div>
         </div>
 
-        {/* Right: Action panel */}
-        <div className="w-72 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
+        {/* Right: Action panel — desktop only */}
+        <div className="hidden md:block w-72 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
           {/* Operation tabs */}
           <div role="tablist" className="tabs tabs-boxed tabs-xs">
             {(['Deposit', 'Withdraw', 'Borrow', 'Repay'] as ActionType[]).map((t) => (
@@ -578,6 +639,46 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
           )}
         </div>
       </div>
+
+      {/* Mobile action panel modal */}
+      {showMobileAction && selectedPool && (
+        <div className="modal modal-open md:hidden" onClick={() => setShowMobileAction(false)}>
+          <div className="modal-box max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => setShowMobileAction(false)}>✕</button>
+
+            <div className="space-y-3">
+              {/* Operation tabs */}
+              <div role="tablist" className="tabs tabs-boxed tabs-xs">
+                {(['Deposit', 'Withdraw', 'Borrow', 'Repay'] as ActionType[]).map((t) => (
+                  <button key={t} type="button" role="tab" className={`tab ${actionTab === t ? 'tab-active' : ''}`} onClick={() => setActionTab(t)}>{t}</button>
+                ))}
+              </div>
+
+              {/* Selected asset */}
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-base-200">
+                <img src={selectedPool.asset.logoURI} width={32} height={32} alt={selectedPool.asset.symbol} className="rounded-full object-cover w-8 h-8 shrink-0" />
+                <div className="flex flex-col min-w-0">
+                  <span className="font-medium text-sm">{selectedPool.asset.symbol}</span>
+                  <span className="text-xs text-base-content/60 truncate">{selectedPool.asset.name}</span>
+                </div>
+              </div>
+
+              {!account ? (
+                <div className="w-full flex justify-center"><WalletConnect /></div>
+              ) : isWrongChain ? (
+                <button type="button" className="btn btn-warning btn-sm w-full" onClick={() => syncChain(Number(chainId))}>Switch Wallet Chain</button>
+              ) : (
+                <>
+                  {actionTab === 'Deposit' && <DepositAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} />}
+                  {actionTab === 'Withdraw' && <WithdrawAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} />}
+                  {actionTab === 'Borrow' && <BorrowAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} />}
+                  {actionTab === 'Repay' && <RepayAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} />}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
