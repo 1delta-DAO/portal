@@ -37,6 +37,7 @@ export function LenderTab() {
   const { data: prices } = useMainPrices()
 
   const isLoading = isPublicDataLoading || isUserDataLoading
+  // Keep combined flag for tabs that don't support independent loading yet
 
   return (
     <div className="space-y-4">
@@ -94,7 +95,8 @@ export function LenderTab() {
           userData={userData}
           chainId={effectiveChainId}
           account={account}
-          isLoading={isLoading}
+          isPublicDataLoading={isPublicDataLoading}
+          isUserDataLoading={isUserDataLoading}
         />
       )}
 
@@ -132,7 +134,8 @@ export function LenderTab() {
           userData={userData}
           chainId={effectiveChainId}
           account={account}
-          isLoading={isLoading}
+          isPublicDataLoading={isPublicDataLoading}
+          isUserDataLoading={isUserDataLoading}
         />
       )}
     </div>

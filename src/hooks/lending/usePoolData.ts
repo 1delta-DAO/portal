@@ -21,29 +21,16 @@ interface LenderEntryRaw {
 }
 
 // ============================================================================
-// Transformed types for internal use (pools indexed by poolId)
+// Transformed types for internal use
 // ============================================================================
 
+/** Pools grouped by lender key. One level — no chainId wrapping. */
 export type LenderData = {
-  [chainId: string]: ChainLendingData
-}
-
-export interface ChainLendingData {
-  data: {
-    [lender: string]: LenderPoolData
-  }
-  lastFetched: number
-}
-
-export interface LenderPoolData {
-  data: {
-    [poolId: string]: PoolDataItem
-  }
-  chainId: string
+  [lender: string]: PoolDataItem[]
 }
 
 export interface PoolDataItem {
-  poolId: string
+  marketUid: string
   underlying: string
   asset: PoolAsset
   totalDeposits: number
@@ -103,54 +90,13 @@ export interface PoolConfig {
   borrowCollateralFactor: number
 }
 
-export interface FlattenedPool {
-  chainId: string
-  lender: string
-  poolId: string
-  pool: PoolDataItem
-}
-
-// ============================================================================
-// Helper functions
-// ============================================================================
-
-/**
- * Flattens LenderData into an array for display in tables/lists.
- * Optionally filter by chainId.
- */
-export function flattenLenderData(
-  lenderData: LenderData | undefined,
-  filterChainId?: string
-): FlattenedPool[] {
-  if (!lenderData) return []
-
-  const result: FlattenedPool[] = []
-
-  for (const [chainId, chainData] of Object.entries(lenderData)) {
-    if (filterChainId && chainId !== filterChainId) continue
-
-    for (const [lender, lenderPoolData] of Object.entries(chainData.data)) {
-      for (const [poolId, pool] of Object.entries(lenderPoolData.data)) {
-        result.push({
-          chainId,
-          lender,
-          poolId,
-          pool,
-        })
-      }
-    }
-  }
-
-  return result
-}
-
 // ============================================================================
 // Hooks
 // ============================================================================
 
 /**
  * Fetches public lending data for a specific chain.
- * Returns data indexed by poolId for easy lookup.
+ * Returns pools grouped by lender key.
  */
 export function useMarginPublicData(chainId: string) {
   const {
@@ -171,32 +117,10 @@ export function useMarginPublicData(chainId: string) {
         throw new Error('API returned ok: false')
       }
 
-      // Transform flat array response into nested LenderData structure
       const transformed: LenderData = {}
-
       for (const entry of json.data) {
-        const { chainId: cId, lender, lastFetched, markets } = entry
-
-        if (!transformed[cId]) {
-          transformed[cId] = { data: {}, lastFetched }
-        }
-
-        const poolDataByKey: Record<string, PoolDataItem> = {}
-        for (const pool of markets) {
-          poolDataByKey[pool.poolId] = pool
-        }
-
-        transformed[cId].data[lender] = {
-          data: poolDataByKey,
-          chainId: cId,
-        }
-
-        // Keep the most recent lastFetched
-        if (lastFetched > transformed[cId].lastFetched) {
-          transformed[cId].lastFetched = lastFetched
-        }
+        transformed[entry.lender] = entry.markets
       }
-
       return transformed
     },
     refetchInterval: 5 * 60 * 1000,

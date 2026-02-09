@@ -31,7 +31,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
     setAmount('')
     setIsAll(false)
     resetState()
-  }, [pool?.poolId])
+  }, [pool?.marketUid])
 
   const debtToken = userPosition
     ? parseAmount(userPosition.debt) + parseAmount(userPosition.debtStable)

@@ -29,7 +29,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   useEffect(() => {
     setAmount('')
     resetState()
-  }, [pool?.poolId])
+  }, [pool?.marketUid])
 
   const depositsToken = userPosition ? parseAmount(userPosition.deposits) : 0
   const debtToken = userPosition

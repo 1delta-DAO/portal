@@ -70,7 +70,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   useEffect(() => {
     setPayCurrencyAddress(null)
     setPayAmount('')
-  }, [collateralPool?.poolId, debtPool?.poolId])
+  }, [collateralPool?.marketUid, debtPool?.marketUid])
 
   // Notify parent of pool selections for table highlighting
   useEffect(() => {
@@ -81,7 +81,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   }, [collateralPool, debtPool, onPoolSelectionChange])
 
   // Max amounts
-  const debtPos = debtPool ? userPositions.get(debtPool.underlying.toLowerCase()) : null
+  const debtPos = debtPool ? userPositions.get(debtPool.marketUid) : null
   const maxBorrowable = debtPos ? Number(debtPos.borrowable) : 0
 
   const handleFetchQuotes = () => {

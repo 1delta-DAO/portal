@@ -63,7 +63,7 @@ const PositionsList: React.FC<{ positions: TaggedPosition[] }> = ({ positions })
     <div className="flex flex-wrap gap-1.5">
       {positions.map((pos) => (
         <div
-          key={`${pos.poolId}-${pos.tag}`}
+          key={`${pos.marketUid}-${pos.tag}`}
           className="badge badge-outline badge-sm flex gap-1 items-center"
         >
           <span

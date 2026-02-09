@@ -7,7 +7,7 @@ export interface SimulatedActionState {
   selectionId: string
   lender: string
   subAccount: string
-  poolId: string
+  marketUid: string
   operation: LenderOperationKind
   amount: string
   amountUsd: number

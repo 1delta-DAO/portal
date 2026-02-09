@@ -31,7 +31,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
     setAmount('')
     setIsAll(false)
     resetState()
-  }, [pool?.poolId])
+  }, [pool?.marketUid])
 
   const withdrawableToken = userPosition ? parseAmount(userPosition.withdrawable) : 0
   const depositsToken = userPosition ? parseAmount(userPosition.deposits) : 0

@@ -39,7 +39,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
 
   const highlightMap = useMemo(() => {
     const map = new Map<string, PoolRole>()
-    for (const h of highlights) map.set(h.poolId, h.role)
+    for (const h of highlights) map.set(h.marketUid, h.role)
     return map
   }, [highlights])
 
@@ -157,13 +157,13 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
           </thead>
           <tbody>
             {sorted.map((pool) => {
-              const role = highlightMap.get(pool.poolId)
-              const userPos = userPositions.get(pool.underlying.toLowerCase())
+              const role = highlightMap.get(pool.marketUid)
+              const userPos = userPositions.get(pool.marketUid)
               const hasPosition = userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
 
               return (
                 <tr
-                  key={pool.poolId}
+                  key={pool.marketUid}
                   className={`transition-colors ${role ? ROLE_STYLES[role] : ''}`}
                 >
                   <td>

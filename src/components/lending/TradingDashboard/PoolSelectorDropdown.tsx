@@ -59,8 +59,8 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
     )
 
     return [...filtered].sort((a, b) => {
-      const posA = userPositions.get(a.underlying.toLowerCase())
-      const posB = userPositions.get(b.underlying.toLowerCase())
+      const posA = userPositions.get(a.marketUid)
+      const posB = userPositions.get(b.marketUid)
       const valA = posA ? (positionType === 'debt' ? Number(posA.debt) + Number(posA.debtStable) : Number(posA.deposits)) : 0
       const valB = posB ? (positionType === 'debt' ? Number(posB.debt) + Number(posB.debtStable) : Number(posB.deposits)) : 0
       if (valA > 0 && valB === 0) return -1
@@ -70,7 +70,7 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
   }, [pools, search, userPositions, positionType])
 
   const getPositionText = (pool: PoolDataItem): string | null => {
-    const pos = userPositions.get(pool.underlying.toLowerCase())
+    const pos = userPositions.get(pool.marketUid)
     if (!pos) return null
     if (positionType === 'debt') {
       const debt = Number(pos.debt) + Number(pos.debtStable)
@@ -125,11 +125,11 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
           )}
           {sorted.map((pool) => {
             const posText = getPositionText(pool)
-            const isSelected = value?.poolId === pool.poolId
+            const isSelected = value?.marketUid === pool.marketUid
 
             return (
               <button
-                key={pool.poolId}
+                key={pool.marketUid}
                 type="button"
                 className={`flex items-center gap-2 w-full px-2 py-1.5 text-left hover:bg-base-200 text-xs ${
                   isSelected ? 'bg-base-200 font-medium' : ''

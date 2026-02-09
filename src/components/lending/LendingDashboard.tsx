@@ -19,7 +19,8 @@ interface Props {
   userData: UserDataResult
   chainId: string
   account?: string
-  isLoading: boolean
+  isPublicDataLoading: boolean
+  isUserDataLoading: boolean
 }
 
 function formatUsd(v: number) {
@@ -50,14 +51,14 @@ function formatTokenAmount(v: number | string): string {
 
 type SortKey = 'symbol' | 'depositApr' | 'borrowApr' | 'totalDepositsUSD' | 'totalDebtUSD' | 'totalLiquidityUSD'
 
-export function LendingDashboard({ lenderData, userData, chainId, account, isLoading }: Props) {
+export function LendingDashboard({ lenderData, userData, chainId, account, isPublicDataLoading, isUserDataLoading }: Props) {
   const { syncChain, currentChainId } = useSyncChain()
   const isWrongChain = !!account && currentChainId !== Number(chainId)
 
   // Lender selection
   const allLenderKeys = useMemo(
-    () => Object.keys(lenderData?.[chainId]?.data ?? {}),
-    [lenderData, chainId]
+    () => Object.keys(lenderData ?? {}),
+    [lenderData]
   )
 
   const [selectedLender, setSelectedLender] = useState<string>('')
@@ -130,21 +131,11 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
     [subAccounts, selectedSubAccountId]
   )
 
-  // All pools for selected lender (deduplicated by underlying — keep highest TVL)
+  // All pools for selected lender
   const allPools = useMemo(() => {
     if (!selectedLender || !lenderData) return []
-    const poolMap = lenderData[chainId]?.data?.[selectedLender]?.data ?? {}
-    const raw = Object.values(poolMap)
-    const byUnderlying = new Map<string, PoolDataItem>()
-    for (const p of raw) {
-      const key = p.underlying.toLowerCase()
-      const existing = byUnderlying.get(key)
-      if (!existing || p.totalDepositsUSD > existing.totalDepositsUSD) {
-        byUnderlying.set(key, p)
-      }
-    }
-    return [...byUnderlying.values()]
-  }, [lenderData, chainId, selectedLender])
+    return lenderData[selectedLender] ?? []
+  }, [lenderData, selectedLender])
 
   // Unique asset addresses for the current lender's pools
   const poolAssetAddresses = useMemo(
@@ -220,13 +211,13 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
     }
   }
 
-  // User positions scoped to the selected sub-account
+  // User positions scoped to the selected sub-account, keyed by marketUid
   const userPositions = useMemo(() => {
     const map = new Map<string, UserPositionEntry>()
     if (!activeSubAccount) return map
     for (const pos of activeSubAccount.positions) {
       if (typeof pos === 'object' && pos !== null) {
-        map.set(pos.underlying.toLowerCase(), pos)
+        map.set(pos.marketUid, pos)
       }
     }
     return map
@@ -250,7 +241,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
   const activePositions = useMemo(() => {
     const result: { position: UserPositionEntry; pool: PoolDataItem }[] = []
     for (const pool of allPools) {
-      const pos = userPositions.get(pool.underlying.toLowerCase())
+      const pos = userPositions.get(pool.marketUid)
       if (pos && (Number(pos.deposits) > 0 || Number(pos.debt) > 0)) {
         result.push({ position: pos, pool })
       }
@@ -260,7 +251,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
 
   // Handle market row click - toggles asset selection
   const handlePoolSelect = (pool: PoolDataItem) => {
-    setSelectedPool((prev) => (prev?.poolId === pool.poolId ? null : pool))
+    setSelectedPool((prev) => (prev?.marketUid === pool.marketUid ? null : pool))
   }
 
   // Handle lender change
@@ -273,7 +264,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
   // User position for the currently selected pool (passed to action sub-components)
   const selectedPoolUserPos = useMemo(() => {
     if (!selectedPool) return null
-    return userPositions.get(selectedPool.underlying.toLowerCase()) ?? null
+    return userPositions.get(selectedPool.marketUid) ?? null
   }, [selectedPool, userPositions])
 
   // Wallet balance for the currently selected pool's asset
@@ -282,7 +273,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
     return walletBalances.get(selectedPool.underlying.toLowerCase()) ?? null
   }, [selectedPool, walletBalances])
 
-  if (isLoading) {
+  if (isPublicDataLoading) {
     return (
       <div className="flex justify-center items-center py-10">
         <span className="loading loading-spinner loading-lg" />
@@ -307,7 +298,13 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
       </div>
 
       {/* User positions grouped by sub-account */}
-      {account && subAccounts.length > 0 && (
+      {account && isUserDataLoading && (
+        <div className="rounded-box border border-base-300 p-4 flex items-center gap-2">
+          <span className="loading loading-spinner loading-sm" />
+          <span className="text-sm text-base-content/60">Loading positions...</span>
+        </div>
+      )}
+      {account && !isUserDataLoading && subAccounts.length > 0 && (
         <div className="rounded-box border border-base-300 p-4 space-y-3">
           <h3 className="text-sm font-semibold">Your Positions</h3>
 
@@ -380,9 +377,9 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
               {activePositions.map(({ position, pool }) => (
                 <div
-                  key={pool.poolId}
+                  key={pool.marketUid}
                   className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
-                    selectedPool?.poolId === pool.poolId
+                    selectedPool?.marketUid === pool.marketUid
                       ? 'bg-primary/15 ring-1 ring-primary'
                       : 'bg-base-200/50 hover:bg-base-200'
                   }`}
@@ -465,15 +462,15 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isLoa
               </thead>
               <tbody>
                 {pools.map((pool) => {
-                  const isSelected = selectedPool?.poolId === pool.poolId
-                  const userPos = userPositions.get(pool.underlying.toLowerCase())
+                  const isSelected = selectedPool?.marketUid === pool.marketUid
+                  const userPos = userPositions.get(pool.marketUid)
                   const hasPosition = userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
                   const depositApr = pool.depositRate.toFixed(2)
                   const borrowApr = pool.variableBorrowRate.toFixed(2)
 
                   return (
                     <tr
-                      key={pool.poolId}
+                      key={pool.marketUid}
                       className={`cursor-pointer transition-colors ${
                         isSelected
                           ? 'bg-primary/10'

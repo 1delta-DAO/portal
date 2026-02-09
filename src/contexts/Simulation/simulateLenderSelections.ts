@@ -21,7 +21,7 @@ export interface SimulatedActionState {
   selectionId: string
   lender: string
   subAccount: string
-  poolId: string
+  marketUid: string
   operation: LenderOperationKind
   amount: string
   amountUsd: number
@@ -177,7 +177,7 @@ export function simulateLenderSelections(
         selectionId: sel.id,
         lender,
         subAccount,
-        poolId: pool.poolId,
+        marketUid: pool.marketUid,
         operation: sel.operation,
         amount: sel.amount,
         amountUsd: 0,
@@ -247,7 +247,7 @@ export function simulateLenderSelections(
       selectionId: sel.id,
       lender,
       subAccount,
-      poolId: pool.poolId,
+      marketUid: pool.marketUid,
       operation: sel.operation,
       amount: sel.amount,
       amountUsd,

@@ -40,17 +40,15 @@ export const LendingActionTab = ({ lenderData, chainId, actionType }: Props) => 
   const { address: account } = useAccount()
 
   const lenders = useMemo(() => {
-    return Object.keys(lenderData?.[chainId]?.data ?? {})
-  }, [lenderData, chainId])
+    return Object.keys(lenderData ?? {})
+  }, [lenderData])
 
   const [selectedLender, setSelectedLender] = useState<string>(lenders[0] ?? '')
 
-  const pools = useMemo(() => {
-    if (!selectedLender) return {}
-    return lenderData[chainId]?.data?.[selectedLender]?.data ?? {}
-  }, [lenderData, chainId, selectedLender])
-
-  const poolList = useMemo(() => Object.values(pools), [pools])
+  const poolList = useMemo(() => {
+    if (!selectedLender) return []
+    return lenderData[selectedLender] ?? []
+  }, [lenderData, selectedLender])
 
   const [selectedPool, setSelectedPool] = useState<PoolDataItem | null>(null)
   const [amount, setAmount] = useState('')
@@ -78,7 +76,7 @@ export const LendingActionTab = ({ lenderData, chainId, actionType }: Props) => 
   }
 
   const handlePoolChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedPool(pools[e.target.value] ?? null)
+    setSelectedPool(poolList.find(p => p.marketUid === e.target.value) ?? null)
   }
 
   // Transaction state
@@ -206,15 +204,15 @@ export const LendingActionTab = ({ lenderData, chainId, actionType }: Props) => 
         <select
           className="select select-bordered flex-1"
           onChange={handlePoolChange}
-          value={selectedPool?.poolId ?? ''}
+          value={selectedPool?.marketUid ?? ''}
           disabled={!selectedLender}
         >
           <option value="" disabled>
             Select asset
           </option>
           {poolList.map((pool) => (
-            <option key={pool.poolId} value={pool.poolId}>
-              {pool.asset.symbol ?? pool.poolId}
+            <option key={pool.marketUid} value={pool.marketUid}>
+              {pool.asset.symbol ?? pool.marketUid}
             </option>
           ))}
         </select>

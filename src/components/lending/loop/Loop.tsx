@@ -45,19 +45,17 @@ export const Loop = ({ lenderData, chainId }: Props) => {
   const { data } = useTokenLists()
 
   const lenders = useMemo(() => {
-    return Object.keys(lenderData?.[chainId]?.data ?? {})
-  }, [lenderData, chainId])
+    return Object.keys(lenderData ?? {})
+  }, [lenderData])
 
   const [selectedLender, setSelectedLender] = useState<string | ''>(lenders[0] ?? '')
 
   /* ---------- Pools ---------- */
 
-  const pools = useMemo(() => {
-    if (!selectedLender) return {}
-    return lenderData[chainId]?.data?.[selectedLender]?.data ?? {}
-  }, [lenderData, chainId, selectedLender])
-
-  const poolList = useMemo(() => Object.values(pools), [pools])
+  const poolList = useMemo(() => {
+    if (!selectedLender) return []
+    return lenderData[selectedLender] ?? []
+  }, [lenderData, selectedLender])
 
   /* ---------- State keeps FULL PoolDataItem ---------- */
 
@@ -119,7 +117,7 @@ export const Loop = ({ lenderData, chainId }: Props) => {
   }, [fromPool, toPool, data])
 
   const handlePoolChange = (side: 'from' | 'to') => (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const pool = pools[e.target.value]
+    const pool = poolList.find(p => p.marketUid === e.target.value) ?? null
 
     if (side === 'from') setFromPool(pool)
     else setToPool(pool)
@@ -192,15 +190,15 @@ export const Loop = ({ lenderData, chainId }: Props) => {
         <select
           className="select select-bordered flex-1"
           onChange={handlePoolChange('from')}
-          value={fromPool?.poolId ?? ''}
+          value={fromPool?.marketUid ?? ''}
           disabled={!selectedLender}
         >
           <option value="" disabled>
             Select pool
           </option>
           {poolList.map((pool) => (
-            <option key={pool.poolId} value={pool.poolId}>
-              {pool.asset.symbol ?? pool.poolId}
+            <option key={pool.marketUid} value={pool.marketUid}>
+              {pool.asset.symbol ?? pool.marketUid}
             </option>
           ))}
         </select>
@@ -223,15 +221,15 @@ export const Loop = ({ lenderData, chainId }: Props) => {
         <select
           className="select select-bordered flex-1"
           onChange={handlePoolChange('to')}
-          value={toPool?.poolId ?? ''}
+          value={toPool?.marketUid ?? ''}
           disabled={!selectedLender}
         >
           <option value="" disabled>
             Select pool
           </option>
           {poolList.map((pool) => (
-            <option key={pool.poolId} value={pool.poolId}>
-              {pool.asset.symbol ?? pool.poolId}
+            <option key={pool.marketUid} value={pool.marketUid}>
+              {pool.asset.symbol ?? pool.marketUid}
             </option>
           ))}
         </select>

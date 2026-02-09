@@ -18,7 +18,8 @@ interface Props {
   userData: UserDataResult
   chainId: string
   account?: string
-  isLoading: boolean
+  isPublicDataLoading: boolean
+  isUserDataLoading: boolean
 }
 
 function abbreviateUsd(v: number): string {
@@ -52,14 +53,14 @@ const OP_LABELS: Record<TradingOperation, string> = {
   Close: 'Close',
 }
 
-export function TradingDashboard({ lenderData, userData, chainId, account, isLoading }: Props) {
+export function TradingDashboard({ lenderData, userData, chainId, account, isPublicDataLoading, isUserDataLoading }: Props) {
   const { syncChain, currentChainId } = useSyncChain()
   const isWrongChain = !!account && currentChainId !== Number(chainId)
 
   // Lender selection
   const allLenderKeys = useMemo(
-    () => Object.keys(lenderData?.[chainId]?.data ?? {}),
-    [lenderData, chainId]
+    () => Object.keys(lenderData ?? {}),
+    [lenderData]
   )
 
   const [selectedLender, setSelectedLender] = useState('')
@@ -123,21 +124,11 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isLoa
     [subAccounts, selectedSubAccountId]
   )
 
-  // Pools (deduplicated by underlying — keep highest TVL)
+  // All pools for selected lender
   const allPools = useMemo(() => {
     if (!selectedLender || !lenderData) return []
-    const poolMap = lenderData[chainId]?.data?.[selectedLender]?.data ?? {}
-    const raw = Object.values(poolMap)
-    const byUnderlying = new Map<string, PoolDataItem>()
-    for (const p of raw) {
-      const key = p.underlying.toLowerCase()
-      const existing = byUnderlying.get(key)
-      if (!existing || p.totalDepositsUSD > existing.totalDepositsUSD) {
-        byUnderlying.set(key, p)
-      }
-    }
-    return [...byUnderlying.values()]
-  }, [lenderData, chainId, selectedLender])
+    return lenderData[selectedLender] ?? []
+  }, [lenderData, selectedLender])
 
   const poolAssetAddresses = useMemo(
     () => [...new Set(allPools.map((p) => p.underlying))],
@@ -146,13 +137,13 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isLoa
 
   const { balances: walletBalances } = useTokenBalances({ chainId, account, assets: poolAssetAddresses })
 
-  // User positions scoped to selected sub-account
+  // User positions scoped to selected sub-account, keyed by marketUid
   const userPositions = useMemo(() => {
     const map = new Map<string, UserPositionEntry>()
     if (!activeSubAccount) return map
     for (const pos of activeSubAccount.positions) {
       if (typeof pos === 'object' && pos !== null) {
-        map.set(pos.underlying.toLowerCase(), pos)
+        map.set(pos.marketUid, pos)
       }
     }
     return map
@@ -170,7 +161,7 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isLoa
   const activePositions = useMemo(() => {
     const result: { position: UserPositionEntry; pool: PoolDataItem }[] = []
     for (const pool of allPools) {
-      const pos = userPositions.get(pool.underlying.toLowerCase())
+      const pos = userPositions.get(pool.marketUid)
       if (pos && (Number(pos.deposits) > 0 || Number(pos.debt) > 0)) {
         result.push({ position: pos, pool })
       }
@@ -180,7 +171,7 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isLoa
 
   // Table highlights from action panel's pool selections
   const tableHighlights: TableHighlight[] = useMemo(
-    () => selectedPools.map(sp => ({ poolId: sp.pool.poolId, role: sp.role })),
+    () => selectedPools.map(sp => ({ marketUid: sp.pool.marketUid, role: sp.role })),
     [selectedPools]
   )
 
@@ -194,7 +185,7 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isLoa
     setSelectedPools(selections)
   }, [])
 
-  if (isLoading) {
+  if (isPublicDataLoading) {
     return (
       <div className="flex justify-center items-center py-10">
         <span className="loading loading-spinner loading-lg" />
@@ -230,7 +221,13 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isLoa
       </div>
 
       {/* User positions + sub-account selector */}
-      {account && subAccounts.length > 0 && (
+      {account && isUserDataLoading && (
+        <div className="rounded-box border border-base-300 p-4 flex items-center gap-2">
+          <span className="loading loading-spinner loading-sm" />
+          <span className="text-sm text-base-content/60">Loading positions...</span>
+        </div>
+      )}
+      {account && !isUserDataLoading && subAccounts.length > 0 && (
         <div className="rounded-box border border-base-300 p-4 space-y-3">
           <h3 className="text-sm font-semibold">Your Positions</h3>
 
@@ -291,7 +288,7 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isLoa
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
               {activePositions.map(({ position, pool }) => (
                 <div
-                  key={pool.poolId}
+                  key={pool.marketUid}
                   className="flex items-center gap-2 p-2 rounded-lg bg-base-200/50"
                 >
                   <img

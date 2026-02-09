@@ -11,7 +11,7 @@ export interface SelectedPool {
 }
 
 export interface TableHighlight {
-  poolId: string
+  marketUid: string
   role: PoolRole
 }
 

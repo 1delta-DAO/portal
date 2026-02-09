@@ -36,17 +36,15 @@ export const Swap = ({ lenderData, chainId }: Props) => {
   const [swapType, setSwapType] = useState<'debt' | 'collateral'>('debt')
 
   const lenders = useMemo(() => {
-    return Object.keys(lenderData?.[chainId]?.data ?? {})
-  }, [lenderData, chainId])
+    return Object.keys(lenderData ?? {})
+  }, [lenderData])
 
   const [selectedLender, setSelectedLender] = useState<string | ''>(lenders[0] ?? '')
 
-  const pools = useMemo(() => {
-    if (!selectedLender) return {}
-    return lenderData[chainId]?.data?.[selectedLender]?.data ?? {}
-  }, [lenderData, chainId, selectedLender])
-
-  const poolList = useMemo(() => Object.values(pools), [pools])
+  const poolList = useMemo(() => {
+    if (!selectedLender) return []
+    return lenderData[selectedLender] ?? []
+  }, [lenderData, selectedLender])
 
   const [assetInPool, setAssetInPool] = useState<PoolDataItem | null>(null)
   const [assetOutPool, setAssetOutPool] = useState<PoolDataItem | null>(null)
@@ -99,7 +97,7 @@ export const Swap = ({ lenderData, chainId }: Props) => {
   }
 
   const handlePoolChange = (side: 'in' | 'out') => (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const pool = pools[e.target.value]
+    const pool = poolList.find(p => p.marketUid === e.target.value) ?? null
 
     if (side === 'in') setAssetInPool(pool)
     else setAssetOutPool(pool)
@@ -209,15 +207,15 @@ export const Swap = ({ lenderData, chainId }: Props) => {
         <select
           className="select select-bordered flex-1"
           onChange={handlePoolChange('in')}
-          value={assetInPool?.poolId ?? ''}
+          value={assetInPool?.marketUid ?? ''}
           disabled={!selectedLender}
         >
           <option value="" disabled>
             {swapType === 'debt' ? 'Debt Asset In' : 'Collateral Asset In'}
           </option>
           {poolList.map((pool) => (
-            <option key={pool.poolId} value={pool.poolId}>
-              {pool.asset.symbol ?? pool.poolId}
+            <option key={pool.marketUid} value={pool.marketUid}>
+              {pool.asset.symbol ?? pool.marketUid}
             </option>
           ))}
         </select>
@@ -239,15 +237,15 @@ export const Swap = ({ lenderData, chainId }: Props) => {
         <select
           className="select select-bordered flex-1"
           onChange={handlePoolChange('out')}
-          value={assetOutPool?.poolId ?? ''}
+          value={assetOutPool?.marketUid ?? ''}
           disabled={!selectedLender}
         >
           <option value="" disabled>
             {swapType === 'debt' ? 'Debt Asset Out' : 'Collateral Asset Out'}
           </option>
           {poolList.map((pool) => (
-            <option key={pool.poolId} value={pool.poolId}>
-              {pool.asset.symbol ?? pool.poolId}
+            <option key={pool.marketUid} value={pool.marketUid}>
+              {pool.asset.symbol ?? pool.marketUid}
             </option>
           ))}
         </select>

@@ -15,7 +15,7 @@ import { LenderData, PoolDataItem } from './usePoolData'
 export interface FlattenedPoolWithUserData {
   chainId: string
   lender: string
-  poolId: string
+  marketUid: string
   asset: RawCurrency
   poolData: PoolDataItem
   /** The user's position for this pool (if any), keyed by sub-account ID */
@@ -49,11 +49,6 @@ export function flattenLenderDataWithUser(
 } {
   const result: FlattenedPoolWithUserData[] = []
 
-  const chainEntry = lenderData[chainId]
-  if (!chainEntry) {
-    return { result, positionTotals: {}, userConfigs: {} }
-  }
-
   // Build a lender->entry map from the flat array, filtering by chainId
   const userDataForChain = new Map<string, LenderUserDataEntry>()
   if (userDataResult?.raw) {
@@ -67,20 +62,19 @@ export function flattenLenderDataWithUser(
   let positionTotals: PositionTotals = {}
   let userConfigs: UserConfigs = {}
 
-  for (const [lender, lenderEntry] of Object.entries(chainEntry.data)) {
-    const poolsMap = lenderEntry.data
+  for (const [lender, pools] of Object.entries(lenderData)) {
     const lenderUserData: LenderUserDataEntry | undefined = userDataForChain.get(lender)
 
-    // Build a lookup: poolId -> { [subAccountId]: UserPositionEntry }
-    const positionsByPool: { [poolId: string]: { [subAccountId: string]: UserPositionEntry } } = {}
+    // Build a lookup: marketUid -> { [subAccountId]: UserPositionEntry }
+    const positionsByPool: { [marketUid: string]: { [subAccountId: string]: UserPositionEntry } } = {}
 
     if (lenderUserData) {
       for (const sub of lenderUserData.data) {
         const positions = extractPositions(sub.positions)
         for (const pos of positions) {
           if (Number(pos.deposits) !== 0 || Number(pos.debt) !== 0) {
-            if (!positionsByPool[pos.poolId]) positionsByPool[pos.poolId] = {}
-            positionsByPool[pos.poolId][sub.accountId] = pos
+            if (!positionsByPool[pos.marketUid]) positionsByPool[pos.marketUid] = {}
+            positionsByPool[pos.marketUid][sub.accountId] = pos
           }
         }
 
@@ -99,14 +93,14 @@ export function flattenLenderDataWithUser(
       }
     }
 
-    for (const [poolId, poolData] of Object.entries(poolsMap)) {
+    for (const poolData of pools) {
       result.push({
         chainId,
         lender,
-        poolId,
+        marketUid: poolData.marketUid,
         asset: poolData.asset as RawCurrency,
         poolData,
-        userPosition: positionsByPool[poolId],
+        userPosition: positionsByPool[poolData.marketUid],
       })
     }
   }

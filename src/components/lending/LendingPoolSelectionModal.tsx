@@ -129,7 +129,7 @@ const LendingPoolList: React.FC<LendingPoolListProps> = ({ pools, onSelect, onCl
 
           return (
             <button
-              key={`${p.chainId}-${p.lender}-${p.poolId}`}
+              key={`${p.chainId}-${p.lender}-${p.marketUid}`}
               type="button"
               className="w-full px-4 py-3 hover:bg-base-200 hover:cursor-pointer text-left border-b border-base-200 last:border-b-0"
               onClick={() => {
@@ -147,7 +147,7 @@ const LendingPoolList: React.FC<LendingPoolListProps> = ({ pools, onSelect, onCl
                     {lenderDisplayName(p.lender)}
                   </span>
                   <span className="text-[11px] text-base-content/50 truncate">
-                    Pool: {p.poolId}
+                    Pool: {p.marketUid}
                   </span>
                 </div>
 
@@ -204,7 +204,7 @@ const LendingPoolList: React.FC<LendingPoolListProps> = ({ pools, onSelect, onCl
             <span className="text-xs text-base-content/70 truncate">
               {lenderDisplayName(p.lender)}
             </span>
-            <span className="text-[11px] text-base-content/50 truncate">Pool: {p.poolId}</span>
+            <span className="text-[11px] text-base-content/50 truncate">Pool: {p.marketUid}</span>
           </div>
 
           {/* 25% – TVL + APR + user data */}
@@ -286,7 +286,7 @@ export const LendingPoolSelectionModal: React.FC<LendingPoolSelectionModalProps>
       const symbol = (asset?.symbol ?? (asset as any)?.ticker ?? '').toLowerCase()
       const name = (asset?.name ?? (asset as any)?.label ?? '').toLowerCase()
       const lender = p.lender.toLowerCase()
-      const poolId = p.poolId.toLowerCase()
+      const poolId = p.marketUid.toLowerCase()
 
       if (assetQ && !(symbol.includes(assetQ) || name.includes(assetQ))) return false
       if (lenderQ && !lender.includes(lenderQ)) return false

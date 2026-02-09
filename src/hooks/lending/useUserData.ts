@@ -6,7 +6,7 @@ import { fetchUserDataViaRpc } from './fetchUserDataRpc'
 // ============================================================================
 
 export interface UserPositionEntry {
-  poolId: string
+  marketUid: string
   underlying: string
   deposits: number | string
   debtStable: number | string

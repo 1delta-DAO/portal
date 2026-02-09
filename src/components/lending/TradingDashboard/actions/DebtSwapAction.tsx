@@ -41,7 +41,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
   }, [debtInPool, debtOutPool, onPoolSelectionChange])
 
   // Max = existing debt balance of the asset being repaid (debt out)
-  const debtOutPos = debtOutPool ? userPositions.get(debtOutPool.underlying.toLowerCase()) : null
+  const debtOutPos = debtOutPool ? userPositions.get(debtOutPool.marketUid) : null
   const maxDebt = debtOutPos ? Number(debtOutPos.debt) + Number(debtOutPos.debtStable) : 0
 
   const handleFetchQuotes = () => {

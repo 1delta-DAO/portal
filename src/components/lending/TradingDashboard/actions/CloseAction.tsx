@@ -41,7 +41,7 @@ export const CloseAction: React.FC<TradingActionProps> = ({
   }, [collateralPool, debtPool, onPoolSelectionChange])
 
   // Max = withdrawable of collateral
-  const colPos = collateralPool ? userPositions.get(collateralPool.underlying.toLowerCase()) : null
+  const colPos = collateralPool ? userPositions.get(collateralPool.marketUid) : null
   const maxWithdrawable = colPos ? Number(colPos.withdrawable) : 0
 
   const handleFetchQuotes = () => {

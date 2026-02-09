@@ -29,7 +29,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   useEffect(() => {
     setAmount('')
     resetState()
-  }, [pool?.poolId])
+  }, [pool?.marketUid])
 
   const walletAmount = walletBalance ? parseFloat(walletBalance.balance) : 0
 
