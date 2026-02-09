@@ -1,11 +1,13 @@
 // src/components/UserLenderPositionsTable.tsx
 import React from 'react'
 import { lenderDisplayName } from '@1delta/lib-utils'
+import type { RawCurrency } from '@1delta/lib-utils'
 import type {
   UserDataResult,
   LenderUserDataEntry,
   UserPositionEntry,
 } from '../../hooks/lending/useUserData'
+import { useTokenLists } from '../../hooks/useTokenLists'
 
 interface UserLenderPositionsTableProps {
   account?: string
@@ -56,33 +58,44 @@ function collectPositions(entry: LenderUserDataEntry): TaggedPosition[] {
   return result
 }
 
-const PositionsList: React.FC<{ positions: TaggedPosition[] }> = ({ positions }) => {
+const PositionsList: React.FC<{ positions: TaggedPosition[]; tokens: Record<string, RawCurrency> }> = ({ positions, tokens }) => {
   if (positions.length === 0) return null
 
   return (
     <div className="flex flex-wrap gap-1.5">
-      {positions.map((pos) => (
-        <div
-          key={`${pos.marketUid}-${pos.tag}`}
-          className="badge badge-outline badge-sm flex gap-1 items-center"
-        >
-          <span
-            className={`text-[9px] font-bold uppercase ${
-              pos.tag === 'debt' ? 'text-error' : 'text-success'
-            }`}
+      {positions.map((pos) => {
+        const token = tokens[pos.underlying.toLowerCase()]
+        const symbol = token?.symbol ?? ''
+        const name = token?.name ?? ''
+        const tooltip = name && name !== symbol ? `${name} (${symbol})` : symbol || pos.underlying
+
+        return (
+          <div
+            key={`${pos.marketUid}-${pos.tag}`}
+            className="badge badge-outline badge-sm flex gap-1 items-center"
+            title={tooltip}
           >
-            {pos.tag}
-          </span>
-          <span className="font-mono text-[10px]">
-            {pos.underlying.slice(0, 6)}...{pos.underlying.slice(-4)}
-          </span>
-          <span className="opacity-70">
-            {pos.tag === 'debt'
-              ? `${Number(pos.debt || 0).toFixed(4)} ($${formatUsd(pos.debtUSD)})`
-              : `${Number(pos.deposits || 0).toFixed(4)} ($${formatUsd(pos.depositsUSD)})`}
-          </span>
-        </div>
-      ))}
+            <span
+              className={`text-[9px] font-bold uppercase ${
+                pos.tag === 'debt' ? 'text-error' : 'text-success'
+              }`}
+            >
+              {pos.tag}
+            </span>
+            {token?.logoURI ? (
+              <img src={token.logoURI} alt={symbol} className="w-3.5 h-3.5 rounded-full" />
+            ) : null}
+            <span className="text-[10px]">
+              {symbol || `${pos.underlying.slice(0, 6)}...${pos.underlying.slice(-4)}`}
+            </span>
+            <span className="opacity-70">
+              {pos.tag === 'debt'
+                ? `${Number(pos.debt || 0).toFixed(4)} ($${formatUsd(pos.debtUSD)})`
+                : `${Number(pos.deposits || 0).toFixed(4)} ($${formatUsd(pos.depositsUSD)})`}
+            </span>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -95,6 +108,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
   error,
   refetch,
 }) => {
+  const { data: tokens } = useTokenLists(chainId)
   const summary = userData?.summary
   const lenderEntries = getActiveLenders(userData?.raw)
 
@@ -278,7 +292,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                       )}
                     </td>
                     <td>
-                      <PositionsList positions={positions} />
+                      <PositionsList positions={positions} tokens={tokens} />
                     </td>
                   </tr>
                 )

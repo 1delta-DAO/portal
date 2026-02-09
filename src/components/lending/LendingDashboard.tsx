@@ -563,16 +563,16 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
           ) : (
             <>
               {actionTab === 'Deposit' && (
-                <DepositAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} lender={selectedLender} chainId={chainId} account={account} accountId={selectedSubAccountId ?? undefined} />
+                <DepositAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} />
               )}
               {actionTab === 'Withdraw' && (
-                <WithdrawAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} lender={selectedLender} chainId={chainId} account={account} accountId={selectedSubAccountId ?? undefined} />
+                <WithdrawAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} />
               )}
               {actionTab === 'Borrow' && (
-                <BorrowAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} lender={selectedLender} chainId={chainId} account={account} accountId={selectedSubAccountId ?? undefined} />
+                <BorrowAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} />
               )}
               {actionTab === 'Repay' && (
-                <RepayAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} lender={selectedLender} chainId={chainId} account={account} accountId={selectedSubAccountId ?? undefined} />
+                <RepayAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} />
               )}
             </>
           )}

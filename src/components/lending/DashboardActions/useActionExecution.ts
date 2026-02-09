@@ -11,13 +11,11 @@ import type { ActionType } from './types'
 export function useActionExecution(params: {
   actionType: ActionType
   pool: PoolDataItem | null
-  lender: string
-  chainId: string
   account?: string
   amount: string
   isAll: boolean
 }) {
-  const { actionType, pool, lender, chainId, account, amount, isAll } = params
+  const { actionType, pool, account, amount, isAll } = params
   const { data: signer } = useWalletClient()
 
   const [result, setResult] = useState<LendingActionResponse | null>(null)
@@ -40,13 +38,11 @@ export function useActionExecution(params: {
     const parsedAmount = parseUnits(amount || '0', decimals)
 
     const response = await fetchLendingAction({
-      chainId,
+      marketUid: pool.marketUid,
       operator: account,
       amount: parsedAmount.toString(),
-      lender,
       actionType,
       receiver: account,
-      underlying: pool.asset.address,
       isAll: isAll || undefined,
     })
 

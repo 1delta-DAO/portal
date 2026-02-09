@@ -11,7 +11,6 @@ interface DepositPanelProps {
   resolvedPool: PoolDataItem | null
   walletBalance: TokenBalance | null
   account?: string
-  chainId: string
 }
 
 export const DepositPanel: React.FC<DepositPanelProps> = ({
@@ -19,7 +18,6 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
   resolvedPool,
   walletBalance,
   account,
-  chainId,
 }) => {
   return (
     <div className="w-72 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
@@ -67,8 +65,6 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
           pool={resolvedPool}
           userPosition={null}
           walletBalance={walletBalance}
-          lender={selectedEntry?.lenderKey ?? ''}
-          chainId={chainId}
           account={account}
         />
       )}

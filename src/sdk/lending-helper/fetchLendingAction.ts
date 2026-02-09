@@ -1,12 +1,9 @@
 export interface LendingActionParams {
-  chainId: string
+  marketUid: string
   operator: string
   amount: string
-  lender: string
   actionType: 'Deposit' | 'Withdraw' | 'Borrow' | 'Repay'
-  receiver: string
-  underlying: string
-  lenderAsset?: string
+  receiver?: string
   payAsset?: string
   receiveAsset?: string
   isAll?: boolean
@@ -39,15 +36,11 @@ export async function fetchLendingAction(
     const action = params.actionType.toLowerCase()
 
     const qs = new URLSearchParams()
-    qs.set('chainId', params.chainId)
+    qs.set('marketUid', params.marketUid)
     qs.set('operator', params.operator)
     qs.set('amount', params.amount)
-    qs.set('lender', params.lender)
-    qs.set('receiver', params.receiver)
-    qs.set('underlying', params.underlying)
-    qs.set('account', params.receiver)
 
-    if (params.lenderAsset) qs.set('lenderAsset', params.lenderAsset)
+    if (params.receiver) qs.set('receiver', params.receiver)
     if (params.payAsset) qs.set('payAsset', params.payAsset)
     if (params.receiveAsset) qs.set('receiveAsset', params.receiveAsset)
     if (params.isAll != null) qs.set('isAll', String(params.isAll))

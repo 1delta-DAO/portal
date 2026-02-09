@@ -8,8 +8,6 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   pool,
   userPosition,
   walletBalance,
-  lender,
-  chainId,
   account,
 }) => {
   const [amount, setAmount] = useState('')
@@ -19,8 +17,6 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
     useActionExecution({
       actionType: 'Repay',
       pool,
-      lender,
-      chainId,
       account,
       amount,
       isAll,

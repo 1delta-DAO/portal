@@ -1,18 +1,21 @@
 // src/components/LenderTab.tsx
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { getAvailableMarginChainIds } from '@1delta/lib-utils'
 import { UserLenderPositionsTable } from './UserTable'
+import { UserAssetsTable } from './UserAssetsTable'
 import { LendingPoolsTable } from './MarketsView'
 import { ChainFilterSelect } from './ChainFilter'
 import { LenderOperationsBuilder } from './LenderOperationsBuilder'
 import { useUserData } from '../../hooks/lending/useUserData'
 import { useMarginPublicData } from '../../hooks/lending/usePoolData'
+import { useLendingBalances } from '../../hooks/lending/useLendingBalances'
+import { useTokenLists } from '../../hooks/useTokenLists'
 import { useMainPrices } from '../../hooks/prices/useMainPrices'
 import { LendingDashboard } from './LendingDashboard'
 import { TradingDashboard } from './TradingDashboard'
 
-type SubTab = 'lending' | 'markets' | 'operations' | 'trading'
+type SubTab = 'earn' | 'lending' | 'operations' | 'trading'
 
 const chains = getAvailableMarginChainIds()
 
@@ -24,10 +27,16 @@ export function LenderTab() {
   // shared chain filter state
   const [selectedChain, setSelectedChain] = useState<string>('1')
 
-  // sub-tab state
-  const [activeTab, setActiveTab] = useState<SubTab>('lending')
+  // sub-tab state — Earn is the default
+  const [activeTab, setActiveTab] = useState<SubTab>('earn')
 
   const effectiveChainId = selectedChain
+
+  // Sub-tab within "earn": 'assets' (default) | 'positions'
+  const [earnSubTab, setEarnSubTab] = useState<'assets' | 'positions'>('assets')
+
+  // Filter markets to owned assets toggle
+  const [filterOwned, setFilterOwned] = useState(false)
 
   const { lenderData, isPublicDataLoading } = useMarginPublicData(effectiveChainId)
   const { userData, isUserDataLoading, error, refetch } = useUserData({
@@ -35,9 +44,20 @@ export function LenderTab() {
     account,
   })
   const { data: prices } = useMainPrices()
+  const { data: tokens } = useTokenLists(effectiveChainId)
+  const {
+    balances: lendingBalances,
+    isLoading: isLendingBalancesLoading,
+    error: lendingBalancesError,
+  } = useLendingBalances({ chainId: effectiveChainId, account })
 
   const isLoading = isPublicDataLoading || isUserDataLoading
-  // Keep combined flag for tabs that don't support independent loading yet
+
+  // Build external asset filter: comma-separated addresses when checkbox is on
+  const externalAssetFilter = useMemo(() => {
+    if (!filterOwned || lendingBalances.length === 0) return ''
+    return lendingBalances.map((b) => b.address.toLowerCase()).join(',')
+  }, [filterOwned, lendingBalances])
 
   return (
     <div className="space-y-4">
@@ -47,19 +67,19 @@ export function LenderTab() {
           <button
             type="button"
             role="tab"
-            className={`tab tab-sm ${activeTab === 'lending' ? 'tab-active' : ''}`}
-            onClick={() => setActiveTab('lending')}
+            className={`tab tab-sm ${activeTab === 'earn' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('earn')}
           >
-            Lending
+            Earn
           </button>
 
           <button
             type="button"
             role="tab"
-            className={`tab tab-sm ${activeTab === 'markets' ? 'tab-active' : ''}`}
-            onClick={() => setActiveTab('markets')}
+            className={`tab tab-sm ${activeTab === 'lending' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('lending')}
           >
-            Markets
+            Lending
           </button>
 
           {SHOW_OPERATIONS_TAB && (
@@ -89,6 +109,68 @@ export function LenderTab() {
       </div>
 
       {/* Tab content */}
+      {activeTab === 'earn' && (
+        <div className="space-y-4">
+          {account && (
+            <div className="space-y-3">
+              {/* Sub-tabs styled as segmented control — visually distinct from main tabs */}
+              <div className="flex items-center gap-1 bg-base-200 rounded-lg p-1 w-fit">
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    earnSubTab === 'assets'
+                      ? 'bg-base-100 shadow-sm text-base-content'
+                      : 'text-base-content/60 hover:text-base-content'
+                  }`}
+                  onClick={() => setEarnSubTab('assets')}
+                >
+                  Your Assets
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    earnSubTab === 'positions'
+                      ? 'bg-base-100 shadow-sm text-base-content'
+                      : 'text-base-content/60 hover:text-base-content'
+                  }`}
+                  onClick={() => setEarnSubTab('positions')}
+                >
+                  Your Lending Positions
+                </button>
+              </div>
+
+              {earnSubTab === 'assets' && (
+                <UserAssetsTable
+                  balances={lendingBalances}
+                  isLoading={isLendingBalancesLoading}
+                  error={lendingBalancesError}
+                  tokens={tokens}
+                  filterOwned={filterOwned}
+                  onFilterOwnedChange={setFilterOwned}
+                />
+              )}
+
+              {earnSubTab === 'positions' && (
+                <UserLenderPositionsTable
+                  account={account}
+                  chainId={effectiveChainId}
+                  userData={userData}
+                  isLoading={isLoading}
+                  error={error}
+                  refetch={refetch}
+                />
+              )}
+            </div>
+          )}
+          <LendingPoolsTable
+            chainId={effectiveChainId}
+            lenderData={lenderData}
+            account={account}
+            externalAssetFilter={externalAssetFilter}
+          />
+        </div>
+      )}
+
       {activeTab === 'lending' && (
         <LendingDashboard
           lenderData={lenderData}
@@ -98,22 +180,6 @@ export function LenderTab() {
           isPublicDataLoading={isPublicDataLoading}
           isUserDataLoading={isUserDataLoading}
         />
-      )}
-
-      {activeTab === 'markets' && (
-        <div className="space-y-4">
-          {account && (
-            <UserLenderPositionsTable
-              account={account}
-              chainId={effectiveChainId}
-              userData={userData}
-              isLoading={isLoading}
-              error={error}
-              refetch={refetch}
-            />
-          )}
-          <LendingPoolsTable chainId={effectiveChainId} lenderData={lenderData} account={account} />
-        </div>
       )}
 
       {activeTab === 'operations' && (

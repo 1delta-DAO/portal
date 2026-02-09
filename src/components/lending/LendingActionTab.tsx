@@ -13,7 +13,6 @@ type ActionType = 'Deposit' | 'Withdraw' | 'Borrow' | 'Repay'
 
 interface Props {
   lenderData: LenderData
-  chainId: string
   actionType: ActionType
 }
 
@@ -36,7 +35,7 @@ const renderCurrency = (asset: RawCurrency) => {
   )
 }
 
-export const LendingActionTab = ({ lenderData, chainId, actionType }: Props) => {
+export const LendingActionTab = ({ lenderData, actionType }: Props) => {
   const { data: signer } = useWalletClient()
   const { address: account } = useAccount()
 
@@ -95,13 +94,11 @@ export const LendingActionTab = ({ lenderData, chainId, actionType }: Props) => 
     const parsedAmount = parseUnits(amount || '0', decimals)
 
     const response = await fetchLendingAction({
-      chainId,
+      marketUid: selectedPool.marketUid,
       operator: account,
       amount: parsedAmount.toString(),
-      lender: selectedLender,
       actionType,
       receiver: account,
-      underlying: selectedPool.asset.address,
       isAll: isAll || undefined,
     })
 

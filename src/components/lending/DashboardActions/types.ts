@@ -9,8 +9,6 @@ export interface ActionPanelProps {
   pool: PoolDataItem | null
   userPosition: UserPositionEntry | null
   walletBalance?: TokenBalance | null
-  lender: string
-  chainId: string
   account?: string
   /** Sub-account ID for lenders with multiple sub-accounts (e.g. INIT) */
   accountId?: string

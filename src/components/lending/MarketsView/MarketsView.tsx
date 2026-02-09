@@ -13,12 +13,14 @@ interface LendingPoolsTableProps {
   chainId?: string
   lenderData?: LenderData
   account?: string
+  externalAssetFilter?: string
 }
 
 export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   chainId,
   lenderData,
   account,
+  externalAssetFilter,
 }) => {
   // Filters
   const [search, setSearch] = useState('')
@@ -38,6 +40,9 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
 
   // Pool selection for deposit
   const [selectedEntry, setSelectedEntry] = useState<PoolEntry | null>(null)
+
+  // Mobile deposit modal
+  const [showMobileDeposit, setShowMobileDeposit] = useState(false)
 
   const { pools, isPoolsLoading: loading } = useFlattenedPools({
     chainId,
@@ -108,6 +113,14 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       )
     }
 
+    if (externalAssetFilter?.trim()) {
+      const addrs = externalAssetFilter.toLowerCase().split(',').filter(Boolean)
+      if (addrs.length > 0) {
+        const addrSet = new Set(addrs)
+        result = result.filter((p) => addrSet.has(p.underlyingAddress.toLowerCase()))
+      }
+    }
+
     const maxUtil = parseFloat(maxUtilPct)
     if (!Number.isNaN(maxUtil)) {
       result = result.filter((p) => {
@@ -173,6 +186,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     minDepositsUsd,
     minAprPct,
     assetFilter,
+    externalAssetFilter,
   ])
 
   // Pagination
@@ -195,6 +209,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     minDepositsUsd,
     minAprPct,
     assetFilter,
+    externalAssetFilter,
     chainId,
   ])
 
@@ -213,13 +228,18 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   }
 
   const handleRowClick = (entry: PoolEntry) => {
-    setSelectedEntry((prev) =>
-      prev &&
-      prev.lenderKey === entry.lenderKey &&
-      prev.underlyingAddress === entry.underlyingAddress
-        ? null
-        : entry
-    )
+    const isSame =
+      selectedEntry &&
+      selectedEntry.lenderKey === entry.lenderKey &&
+      selectedEntry.underlyingAddress === entry.underlyingAddress
+
+    if (isSame) {
+      setSelectedEntry(null)
+      setShowMobileDeposit(false)
+    } else {
+      setSelectedEntry(entry)
+      setShowMobileDeposit(true)
+    }
   }
 
   if (loading) {
@@ -338,7 +358,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
         </div>
       </div>
 
-      {/* Two-column layout: table + deposit panel */}
+      {/* Desktop: two-column layout; Mobile: full-width card list */}
       <div className="flex gap-4 items-start">
         <MarketsTable
           pools={paginatedPools}
@@ -356,16 +376,39 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
           onGoToPage={goToPage}
         />
 
+        {/* Desktop deposit panel — hidden on mobile */}
         {showDepositPanel && (
-          <DepositPanel
-            selectedEntry={selectedEntry}
-            resolvedPool={resolvedPool}
-            walletBalance={selectedWalletBal}
-            account={account}
-            chainId={chainId}
-          />
+          <div className="hidden md:block">
+            <DepositPanel
+              selectedEntry={selectedEntry}
+              resolvedPool={resolvedPool}
+              walletBalance={selectedWalletBal}
+              account={account}
+            />
+          </div>
         )}
       </div>
+
+      {/* Mobile deposit modal */}
+      {showMobileDeposit && selectedEntry && showDepositPanel && (
+        <div className="modal modal-open md:hidden" onClick={() => setShowMobileDeposit(false)}>
+          <div className="modal-box max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+              onClick={() => setShowMobileDeposit(false)}
+            >
+              ✕
+            </button>
+            <DepositPanel
+              selectedEntry={selectedEntry}
+              resolvedPool={resolvedPool}
+              walletBalance={selectedWalletBal}
+              account={account}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

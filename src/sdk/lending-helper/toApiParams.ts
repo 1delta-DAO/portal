@@ -179,23 +179,21 @@ const ACTION_TYPE_MAP = {
  */
 export function selectionToLendingParams(
   sel: LenderOperationSelection,
-  opts: { chainId: string; operator: string; receiver: string }
+  opts: { operator: string; receiver: string }
 ): LendingActionParams | null {
   if (!sel.pool) return null
 
-  const { asset, lender } = sel.pool
+  const { asset, marketUid } = sel.pool
   const amount = parseAmountDecimal(sel.amount, asset.decimals)
   const isAll =
     sel.useMax && (sel.operation === 'repay' || sel.operation === 'withdraw')
 
   return {
-    chainId: opts.chainId,
+    marketUid,
     operator: opts.operator,
     amount: amount.toString(),
-    lender,
     actionType: ACTION_TYPE_MAP[sel.operation],
     receiver: opts.receiver,
-    underlying: asset.address,
     isAll: isAll || undefined,
   }
 }

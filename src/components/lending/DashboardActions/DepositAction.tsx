@@ -8,8 +8,6 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   pool,
   userPosition,
   walletBalance,
-  lender,
-  chainId,
   account,
 }) => {
   const [amount, setAmount] = useState('')
@@ -18,8 +16,6 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
     useActionExecution({
       actionType: 'Deposit',
       pool,
-      lender,
-      chainId,
       account,
       amount,
       isAll: false,
