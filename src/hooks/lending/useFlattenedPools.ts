@@ -12,22 +12,22 @@ export interface PoolExposure {
 }
 
 export interface PoolEntry {
-  chain_id: string
-  lender_key: string
-  underlying_address: string
-  asset_group: string
-  deposit_rate: string
-  variable_borrow_rate: string
-  stable_borrow_rate: string
-  intrinsic_yield: string | null
-  total_deposits: string
-  total_debt: string
-  total_liquidity: string
-  total_deposits_usd: string
-  total_debt_usd: string
-  total_liquidity_usd: string
+  chainId: string
+  lenderKey: string
+  underlyingAddress: string
+  assetGroup: string
+  depositRate: string
+  variableBorrowRate: string
+  stableBorrowRate: string
+  intrinsicYield: string | null
+  totalDeposits: string
+  totalDebt: string
+  totalLiquidity: string
+  totalDepositsUsd: string
+  totalDebtUsd: string
+  totalLiquidityUsd: string
   utilization: string
-  config_ids: number[]
+  configIds: number[]
   exposures: PoolExposure[]
 }
 

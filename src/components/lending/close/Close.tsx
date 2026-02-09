@@ -4,6 +4,7 @@ import {
   RawCurrency,
 } from '@1delta/lib-utils'
 import { LenderData, PoolDataItem } from '../../../hooks/lending/usePoolData'
+import { sortLenderKeysByTvl } from '../../../utils/format'
 import { useMemo, useState } from 'react'
 import { parseUnits } from 'viem'
 import { ExecuteCloseButton } from './Execute'
@@ -33,9 +34,7 @@ interface Props {
 }
 
 export const Close = ({ lenderData, chainId }: Props) => {
-  const lenders = useMemo(() => {
-    return Object.keys(lenderData ?? {})
-  }, [lenderData])
+  const lenders = useMemo(() => sortLenderKeysByTvl(lenderData), [lenderData])
 
   const [selectedLender, setSelectedLender] = useState<string | ''>(lenders[0] ?? '')
 

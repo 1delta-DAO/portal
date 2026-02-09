@@ -1,47 +1,52 @@
 import { useMemo, useState, useEffect } from 'react'
-import { loadTokenLists, getTokenListsCache } from '../lib/data/tokenListsCache'
+import type { RawCurrency } from '@1delta/lib-utils'
+import {
+  loadTokenListForChain,
+  getChainTokensCache,
+} from '../lib/data/tokenListsCache'
 
-export type TokenListsRecord = Record<string, Record<string, any>>
-
-let cachedLists: TokenListsRecord | null = null
-let loadingPromise: Promise<TokenListsRecord> | null = null
-
-export function useTokenLists() {
-  const [data, setData] = useState<TokenListsRecord | null>(cachedLists || getTokenListsCache())
-  const [isLoading, setIsLoading] = useState(!cachedLists && !getTokenListsCache())
+/**
+ * Fetches the token list for a single chain on demand.
+ * The list is cached globally — once fetched it never refetches.
+ *
+ * @param chainId - The chain to load tokens for (omit to skip).
+ * @returns `{ data, isLoading }` where `data` is `Record<address, RawCurrency>`.
+ */
+export function useTokenLists(chainId?: string) {
+  const cached = chainId ? getChainTokensCache(chainId) : undefined
+  const [data, setData] = useState<Record<string, RawCurrency> | undefined>(cached)
+  const [isLoading, setIsLoading] = useState(!cached && !!chainId)
 
   useEffect(() => {
-    const cached = getTokenListsCache()
-    if (cached) {
-      cachedLists = cached
-      setData(cached)
+    if (!chainId) {
+      setData(undefined)
       setIsLoading(false)
       return
     }
 
-    if (!loadingPromise) {
-      loadingPromise = loadTokenLists().then((result) => {
-        cachedLists = result
-        return result
-      })
+    const existing = getChainTokensCache(chainId)
+    if (existing) {
+      setData(existing)
+      setIsLoading(false)
+      return
     }
 
-    loadingPromise
+    setIsLoading(true)
+    loadTokenListForChain(chainId)
       .then((result) => {
-        setData(result)
+        setData(result ?? undefined)
         setIsLoading(false)
       })
       .catch((e) => {
-        console.error('Failed to load token lists:', e)
+        console.error(`Failed to load token list for chain ${chainId}:`, e)
         setIsLoading(false)
       })
-  }, [])
+  }, [chainId])
 
   return useMemo(
     () => ({
-      data: data || ({} as TokenListsRecord),
+      data: data ?? ({} as Record<string, RawCurrency>),
       isLoading,
-      error: null,
     }),
     [data, isLoading]
   )

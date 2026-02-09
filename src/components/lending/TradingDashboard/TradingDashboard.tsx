@@ -6,6 +6,7 @@ import { useTokenBalances } from '../../../hooks/lending/useTokenBalances'
 import { useSyncChain } from '../../../hooks/useSyncChain'
 import { SearchableSelect, type SearchableSelectOption } from '../SearchableSelect'
 import { WalletConnect } from '../../connect'
+import { computeLenderTvl } from '../../../utils/format'
 import { TradingMarketTable } from './TradingMarketTable'
 import { LoopAction } from './actions/LoopAction'
 import { ColSwapAction } from './actions/ColSwapAction'
@@ -87,9 +88,9 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
       if (balA > 0 && balB > 0) return balB - balA
       if (balA > 0) return -1
       if (balB > 0) return 1
-      return lenderDisplayNameFull(a).localeCompare(lenderDisplayNameFull(b))
+      return computeLenderTvl(lenderData?.[b] ?? []) - computeLenderTvl(lenderData?.[a] ?? [])
     })
-  }, [allLenderKeys, lenderBalances])
+  }, [allLenderKeys, lenderBalances, lenderData])
 
   const lenderOptions: SearchableSelectOption[] = lenders.map((l) => ({
     value: l,

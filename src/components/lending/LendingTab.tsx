@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import { useAccount } from 'wagmi'
 import { getAvailableMarginChainIds } from '@1delta/lib-utils'
 import { UserLenderPositionsTable } from './UserTable'
-import { LendingPoolsTable } from './PoolsTable'
+import { LendingPoolsTable } from './MarketsView'
 import { ChainFilterSelect } from './ChainFilter'
 import { LenderOperationsBuilder } from './LenderOperationsBuilder'
 import { useUserData } from '../../hooks/lending/useUserData'
@@ -112,7 +112,7 @@ export function LenderTab() {
               refetch={refetch}
             />
           )}
-          <LendingPoolsTable chainId={effectiveChainId} />
+          <LendingPoolsTable chainId={effectiveChainId} lenderData={lenderData} account={account} />
         </div>
       )}
 

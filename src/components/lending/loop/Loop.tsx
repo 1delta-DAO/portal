@@ -6,6 +6,7 @@ import {
   RawCurrency,
 } from '@1delta/lib-utils'
 import { LenderData, PoolDataItem } from '../../../hooks/lending/usePoolData'
+import { sortLenderKeysByTvl } from '../../../utils/format'
 import { useMemo, useState } from 'react'
 import { useTokenLists } from '../../../hooks/useTokenLists'
 import { parseUnits, zeroAddress } from 'viem'
@@ -42,11 +43,9 @@ interface Props {
 export const Loop = ({ lenderData, chainId }: Props) => {
   /* ---------- Lender selection ---------- */
 
-  const { data } = useTokenLists()
+  const { data: chainTokens } = useTokenLists(chainId)
 
-  const lenders = useMemo(() => {
-    return Object.keys(lenderData ?? {})
-  }, [lenderData])
+  const lenders = useMemo(() => sortLenderKeysByTvl(lenderData), [lenderData])
 
   const [selectedLender, setSelectedLender] = useState<string | ''>(lenders[0] ?? '')
 
@@ -110,11 +109,11 @@ export const Loop = ({ lenderData, chainId }: Props) => {
     const hasWrappedNative = Boolean(wnative)
 
     if (hasWrappedNative) {
-      assets.unshift(data?.[chainId]?.[zeroAddress])
+      assets.unshift(chainTokens[zeroAddress])
     }
 
     return assets
-  }, [fromPool, toPool, data])
+  }, [fromPool, toPool, chainTokens])
 
   const handlePoolChange = (side: 'from' | 'to') => (e: React.ChangeEvent<HTMLSelectElement>) => {
     const pool = poolList.find(p => p.marketUid === e.target.value) ?? null

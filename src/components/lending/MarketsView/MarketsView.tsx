@@ -1,0 +1,371 @@
+import React, { useEffect, useMemo, useState } from 'react'
+import { getChainName, lenderDisplayNameFull } from '@1delta/lib-utils'
+import { useFlattenedPools, type PoolEntry } from '../../../hooks/lending/useFlattenedPools'
+import type { LenderData } from '../../../hooks/lending/usePoolData'
+import { useTokenBalances } from '../../../hooks/lending/useTokenBalances'
+import { useTokenLists } from '../../../hooks/useTokenLists'
+import { computeLenderTvl } from '../../../utils/format'
+import { computePoolMetrics, resolvePoolDataItem, type SortKey } from './helpers'
+import { MarketsTable } from './MarketsTable'
+import { DepositPanel } from './DepositPanel'
+
+interface LendingPoolsTableProps {
+  chainId?: string
+  lenderData?: LenderData
+  account?: string
+}
+
+export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
+  chainId,
+  lenderData,
+  account,
+}) => {
+  // Filters
+  const [search, setSearch] = useState('')
+  const [selectedLender, setSelectedLender] = useState<string>('all')
+  const [sortKey, setSortKey] = useState<SortKey>('apr')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  // Pagination
+  const [pageSize, setPageSize] = useState<number>(5)
+  const [page, setPage] = useState<number>(1)
+
+  // Extra filters
+  const [maxUtilPct, setMaxUtilPct] = useState<string>('90')
+  const [minDepositsUsd, setMinDepositsUsd] = useState<string>('10000')
+  const [minAprPct, setMinAprPct] = useState<string>('1')
+  const [assetFilter, setAssetFilter] = useState<string>('')
+
+  // Pool selection for deposit
+  const [selectedEntry, setSelectedEntry] = useState<PoolEntry | null>(null)
+
+  const { pools, isPoolsLoading: loading } = useFlattenedPools({
+    chainId,
+    enabled: !!chainId,
+  })
+
+  const { data: chainTokens } = useTokenLists(chainId)
+
+  if (!chainId) {
+    return (
+      <div className="w-full max-w-6xl mx-auto p-4">
+        <p className="text-sm text-base-content/70">Select a chain to view lending markets.</p>
+      </div>
+    )
+  }
+
+  // Resolve selected PoolEntry -> PoolDataItem via lenderData
+  const resolvedPool = useMemo(
+    () => (selectedEntry ? resolvePoolDataItem(selectedEntry, lenderData) : null),
+    [selectedEntry, lenderData]
+  )
+
+  // Wallet balance for the selected asset
+  const selectedAssets = useMemo(
+    () => (selectedEntry ? [selectedEntry.underlyingAddress] : []),
+    [selectedEntry]
+  )
+  const { balances: walletBalances } = useTokenBalances({
+    chainId,
+    account,
+    assets: selectedAssets,
+  })
+  const selectedWalletBal = useMemo(() => {
+    if (!selectedEntry) return null
+    return walletBalances.get(selectedEntry.underlyingAddress.toLowerCase()) ?? null
+  }, [selectedEntry, walletBalances])
+
+  const lenders = useMemo(() => {
+    const keys = Array.from(new Set(pools.map((p) => p.lenderKey)))
+    return keys.sort(
+      (a, b) => computeLenderTvl(lenderData?.[b] ?? []) - computeLenderTvl(lenderData?.[a] ?? [])
+    )
+  }, [pools, lenderData])
+
+  // Filtering + sorting
+  const filteredAndSortedPools = useMemo(() => {
+    let result = pools
+
+    if (selectedLender !== 'all') {
+      result = result.filter((p) => p.lenderKey === selectedLender)
+    }
+
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter(
+        (p) =>
+          p.underlyingAddress.toLowerCase().includes(q) ||
+          p.lenderKey.toLowerCase().includes(q) ||
+          p.assetGroup.toLowerCase().includes(q)
+      )
+    }
+
+    if (assetFilter.trim()) {
+      const q = assetFilter.toLowerCase()
+      result = result.filter(
+        (p) =>
+          p.assetGroup.toLowerCase().includes(q) || p.underlyingAddress.toLowerCase().includes(q)
+      )
+    }
+
+    const maxUtil = parseFloat(maxUtilPct)
+    if (!Number.isNaN(maxUtil)) {
+      result = result.filter((p) => {
+        const { utilization } = computePoolMetrics(p)
+        return utilization * 100 <= maxUtil
+      })
+    }
+
+    const minDeps = parseFloat(minDepositsUsd)
+    if (!Number.isNaN(minDeps)) {
+      result = result.filter((p) => (parseFloat(p.totalDepositsUsd) || 0) >= minDeps)
+    }
+
+    const minApr = parseFloat(minAprPct)
+    if (!Number.isNaN(minApr)) {
+      result = result.filter((p) => {
+        const { apr } = computePoolMetrics(p)
+        return apr >= minApr
+      })
+    }
+
+    result = [...result].sort((a, b) => {
+      const metricsA = computePoolMetrics(a)
+      const metricsB = computePoolMetrics(b)
+
+      let aVal: number
+      let bVal: number
+
+      switch (sortKey) {
+        case 'apr':
+          aVal = metricsA.apr
+          bVal = metricsB.apr
+          break
+        case 'utilization':
+          aVal = metricsA.utilization
+          bVal = metricsB.utilization
+          break
+        case 'totalDepositsUSD':
+          aVal = parseFloat(a.totalDepositsUsd) || 0
+          bVal = parseFloat(b.totalDepositsUsd) || 0
+          break
+        case 'totalLiquidityUSD':
+          aVal = parseFloat(a.totalLiquidityUsd) || 0
+          bVal = parseFloat(b.totalLiquidityUsd) || 0
+          break
+        default:
+          aVal = 0
+          bVal = 0
+      }
+
+      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+
+    return result
+  }, [
+    pools,
+    search,
+    selectedLender,
+    sortKey,
+    sortDir,
+    maxUtilPct,
+    minDepositsUsd,
+    minAprPct,
+    assetFilter,
+  ])
+
+  // Pagination
+  const totalItems = filteredAndSortedPools.length
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const startIndex = (currentPage - 1) * pageSize
+  const endIndex = Math.min(startIndex + pageSize, totalItems)
+  const paginatedPools = filteredAndSortedPools.slice(startIndex, endIndex)
+
+  useEffect(() => {
+    setPage(1)
+  }, [
+    search,
+    selectedLender,
+    sortKey,
+    sortDir,
+    pageSize,
+    maxUtilPct,
+    minDepositsUsd,
+    minAprPct,
+    assetFilter,
+    chainId,
+  ])
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir('desc')
+    }
+  }
+
+  const goToPage = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages) return
+    setPage(newPage)
+  }
+
+  const handleRowClick = (entry: PoolEntry) => {
+    setSelectedEntry((prev) =>
+      prev &&
+      prev.lenderKey === entry.lenderKey &&
+      prev.underlyingAddress === entry.underlyingAddress
+        ? null
+        : entry
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-10">
+        <span className="loading loading-spinner loading-lg" />
+      </div>
+    )
+  }
+
+  const showDepositPanel = !!lenderData
+
+  return (
+    <div className="w-full max-w-6xl mx-auto p-4 space-y-4">
+      {/* Top row: title + main controls */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Lending Markets</h2>
+          <p className="text-sm text-base-content/70">
+            Flattened view of pools enriched with APR, utilization and exposure.
+          </p>
+          <p className="text-xs text-base-content/50 mt-1">{getChainName(chainId)}</p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 md:justify-end">
+          <input
+            type="text"
+            placeholder="Search asset / lender"
+            className="input input-bordered input-sm w-full md:w-64"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+
+          <select
+            className="select select-bordered select-sm"
+            value={selectedLender}
+            onChange={(e) => setSelectedLender(e.target.value)}
+          >
+            <option value="all">All lenders</option>
+            {lenders.map((l) => (
+              <option key={l} value={l}>
+                {lenderDisplayNameFull(l)}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="select select-bordered select-sm"
+            value={pageSize}
+            onChange={(e) => setPageSize(parseInt(e.target.value, 10))}
+          >
+            <option value={5}>5 / page</option>
+            <option value={20}>20 / page</option>
+            <option value={50}>50 / page</option>
+            <option value={100}>100 / page</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Numeric + asset filters row */}
+      <div className="flex flex-wrap gap-2 items-end">
+        <div className="form-control w-24">
+          <label className="label py-0">
+            <span className="label-text text-xs">Max Util (%)</span>
+          </label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            className="input input-bordered input-xs"
+            placeholder="e.g. 60"
+            value={maxUtilPct}
+            onChange={(e) => setMaxUtilPct(e.target.value)}
+          />
+        </div>
+
+        <div className="form-control w-28">
+          <label className="label py-0">
+            <span className="label-text text-xs">Min APR (%)</span>
+          </label>
+          <input
+            type="number"
+            min={0}
+            className="input input-bordered input-xs"
+            placeholder="e.g. 5"
+            value={minAprPct}
+            onChange={(e) => setMinAprPct(e.target.value)}
+          />
+        </div>
+
+        <div className="form-control w-36">
+          <label className="label py-0">
+            <span className="label-text text-xs">Min Deposits (USD)</span>
+          </label>
+          <input
+            type="number"
+            min={0}
+            className="input input-bordered input-xs"
+            placeholder="e.g. 100000"
+            value={minDepositsUsd}
+            onChange={(e) => setMinDepositsUsd(e.target.value)}
+          />
+        </div>
+
+        <div className="form-control w-36">
+          <label className="label py-0">
+            <span className="label-text text-xs">Asset (addr / symbol)</span>
+          </label>
+          <input
+            type="text"
+            className="input input-bordered input-xs"
+            placeholder="e.g. USDC, 0x..."
+            value={assetFilter}
+            onChange={(e) => setAssetFilter(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Two-column layout: table + deposit panel */}
+      <div className="flex gap-4 items-start">
+        <MarketsTable
+          pools={paginatedPools}
+          chainTokens={chainTokens}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onToggleSort={toggleSort}
+          selectedEntry={selectedEntry}
+          onRowClick={handleRowClick}
+          totalItems={totalItems}
+          startIndex={startIndex}
+          endIndex={endIndex}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onGoToPage={goToPage}
+        />
+
+        {showDepositPanel && (
+          <DepositPanel
+            selectedEntry={selectedEntry}
+            resolvedPool={resolvedPool}
+            walletBalance={selectedWalletBal}
+            account={account}
+            chainId={chainId}
+          />
+        )}
+      </div>
+    </div>
+  )
+}

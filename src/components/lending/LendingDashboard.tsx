@@ -13,6 +13,7 @@ import {
 } from './DashboardActions'
 import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'
 import { WalletConnect } from '../connect'
+import { formatUsd, abbreviateUsd, formatTokenAmount, computeLenderTvl } from '../../utils/format'
 
 interface Props {
   lenderData: LenderData | undefined
@@ -21,32 +22,6 @@ interface Props {
   account?: string
   isPublicDataLoading: boolean
   isUserDataLoading: boolean
-}
-
-function formatUsd(v: number) {
-  if (!Number.isFinite(v)) return '0'
-  return v.toLocaleString(undefined, {
-    maximumFractionDigits: v < 1000 ? 2 : 0,
-  })
-}
-
-function abbreviateUsd(v: number): string {
-  if (!Number.isFinite(v) || v === 0) return '$0'
-  const abs = Math.abs(v)
-  const sign = v < 0 ? '-' : ''
-  if (abs >= 1_000_000_000) return `${sign}$${(abs / 1_000_000_000).toFixed(2)}B`
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`
-  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`
-  return `${sign}$${abs.toFixed(2)}`
-}
-
-function formatTokenAmount(v: number | string): string {
-  const num = typeof v === 'string' ? parseFloat(v) : v
-  if (!Number.isFinite(num) || num === 0) return '0'
-  if (num < 0.0001) return '<0.0001'
-  if (num < 1) return num.toFixed(6)
-  if (num < 1000) return num.toFixed(4)
-  return num.toLocaleString(undefined, { maximumFractionDigits: 2 })
 }
 
 type SortKey = 'symbol' | 'depositApr' | 'borrowApr' | 'totalDepositsUSD' | 'totalDebtUSD' | 'totalLiquidityUSD'
@@ -83,7 +58,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
     return map
   }, [userData, chainId])
 
-  // Lenders sorted: those with balance first (by balance desc), then the rest alphabetically
+  // Lenders sorted: those with balance first (by balance desc), then the rest by TVL desc
   const lenders = useMemo(() => {
     return [...allLenderKeys].sort((a, b) => {
       const balA = lenderBalances.get(a) ?? 0
@@ -91,9 +66,9 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
       if (balA > 0 && balB > 0) return balB - balA
       if (balA > 0) return -1
       if (balB > 0) return 1
-      return lenderDisplayNameFull(a).localeCompare(lenderDisplayNameFull(b))
+      return computeLenderTvl(lenderData?.[b] ?? []) - computeLenderTvl(lenderData?.[a] ?? [])
     })
-  }, [allLenderKeys, lenderBalances])
+  }, [allLenderKeys, lenderBalances, lenderData])
 
   // Lender options for searchable dropdown (no useMemo — display names may resolve lazily)
   const lenderOptions: SearchableSelectOption[] = lenders.map((l) => ({

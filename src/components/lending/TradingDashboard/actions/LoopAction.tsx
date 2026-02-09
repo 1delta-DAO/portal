@@ -22,7 +22,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   accountId,
   onPoolSelectionChange,
 }) => {
-  const { data: tokenLists } = useTokenLists()
+  const { data: chainTokens } = useTokenLists(chainId)
 
   // Pool selections
   const [collateralPool, setCollateralPool] = useState<PoolDataItem | null>(null)
@@ -57,12 +57,12 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
     // Add native token if wrapped native is in the list
     const hasWrappedNative = assets.some(a => isWNative(a))
-    if (hasWrappedNative && tokenLists[chainId]?.[zeroAddress]) {
-      assets.unshift(tokenLists[chainId][zeroAddress] as RawCurrency)
+    if (hasWrappedNative && chainTokens[zeroAddress]) {
+      assets.unshift(chainTokens[zeroAddress] as RawCurrency)
     }
 
     return assets
-  }, [collateralPool, debtPool, tokenLists, chainId])
+  }, [collateralPool, debtPool, chainTokens])
 
   const selectedPayCurrency = payCurrencies.find(c => c.address === payCurrencyAddress) ?? null
 

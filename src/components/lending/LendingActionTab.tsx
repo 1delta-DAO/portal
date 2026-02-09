@@ -3,6 +3,7 @@ import { Address, Hex, parseUnits } from 'viem'
 import { useAccount, useWalletClient } from 'wagmi'
 import { lenderDisplayNameFull, RawCurrency } from '@1delta/lib-utils'
 import { LenderData, PoolDataItem } from '../../hooks/lending/usePoolData'
+import { sortLenderKeysByTvl } from '../../utils/format'
 import {
   fetchLendingAction,
   type LendingActionResponse,
@@ -39,9 +40,7 @@ export const LendingActionTab = ({ lenderData, chainId, actionType }: Props) => 
   const { data: signer } = useWalletClient()
   const { address: account } = useAccount()
 
-  const lenders = useMemo(() => {
-    return Object.keys(lenderData ?? {})
-  }, [lenderData])
+  const lenders = useMemo(() => sortLenderKeysByTvl(lenderData), [lenderData])
 
   const [selectedLender, setSelectedLender] = useState<string>(lenders[0] ?? '')
 
