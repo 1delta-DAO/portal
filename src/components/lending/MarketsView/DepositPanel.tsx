@@ -4,6 +4,7 @@ import type { PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry, UserSubAccount } from '../../../hooks/lending/useUserData'
 import type { TokenBalance } from '../../../hooks/lending/useTokenBalances'
+import { useSyncChain } from '../../../hooks/useSyncChain'
 import { DepositAction, WithdrawAction } from '../DashboardActions'
 import { WalletConnect } from '../../connect'
 
@@ -14,6 +15,7 @@ interface DepositPanelProps {
   resolvedPool: PoolDataItem | null
   walletBalance: TokenBalance | null
   account?: string
+  chainId?: string
   nativeToken?: RawCurrency | null
   nativeBalance?: TokenBalance | null
   subAccounts?: UserSubAccount[]
@@ -26,6 +28,7 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
   resolvedPool,
   walletBalance,
   account,
+  chainId,
   nativeToken,
   nativeBalance,
   subAccounts,
@@ -33,6 +36,8 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
   userPosition,
 }) => {
   const [actionTab, setActionTab] = useState<EarnAction>('Deposit')
+  const { syncChain, currentChainId } = useSyncChain()
+  const isWrongChain = !!account && !!chainId && currentChainId !== Number(chainId)
 
   return (
     <div className="w-72 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
@@ -88,6 +93,14 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
         <div className="w-full flex justify-center">
           <WalletConnect />
         </div>
+      ) : isWrongChain ? (
+        <button
+          type="button"
+          className="btn btn-warning btn-sm w-full"
+          onClick={() => syncChain(Number(chainId))}
+        >
+          Switch Wallet Chain
+        </button>
       ) : actionTab === 'Deposit' ? (
         <DepositAction
           pool={resolvedPool}

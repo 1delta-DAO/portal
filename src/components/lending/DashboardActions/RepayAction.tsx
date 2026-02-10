@@ -34,7 +34,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
   const needsAccount = hasSubAccounts && !selectedAccountId
 
-  const { result, loading, executing, error, fetchAction, execute, resetState } =
+  const { result, loading, executingPermission, executingMain, hasPermission, permissionDone, error, fetchAction, executePermission, executeMain, resetState } =
     useActionExecution({
       actionType: 'Repay',
       pool,
@@ -161,14 +161,25 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
         {loading ? <span className="loading loading-spinner loading-xs" /> : 'Prepare Repay'}
       </button>
 
-      {result && (
+      {result && hasPermission && !permissionDone && (
+        <button
+          type="button"
+          className="btn btn-warning btn-sm w-full"
+          disabled={executingPermission}
+          onClick={executePermission}
+        >
+          {executingPermission ? <span className="loading loading-spinner loading-xs" /> : 'Approve Permission'}
+        </button>
+      )}
+
+      {result && (!hasPermission || permissionDone) && (
         <button
           type="button"
           className="btn btn-success btn-sm w-full"
-          disabled={executing}
-          onClick={execute}
+          disabled={executingMain}
+          onClick={executeMain}
         >
-          {executing ? <span className="loading loading-spinner loading-xs" /> : 'Execute Repay'}
+          {executingMain ? <span className="loading loading-spinner loading-xs" /> : 'Execute Repay'}
         </button>
       )}
     </div>
