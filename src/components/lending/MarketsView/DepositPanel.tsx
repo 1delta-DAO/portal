@@ -1,5 +1,5 @@
 import React from 'react'
-import { lenderDisplayName } from '@1delta/lib-utils'
+import { lenderDisplayName, type RawCurrency } from '@1delta/lib-utils'
 import type { PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { TokenBalance } from '../../../hooks/lending/useTokenBalances'
@@ -11,6 +11,8 @@ interface DepositPanelProps {
   resolvedPool: PoolDataItem | null
   walletBalance: TokenBalance | null
   account?: string
+  nativeToken?: RawCurrency | null
+  nativeBalance?: TokenBalance | null
 }
 
 export const DepositPanel: React.FC<DepositPanelProps> = ({
@@ -18,6 +20,8 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
   resolvedPool,
   walletBalance,
   account,
+  nativeToken,
+  nativeBalance,
 }) => {
   return (
     <div className="w-72 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
@@ -66,6 +70,8 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
           userPosition={null}
           walletBalance={walletBalance}
           account={account}
+          nativeToken={nativeToken}
+          nativeBalance={nativeBalance}
         />
       )}
     </div>

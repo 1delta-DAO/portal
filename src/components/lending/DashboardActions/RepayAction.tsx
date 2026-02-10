@@ -1,17 +1,25 @@
 import React, { useEffect, useState } from 'react'
+import { isWNative } from '@1delta/lib-utils'
+import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
 import { formatTokenAmount, formatUsd, parseAmount, formatTokenForInput } from './format'
 import { AmountQuickButtons } from './AmountQuickButtons'
+import { NativeCurrencySelector } from './NativeCurrencySelector'
 
 export const RepayAction: React.FC<ActionPanelProps> = ({
   pool,
   userPosition,
   walletBalance,
   account,
+  nativeToken,
+  nativeBalance,
 }) => {
   const [amount, setAmount] = useState('')
   const [isAll, setIsAll] = useState(false)
+  const [useNative, setUseNative] = useState(false)
+
+  const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
   const { result, loading, executing, error, fetchAction, execute, resetState } =
     useActionExecution({
@@ -20,12 +28,14 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
       account,
       amount,
       isAll,
+      payAsset: canUseNative && useNative ? zeroAddress : undefined,
     })
 
   // Reset when pool changes
   useEffect(() => {
     setAmount('')
     setIsAll(false)
+    setUseNative(false)
     resetState()
   }, [pool?.marketUid])
 
@@ -34,6 +44,8 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
     : 0
   const currentAmount = parseAmount(amount)
   const overMax = debtToken > 0 && currentAmount > debtToken + 1e-9
+
+  const activeBal = canUseNative && useNative ? nativeBalance : walletBalance
 
   const handleQuickSelect = (val: string) => {
     setIsAll(false)
@@ -49,12 +61,23 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
 
   return (
     <div className="space-y-3">
+      {/* Native/wrapped selector */}
+      {canUseNative && nativeToken && (
+        <NativeCurrencySelector
+          wrappedSymbol={pool!.asset.symbol}
+          nativeToken={nativeToken}
+          useNative={useNative}
+          onChange={setUseNative}
+          label="Pay with"
+        />
+      )}
+
       {/* Wallet balance */}
-      {walletBalance && parseFloat(walletBalance.balance) > 0 && (
+      {activeBal && parseFloat(activeBal.balance) > 0 && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Wallet balance:</span>
           <span className="font-medium">
-            {formatTokenAmount(walletBalance.balance)} (${formatUsd(walletBalance.balanceUSD)})
+            {formatTokenAmount(activeBal.balance)} (${formatUsd(activeBal.balanceUSD)})
           </span>
         </div>
       )}

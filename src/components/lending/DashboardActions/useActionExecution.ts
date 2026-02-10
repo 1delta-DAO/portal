@@ -14,8 +14,12 @@ export function useActionExecution(params: {
   account?: string
   amount: string
   isAll: boolean
+  /** For Deposit / Repay: address of the token to pay with */
+  payAsset?: string
+  /** For Withdraw / Borrow: address of the token to receive */
+  receiveAsset?: string
 }) {
-  const { actionType, pool, account, amount, isAll } = params
+  const { actionType, pool, account, amount, isAll, payAsset, receiveAsset } = params
   const { data: signer } = useWalletClient()
 
   const [result, setResult] = useState<LendingActionResponse | null>(null)
@@ -44,6 +48,8 @@ export function useActionExecution(params: {
       actionType,
       receiver: account,
       isAll: isAll || undefined,
+      payAsset,
+      receiveAsset,
     })
 
     setLoading(false)

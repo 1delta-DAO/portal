@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { getChainName, lenderDisplayNameFull } from '@1delta/lib-utils'
+import { getChainName, isWNative, lenderDisplayNameFull } from '@1delta/lib-utils'
+import { zeroAddress } from 'viem'
 import { useFlattenedPools, type PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import type { LenderData } from '../../../hooks/lending/usePoolData'
 import { useTokenBalances } from '../../../hooks/lending/useTokenBalances'
@@ -65,11 +66,20 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     [selectedEntry, lenderData]
   )
 
-  // Wallet balance for the selected asset
-  const selectedAssets = useMemo(
-    () => (selectedEntry ? [selectedEntry.underlyingAddress] : []),
-    [selectedEntry]
+  // Whether the selected pool's underlying is wrapped native
+  const selectedIsWrappedNative = useMemo(
+    () => !!resolvedPool && isWNative(resolvedPool.asset),
+    [resolvedPool]
   )
+
+  // Wallet balance for the selected asset (include native when relevant)
+  const selectedAssets = useMemo(() => {
+    if (!selectedEntry) return []
+    const addrs = [selectedEntry.underlyingAddress]
+    if (selectedIsWrappedNative) addrs.push(zeroAddress)
+    return addrs
+  }, [selectedEntry, selectedIsWrappedNative])
+
   const { balances: walletBalances } = useTokenBalances({
     chainId,
     account,
@@ -79,6 +89,17 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     if (!selectedEntry) return null
     return walletBalances.get(selectedEntry.underlyingAddress.toLowerCase()) ?? null
   }, [selectedEntry, walletBalances])
+
+  // Native token info for the selected pool
+  const nativeToken = useMemo(() => {
+    if (!selectedIsWrappedNative) return null
+    return chainTokens[zeroAddress] ?? null
+  }, [selectedIsWrappedNative, chainTokens])
+
+  const nativeBalance = useMemo(() => {
+    if (!nativeToken) return null
+    return walletBalances.get(zeroAddress) ?? null
+  }, [nativeToken, walletBalances])
 
   const lenders = useMemo(() => {
     const keys = Array.from(new Set(pools.map((p) => p.lenderKey)))
@@ -384,6 +405,8 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
               resolvedPool={resolvedPool}
               walletBalance={selectedWalletBal}
               account={account}
+              nativeToken={nativeToken}
+              nativeBalance={nativeBalance}
             />
           </div>
         )}
@@ -405,6 +428,8 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
               resolvedPool={resolvedPool}
               walletBalance={selectedWalletBal}
               account={account}
+              nativeToken={nativeToken}
+              nativeBalance={nativeBalance}
             />
           </div>
         </div>

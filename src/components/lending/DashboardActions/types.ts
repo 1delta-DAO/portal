@@ -1,3 +1,4 @@
+import type { RawCurrency } from '@1delta/lib-utils'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry } from '../../../hooks/lending/useUserData'
 import type { TokenBalance } from '../../../hooks/lending/useTokenBalances'
@@ -12,6 +13,10 @@ export interface ActionPanelProps {
   account?: string
   /** Sub-account ID for lenders with multiple sub-accounts (e.g. INIT) */
   accountId?: string
+  /** Native token info (from chainTokens[zeroAddress]), only provided when pool asset is wrapped native */
+  nativeToken?: RawCurrency | null
+  /** Native token wallet balance */
+  nativeBalance?: TokenBalance | null
 }
 
 export interface ActionState {

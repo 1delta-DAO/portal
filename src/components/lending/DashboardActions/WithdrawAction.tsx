@@ -1,17 +1,24 @@
 import React, { useEffect, useState } from 'react'
+import { isWNative } from '@1delta/lib-utils'
+import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
 import { formatTokenAmount, formatUsd, parseAmount, formatTokenForInput } from './format'
 import { AmountQuickButtons } from './AmountQuickButtons'
+import { NativeCurrencySelector } from './NativeCurrencySelector'
 
 export const WithdrawAction: React.FC<ActionPanelProps> = ({
   pool,
   userPosition,
   walletBalance,
   account,
+  nativeToken,
 }) => {
   const [amount, setAmount] = useState('')
   const [isAll, setIsAll] = useState(false)
+  const [useNative, setUseNative] = useState(false)
+
+  const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
   const { result, loading, executing, error, fetchAction, execute, resetState } =
     useActionExecution({
@@ -20,12 +27,14 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
       account,
       amount,
       isAll,
+      receiveAsset: canUseNative && useNative ? zeroAddress : undefined,
     })
 
   // Reset when pool changes
   useEffect(() => {
     setAmount('')
     setIsAll(false)
+    setUseNative(false)
     resetState()
   }, [pool?.marketUid])
 
@@ -48,6 +57,17 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
 
   return (
     <div className="space-y-3">
+      {/* Native/wrapped selector */}
+      {canUseNative && nativeToken && (
+        <NativeCurrencySelector
+          wrappedSymbol={pool!.asset.symbol}
+          nativeToken={nativeToken}
+          useNative={useNative}
+          onChange={setUseNative}
+          label="Receive as"
+        />
+      )}
+
       {/* Available balance */}
       {userPosition && depositsToken > 0 && (
         <div className="text-xs flex justify-between px-1">
