@@ -3,6 +3,7 @@ import { getChainName, isWNative, lenderDisplayNameFull } from '@1delta/lib-util
 import { zeroAddress } from 'viem'
 import { useFlattenedPools, type PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import type { LenderData } from '../../../hooks/lending/usePoolData'
+import type { UserDataResult } from '../../../hooks/lending/useUserData'
 import { useTokenBalances } from '../../../hooks/lending/useTokenBalances'
 import { useTokenLists } from '../../../hooks/useTokenLists'
 import { computeLenderTvl } from '../../../utils/format'
@@ -15,6 +16,7 @@ interface LendingPoolsTableProps {
   lenderData?: LenderData
   account?: string
   externalAssetFilter?: string
+  userData?: UserDataResult
 }
 
 export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
@@ -22,6 +24,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   lenderData,
   account,
   externalAssetFilter,
+  userData,
 }) => {
   // Filters
   const [search, setSearch] = useState('')
@@ -100,6 +103,28 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     if (!nativeToken) return null
     return walletBalances.get(zeroAddress) ?? null
   }, [nativeToken, walletBalances])
+
+  // Sub-accounts for the selected entry's lender (for deposit sub-account selector)
+  const selectedSubAccounts = useMemo(() => {
+    if (!selectedEntry || !userData?.raw) return []
+    const entry = userData.raw.find(
+      (e) => e.chainId === chainId && e.lender === selectedEntry.lenderKey
+    )
+    return entry?.data ?? []
+  }, [selectedEntry, userData, chainId])
+
+  // User position for the selected pool (first sub-account with a matching position)
+  const selectedUserPosition = useMemo(() => {
+    if (!resolvedPool || selectedSubAccounts.length === 0) return null
+    for (const sub of selectedSubAccounts) {
+      for (const pos of sub.positions) {
+        if (typeof pos === 'object' && pos !== null && pos.marketUid === resolvedPool.marketUid) {
+          return pos
+        }
+      }
+    }
+    return null
+  }, [resolvedPool, selectedSubAccounts])
 
   const lenders = useMemo(() => {
     const keys = Array.from(new Set(pools.map((p) => p.lenderKey)))
@@ -397,7 +422,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
           onGoToPage={goToPage}
         />
 
-        {/* Desktop deposit panel — hidden on mobile */}
+        {/* Desktop action panel — hidden on mobile */}
         {showDepositPanel && (
           <div className="hidden md:block">
             <DepositPanel
@@ -407,6 +432,9 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
               account={account}
               nativeToken={nativeToken}
               nativeBalance={nativeBalance}
+              subAccounts={selectedSubAccounts}
+              lenderKey={selectedEntry?.lenderKey}
+              userPosition={selectedUserPosition}
             />
           </div>
         )}
@@ -430,6 +458,9 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
               account={account}
               nativeToken={nativeToken}
               nativeBalance={nativeBalance}
+              subAccounts={selectedSubAccounts}
+              lenderKey={selectedEntry?.lenderKey}
+              userPosition={selectedUserPosition}
             />
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Address, Hex, parseUnits } from 'viem'
 import { useWalletClient } from 'wagmi'
+import { useQueryClient } from '@tanstack/react-query'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import {
   fetchLendingAction,
@@ -18,9 +19,14 @@ export function useActionExecution(params: {
   payAsset?: string
   /** For Withdraw / Borrow: address of the token to receive */
   receiveAsset?: string
+  /** Sub-account ID for multi-account lenders */
+  accountId?: string
+  /** Chain ID string for query invalidation */
+  chainId?: string
 }) {
-  const { actionType, pool, account, amount, isAll, payAsset, receiveAsset } = params
+  const { actionType, pool, account, amount, isAll, payAsset, receiveAsset, accountId, chainId } = params
   const { data: signer } = useWalletClient()
+  const queryClient = useQueryClient()
 
   const [result, setResult] = useState<LendingActionResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -50,6 +56,7 @@ export function useActionExecution(params: {
       isAll: isAll || undefined,
       payAsset,
       receiveAsset,
+      accountId,
     })
 
     setLoading(false)
@@ -78,6 +85,12 @@ export function useActionExecution(params: {
         data: result.transaction.data as Hex,
         value: BigInt(result.transaction.value ?? 0),
       })
+
+      // Invalidate all user-scoped queries for this chain after successful tx
+      const cid = chainId ?? String(signer.chain.id)
+      queryClient.invalidateQueries({ queryKey: ['userData', cid, account] })
+      queryClient.invalidateQueries({ queryKey: ['tokenBalances', cid, account], exact: false })
+      queryClient.invalidateQueries({ queryKey: ['lendingBalances', cid, account] })
     } catch (e: any) {
       console.error('Execution failed:', e)
       setError(e.message ?? 'Transaction failed')

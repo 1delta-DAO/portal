@@ -1,10 +1,13 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { lenderDisplayName, type RawCurrency } from '@1delta/lib-utils'
 import type { PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
+import type { UserPositionEntry, UserSubAccount } from '../../../hooks/lending/useUserData'
 import type { TokenBalance } from '../../../hooks/lending/useTokenBalances'
-import { DepositAction } from '../DashboardActions'
+import { DepositAction, WithdrawAction } from '../DashboardActions'
 import { WalletConnect } from '../../connect'
+
+type EarnAction = 'Deposit' | 'Withdraw'
 
 interface DepositPanelProps {
   selectedEntry: PoolEntry | null
@@ -13,6 +16,9 @@ interface DepositPanelProps {
   account?: string
   nativeToken?: RawCurrency | null
   nativeBalance?: TokenBalance | null
+  subAccounts?: UserSubAccount[]
+  lenderKey?: string
+  userPosition?: UserPositionEntry | null
 }
 
 export const DepositPanel: React.FC<DepositPanelProps> = ({
@@ -22,10 +28,28 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
   account,
   nativeToken,
   nativeBalance,
+  subAccounts,
+  lenderKey,
+  userPosition,
 }) => {
+  const [actionTab, setActionTab] = useState<EarnAction>('Deposit')
+
   return (
     <div className="w-72 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
-      <h3 className="text-sm font-semibold">Deposit</h3>
+      {/* Deposit / Withdraw tabs */}
+      <div role="tablist" className="tabs tabs-boxed tabs-xs">
+        {(['Deposit', 'Withdraw'] as EarnAction[]).map((t) => (
+          <button
+            key={t}
+            type="button"
+            role="tab"
+            className={`tab ${actionTab === t ? 'tab-active' : ''}`}
+            onClick={() => setActionTab(t)}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
 
       {/* Selected asset display */}
       {resolvedPool ? (
@@ -59,19 +83,32 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
         </div>
       )}
 
-      {/* Deposit action */}
+      {/* Action component */}
       {!account ? (
         <div className="w-full flex justify-center">
           <WalletConnect />
         </div>
-      ) : (
+      ) : actionTab === 'Deposit' ? (
         <DepositAction
           pool={resolvedPool}
-          userPosition={null}
+          userPosition={userPosition ?? null}
           walletBalance={walletBalance}
           account={account}
           nativeToken={nativeToken}
           nativeBalance={nativeBalance}
+          subAccounts={subAccounts}
+          lenderKey={lenderKey}
+        />
+      ) : (
+        <WithdrawAction
+          pool={resolvedPool}
+          userPosition={userPosition ?? null}
+          walletBalance={walletBalance}
+          account={account}
+          nativeToken={nativeToken}
+          nativeBalance={nativeBalance}
+          subAccounts={subAccounts}
+          lenderKey={lenderKey}
         />
       )}
     </div>

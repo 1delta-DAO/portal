@@ -166,6 +166,7 @@ export function LenderTab() {
             lenderData={lenderData}
             account={account}
             externalAssetFilter={externalAssetFilter}
+            userData={userData}
           />
         </div>
       )}

@@ -6,19 +6,32 @@ import { useActionExecution } from './useActionExecution'
 import { formatTokenAmount, formatUsd, parseAmount, formatTokenForInput } from './format'
 import { AmountQuickButtons } from './AmountQuickButtons'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
+import { SubAccountSelector } from './SubAccountSelector'
+import { lenderSupportsSubAccounts } from './helpers'
 
 export const WithdrawAction: React.FC<ActionPanelProps> = ({
   pool,
   userPosition,
   walletBalance,
   account,
+  accountId,
+  subAccounts,
+  lenderKey,
   nativeToken,
 }) => {
   const [amount, setAmount] = useState('')
   const [isAll, setIsAll] = useState(false)
   const [useNative, setUseNative] = useState(false)
 
+  const hasSubAccounts = lenderSupportsSubAccounts(lenderKey)
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(accountId ?? null)
+
+  useEffect(() => {
+    setSelectedAccountId(accountId ?? null)
+  }, [accountId])
+
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
+  const needsAccount = hasSubAccounts && !selectedAccountId
 
   const { result, loading, executing, error, fetchAction, execute, resetState } =
     useActionExecution({
@@ -28,6 +41,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
       amount,
       isAll,
       receiveAsset: canUseNative && useNative ? zeroAddress : undefined,
+      accountId: hasSubAccounts ? selectedAccountId ?? undefined : undefined,
     })
 
   // Reset when pool changes
@@ -57,6 +71,16 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
 
   return (
     <div className="space-y-3">
+      {/* Sub-account selector */}
+      {hasSubAccounts && (
+        <SubAccountSelector
+          subAccounts={subAccounts ?? []}
+          selectedAccountId={selectedAccountId}
+          onChange={setSelectedAccountId}
+          allowCreate={false}
+        />
+      )}
+
       {/* Native/wrapped selector */}
       {canUseNative && nativeToken && (
         <NativeCurrencySelector
@@ -117,7 +141,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
       <button
         type="button"
         className="btn btn-primary btn-sm w-full"
-        disabled={loading || !pool || !account}
+        disabled={loading || !pool || !account || needsAccount}
         onClick={fetchAction}
       >
         {loading ? <span className="loading loading-spinner loading-xs" /> : 'Prepare Withdraw'}

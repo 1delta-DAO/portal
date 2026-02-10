@@ -648,16 +648,16 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
           ) : (
             <>
               {actionTab === 'Deposit' && (
-                <DepositAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} nativeToken={nativeToken} nativeBalance={nativeBalance} />
+                <DepositAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />
               )}
               {actionTab === 'Withdraw' && (
-                <WithdrawAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} nativeToken={nativeToken} nativeBalance={nativeBalance} />
+                <WithdrawAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />
               )}
               {actionTab === 'Borrow' && (
-                <BorrowAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} nativeToken={nativeToken} nativeBalance={nativeBalance} />
+                <BorrowAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />
               )}
               {actionTab === 'Repay' && (
-                <RepayAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} nativeToken={nativeToken} nativeBalance={nativeBalance} />
+                <RepayAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />
               )}
             </>
           )}
@@ -693,10 +693,10 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
                 <button type="button" className="btn btn-warning btn-sm w-full" onClick={() => syncChain(Number(chainId))}>Switch Wallet Chain</button>
               ) : (
                 <>
-                  {actionTab === 'Deposit' && <DepositAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} nativeToken={nativeToken} nativeBalance={nativeBalance} />}
-                  {actionTab === 'Withdraw' && <WithdrawAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} nativeToken={nativeToken} nativeBalance={nativeBalance} />}
-                  {actionTab === 'Borrow' && <BorrowAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} nativeToken={nativeToken} nativeBalance={nativeBalance} />}
-                  {actionTab === 'Repay' && <RepayAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} nativeToken={nativeToken} nativeBalance={nativeBalance} />}
+                  {actionTab === 'Deposit' && <DepositAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />}
+                  {actionTab === 'Withdraw' && <WithdrawAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />}
+                  {actionTab === 'Borrow' && <BorrowAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />}
+                  {actionTab === 'Repay' && <RepayAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />}
                 </>
               )}
             </div>

@@ -14,7 +14,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-base-200 text-base-content">
-      <div className="navbar bg-base-100 shadow-lg">
+      <div className="navbar bg-base-100 shadow-lg fixed top-0 left-0 right-0 z-50">
         <div className="flex flex-row p-2 grow">
           <div className="flex-1">
             <div className="flex items-center space-x-2">
@@ -33,7 +33,7 @@ export default function App() {
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto pt-24 pb-8 px-4 sm:px-6 lg:px-8">
         <div className="space-y-4 flex flex-col items-center">
 
           <div className="w-full min-w-[300px]">

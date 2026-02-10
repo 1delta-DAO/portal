@@ -6,17 +6,30 @@ import { useActionExecution } from './useActionExecution'
 import { formatTokenAmount, formatUsd } from './format'
 import { AmountQuickButtons } from './AmountQuickButtons'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
+import { SubAccountSelector } from './SubAccountSelector'
+import { lenderSupportsSubAccounts } from './helpers'
 
 export const DepositAction: React.FC<ActionPanelProps> = ({
   pool,
   userPosition,
   walletBalance,
   account,
+  accountId,
+  subAccounts,
+  lenderKey,
   nativeToken,
   nativeBalance,
 }) => {
   const [amount, setAmount] = useState('')
   const [useNative, setUseNative] = useState(false)
+
+  const hasSubAccounts = lenderSupportsSubAccounts(lenderKey)
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(accountId ?? null)
+
+  // Sync with parent's accountId when it changes
+  useEffect(() => {
+    setSelectedAccountId(accountId ?? null)
+  }, [accountId])
 
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
@@ -28,6 +41,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       amount,
       isAll: false,
       payAsset: canUseNative && useNative ? zeroAddress : undefined,
+      accountId: hasSubAccounts ? selectedAccountId ?? undefined : undefined,
     })
 
   // Reset when pool changes
@@ -42,6 +56,16 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
 
   return (
     <div className="space-y-3">
+      {/* Sub-account selector */}
+      {hasSubAccounts && (
+        <SubAccountSelector
+          subAccounts={subAccounts ?? []}
+          selectedAccountId={selectedAccountId}
+          onChange={setSelectedAccountId}
+          allowCreate
+        />
+      )}
+
       {/* Native/wrapped selector */}
       {canUseNative && nativeToken && (
         <NativeCurrencySelector

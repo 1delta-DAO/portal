@@ -8,6 +8,7 @@ export interface LendingActionParams {
   receiveAsset?: string
   isAll?: boolean
   lendingMode?: string
+  accountId?: string
 }
 
 export interface LendingTransaction {
@@ -45,6 +46,7 @@ export async function fetchLendingAction(
     if (params.receiveAsset) qs.set('receiveAsset', params.receiveAsset)
     if (params.isAll != null) qs.set('isAll', String(params.isAll))
     if (params.lendingMode) qs.set('lendingMode', params.lendingMode)
+    if (params.accountId) qs.set('accountId', params.accountId)
 
     const res = await fetch(`${LENDING_ACTIONS_BASE}/${action}?${qs}`)
 
