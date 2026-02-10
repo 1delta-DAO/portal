@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 
 // @ts-ignore
-const BACKEND_BASE_URL = `https://beta.data.1delta.io` // import.meta.env.VITE_MARGIN_API_URL
-const endpointLendingLatest = `${BACKEND_BASE_URL}/lending/latest?chains=`
+const BACKEND_BASE_URL = `https://portal.1delta.io` // import.meta.env.VITE_MARGIN_API_URL
+const endpointLendingLatest = `${BACKEND_BASE_URL}/v1/data/lending/latest?chains=`
 
 // ============================================================================
 // Types for the /lending/latest API response (flat array)

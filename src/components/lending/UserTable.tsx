@@ -5,9 +5,11 @@ import type { RawCurrency } from '@1delta/lib-utils'
 import type {
   UserDataResult,
   LenderUserDataEntry,
+  UserSubAccount,
   UserPositionEntry,
 } from '../../hooks/lending/useUserData'
 import { useTokenLists } from '../../hooks/useTokenLists'
+import { abbreviateUsd } from '../../utils/format'
 
 interface UserLenderPositionsTableProps {
   account?: string
@@ -42,17 +44,15 @@ function getActiveLenders(raw: LenderUserDataEntry[] | undefined): LenderUserDat
 
 type TaggedPosition = UserPositionEntry & { tag: 'collateral' | 'debt' }
 
-/** Collect all positions across sub-accounts with collateral/debt tags */
-function collectPositions(entry: LenderUserDataEntry): TaggedPosition[] {
+/** Collect positions from a single sub-account with collateral/debt tags */
+function collectSubAccountPositions(sub: UserSubAccount): TaggedPosition[] {
   const result: TaggedPosition[] = []
-  for (const sub of entry.data) {
-    for (const pos of extractPositions(sub.positions)) {
-      if (Number(pos.deposits) > 0) {
-        result.push({ ...pos, tag: 'collateral' })
-      }
-      if (Number(pos.debt) > 0) {
-        result.push({ ...pos, tag: 'debt' })
-      }
+  for (const pos of extractPositions(sub.positions)) {
+    if (Number(pos.deposits) > 0) {
+      result.push({ ...pos, tag: 'collateral' })
+    }
+    if (Number(pos.debt) > 0) {
+      result.push({ ...pos, tag: 'debt' })
     }
   }
   return result
@@ -97,6 +97,23 @@ const PositionsList: React.FC<{ positions: TaggedPosition[]; tokens: Record<stri
         )
       })}
     </div>
+  )
+}
+
+function HealthBadge({ health }: { health: number | null }) {
+  if (health == null) return <span className="text-xs text-base-content/50">n/a</span>
+  return (
+    <span
+      className={`badge badge-sm ${
+        health < 1.1
+          ? 'badge-error'
+          : health < 1.3
+            ? 'badge-warning'
+            : 'badge-success'
+      }`}
+    >
+      {health.toFixed(2)}
+    </span>
   )
 }
 
@@ -160,7 +177,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
         <div>
           <h2 className="text-2xl font-bold">Your Lending Positions</h2>
           <p className="text-sm text-base-content/70">
-            Grouped by lender and chain, including positions and 24h change.
+            Grouped by lender, with sub-accounts shown separately.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 md:justify-end items-center">
@@ -214,87 +231,108 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
         </div>
       )}
 
-      {/* Per-lender table */}
+      {/* Per-lender groups with sub-account rows */}
       <div className="rounded-box border border-base-300 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="table table-zebra table-sm w-full">
             <thead>
               <tr>
-                <th>Lender</th>
-                <th>Net Worth</th>
-                <th>24h Change</th>
+                <th>Lender / Account</th>
+                <th>NAV</th>
+                <th>Deposits</th>
+                <th>Debt</th>
                 <th>APR</th>
                 <th>Health</th>
-                <th>Leverage</th>
                 <th>Positions</th>
               </tr>
             </thead>
             <tbody>
               {lenderEntries.map((entry) => {
-                const pnl24h = entry.netWorth - entry.netWorth24h
-                const positions = collectPositions(entry)
+                const subs = entry.data.filter(
+                  (sub) => extractPositions(sub.positions).length > 0 || sub.balanceData.nav !== 0
+                )
+                const hasSingleSub = subs.length <= 1
 
                 return (
-                  <tr key={`${entry.chainId}-${entry.lender}`}>
-                    <td>
-                      <div className="flex flex-col text-xs">
-                        <span className="font-semibold">
-                          {lenderDisplayName(entry.lender)}
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="text-xs font-semibold">
-                        ${formatUsd(entry.netWorth)}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="flex flex-col text-xs">
-                        <span>${formatUsd(entry.netWorth24h)}</span>
-                        {entry.netWorth24h !== 0 && (
-                          <span
-                            className={pnl24h >= 0 ? 'text-success' : 'text-error'}
-                          >
-                            {((pnl24h / entry.netWorth24h) * 100).toFixed(2)}%
+                  <React.Fragment key={`${entry.chainId}-${entry.lender}`}>
+                    {/* Lender header row */}
+                    <tr className="bg-base-200/50">
+                      <td colSpan={hasSingleSub ? 1 : 7}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm">
+                            {lenderDisplayName(entry.lender)}
                           </span>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <span className="text-xs font-semibold">
-                        {entry.netApr.toFixed(2)}%
-                      </span>
-                    </td>
-                    <td>
-                      {entry.healthFactor != null ? (
-                        <span
-                          className={`badge badge-sm ${
-                            entry.healthFactor < 1.1
-                              ? 'badge-error'
-                              : entry.healthFactor < 1.3
-                                ? 'badge-warning'
-                                : 'badge-success'
-                          }`}
-                        >
-                          {entry.healthFactor.toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-base-content/50">n/a</span>
+                          {!hasSingleSub && (
+                            <span className="text-xs text-base-content/50">
+                              {subs.length} accounts
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      {hasSingleSub && (
+                        <>
+                          <td className="text-xs font-semibold">
+                            ${abbreviateUsd(entry.netWorth)}
+                          </td>
+                          <td className="text-xs">
+                            ${abbreviateUsd(entry.totalDepositsUSD)}
+                          </td>
+                          <td className="text-xs">
+                            ${abbreviateUsd(entry.totalDebtUSD)}
+                          </td>
+                          <td className="text-xs font-semibold">
+                            {entry.netApr.toFixed(2)}%
+                          </td>
+                          <td>
+                            <HealthBadge health={entry.healthFactor} />
+                          </td>
+                          <td>
+                            <PositionsList
+                              positions={collectSubAccountPositions(subs[0] ?? entry.data[0])}
+                              tokens={tokens}
+                            />
+                          </td>
+                        </>
                       )}
-                    </td>
-                    <td>
-                      {entry.leverage > 1 ? (
-                        <span className="badge badge-outline badge-sm">
-                          {entry.leverage.toFixed(2)}x
-                        </span>
-                      ) : (
-                        <span className="text-xs text-base-content/50">n/a</span>
-                      )}
-                    </td>
-                    <td>
-                      <PositionsList positions={positions} tokens={tokens} />
-                    </td>
-                  </tr>
+                    </tr>
+
+                    {/* Sub-account rows (only when multiple) */}
+                    {!hasSingleSub &&
+                      subs.map((sub, idx) => {
+                        const positions = collectSubAccountPositions(sub)
+                        const bal = sub.balanceData
+                        return (
+                          <tr key={sub.accountId}>
+                            <td className="pl-6">
+                              <span className="text-xs font-medium text-base-content/70">
+                                #{idx + 1}
+                              </span>
+                              <span className="text-[10px] text-base-content/40 ml-1" title={sub.accountId}>
+                                {sub.accountId.slice(0, 8)}...
+                              </span>
+                            </td>
+                            <td className="text-xs font-semibold">
+                              ${abbreviateUsd(bal.nav)}
+                            </td>
+                            <td className="text-xs">
+                              ${abbreviateUsd(bal.deposits)}
+                            </td>
+                            <td className="text-xs">
+                              ${abbreviateUsd(bal.debt)}
+                            </td>
+                            <td className="text-xs font-semibold">
+                              {sub.aprData.apr.toFixed(2)}%
+                            </td>
+                            <td>
+                              <HealthBadge health={sub.health} />
+                            </td>
+                            <td>
+                              <PositionsList positions={positions} tokens={tokens} />
+                            </td>
+                          </tr>
+                        )
+                      })}
+                  </React.Fragment>
                 )
               })}
             </tbody>

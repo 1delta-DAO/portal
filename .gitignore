@@ -5,3 +5,4 @@ node_modules/
 broadcast/
 dist/
 .claude
+*.tsbuildinfo

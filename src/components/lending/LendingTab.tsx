@@ -32,9 +32,6 @@ export function LenderTab() {
 
   const effectiveChainId = selectedChain
 
-  // Sub-tab within "earn": 'assets' (default) | 'positions'
-  const [earnSubTab, setEarnSubTab] = useState<'assets' | 'positions'>('assets')
-
   // Filter markets to owned assets toggle
   const [filterOwned, setFilterOwned] = useState(false)
 
@@ -112,55 +109,24 @@ export function LenderTab() {
       {activeTab === 'earn' && (
         <div className="space-y-4">
           {account && (
-            <div className="space-y-3">
-              {/* Sub-tabs styled as segmented control — visually distinct from main tabs */}
-              <div className="flex items-center gap-1 bg-base-200 rounded-lg p-1 w-fit">
-                <button
-                  type="button"
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                    earnSubTab === 'assets'
-                      ? 'bg-base-100 shadow-sm text-base-content'
-                      : 'text-base-content/60 hover:text-base-content'
-                  }`}
-                  onClick={() => setEarnSubTab('assets')}
-                >
-                  Your Assets
-                </button>
-                <button
-                  type="button"
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                    earnSubTab === 'positions'
-                      ? 'bg-base-100 shadow-sm text-base-content'
-                      : 'text-base-content/60 hover:text-base-content'
-                  }`}
-                  onClick={() => setEarnSubTab('positions')}
-                >
-                  Your Lending Positions
-                </button>
-              </div>
-
-              {earnSubTab === 'assets' && (
-                <UserAssetsTable
-                  balances={lendingBalances}
-                  isLoading={isLendingBalancesLoading}
-                  error={lendingBalancesError}
-                  tokens={tokens}
-                  filterOwned={filterOwned}
-                  onFilterOwnedChange={setFilterOwned}
-                />
-              )}
-
-              {earnSubTab === 'positions' && (
-                <UserLenderPositionsTable
-                  account={account}
-                  chainId={effectiveChainId}
-                  userData={userData}
-                  isLoading={isLoading}
-                  error={error}
-                  refetch={refetch}
-                />
-              )}
-            </div>
+            <>
+              <UserAssetsTable
+                balances={lendingBalances}
+                isLoading={isLendingBalancesLoading}
+                error={lendingBalancesError}
+                tokens={tokens}
+                filterOwned={filterOwned}
+                onFilterOwnedChange={setFilterOwned}
+              />
+              <UserLenderPositionsTable
+                account={account}
+                chainId={effectiveChainId}
+                userData={userData}
+                isLoading={isLoading}
+                error={error}
+                refetch={refetch}
+              />
+            </>
           )}
           <LendingPoolsTable
             chainId={effectiveChainId}

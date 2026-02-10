@@ -3,15 +3,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 export function WalletConnect() {
   return (
     <ConnectButton.Custom>
-      {({
-        account,
-        chain,
-        openAccountModal,
-        openChainModal,
-        openConnectModal,
-        mounted,
-        authenticationStatus,
-      }) => {
+      {({ account, chain, openAccountModal, openConnectModal, mounted, authenticationStatus }) => {
         const ready = mounted && authenticationStatus !== 'loading'
         const connected =
           ready &&
