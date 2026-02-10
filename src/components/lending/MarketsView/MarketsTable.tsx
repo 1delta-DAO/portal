@@ -100,10 +100,10 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                 Utilization{sortIndicator('utilization')}
               </th>
               <th className="cursor-pointer" onClick={() => onToggleSort('totalDepositsUSD')}>
-                Deposits (USD){sortIndicator('totalDepositsUSD')}
+                Deposits{sortIndicator('totalDepositsUSD')}
               </th>
               <th className="cursor-pointer" onClick={() => onToggleSort('totalLiquidityUSD')}>
-                Liquidity (USD){sortIndicator('totalLiquidityUSD')}
+                Liquidity{sortIndicator('totalLiquidityUSD')}
               </th>
               <th>Price</th>
               <th>Exposures</th>

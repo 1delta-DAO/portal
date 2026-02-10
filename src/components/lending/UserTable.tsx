@@ -272,13 +272,13 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                       {hasSingleSub && (
                         <>
                           <td className="text-xs font-semibold">
-                            ${abbreviateUsd(entry.netWorth)}
+                            {abbreviateUsd(entry.netWorth)}
                           </td>
                           <td className="text-xs">
-                            ${abbreviateUsd(entry.totalDepositsUSD)}
+                            {abbreviateUsd(entry.totalDepositsUSD)}
                           </td>
                           <td className="text-xs">
-                            ${abbreviateUsd(entry.totalDebtUSD)}
+                            {abbreviateUsd(entry.totalDebtUSD)}
                           </td>
                           <td className="text-xs font-semibold">
                             {entry.netApr.toFixed(2)}%
@@ -312,13 +312,13 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                               </span>
                             </td>
                             <td className="text-xs font-semibold">
-                              ${abbreviateUsd(bal.nav)}
+                              {abbreviateUsd(bal.nav)}
                             </td>
                             <td className="text-xs">
-                              ${abbreviateUsd(bal.deposits)}
+                              {abbreviateUsd(bal.deposits)}
                             </td>
                             <td className="text-xs">
-                              ${abbreviateUsd(bal.debt)}
+                              {abbreviateUsd(bal.debt)}
                             </td>
                             <td className="text-xs font-semibold">
                               {sub.aprData.apr.toFixed(2)}%
