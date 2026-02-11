@@ -9,9 +9,8 @@ interface OracleData {
 export async function fetchMainPrices(): Promise<OracleData> {
   try {
     const pricesRaw = await fetch(WORKER_ENDPOINT + '0')
-    const priceDataRaw = await pricesRaw.json()
-    const priceData = priceDataRaw.prices
-    return priceData
+    const envelope = await pricesRaw.json()
+    return envelope.data?.prices ?? {}
   } catch {
     console.log('failedprice fetch')
     return {}
@@ -21,9 +20,8 @@ export async function fetchMainPrices(): Promise<OracleData> {
 export async function fetchMainPricesHist(): Promise<OracleData> {
   try {
     const pricesRaw = await fetch(WORKER_ENDPOINT + '24')
-    const priceDataRaw = await pricesRaw.json()
-    const priceData = priceDataRaw.prices
-    return priceData
+    const envelope = await pricesRaw.json()
+    return envelope.data?.prices ?? {}
   } catch {
     console.log('failed hist price fetch')
     return {}

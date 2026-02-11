@@ -141,7 +141,7 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
 
       {permissions.map((tx, i) => (
         <button key={i} type="button" className="btn btn-outline btn-sm w-full" onClick={() => executePermission(tx)}>
-          {tx.info || 'Approve'}
+          {tx.description || 'Approve'}
         </button>
       ))}
 

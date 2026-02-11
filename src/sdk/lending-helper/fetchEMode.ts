@@ -38,7 +38,12 @@ export async function fetchEModeList(params: {
     }
 
     const json = await res.json()
-    const rawEntries: any[] = json.data ?? []
+
+    if (!json.success) {
+      return { success: false, error: json.error?.message ?? 'API error' }
+    }
+
+    const rawEntries: any[] = json.data?.data ?? []
 
     // Normalize from API shape (lenderKey/eModes/category) to our types
     const data: EModeLenderEntry[] = rawEntries.map((entry: any) => ({
@@ -122,7 +127,12 @@ export async function fetchEModeAnalysis(params: {
     }
 
     const json = await res.json()
-    const rawAnalysis: any[] = json.data ?? json
+
+    if (!json.success) {
+      return { success: false, error: json.error?.message ?? 'API error' }
+    }
+
+    const rawAnalysis: any[] = json.data?.data ?? json.data ?? []
 
     // Normalize from API shape (category → modeId)
     const data: EModeAnalysisEntry[] = rawAnalysis.map((e: any) => ({
@@ -174,9 +184,15 @@ export async function fetchEModeSwitch(params: {
     }
 
     const json = await res.json()
+
+    if (!json.success) {
+      return { success: false, error: json.error?.message ?? 'API error' }
+    }
+
+    const tx = json.actions?.transactions?.[0]
     return {
       success: true,
-      data: { to: json.to, data: json.data, value: json.value ?? '0' },
+      data: tx ? { to: tx.to, data: tx.data, value: tx.value ?? '0' } : undefined,
     }
   } catch (err: any) {
     return { success: false, error: err?.message ?? 'Unknown error' }

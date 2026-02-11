@@ -96,9 +96,12 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
           throw new Error(`HTTP ${res.status}: ${text || res.statusText}`)
         }
 
-        const data = await res.json()
-        const quotes = normalizeQuotes(operation, data.quotes ?? [])
-        const permissions: Tx[] = data.permissionTxns ?? []
+        const envelope = await res.json()
+        if (!envelope.success) {
+          throw new Error(envelope.error?.message ?? 'API error')
+        }
+        const quotes = normalizeQuotes(operation, envelope.data?.quotes ?? [])
+        const permissions: Tx[] = envelope.actions?.permissions ?? []
 
         setState((s) => ({
           ...s,

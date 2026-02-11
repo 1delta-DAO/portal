@@ -15,10 +15,8 @@ import { useSimulatedLenderSelections } from '../../hooks/lending/useSimulatedLe
 import type { SimulatedActionState } from '../../contexts/Simulation/simulateLenderSelections'
 import { RunningBalancesOverview } from './RunningBlanacesOverview'
 import { useAccount } from 'wagmi'
-import {
-  fetchAllocateAction,
-  type AllocateResponseData,
-} from '../../sdk/lending-helper/fetchAllocateAction'
+import { fetchAllocateAction } from '../../sdk/lending-helper/fetchAllocateAction'
+import type { ApiActions } from '../../sdk/lending-helper/fetchFromApi'
 
 interface LenderOperationsBuilderProps {
   chainId: string
@@ -61,7 +59,7 @@ const LenderOperationsBuilderInner: React.FC<{
     return map
   }, [steps])
 
-  const [allocateResult, setAllocateResult] = useState<AllocateResponseData | null>(null)
+  const [allocateResult, setAllocateResult] = useState<ApiActions | null>(null)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [executing, setExecuting] = useState(false)
 
@@ -98,7 +96,7 @@ const LenderOperationsBuilderInner: React.FC<{
         return
       }
 
-      setAllocateResult(response.data ?? null)
+      setAllocateResult(response.actions ?? null)
       setFetchError(null)
     }
 
@@ -113,7 +111,7 @@ const LenderOperationsBuilderInner: React.FC<{
 
     setExecuting(true)
     try {
-      for (const perm of allocateResult.permissionTxns) {
+      for (const perm of allocateResult.permissions) {
         const { ok, error: txError } = await send(perm)
         if (!ok) {
           setFetchError(txError ?? 'Permission transaction failed')
@@ -121,13 +119,12 @@ const LenderOperationsBuilderInner: React.FC<{
         }
       }
 
-      const { ok, error: txError } = await send({
-        to: account,
-        data: allocateResult.data,
-        value: allocateResult.value ?? '0',
-      })
-      if (!ok) {
-        setFetchError(txError ?? 'Transaction failed')
+      for (const tx of allocateResult.transactions) {
+        const { ok, error: txError } = await send(tx)
+        if (!ok) {
+          setFetchError(txError ?? 'Transaction failed')
+          return
+        }
       }
     } finally {
       setExecuting(false)

@@ -32,10 +32,13 @@ export interface PoolEntry {
 }
 
 interface PoolsApiResponse {
-  ok: boolean
-  start: number
-  count: number
-  pools: PoolEntry[]
+  success: boolean
+  data: {
+    start: number
+    count: number
+    pools: PoolEntry[]
+  }
+  error?: { code: string; message: string }
 }
 
 // ============================================================================
@@ -90,12 +93,11 @@ export function useFlattenedPools(params: {
       }
       const json = (await r.json()) as PoolsApiResponse
 
-      return {
-        ok: json.ok,
-        start: json.start ?? 0,
-        count: json.count ?? 0,
-        pools: Array.isArray(json?.pools) ? json.pools : [],
+      if (!json.success) {
+        throw new Error(json.error?.message ?? 'Pools API returned success: false')
       }
+
+      return json
     },
     refetchInterval: 8 * 60 * 1000,
     staleTime: 30_000,
@@ -104,8 +106,8 @@ export function useFlattenedPools(params: {
   })
 
   return {
-    pools: data?.pools ?? [],
-    count: data?.count ?? 0,
+    pools: data?.data?.pools ?? [],
+    count: data?.data?.count ?? 0,
     isPoolsLoading: isLoading,
     isPoolsFetching: isFetching,
     error,

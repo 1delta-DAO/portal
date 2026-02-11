@@ -8,8 +8,9 @@ const endpointLendingLatest = `${BACKEND_BASE_URL}/v1/data/lending/latest?chains
 // ============================================================================
 
 interface LendingLatestApiResponse {
-  ok: boolean
-  data: LenderEntryRaw[]
+  success: boolean
+  data: { data: LenderEntryRaw[] }
+  error?: { code: string; message: string }
 }
 
 interface LenderEntryRaw {
@@ -112,12 +113,12 @@ export function useMarginPublicData(chainId: string) {
         throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
       }
       const json = (await r.json()) as LendingLatestApiResponse
-      if (!json.ok) {
-        throw new Error('API returned ok: false')
+      if (!json.success) {
+        throw new Error(json.error?.message ?? 'API returned success: false')
       }
 
       const transformed: LenderData = {}
-      for (const entry of json.data) {
+      for (const entry of json.data.data) {
         transformed[entry.lender] = entry.markets
       }
       return transformed

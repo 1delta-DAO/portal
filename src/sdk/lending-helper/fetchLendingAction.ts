@@ -18,11 +18,11 @@ export interface LendingTransaction {
 }
 
 export interface LendingPermission extends LendingTransaction {
-  info?: string
+  description?: string
 }
 
 export interface LendingActionResponse {
-  transaction: LendingTransaction
+  transactions: LendingTransaction[]
   permissions: LendingPermission[]
 }
 
@@ -114,8 +114,22 @@ export async function fetchLendingAction(
       }
     }
 
-    const json = (await res.json()) as LendingActionResponse
-    return { success: true, data: json }
+    const json = await res.json()
+
+    if (!json.success) {
+      return {
+        success: false,
+        error: json.error?.message ?? 'API error',
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        transactions: json.actions?.transactions ?? [],
+        permissions: json.actions?.permissions ?? [],
+      },
+    }
   } catch (err: any) {
     return {
       success: false,
@@ -157,8 +171,23 @@ export async function fetchLendingActionWithSimulation(
       }
     }
 
-    const json = (await res.json()) as LendingActionResponseWithSimulation
-    return { success: true, data: json }
+    const json = await res.json()
+
+    if (!json.success) {
+      return {
+        success: false,
+        error: json.error?.message ?? 'API error',
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        transactions: json.actions?.transactions ?? [],
+        permissions: json.actions?.permissions ?? [],
+        simulation: json.data?.simulation,
+      },
+    }
   } catch (err: any) {
     return {
       success: false,
@@ -200,8 +229,20 @@ export async function fetchCollateralToggle(
       }
     }
 
-    const json = (await res.json()) as LendingTransaction
-    return { success: true, data: json }
+    const json = await res.json()
+
+    if (!json.success) {
+      return {
+        success: false,
+        error: json.error?.message ?? 'API error',
+      }
+    }
+
+    const tx = json.actions?.transactions?.[0]
+    return {
+      success: true,
+      data: tx ? { to: tx.to, data: tx.data, value: tx.value ?? '0' } : undefined,
+    }
   } catch (err: any) {
     return {
       success: false,

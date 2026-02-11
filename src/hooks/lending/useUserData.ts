@@ -160,14 +160,14 @@ export function useUserData(params: { chainId: string; account?: string; enabled
         throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
       }
       const json = (await r.json()) as {
-        ok: boolean
-        data: LenderUserDataEntry[]
-        summary: UserDataSummary
+        success: boolean
+        data: { data: LenderUserDataEntry[]; summary: UserDataSummary }
+        error?: { code: string; message: string }
       }
-      if (!json.ok) {
-        throw new Error('API returned ok: false')
+      if (!json.success) {
+        throw new Error(json.error?.message ?? 'API returned success: false')
       }
-      return { raw: json.data, summary: json.summary }
+      return { raw: json.data.data, summary: json.data.summary }
     },
     refetchInterval: 5 * 60 * 1000,
     staleTime: 30_000,

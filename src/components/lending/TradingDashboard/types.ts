@@ -19,7 +19,7 @@ export interface Tx {
   to: string
   data: string
   value: string
-  info?: string
+  description?: string
 }
 
 export interface TradingQuote {
@@ -32,8 +32,9 @@ export interface TradingQuote {
 }
 
 export interface QuoteResponse {
-  quotes: TradingQuote[]
-  permissionTxns: Tx[]
+  success: boolean
+  data: { quotes: TradingQuote[] } | null
+  actions: { transactions: Tx[]; permissions: Tx[] } | null
 }
 
 export interface TradingActionProps {

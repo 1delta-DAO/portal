@@ -142,9 +142,13 @@ export function useActionExecution(params: {
     setExecutingMain(true)
     setError(null)
 
-    const { ok, error: txError } = await send(result.transaction)
-    if (!ok) {
-      setError(txError ?? 'Transaction failed')
+    for (const tx of result.transactions) {
+      const { ok, error: txError } = await send(tx)
+      if (!ok) {
+        setError(txError ?? 'Transaction failed')
+        setExecutingMain(false)
+        return
+      }
     }
     setExecutingMain(false)
   }

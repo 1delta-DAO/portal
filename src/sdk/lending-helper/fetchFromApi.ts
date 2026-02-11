@@ -1,5 +1,12 @@
 import { AllocationAction } from './types'
 
+// ---- Shared API envelope types ----
+
+export interface ApiActions {
+  transactions: { to: string; data: string; value: string }[]
+  permissions: { to: string; data: string; value: string; description: string }[]
+}
+
 // ---- Generic POST helper ----
 
 export interface CreateTxnRequestBody {
@@ -10,7 +17,8 @@ export interface CreateTxnRequestBody {
 
 export interface CreateTxnResponse<T = any> {
   success: boolean
-  data?: T
+  data?: T | null
+  actions?: ApiActions | null
   error?: string
 }
 
@@ -33,9 +41,16 @@ export async function fetchTransactionData<T = any>(
       }
     }
 
-    const json = (await res.json()) as T
+    const json = await res.json()
 
-    return { success: true, data: json }
+    if (!json.success) {
+      return {
+        success: false,
+        error: json.error?.message ?? 'API error',
+      }
+    }
+
+    return { success: true, data: json.data, actions: json.actions }
   } catch (err: any) {
     return {
       success: false,

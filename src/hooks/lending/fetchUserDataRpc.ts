@@ -13,11 +13,12 @@ interface JsonRpcCall {
 }
 
 interface RpcCallApiResponse {
-  ok: boolean
+  success: boolean
   data: {
     rpcCallId: string
     rpcCalls: JsonRpcCall[]
   }
+  error?: { code: string; message: string }
 }
 
 // ============================================================================
@@ -25,9 +26,12 @@ interface RpcCallApiResponse {
 // ============================================================================
 
 interface ParseApiResponse {
-  ok: boolean
-  data: LenderUserDataEntry[]
-  summary: UserDataSummary
+  success: boolean
+  data: {
+    data: LenderUserDataEntry[]
+    summary: UserDataSummary
+  }
+  error?: { code: string; message: string }
 }
 
 // ============================================================================
@@ -51,7 +55,7 @@ import { BACKEND_BASE_URL } from '../../config/backend'
 // Helpers
 // ============================================================================
 
-async function fetchApi<T extends { ok: boolean }>(
+async function fetchApi<T extends { success: boolean; error?: { code: string; message: string } }>(
   label: string,
   url: string,
   init?: RequestInit
@@ -62,8 +66,8 @@ async function fetchApi<T extends { ok: boolean }>(
     throw new Error(`${label} HTTP ${res.status}: ${text || res.statusText}`)
   }
   const json = (await res.json()) as T
-  if (!json.ok) {
-    throw new Error(`${label} API returned ok: false`)
+  if (!json.success) {
+    throw new Error(json.error?.message ?? `${label} API returned success: false`)
   }
   return json
 }
@@ -96,11 +100,11 @@ export async function fetchUserDataViaRpc(
 
   // Step 3: Send results to parse endpoint
   const parseUrl = `${BACKEND_BASE_URL}/v1/data/lending/user-positions/parse`
-  const { data, summary } = await fetchApi<ParseApiResponse>('parse', parseUrl, {
+  const parseResult = await fetchApi<ParseApiResponse>('parse', parseUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rpcCallId, rawResponses }),
   })
 
-  return { data, summary }
+  return { data: parseResult.data.data, summary: parseResult.data.summary }
 }

@@ -171,10 +171,10 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
                 disabled={!isCurrent || executingPermission}
                 onClick={isCurrent ? executeNextPermission : undefined}
               >
-                {done ? `\u2713 ${perm.info || `Approval ${i + 1}`}` : isCurrent && executingPermission ? (
+                {done ? `\u2713 ${perm.description || `Approval ${i + 1}`}` : isCurrent && executingPermission ? (
                   <span className="loading loading-spinner loading-xs" />
                 ) : (
-                  perm.info || `Approval ${i + 1}`
+                  perm.description || `Approval ${i + 1}`
                 )}
               </button>
             )

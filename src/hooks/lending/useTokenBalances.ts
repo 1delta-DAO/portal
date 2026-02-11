@@ -13,11 +13,14 @@ export interface TokenBalance {
 }
 
 interface BalancesApiResponse {
-  ok: boolean
-  chainId: string
-  account: string
-  count: number
-  balances: TokenBalance[]
+  success: boolean
+  data: {
+    chainId: string
+    account: string
+    count: number
+    balances: TokenBalance[]
+  }
+  error?: { code: string; message: string }
 }
 
 /**
@@ -52,12 +55,12 @@ export function useTokenBalances(params: {
         throw new Error(`Balances HTTP ${res.status}: ${text || res.statusText}`)
       }
       const json = (await res.json()) as BalancesApiResponse
-      if (!json.ok) {
-        throw new Error('Balances API returned ok: false')
+      if (!json.success) {
+        throw new Error(json.error?.message ?? 'Balances API returned success: false')
       }
 
       const map = new Map<string, TokenBalance>()
-      for (const bal of json.balances) {
+      for (const bal of json.data.balances) {
         map.set(bal.address.toLowerCase(), bal)
       }
       return map

@@ -228,7 +228,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
           className="btn btn-outline btn-sm w-full"
           onClick={() => executePermission(tx)}
         >
-          {tx.info || 'Approve'}
+          {tx.description || 'Approve'}
         </button>
       ))}
 

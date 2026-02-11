@@ -129,9 +129,12 @@ export const LendingActionTab = ({ lenderData, actionType, chainId }: Props) => 
         }
       }
 
-      const { ok, error: txError } = await send(result.transaction)
-      if (!ok) {
-        setError(txError ?? 'Transaction failed')
+      for (const tx of result.transactions) {
+        const { ok, error: txError } = await send(tx)
+        if (!ok) {
+          setError(txError ?? 'Transaction failed')
+          return
+        }
       }
     } finally {
       setExecuting(false)

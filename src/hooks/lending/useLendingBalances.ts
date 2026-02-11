@@ -4,11 +4,14 @@ import type { TokenBalance } from './useTokenBalances'
 import { BACKEND_BASE_URL } from '../../config/backend'
 
 interface LendingBalancesApiResponse {
-  ok: boolean
-  chainId: string
-  account: string
-  count: number
-  balances: TokenBalance[]
+  success: boolean
+  data: {
+    chainId: string
+    account: string
+    count: number
+    balances: TokenBalance[]
+  }
+  error?: { code: string; message: string }
 }
 
 /**
@@ -38,11 +41,11 @@ export function useLendingBalances(params: {
         throw new Error(`Lending balances HTTP ${res.status}: ${text || res.statusText}`)
       }
       const json = (await res.json()) as LendingBalancesApiResponse
-      if (!json.ok) {
-        throw new Error('Lending balances API returned ok: false')
+      if (!json.success) {
+        throw new Error(json.error?.message ?? 'Lending balances API returned success: false')
       }
 
-      return json.balances
+      return json.data.balances
     },
     staleTime: 30_000,
     refetchInterval: 60_000,
