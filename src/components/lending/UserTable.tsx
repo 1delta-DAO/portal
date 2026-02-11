@@ -93,7 +93,7 @@ const CollateralToggle: React.FC<{
   }
 
   return (
-    <div className="inline-flex items-center gap-1">
+    <div className="inline-flex items-center gap-1 relative group">
       <input
         type="checkbox"
         className={`toggle toggle-xs ${enabled ? 'toggle-success' : ''}`}
@@ -103,9 +103,20 @@ const CollateralToggle: React.FC<{
       />
       {sending && <span className="loading loading-spinner loading-xs" />}
       {displayError && (
-        <span className="text-error text-[9px] max-w-[120px] truncate" title={displayError}>
-          {displayError}
-        </span>
+        <>
+          {/* Error indicator icon */}
+          <span className="text-error text-xs cursor-help">⚠</span>
+          {/* Error popover */}
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 w-48">
+            <div className="bg-error text-error-content text-[10px] px-2 py-1.5 rounded shadow-lg">
+              {displayError}
+            </div>
+            {/* Arrow */}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
+              <div className="border-4 border-transparent border-t-error" />
+            </div>
+          </div>
+        </>
       )}
     </div>
   )
