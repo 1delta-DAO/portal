@@ -138,3 +138,47 @@ export async function fetchEModeAnalysis(params: {
     return { success: false, error: err?.message ?? 'Unknown error' }
   }
 }
+
+// ============================================================================
+// E-Mode Switch — build calldata for switching e-mode category
+// ============================================================================
+
+export interface EModeSwitchTx {
+  to: string
+  data: string
+  value: string
+}
+
+export interface EModeSwitchResult {
+  success: boolean
+  data?: EModeSwitchTx
+  error?: string
+}
+
+export async function fetchEModeSwitch(params: {
+  chainId: string
+  lender: string
+  eMode: number
+}): Promise<EModeSwitchResult> {
+  try {
+    const qs = new URLSearchParams()
+    qs.set('chainId', params.chainId)
+    qs.set('lender', params.lender)
+    qs.set('eMode', String(params.eMode))
+
+    const res = await fetch(`${BACKEND_BASE_URL}/actions/lending/e-mode?${qs}`)
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      return { success: false, error: `HTTP ${res.status}: ${text || res.statusText}` }
+    }
+
+    const json = await res.json()
+    return {
+      success: true,
+      data: { to: json.to, data: json.data, value: json.value ?? '0' },
+    }
+  } catch (err: any) {
+    return { success: false, error: err?.message ?? 'Unknown error' }
+  }
+}

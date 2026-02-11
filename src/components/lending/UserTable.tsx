@@ -2,9 +2,7 @@
 import React, { useState } from 'react'
 import { lenderDisplayName } from '@1delta/lib-utils'
 import type { RawCurrency } from '@1delta/lib-utils'
-import { Address, Hex } from 'viem'
-import { useWalletClient, useChainId } from 'wagmi'
-import { useQueryClient } from '@tanstack/react-query'
+import { useSendLendingTransaction } from '../../hooks/useSendLendingTransaction'
 import type {
   UserDataResult,
   LenderUserDataEntry,
@@ -73,42 +71,24 @@ const CollateralToggle: React.FC<{
   account: string
   chainId: string
 }> = ({ marketUid, enabled, account, chainId }) => {
-  const { data: signer } = useWalletClient()
-  const walletChainId = useChainId()
-  const queryClient = useQueryClient()
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { send, sending, error, clearError } = useSendLendingTransaction({ chainId, account })
+  const [localError, setLocalError] = useState<string | null>(null)
+
+  const displayError = localError || error
 
   const handleToggle = async () => {
-    if (!signer || busy) return
-    setBusy(true)
-    setError(null)
+    if (sending) return
+    setLocalError(null)
+    clearError()
 
-    try {
-      if (walletChainId !== Number(chainId)) {
-        throw new Error(`Please switch to chain ${chainId}`)
-      }
-
-      const res = await fetchCollateralToggle({ marketUid, enabled: !enabled })
-      if (!res.success || !res.data) {
-        throw new Error(res.error ?? 'Failed to build collateral toggle tx')
-      }
-
-      await signer.sendTransaction({
-        to: res.data.to as Address,
-        data: res.data.data as Hex,
-        value: BigInt(res.data.value ?? 0),
-      })
-
-      // Refresh user data to recalculate health factors
-      queryClient.invalidateQueries({ queryKey: ['userData', chainId, account] })
-      queryClient.invalidateQueries({ queryKey: ['lendingBalances', chainId, account] })
-    } catch (e: any) {
-      console.error('Collateral toggle failed:', e)
-      setError(e.shortMessage ?? e.message ?? 'Transaction failed')
-    } finally {
-      setBusy(false)
+    const res = await fetchCollateralToggle({ marketUid, enabled: !enabled })
+    if (!res.success || !res.data) {
+      setLocalError(res.error ?? 'Failed to build collateral toggle tx')
+      return
     }
+
+    const { ok, error: txError } = await send(res.data)
+    if (!ok) setLocalError(txError ?? 'Transaction failed')
   }
 
   return (
@@ -117,13 +97,13 @@ const CollateralToggle: React.FC<{
         type="checkbox"
         className={`toggle toggle-xs ${enabled ? 'toggle-success' : ''}`}
         checked={enabled}
-        disabled={busy || !signer}
+        disabled={sending}
         onChange={handleToggle}
       />
-      {busy && <span className="loading loading-spinner loading-xs" />}
-      {error && (
-        <span className="text-error text-[9px] max-w-[120px] truncate" title={error}>
-          {error}
+      {sending && <span className="loading loading-spinner loading-xs" />}
+      {displayError && (
+        <span className="text-error text-[9px] max-w-[120px] truncate" title={displayError}>
+          {displayError}
         </span>
       )}
     </div>

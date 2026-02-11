@@ -11,6 +11,7 @@ export interface ActionPanelProps {
   userPosition: UserPositionEntry | null
   walletBalance?: TokenBalance | null
   account?: string
+  chainId: string
   /** Sub-account ID for lenders with multiple sub-accounts (e.g. INIT) */
   accountId?: string
   /** All sub-accounts for the current lender (for sub-account selector) */

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import type { UserSubAccount } from '../../hooks/lending/useUserData'
+import { useSendLendingTransaction } from '../../hooks/useSendLendingTransaction'
 import {
   fetchEModeList,
   fetchEModeAnalysis,
+  fetchEModeSwitch,
   type EModeCategory,
   type EModeAnalysisEntry,
   type EModeAnalysisBody,
@@ -16,9 +18,10 @@ interface EModeBadgeProps {
   subAccount: UserSubAccount
   lender: string
   chainId: string
+  account?: string
 }
 
-export const EModeBadge: React.FC<EModeBadgeProps> = ({ subAccount, lender, chainId }) => {
+export const EModeBadge: React.FC<EModeBadgeProps> = ({ subAccount, lender, chainId, account }) => {
   const [open, setOpen] = useState(false)
   const mode = subAccount.userConfig.selectedMode
 
@@ -42,6 +45,7 @@ export const EModeBadge: React.FC<EModeBadgeProps> = ({ subAccount, lender, chai
           subAccount={subAccount}
           lender={lender}
           chainId={chainId}
+          account={account}
           onClose={() => setOpen(false)}
         />
       )}
@@ -57,6 +61,7 @@ interface EModeAnalysisModalProps {
   subAccount: UserSubAccount
   lender: string
   chainId: string
+  account?: string
   onClose: () => void
 }
 
@@ -64,12 +69,18 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
   subAccount,
   lender,
   chainId,
+  account,
   onClose,
 }) => {
+  const { send } = useSendLendingTransaction({ chainId, account })
+
   const [categories, setCategories] = useState<EModeCategory[]>([])
   const [analysis, setAnalysis] = useState<EModeAnalysisEntry[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [switchingMode, setSwitchingMode] = useState<number | null>(null)
+  const [switchError, setSwitchError] = useState<string | null>(null)
+  const [switchSuccess, setSwitchSuccess] = useState<number | null>(null)
 
   const currentMode = subAccount.userConfig.selectedMode
   const hasPositions = subAccount.positions.some(
@@ -160,6 +171,43 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
     }
   }
 
+  // Determine if a mode is eligible for switching
+  const canSwitchTo = (catId: number): boolean => {
+    if (catId === currentMode) return false
+    if (!account) return false
+    // If there's no analysis (no positions), any non-current mode is switchable
+    if (!hasPositions) return true
+    const entry = analysisMap.get(catId)
+    // If analysis is available, respect canSwitch flag
+    if (entry) return entry.canSwitch
+    // No analysis entry for this mode — allow if user has no positions
+    return !hasPositions
+  }
+
+  const handleSwitch = async (targetMode: number) => {
+    if (!account) return
+
+    setSwitchingMode(targetMode)
+    setSwitchError(null)
+    setSwitchSuccess(null)
+
+    const res = await fetchEModeSwitch({ chainId, lender, eMode: targetMode })
+
+    if (!res.success || !res.data) {
+      setSwitchError(res.error ?? 'Failed to build e-mode switch transaction')
+      setSwitchingMode(null)
+      return
+    }
+
+    const { ok, error: txError } = await send(res.data)
+    if (ok) {
+      setSwitchSuccess(targetMode)
+    } else {
+      setSwitchError(txError ?? 'Transaction failed')
+    }
+    setSwitchingMode(null)
+  }
+
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center" onClick={onClose}>
       {/* backdrop */}
@@ -190,6 +238,26 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
             </span>
           </div>
 
+          {/* Switch success banner */}
+          {switchSuccess != null && (
+            <div className="alert alert-success text-xs py-2">
+              <span>
+                Switched to{' '}
+                <span className="font-semibold">
+                  {categories.find((c) => c.id === switchSuccess)?.label ?? `Mode #${switchSuccess}`}
+                </span>
+                . Positions are refreshing...
+              </span>
+            </div>
+          )}
+
+          {/* Switch error banner */}
+          {switchError && (
+            <div className="alert alert-error text-xs py-2">
+              <span>{switchError}</span>
+            </div>
+          )}
+
           {loading && (
             <div className="flex justify-center py-8">
               <span className="loading loading-spinner loading-md" />
@@ -213,6 +281,8 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
               {categories.map((cat) => {
                 const isCurrent = cat.id === currentMode
                 const entry = analysisMap.get(cat.id)
+                const eligible = canSwitchTo(cat.id)
+                const isSwitching = switchingMode === cat.id
 
                 return (
                   <div
@@ -240,9 +310,25 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
                           )
                         )}
                       </div>
-                      {cat.id === 0 && (
-                        <span className="text-[10px] text-base-content/50">Default</span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {cat.id === 0 && (
+                          <span className="text-[10px] text-base-content/50">Default</span>
+                        )}
+                        {!isCurrent && eligible && (
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-primary"
+                            disabled={isSwitching || switchingMode != null}
+                            onClick={() => handleSwitch(cat.id)}
+                          >
+                            {isSwitching ? (
+                              <span className="loading loading-spinner loading-xs" />
+                            ) : (
+                              'Switch'
+                            )}
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Analysis data — always show health factor when available */}

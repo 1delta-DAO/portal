@@ -42,7 +42,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   const {
     quotes, permissions, selectedIndex, loading, executing, error,
     fetchQuotes, selectQuote, executePermission, executeQuote, reset,
-  } = useTradingQuotes()
+  } = useTradingQuotes({ chainId, account })
 
   // Derive pay currencies from selected pools
   const payCurrencies = useMemo(() => {

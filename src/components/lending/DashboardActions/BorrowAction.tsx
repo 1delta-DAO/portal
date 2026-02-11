@@ -14,6 +14,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   userPosition,
   walletBalance,
   account,
+  chainId,
   accountId,
   subAccounts,
   lenderKey,
@@ -41,6 +42,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
       isAll: false,
       receiveAsset: canUseNative && useNative ? zeroAddress : undefined,
       accountId: hasSubAccounts ? selectedAccountId ?? undefined : undefined,
+      chainId,
     })
 
   // Reset when pool changes

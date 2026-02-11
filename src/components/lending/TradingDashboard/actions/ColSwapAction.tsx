@@ -30,7 +30,7 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
   const {
     quotes, permissions, selectedIndex, loading, executing, error,
     fetchQuotes, selectQuote, executePermission, executeQuote, reset,
-  } = useTradingQuotes()
+  } = useTradingQuotes({ chainId, account })
 
   // Notify parent
   useEffect(() => {

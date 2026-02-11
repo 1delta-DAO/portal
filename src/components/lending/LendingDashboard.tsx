@@ -2,7 +2,11 @@ import React, { useMemo, useState } from 'react'
 import { isWNative, lenderDisplayNameFull } from '@1delta/lib-utils'
 import { zeroAddress } from 'viem'
 import type { LenderData, PoolDataItem } from '../../hooks/lending/usePoolData'
-import type { UserDataResult, UserPositionEntry, UserSubAccount } from '../../hooks/lending/useUserData'
+import type {
+  UserDataResult,
+  UserPositionEntry,
+  UserSubAccount,
+} from '../../hooks/lending/useUserData'
 import { useTokenBalances } from '../../hooks/lending/useTokenBalances'
 import { useTokenLists } from '../../hooks/useTokenLists'
 import { useSyncChain } from '../../hooks/useSyncChain'
@@ -27,17 +31,27 @@ interface Props {
   isUserDataLoading: boolean
 }
 
-type SortKey = 'symbol' | 'depositApr' | 'borrowApr' | 'totalDepositsUSD' | 'totalDebtUSD' | 'totalLiquidityUSD'
+type SortKey =
+  | 'symbol'
+  | 'depositApr'
+  | 'borrowApr'
+  | 'totalDepositsUSD'
+  | 'totalDebtUSD'
+  | 'totalLiquidityUSD'
 
-export function LendingDashboard({ lenderData, userData, chainId, account, isPublicDataLoading, isUserDataLoading }: Props) {
+export function LendingDashboard({
+  lenderData,
+  userData,
+  chainId,
+  account,
+  isPublicDataLoading,
+  isUserDataLoading,
+}: Props) {
   const { syncChain, currentChainId } = useSyncChain()
   const isWrongChain = !!account && currentChainId !== Number(chainId)
 
   // Lender selection
-  const allLenderKeys = useMemo(
-    () => Object.keys(lenderData ?? {}),
-    [lenderData]
-  )
+  const allLenderKeys = useMemo(() => Object.keys(lenderData ?? {}), [lenderData])
 
   const [selectedLender, setSelectedLender] = useState<string>('')
   const [selectedSubAccountId, setSelectedSubAccountId] = useState<string | null>(null)
@@ -91,7 +105,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
   // Sub-accounts for the selected lender
   const subAccounts: UserSubAccount[] = useMemo(() => {
     if (!selectedLender || !userData.raw) return []
-    const entry = userData.raw.find(e => e.chainId === chainId && e.lender === selectedLender)
+    const entry = userData.raw.find((e) => e.chainId === chainId && e.lender === selectedLender)
     return entry?.data ?? []
   }, [userData, chainId, selectedLender])
 
@@ -106,7 +120,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
 
   // The currently active sub-account (or null)
   const activeSubAccount = useMemo(
-    () => subAccounts.find(s => s.accountId === selectedSubAccountId) ?? null,
+    () => subAccounts.find((s) => s.accountId === selectedSubAccountId) ?? null,
     [subAccounts, selectedSubAccountId]
   )
 
@@ -120,10 +134,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
   const { data: chainTokens } = useTokenLists(chainId)
 
   // Whether any pool in this lender uses wrapped native
-  const hasWrappedNative = useMemo(
-    () => allPools.some((p) => isWNative(p.asset)),
-    [allPools]
-  )
+  const hasWrappedNative = useMemo(() => allPools.some((p) => isWNative(p.asset)), [allPools])
 
   // Unique asset addresses for the current lender's pools
   // Include zeroAddress so we also fetch the native balance when relevant
@@ -147,10 +158,11 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
     // Search filter
     if (assetSearch.trim()) {
       const q = assetSearch.toLowerCase()
-      result = result.filter((p) =>
-        p.asset.symbol.toLowerCase().includes(q) ||
-        p.asset.name.toLowerCase().includes(q) ||
-        p.asset.address.toLowerCase().includes(q)
+      result = result.filter(
+        (p) =>
+          p.asset.symbol.toLowerCase().includes(q) ||
+          p.asset.name.toLowerCase().includes(q) ||
+          p.asset.address.toLowerCase().includes(q)
       )
     }
 
@@ -315,9 +327,14 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
           <div className="flex flex-wrap gap-2">
             {subAccounts.map((sub, i) => {
               const isActive = sub.accountId === selectedSubAccountId
-              const healthBadge = sub.health != null
-                ? sub.health < 1.1 ? 'badge-error' : sub.health < 1.3 ? 'badge-warning' : 'badge-success'
-                : null
+              const healthBadge =
+                sub.health != null
+                  ? sub.health < 1.1
+                    ? 'badge-error'
+                    : sub.health < 1.3
+                      ? 'badge-warning'
+                      : 'badge-success'
+                  : null
 
               return (
                 <button
@@ -339,7 +356,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
                       {sub.health!.toFixed(2)}
                     </span>
                   )}
-                  <EModeBadge subAccount={sub} lender={selectedLender} chainId={chainId} />
+                  <EModeBadge subAccount={sub} lender={selectedLender} chainId={chainId} account={account} />
                 </button>
               )
             })}
@@ -349,10 +366,14 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
           {lenderSummary && (
             <div className="flex gap-4 items-center text-xs flex-wrap">
               <span>
-                Deposits: <span className="font-semibold text-success">${formatUsd(lenderSummary.deposits)}</span>
+                Deposits:{' '}
+                <span className="font-semibold text-success">
+                  ${formatUsd(lenderSummary.deposits)}
+                </span>
               </span>
               <span>
-                Debt: <span className="font-semibold text-error">${formatUsd(lenderSummary.debt)}</span>
+                Debt:{' '}
+                <span className="font-semibold text-error">${formatUsd(lenderSummary.debt)}</span>
               </span>
               <span>
                 Net: <span className="font-semibold">${formatUsd(lenderSummary.nav)}</span>
@@ -429,7 +450,10 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
               value={assetSearch}
               onChange={(e) => setAssetSearch(e.target.value)}
             />
-            <span className="flex items-center gap-1 text-[10px] text-base-content/50 shrink-0" title="Deposits &amp; borrows are paused">
+            <span
+              className="flex items-center gap-1 text-[10px] text-base-content/50 shrink-0"
+              title="Deposits &amp; borrows are paused"
+            >
               <span className="text-warning text-sm">&#x2744;</span> = Paused
             </span>
           </div>
@@ -441,27 +465,54 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
                 <tr>
                   <th className="cursor-pointer select-none" onClick={() => toggleSort('symbol')}>
                     Asset
-                    {sortKey === 'symbol' && <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>}
+                    {sortKey === 'symbol' && (
+                      <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                    )}
                   </th>
-                  <th className="cursor-pointer select-none" onClick={() => toggleSort('depositApr')}>
+                  <th
+                    className="cursor-pointer select-none"
+                    onClick={() => toggleSort('depositApr')}
+                  >
                     Deposit APR
-                    {sortKey === 'depositApr' && <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>}
+                    {sortKey === 'depositApr' && (
+                      <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                    )}
                   </th>
-                  <th className="cursor-pointer select-none" onClick={() => toggleSort('borrowApr')}>
+                  <th
+                    className="cursor-pointer select-none"
+                    onClick={() => toggleSort('borrowApr')}
+                  >
                     Borrow APR
-                    {sortKey === 'borrowApr' && <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>}
+                    {sortKey === 'borrowApr' && (
+                      <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                    )}
                   </th>
-                  <th className="cursor-pointer select-none" onClick={() => toggleSort('totalDepositsUSD')}>
+                  <th
+                    className="cursor-pointer select-none"
+                    onClick={() => toggleSort('totalDepositsUSD')}
+                  >
                     Total Deposits
-                    {sortKey === 'totalDepositsUSD' && <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>}
+                    {sortKey === 'totalDepositsUSD' && (
+                      <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                    )}
                   </th>
-                  <th className="cursor-pointer select-none" onClick={() => toggleSort('totalDebtUSD')}>
+                  <th
+                    className="cursor-pointer select-none"
+                    onClick={() => toggleSort('totalDebtUSD')}
+                  >
                     Total Borrows
-                    {sortKey === 'totalDebtUSD' && <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>}
+                    {sortKey === 'totalDebtUSD' && (
+                      <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                    )}
                   </th>
-                  <th className="cursor-pointer select-none" onClick={() => toggleSort('totalLiquidityUSD')}>
+                  <th
+                    className="cursor-pointer select-none"
+                    onClick={() => toggleSort('totalLiquidityUSD')}
+                  >
                     Liquidity
-                    {sortKey === 'totalLiquidityUSD' && <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>}
+                    {sortKey === 'totalLiquidityUSD' && (
+                      <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                    )}
                   </th>
                 </tr>
               </thead>
@@ -469,7 +520,8 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
                 {pools.map((pool) => {
                   const isSelected = selectedPool?.marketUid === pool.marketUid
                   const userPos = userPositions.get(pool.marketUid)
-                  const hasPosition = userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
+                  const hasPosition =
+                    userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
                   const depositApr = pool.depositRate.toFixed(2)
                   const borrowApr = pool.variableBorrowRate.toFixed(2)
 
@@ -477,9 +529,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
                     <tr
                       key={pool.marketUid}
                       className={`cursor-pointer transition-colors ${
-                        isSelected
-                          ? 'bg-primary/10'
-                          : 'hover:bg-base-200'
+                        isSelected ? 'bg-primary/10' : 'hover:bg-base-200'
                       }`}
                       onClick={() => handlePoolSelect(pool)}
                     >
@@ -503,7 +553,14 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
                           <div className="flex flex-col">
                             <span className="font-medium text-sm">
                               {pool.asset.symbol}
-                              {pool.isFrozen && <span className="ml-1 text-warning text-xs" title="Deposits &amp; borrows are paused">&#x2744;</span>}
+                              {pool.isFrozen && (
+                                <span
+                                  className="ml-1 text-warning text-xs"
+                                  title="Deposits &amp; borrows are paused"
+                                >
+                                  &#x2744;
+                                </span>
+                              )}
                             </span>
                             <span className="text-xs text-base-content/60">{pool.asset.name}</span>
                           </div>
@@ -516,13 +573,19 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
                         <span className="text-sm font-medium text-warning">{borrowApr}%</span>
                       </td>
                       <td>
-                        <span className="text-xs" title={`$${formatUsd(pool.totalDepositsUSD)}`}>{abbreviateUsd(pool.totalDepositsUSD)}</span>
+                        <span className="text-xs" title={`$${formatUsd(pool.totalDepositsUSD)}`}>
+                          {abbreviateUsd(pool.totalDepositsUSD)}
+                        </span>
                       </td>
                       <td>
-                        <span className="text-xs" title={`$${formatUsd(pool.totalDebtUSD)}`}>{abbreviateUsd(pool.totalDebtUSD)}</span>
+                        <span className="text-xs" title={`$${formatUsd(pool.totalDebtUSD)}`}>
+                          {abbreviateUsd(pool.totalDebtUSD)}
+                        </span>
                       </td>
                       <td>
-                        <span className="text-xs" title={`$${formatUsd(pool.totalLiquidityUSD)}`}>{abbreviateUsd(pool.totalLiquidityUSD)}</span>
+                        <span className="text-xs" title={`$${formatUsd(pool.totalLiquidityUSD)}`}>
+                          {abbreviateUsd(pool.totalLiquidityUSD)}
+                        </span>
                       </td>
                     </tr>
                   )
@@ -542,11 +605,26 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
           <div className="md:hidden divide-y divide-base-300">
             {pools.length > 0 && (
               <div className="flex gap-1 p-2 overflow-x-auto">
-                {(['depositApr', 'borrowApr', 'totalDepositsUSD', 'totalLiquidityUSD'] as SortKey[]).map((key) => {
-                  const labels: Record<string, string> = { depositApr: 'Dep APR', borrowApr: 'Bor APR', totalDepositsUSD: 'Deposits', totalLiquidityUSD: 'Liquidity' }
+                {(
+                  ['depositApr', 'borrowApr', 'totalDepositsUSD', 'totalLiquidityUSD'] as SortKey[]
+                ).map((key) => {
+                  const labels: Record<string, string> = {
+                    depositApr: 'Dep APR',
+                    borrowApr: 'Bor APR',
+                    totalDepositsUSD: 'Deposits',
+                    totalLiquidityUSD: 'Liquidity',
+                  }
                   return (
-                    <button key={key} type="button" className={`btn btn-xs ${sortKey === key ? 'btn-primary' : 'btn-ghost'}`} onClick={() => toggleSort(key)}>
-                      {labels[key]}{sortKey === key && <span className="ml-0.5">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>}
+                    <button
+                      key={key}
+                      type="button"
+                      className={`btn btn-xs ${sortKey === key ? 'btn-primary' : 'btn-ghost'}`}
+                      onClick={() => toggleSort(key)}
+                    >
+                      {labels[key]}
+                      {sortKey === key && (
+                        <span className="ml-0.5">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>
+                      )}
                     </button>
                   )
                 })}
@@ -555,7 +633,8 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
             {pools.map((pool) => {
               const isSelected = selectedPool?.marketUid === pool.marketUid
               const userPos = userPositions.get(pool.marketUid)
-              const hasPosition = userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
+              const hasPosition =
+                userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
 
               return (
                 <div
@@ -566,24 +645,41 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="relative shrink-0 w-7 h-7">
-                        <img src={pool.asset.logoURI} width={28} height={28} alt={pool.asset.symbol} className="rounded-full object-cover w-7 h-7" />
-                        {hasPosition && <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100" />}
+                        <img
+                          src={pool.asset.logoURI}
+                          width={28}
+                          height={28}
+                          alt={pool.asset.symbol}
+                          className="rounded-full object-cover w-7 h-7"
+                        />
+                        {hasPosition && (
+                          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100" />
+                        )}
                       </div>
                       <div className="flex flex-col">
                         <span className="font-semibold text-sm">
                           {pool.asset.symbol}
-                          {pool.isFrozen && <span className="ml-1 text-warning text-xs">&#x2744;</span>}
+                          {pool.isFrozen && (
+                            <span className="ml-1 text-warning text-xs">&#x2744;</span>
+                          )}
                         </span>
                         <span className="text-[11px] text-base-content/60">{pool.asset.name}</span>
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="font-bold text-sm text-success">{pool.depositRate.toFixed(2)}%</span>
+                      <span className="font-bold text-sm text-success">
+                        {pool.depositRate.toFixed(2)}%
+                      </span>
                       <span className="text-[10px] text-base-content/50 block">Deposit APR</span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between mt-2 text-xs text-base-content/70">
-                    <span>Borrow: <span className="text-warning font-medium">{pool.variableBorrowRate.toFixed(2)}%</span></span>
+                    <span>
+                      Borrow:{' '}
+                      <span className="text-warning font-medium">
+                        {pool.variableBorrowRate.toFixed(2)}%
+                      </span>
+                    </span>
                     <span>Dep: {abbreviateUsd(pool.totalDepositsUSD)}</span>
                     <span>Liq: {abbreviateUsd(pool.totalLiquidityUSD)}</span>
                   </div>
@@ -591,7 +687,9 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
               )
             })}
             {pools.length === 0 && (
-              <div className="text-center py-6 text-sm text-base-content/60">No pools match your search.</div>
+              <div className="text-center py-6 text-sm text-base-content/60">
+                No pools match your search.
+              </div>
             )}
           </div>
         </div>
@@ -625,7 +723,9 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
               />
               <div className="flex flex-col min-w-0">
                 <span className="font-medium text-sm">{selectedPool.asset.symbol}</span>
-                <span className="text-xs text-base-content/60 truncate">{selectedPool.asset.name}</span>
+                <span className="text-xs text-base-content/60 truncate">
+                  {selectedPool.asset.name}
+                </span>
               </div>
             </div>
           ) : (
@@ -650,16 +750,60 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
           ) : (
             <>
               {actionTab === 'Deposit' && (
-                <DepositAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />
+                <DepositAction
+                  pool={selectedPool}
+                  userPosition={selectedPoolUserPos}
+                  walletBalance={selectedPoolWalletBal}
+                  account={account}
+                  chainId={chainId}
+                  accountId={selectedSubAccountId ?? undefined}
+                  subAccounts={subAccounts}
+                  lenderKey={selectedLender}
+                  nativeToken={nativeToken}
+                  nativeBalance={nativeBalance}
+                />
               )}
               {actionTab === 'Withdraw' && (
-                <WithdrawAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />
+                <WithdrawAction
+                  pool={selectedPool}
+                  userPosition={selectedPoolUserPos}
+                  walletBalance={selectedPoolWalletBal}
+                  account={account}
+                  chainId={chainId}
+                  accountId={selectedSubAccountId ?? undefined}
+                  subAccounts={subAccounts}
+                  lenderKey={selectedLender}
+                  nativeToken={nativeToken}
+                  nativeBalance={nativeBalance}
+                />
               )}
               {actionTab === 'Borrow' && (
-                <BorrowAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />
+                <BorrowAction
+                  pool={selectedPool}
+                  userPosition={selectedPoolUserPos}
+                  walletBalance={selectedPoolWalletBal}
+                  account={account}
+                  chainId={chainId}
+                  accountId={selectedSubAccountId ?? undefined}
+                  subAccounts={subAccounts}
+                  lenderKey={selectedLender}
+                  nativeToken={nativeToken}
+                  nativeBalance={nativeBalance}
+                />
               )}
               {actionTab === 'Repay' && (
-                <RepayAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />
+                <RepayAction
+                  pool={selectedPool}
+                  userPosition={selectedPoolUserPos}
+                  walletBalance={selectedPoolWalletBal}
+                  account={account}
+                  chainId={chainId}
+                  accountId={selectedSubAccountId ?? undefined}
+                  subAccounts={subAccounts}
+                  lenderKey={selectedLender}
+                  nativeToken={nativeToken}
+                  nativeBalance={nativeBalance}
+                />
               )}
             </>
           )}
@@ -670,35 +814,117 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
       {showMobileAction && selectedPool && (
         <div className="modal modal-open md:hidden" onClick={() => setShowMobileAction(false)}>
           <div className="modal-box max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => setShowMobileAction(false)}>✕</button>
+            <button
+              type="button"
+              className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+              onClick={() => setShowMobileAction(false)}
+            >
+              ✕
+            </button>
 
             <div className="space-y-3">
               {/* Operation tabs */}
               <div role="tablist" className="tabs tabs-boxed tabs-xs">
                 {(['Deposit', 'Withdraw', 'Borrow', 'Repay'] as ActionType[]).map((t) => (
-                  <button key={t} type="button" role="tab" className={`tab ${actionTab === t ? 'tab-active' : ''}`} onClick={() => setActionTab(t)}>{t}</button>
+                  <button
+                    key={t}
+                    type="button"
+                    role="tab"
+                    className={`tab ${actionTab === t ? 'tab-active' : ''}`}
+                    onClick={() => setActionTab(t)}
+                  >
+                    {t}
+                  </button>
                 ))}
               </div>
 
               {/* Selected asset */}
               <div className="flex items-center gap-2 p-2 rounded-lg bg-base-200">
-                <img src={selectedPool.asset.logoURI} width={32} height={32} alt={selectedPool.asset.symbol} className="rounded-full object-cover w-8 h-8 shrink-0" />
+                <img
+                  src={selectedPool.asset.logoURI}
+                  width={32}
+                  height={32}
+                  alt={selectedPool.asset.symbol}
+                  className="rounded-full object-cover w-8 h-8 shrink-0"
+                />
                 <div className="flex flex-col min-w-0">
                   <span className="font-medium text-sm">{selectedPool.asset.symbol}</span>
-                  <span className="text-xs text-base-content/60 truncate">{selectedPool.asset.name}</span>
+                  <span className="text-xs text-base-content/60 truncate">
+                    {selectedPool.asset.name}
+                  </span>
                 </div>
               </div>
 
               {!account ? (
-                <div className="w-full flex justify-center"><WalletConnect /></div>
+                <div className="w-full flex justify-center">
+                  <WalletConnect />
+                </div>
               ) : isWrongChain ? (
-                <button type="button" className="btn btn-warning btn-sm w-full" onClick={() => syncChain(Number(chainId))}>Switch Wallet Chain</button>
+                <button
+                  type="button"
+                  className="btn btn-warning btn-sm w-full"
+                  onClick={() => syncChain(Number(chainId))}
+                >
+                  Switch Wallet Chain
+                </button>
               ) : (
                 <>
-                  {actionTab === 'Deposit' && <DepositAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />}
-                  {actionTab === 'Withdraw' && <WithdrawAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />}
-                  {actionTab === 'Borrow' && <BorrowAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />}
-                  {actionTab === 'Repay' && <RepayAction pool={selectedPool} userPosition={selectedPoolUserPos} walletBalance={selectedPoolWalletBal} account={account} accountId={selectedSubAccountId ?? undefined} subAccounts={subAccounts} lenderKey={selectedLender} nativeToken={nativeToken} nativeBalance={nativeBalance} />}
+                  {actionTab === 'Deposit' && (
+                    <DepositAction
+                      pool={selectedPool}
+                      userPosition={selectedPoolUserPos}
+                      walletBalance={selectedPoolWalletBal}
+                      account={account}
+                      chainId={chainId}
+                      accountId={selectedSubAccountId ?? undefined}
+                      subAccounts={subAccounts}
+                      lenderKey={selectedLender}
+                      nativeToken={nativeToken}
+                      nativeBalance={nativeBalance}
+                    />
+                  )}
+                  {actionTab === 'Withdraw' && (
+                    <WithdrawAction
+                      pool={selectedPool}
+                      userPosition={selectedPoolUserPos}
+                      walletBalance={selectedPoolWalletBal}
+                      account={account}
+                      chainId={chainId}
+                      accountId={selectedSubAccountId ?? undefined}
+                      subAccounts={subAccounts}
+                      lenderKey={selectedLender}
+                      nativeToken={nativeToken}
+                      nativeBalance={nativeBalance}
+                    />
+                  )}
+                  {actionTab === 'Borrow' && (
+                    <BorrowAction
+                      pool={selectedPool}
+                      userPosition={selectedPoolUserPos}
+                      walletBalance={selectedPoolWalletBal}
+                      account={account}
+                      chainId={chainId}
+                      accountId={selectedSubAccountId ?? undefined}
+                      subAccounts={subAccounts}
+                      lenderKey={selectedLender}
+                      nativeToken={nativeToken}
+                      nativeBalance={nativeBalance}
+                    />
+                  )}
+                  {actionTab === 'Repay' && (
+                    <RepayAction
+                      pool={selectedPool}
+                      userPosition={selectedPoolUserPos}
+                      walletBalance={selectedPoolWalletBal}
+                      account={account}
+                      chainId={chainId}
+                      accountId={selectedSubAccountId ?? undefined}
+                      subAccounts={subAccounts}
+                      lenderKey={selectedLender}
+                      nativeToken={nativeToken}
+                      nativeBalance={nativeBalance}
+                    />
+                  )}
                 </>
               )}
             </div>

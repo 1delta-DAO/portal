@@ -1,6 +1,6 @@
 // src/components/lending/LenderOperationsBuilder.tsx
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Address, Hex } from 'viem'
+import { useSendLendingTransaction } from '../../hooks/useSendLendingTransaction'
 import { LenderSelectionProvider, useLenderSelection } from '../../contexts/LenderSelectionContext'
 import { LenderOperationSelectionRow } from './LenderOperationSelectionRow'
 import type { UserDataResult } from '../../hooks/lending/useUserData'
@@ -14,7 +14,7 @@ import { LenderData } from '../../hooks/lending/usePoolData'
 import { useSimulatedLenderSelections } from '../../hooks/lending/useSimulatedLenderSelections'
 import type { SimulatedActionState } from '../../contexts/Simulation/simulateLenderSelections'
 import { RunningBalancesOverview } from './RunningBlanacesOverview'
-import { useAccount, useWalletClient } from 'wagmi'
+import { useAccount } from 'wagmi'
 import {
   fetchAllocateAction,
   type AllocateResponseData,
@@ -42,8 +42,8 @@ const LenderOperationsBuilderInner: React.FC<{
   prices?: { [k: string]: number }
 }> = ({ flattenedPools, positionTotals, userConfigs, prices, chainId }) => {
   const { selections, addSelection } = useLenderSelection()
-  const { data: signer } = useWalletClient()
   const { address: account } = useAccount()
+  const { send } = useSendLendingTransaction({ chainId, account })
 
   // Run the simulation based on current selections
   const { steps, finalAssetBalances } = useSimulatedLenderSelections(
@@ -109,30 +109,30 @@ const LenderOperationsBuilderInner: React.FC<{
   }, [account, selections, chainId, finalAssetBalances])
 
   const executeAll = useCallback(async () => {
-    if (!signer || !account || !allocateResult) return
+    if (!account || !allocateResult) return
 
     setExecuting(true)
     try {
       for (const perm of allocateResult.permissionTxns) {
-        await signer.sendTransaction({
-          to: perm.to as Address,
-          data: perm.data as Hex,
-          value: BigInt(perm.value ?? 0),
-        })
+        const { ok, error: txError } = await send(perm)
+        if (!ok) {
+          setFetchError(txError ?? 'Permission transaction failed')
+          return
+        }
       }
 
-      await signer.sendTransaction({
-        to: account as Address,
-        data: allocateResult.data as Hex,
-        value: BigInt(allocateResult.value ?? 0),
+      const { ok, error: txError } = await send({
+        to: account,
+        data: allocateResult.data,
+        value: allocateResult.value ?? '0',
       })
-    } catch (e: any) {
-      console.error('Execution failed:', e)
-      setFetchError(e.message ?? 'Transaction failed')
+      if (!ok) {
+        setFetchError(txError ?? 'Transaction failed')
+      }
     } finally {
       setExecuting(false)
     }
-  }, [signer, account, allocateResult])
+  }, [account, allocateResult, send])
 
   return (
     <div className="space-y-3">

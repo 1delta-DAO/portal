@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Address, Hex, parseUnits } from 'viem'
-import { useAccount, useWalletClient } from 'wagmi'
+import { parseUnits } from 'viem'
+import { useAccount } from 'wagmi'
 import { lenderDisplayNameFull, RawCurrency } from '@1delta/lib-utils'
 import { LenderData, PoolDataItem } from '../../hooks/lending/usePoolData'
 import { sortLenderKeysByTvl } from '../../utils/format'
@@ -8,12 +8,14 @@ import {
   fetchLendingAction,
   type LendingActionResponse,
 } from '../../sdk/lending-helper/fetchLendingAction'
+import { useSendLendingTransaction } from '../../hooks/useSendLendingTransaction'
 
 type ActionType = 'Deposit' | 'Withdraw' | 'Borrow' | 'Repay'
 
 interface Props {
   lenderData: LenderData
   actionType: ActionType
+  chainId: string
 }
 
 const renderCurrency = (asset: RawCurrency) => {
@@ -35,9 +37,9 @@ const renderCurrency = (asset: RawCurrency) => {
   )
 }
 
-export const LendingActionTab = ({ lenderData, actionType }: Props) => {
-  const { data: signer } = useWalletClient()
+export const LendingActionTab = ({ lenderData, actionType, chainId }: Props) => {
   const { address: account } = useAccount()
+  const { send, sending: txSending } = useSendLendingTransaction({ chainId, account })
 
   const lenders = useMemo(() => sortLenderKeysByTvl(lenderData), [lenderData])
 
@@ -113,28 +115,24 @@ export const LendingActionTab = ({ lenderData, actionType }: Props) => {
   }
 
   const execute = async () => {
-    if (!signer || !result) return
+    if (!result) return
 
     setExecuting(true)
     setError(null)
 
     try {
-      if (result.permission) {
-        await signer.sendTransaction({
-          to: result.permission.to as Address,
-          data: result.permission.data as Hex,
-          value: BigInt(result.permission.value ?? 0),
-        })
+      for (const perm of result.permissions) {
+        const permResult = await send(perm)
+        if (!permResult.ok) {
+          setError(permResult.error ?? 'Permission transaction failed')
+          return
+        }
       }
 
-      await signer.sendTransaction({
-        to: result.transaction.to as Address,
-        data: result.transaction.data as Hex,
-        value: BigInt(result.transaction.value ?? 0),
-      })
-    } catch (e: any) {
-      console.error('Execution failed:', e)
-      setError(e.message ?? 'Transaction failed')
+      const { ok, error: txError } = await send(result.transaction)
+      if (!ok) {
+        setError(txError ?? 'Transaction failed')
+      }
     } finally {
       setExecuting(false)
     }

@@ -14,6 +14,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
   userPosition,
   walletBalance,
   account,
+  chainId,
   accountId,
   subAccounts,
   lenderKey,
@@ -42,6 +43,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
       isAll,
       receiveAsset: canUseNative && useNative ? zeroAddress : undefined,
       accountId: hasSubAccounts ? selectedAccountId ?? undefined : undefined,
+      chainId,
     })
 
   // Reset when pool changes

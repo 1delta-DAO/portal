@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react'
-import { Address, Hex } from 'viem'
-import { useWalletClient } from 'wagmi'
+import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
 import type { TradingOperation, TradingQuote, Tx } from './types'
 
 const ENDPOINTS: Record<TradingOperation, string> = {
@@ -59,8 +58,8 @@ interface QuoteState {
   error: string | null
 }
 
-export function useTradingQuotes() {
-  const { data: signer } = useWalletClient()
+export function useTradingQuotes(params: { chainId: string; account?: string }) {
+  const { send } = useSendLendingTransaction({ chainId: params.chainId, account: params.account })
 
   const [state, setState] = useState<QuoteState>({
     quotes: [],
@@ -120,32 +119,26 @@ export function useTradingQuotes() {
 
   const executePermission = useCallback(
     async (tx: Tx) => {
-      if (!signer) return
-      await signer.sendTransaction({
-        to: tx.to as Address,
-        data: tx.data as Hex,
-        value: BigInt(tx.value ?? 0),
-      })
+      const { ok, error: txError } = await send(tx)
+      if (!ok) {
+        setState((s) => ({ ...s, error: txError ?? 'Permission failed' }))
+      }
     },
-    [signer]
+    [send]
   )
 
   const executeQuote = useCallback(async () => {
-    if (state.selectedIndex === null || !signer) return
+    if (state.selectedIndex === null) return
 
     setState((s) => ({ ...s, executing: true, error: null }))
-    try {
-      const quote = state.quotes[state.selectedIndex]
-      await signer.sendTransaction({
-        to: quote.tx.to as Address,
-        data: quote.tx.data as Hex,
-        value: BigInt(quote.tx.value ?? 0),
-      })
-      setState((s) => ({ ...s, executing: false }))
-    } catch (e: any) {
-      setState((s) => ({ ...s, executing: false, error: e.message ?? 'Execution failed' }))
-    }
-  }, [state.selectedIndex, state.quotes, signer])
+    const quote = state.quotes[state.selectedIndex]
+    const { ok, error: txError } = await send(quote.tx)
+    setState((s) => ({
+      ...s,
+      executing: false,
+      error: ok ? null : (txError ?? 'Execution failed'),
+    }))
+  }, [state.selectedIndex, state.quotes, send])
 
   const reset = useCallback(() => {
     setState({
