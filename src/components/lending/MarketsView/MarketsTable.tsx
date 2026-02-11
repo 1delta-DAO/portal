@@ -85,7 +85,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
   )
 
   return (
-    <div className="flex-1 rounded-box border border-base-300 overflow-visible">
+    <div className="flex-1 min-w-0 rounded-box border border-base-300 overflow-hidden">
       {/* ── Desktop table ── */}
       <div className="hidden md:block overflow-x-auto">
         <table className="table table-zebra table-sm table-fixed w-full">

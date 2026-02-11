@@ -21,6 +21,7 @@ import { SearchableSelect, type SearchableSelectOption } from './SearchableSelec
 import { WalletConnect } from '../connect'
 import { formatUsd, abbreviateUsd, formatTokenAmount, computeLenderTvl } from '../../utils/format'
 import { EModeBadge } from './EModeAnalysisModal'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 interface Props {
   lenderData: LenderData | undefined
@@ -49,6 +50,7 @@ export function LendingDashboard({
 }: Props) {
   const { syncChain, currentChainId } = useSyncChain()
   const isWrongChain = !!account && currentChainId !== Number(chainId)
+  const isMobile = useIsMobile()
 
   // Lender selection
   const allLenderKeys = useMemo(() => Object.keys(lenderData ?? {}), [lenderData])
@@ -299,8 +301,8 @@ export function LendingDashboard({
   return (
     <div className="space-y-4">
       {/* Lender selector */}
-      <div className="flex items-center gap-3">
-        <label className="text-sm font-medium">Lender:</label>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="text-sm font-medium shrink-0">Lender:</label>
         <SearchableSelect
           options={lenderOptions}
           value={selectedLender}
@@ -308,7 +310,7 @@ export function LendingDashboard({
           placeholder="Search lenders..."
         />
         {lenderBalances.size > 0 && (
-          <span className="text-xs text-base-content/50">{'\u25CF'} = has balance</span>
+          <span className="text-xs text-base-content/50 shrink-0">{'\u25CF'} = has balance</span>
         )}
       </div>
 
@@ -440,7 +442,7 @@ export function LendingDashboard({
       {/* Two column layout: Markets + Action Panel */}
       <div className="flex gap-4 items-start">
         {/* Left: Market data table */}
-        <div className="flex-1 rounded-box border border-base-300 overflow-hidden">
+        <div className="flex-1 min-w-0 rounded-box border border-base-300 overflow-hidden">
           {/* Search + legend */}
           <div className="p-2 border-b border-base-300 flex items-center gap-3">
             <input
@@ -761,6 +763,7 @@ export function LendingDashboard({
                   lenderKey={selectedLender}
                   nativeToken={nativeToken}
                   nativeBalance={nativeBalance}
+                  subAccount={activeSubAccount ?? undefined}
                 />
               )}
               {actionTab === 'Withdraw' && (
@@ -775,6 +778,7 @@ export function LendingDashboard({
                   lenderKey={selectedLender}
                   nativeToken={nativeToken}
                   nativeBalance={nativeBalance}
+                  subAccount={activeSubAccount ?? undefined}
                 />
               )}
               {actionTab === 'Borrow' && (
@@ -789,6 +793,7 @@ export function LendingDashboard({
                   lenderKey={selectedLender}
                   nativeToken={nativeToken}
                   nativeBalance={nativeBalance}
+                  subAccount={activeSubAccount ?? undefined}
                 />
               )}
               {actionTab === 'Repay' && (
@@ -803,6 +808,7 @@ export function LendingDashboard({
                   lenderKey={selectedLender}
                   nativeToken={nativeToken}
                   nativeBalance={nativeBalance}
+                  subAccount={activeSubAccount ?? undefined}
                 />
               )}
             </>
@@ -811,8 +817,8 @@ export function LendingDashboard({
       </div>
 
       {/* Mobile action panel modal */}
-      {showMobileAction && selectedPool && (
-        <div className="modal modal-open md:hidden" onClick={() => setShowMobileAction(false)}>
+      {isMobile && showMobileAction && selectedPool && (
+        <div className="modal modal-open" onClick={() => setShowMobileAction(false)}>
           <div className="modal-box max-w-sm" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
@@ -881,6 +887,7 @@ export function LendingDashboard({
                       lenderKey={selectedLender}
                       nativeToken={nativeToken}
                       nativeBalance={nativeBalance}
+                      subAccount={activeSubAccount ?? undefined}
                     />
                   )}
                   {actionTab === 'Withdraw' && (
@@ -895,6 +902,7 @@ export function LendingDashboard({
                       lenderKey={selectedLender}
                       nativeToken={nativeToken}
                       nativeBalance={nativeBalance}
+                      subAccount={activeSubAccount ?? undefined}
                     />
                   )}
                   {actionTab === 'Borrow' && (
@@ -909,6 +917,7 @@ export function LendingDashboard({
                       lenderKey={selectedLender}
                       nativeToken={nativeToken}
                       nativeBalance={nativeBalance}
+                      subAccount={activeSubAccount ?? undefined}
                     />
                   )}
                   {actionTab === 'Repay' && (
@@ -923,6 +932,7 @@ export function LendingDashboard({
                       lenderKey={selectedLender}
                       nativeToken={nativeToken}
                       nativeBalance={nativeBalance}
+                      subAccount={activeSubAccount ?? undefined}
                     />
                   )}
                 </>

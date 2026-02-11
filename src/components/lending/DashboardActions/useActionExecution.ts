@@ -1,12 +1,50 @@
 import { useState } from 'react'
 import { parseUnits } from 'viem'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
+import type { UserSubAccount } from '../../../hooks/lending/useUserData'
 import {
   fetchLendingAction,
-  type LendingActionResponse,
+  fetchLendingActionWithSimulation,
+  type LendingActionBody,
+  type LendingActionResponseWithSimulation,
+  type LendingActionSimulation,
 } from '../../../sdk/lending-helper/fetchLendingAction'
 import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
 import type { ActionType } from './types'
+
+function buildSimulationBody(sub: UserSubAccount): LendingActionBody {
+  const bd = sub.balanceData
+  const ad = sub.aprData
+  return {
+    balanceData: {
+      deposits: bd.deposits,
+      debt: bd.debt,
+      adjustedDebt: bd.adjustedDebt,
+      collateral: bd.collateral,
+      collateralAllActive: bd.collateralAllActive,
+      borrowDiscountedCollateral: bd.borrowDiscountedCollateral,
+      borrowDiscountedCollateralAllActive: bd.borrowDiscountedCollateralAllActive,
+      nav: bd.nav,
+      deposits24h: bd.deposits24h,
+      debt24h: bd.debt24h,
+      nav24h: bd.nav24h,
+      rewards: bd.rewards,
+    },
+    aprData: {
+      apr: ad.apr,
+      depositApr: ad.depositApr,
+      borrowApr: ad.borrowApr,
+      rewardApr: ad.rewardApr,
+      rewardDepositApr: ad.rewardDepositApr,
+      rewardBorrowApr: ad.rewardBorrowApr,
+      intrinsicApr: ad.stakingApr,
+      intrinsicDepositApr: ad.stakingDepositApr,
+      intrinsicBorrowApr: ad.stakingBorrowApr,
+      rewards: ad.rewards,
+    },
+    modeId: sub.userConfig.selectedMode,
+  }
+}
 
 export function useActionExecution(params: {
   actionType: ActionType
@@ -22,12 +60,14 @@ export function useActionExecution(params: {
   accountId?: string
   /** Chain ID string for query invalidation */
   chainId?: string
+  /** Active sub-account — when provided, uses POST for simulation */
+  subAccount?: UserSubAccount
 }) {
-  const { actionType, pool, account, amount, isAll, payAsset, receiveAsset, accountId, chainId } =
+  const { actionType, pool, account, amount, isAll, payAsset, receiveAsset, accountId, chainId, subAccount } =
     params
   const { send } = useSendLendingTransaction({ chainId: chainId ?? '', account })
 
-  const [result, setResult] = useState<LendingActionResponse | null>(null)
+  const [result, setResult] = useState<LendingActionResponseWithSimulation | null>(null)
   const [loading, setLoading] = useState(false)
   const [executingPermission, setExecutingPermission] = useState(false)
   const [executingMain, setExecutingMain] = useState(false)
@@ -39,6 +79,7 @@ export function useActionExecution(params: {
   const hasPermissions = permissions.length > 0
   const allPermissionsDone = hasPermissions && permissionsCompleted >= permissions.length
   const executing = executingPermission || executingMain
+  const simulation: LendingActionSimulation | undefined = result?.simulation
 
   const resetState = () => {
     setResult(null)
@@ -55,8 +96,8 @@ export function useActionExecution(params: {
 
     const decimals = pool.asset.decimals ?? 18
     const parsedAmount = parseUnits(amount || '0', decimals)
-    console.log('pool', pool)
-    const response = await fetchLendingAction({
+
+    const actionParams = {
       marketUid: pool.marketUid,
       operator: account,
       amount: parsedAmount.toString(),
@@ -66,7 +107,11 @@ export function useActionExecution(params: {
       payAsset,
       receiveAsset,
       accountId,
-    })
+    }
+
+    const response = subAccount
+      ? await fetchLendingActionWithSimulation(actionParams, buildSimulationBody(subAccount))
+      : await fetchLendingAction(actionParams)
 
     setLoading(false)
     if (!response.success) {
@@ -106,6 +151,7 @@ export function useActionExecution(params: {
 
   return {
     result,
+    simulation,
     loading,
     executing,
     executingPermission,

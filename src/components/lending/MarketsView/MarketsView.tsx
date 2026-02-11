@@ -10,6 +10,7 @@ import { computeLenderTvl } from '../../../utils/format'
 import { computePoolMetrics, resolvePoolDataItem, type SortKey } from './helpers'
 import { MarketsTable } from './MarketsTable'
 import { DepositPanel } from './DepositPanel'
+import { useIsMobile } from '../../../hooks/useIsMobile'
 
 interface LendingPoolsTableProps {
   chainId?: string
@@ -26,6 +27,8 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   externalAssetFilter,
   userData,
 }) => {
+  const isMobile = useIsMobile()
+
   // Filters
   const [search, setSearch] = useState('')
   const [selectedLender, setSelectedLender] = useState<string>('all')
@@ -299,7 +302,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   const showDepositPanel = !!lenderData
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-4 space-y-4">
+    <div className="w-full max-w-6xl mx-auto p-4 space-y-4 overflow-hidden">
       {/* Top row: title + main controls */}
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
@@ -346,8 +349,8 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       </div>
 
       {/* Numeric + asset filters row */}
-      <div className="flex flex-wrap gap-2 items-end">
-        <div className="form-control w-24">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+        <div className="form-control">
           <label className="label py-0">
             <span className="label-text text-xs">Max Util (%)</span>
           </label>
@@ -362,7 +365,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
           />
         </div>
 
-        <div className="form-control w-28">
+        <div className="form-control">
           <label className="label py-0">
             <span className="label-text text-xs">Min APR (%)</span>
           </label>
@@ -376,7 +379,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
           />
         </div>
 
-        <div className="form-control w-36">
+        <div className="form-control">
           <label className="label py-0">
             <span className="label-text text-xs">Min Deposits (USD)</span>
           </label>
@@ -390,7 +393,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
           />
         </div>
 
-        <div className="form-control w-36">
+        <div className="form-control">
           <label className="label py-0">
             <span className="label-text text-xs">Asset (addr / symbol)</span>
           </label>
@@ -442,8 +445,8 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       </div>
 
       {/* Mobile deposit modal */}
-      {showMobileDeposit && selectedEntry && showDepositPanel && (
-        <div className="modal modal-open md:hidden" onClick={() => setShowMobileDeposit(false)}>
+      {isMobile && showMobileDeposit && selectedEntry && showDepositPanel && (
+        <div className="modal modal-open" onClick={() => setShowMobileDeposit(false)}>
           <div className="modal-box max-w-sm" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"

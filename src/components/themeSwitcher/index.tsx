@@ -37,7 +37,7 @@ export function ThemeSwitcher() {
 
   return (
     <select
-      className="select select-bordered select-sm pr-10"
+      className="select select-bordered select-sm"
       value={theme}
       onChange={(e) => setTheme(e.target.value)}
     >

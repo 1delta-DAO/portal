@@ -32,6 +32,56 @@ export interface LendingActionResult {
   error?: string
 }
 
+// ============================================================================
+// POST variant — includes simulation with projected health factor
+// ============================================================================
+
+export interface LendingActionBody {
+  balanceData: {
+    deposits: number
+    debt: number
+    adjustedDebt: number
+    collateral: number
+    collateralAllActive: number
+    borrowDiscountedCollateral: number
+    borrowDiscountedCollateralAllActive: number
+    nav: number
+    deposits24h: number
+    debt24h: number
+    nav24h: number
+    rewards: Record<string, unknown>
+  }
+  aprData: {
+    apr: number
+    depositApr: number
+    borrowApr: number
+    rewardApr: number
+    rewardDepositApr: number
+    rewardBorrowApr: number
+    intrinsicApr: number
+    intrinsicDepositApr: number
+    intrinsicBorrowApr: number
+    rewards: Record<string, unknown>
+  }
+  modeId: number
+}
+
+export interface LendingActionSimulation {
+  balanceData: LendingActionBody['balanceData']
+  aprData: LendingActionBody['aprData']
+  healthFactor: number | null
+}
+
+export interface LendingActionResponseWithSimulation extends LendingActionResponse {
+  simulation?: LendingActionSimulation
+}
+
+export interface LendingActionResultWithSimulation {
+  success: boolean
+  data?: LendingActionResponseWithSimulation
+  error?: string
+}
+
 const LENDING_ACTIONS_BASE = 'https://portal.1delta.io/v1/actions/lending'
 
 export async function fetchLendingAction(
@@ -63,6 +113,49 @@ export async function fetchLendingAction(
     }
 
     const json = (await res.json()) as LendingActionResponse
+    return { success: true, data: json }
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message ?? 'Unknown error',
+    }
+  }
+}
+
+export async function fetchLendingActionWithSimulation(
+  params: LendingActionParams,
+  body: LendingActionBody
+): Promise<LendingActionResultWithSimulation> {
+  try {
+    const action = params.actionType.toLowerCase()
+
+    const qs = new URLSearchParams()
+    qs.set('marketUid', params.marketUid)
+    qs.set('operator', params.operator)
+    qs.set('amount', params.amount)
+
+    if (params.receiver) qs.set('receiver', params.receiver)
+    if (params.payAsset) qs.set('payAsset', params.payAsset)
+    if (params.receiveAsset) qs.set('receiveAsset', params.receiveAsset)
+    if (params.isAll != null) qs.set('isAll', String(params.isAll))
+    if (params.lendingMode) qs.set('lendingMode', params.lendingMode)
+    if (params.accountId) qs.set('accountId', params.accountId)
+
+    const res = await fetch(`${LENDING_ACTIONS_BASE}/${action}?${qs}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      return {
+        success: false,
+        error: `HTTP ${res.status}: ${text || res.statusText}`,
+      }
+    }
+
+    const json = (await res.json()) as LendingActionResponseWithSimulation
     return { success: true, data: json }
   } catch (err: any) {
     return {

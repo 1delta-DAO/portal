@@ -22,6 +22,8 @@ export interface ActionPanelProps {
   nativeToken?: RawCurrency | null
   /** Native token wallet balance */
   nativeBalance?: TokenBalance | null
+  /** Active sub-account — used to send balance/apr data for simulation */
+  subAccount?: UserSubAccount
 }
 
 export interface ActionState {

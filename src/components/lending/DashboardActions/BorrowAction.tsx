@@ -8,6 +8,7 @@ import { AmountQuickButtons } from './AmountQuickButtons'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
 import { lenderSupportsSubAccounts } from './helpers'
+import { HealthFactorProjection } from './HealthFactorProjection'
 
 export const BorrowAction: React.FC<ActionPanelProps> = ({
   pool,
@@ -19,6 +20,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   subAccounts,
   lenderKey,
   nativeToken,
+  subAccount,
 }) => {
   const [amount, setAmount] = useState('')
   const [useNative, setUseNative] = useState(false)
@@ -33,7 +35,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
   const needsAccount = hasSubAccounts && !selectedAccountId
 
-  const { result, loading, executingPermission, executingMain, permissions, hasPermissions, permissionsCompleted, allPermissionsDone, error, fetchAction, executeNextPermission, executeMain, resetState } =
+  const { result, simulation, loading, executingPermission, executingMain, permissions, hasPermissions, permissionsCompleted, allPermissionsDone, error, fetchAction, executeNextPermission, executeMain, resetState } =
     useActionExecution({
       actionType: 'Borrow',
       pool,
@@ -43,6 +45,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
       receiveAsset: canUseNative && useNative ? zeroAddress : undefined,
       accountId: hasSubAccounts ? selectedAccountId ?? undefined : undefined,
       chainId,
+      subAccount,
     })
 
   // Reset when pool changes
@@ -152,6 +155,12 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
       >
         {loading ? <span className="loading loading-spinner loading-xs" /> : 'Prepare Borrow'}
       </button>
+
+      {/* Projected health factor */}
+      <HealthFactorProjection
+        simulation={simulation}
+        currentHealth={subAccount?.health ?? null}
+      />
 
       {result && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">

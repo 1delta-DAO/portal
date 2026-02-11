@@ -8,6 +8,7 @@ import { AmountQuickButtons } from './AmountQuickButtons'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
 import { lenderSupportsSubAccounts } from './helpers'
+import { HealthFactorProjection } from './HealthFactorProjection'
 
 export const DepositAction: React.FC<ActionPanelProps> = ({
   pool,
@@ -20,6 +21,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   lenderKey,
   nativeToken,
   nativeBalance,
+  subAccount,
 }) => {
   const [amount, setAmount] = useState('')
   const [useNative, setUseNative] = useState(false)
@@ -34,7 +36,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
 
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
-  const { result, loading, executingPermission, executingMain, permissions, hasPermissions, permissionsCompleted, allPermissionsDone, error, fetchAction, executeNextPermission, executeMain, resetState } =
+  const { result, simulation, loading, executingPermission, executingMain, permissions, hasPermissions, permissionsCompleted, allPermissionsDone, error, fetchAction, executeNextPermission, executeMain, resetState } =
     useActionExecution({
       actionType: 'Deposit',
       pool,
@@ -44,6 +46,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       payAsset: canUseNative && useNative ? zeroAddress : undefined,
       accountId: hasSubAccounts ? selectedAccountId ?? undefined : undefined,
       chainId,
+      subAccount,
     })
 
   // Reset when pool changes
@@ -126,6 +129,12 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       >
         {loading ? <span className="loading loading-spinner loading-xs" /> : 'Prepare Deposit'}
       </button>
+
+      {/* Projected health factor */}
+      <HealthFactorProjection
+        simulation={simulation}
+        currentHealth={subAccount?.health ?? null}
+      />
 
       {result && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">

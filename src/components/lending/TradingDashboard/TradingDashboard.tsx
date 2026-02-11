@@ -13,6 +13,7 @@ import { ColSwapAction } from './actions/ColSwapAction'
 import { DebtSwapAction } from './actions/DebtSwapAction'
 import { CloseAction } from './actions/CloseAction'
 import type { TradingOperation, SelectedPool, TableHighlight } from './types'
+import { useIsMobile } from '../../../hooks/useIsMobile'
 
 interface Props {
   lenderData: LenderData | undefined
@@ -57,6 +58,7 @@ const OP_LABELS: Record<TradingOperation, string> = {
 export function TradingDashboard({ lenderData, userData, chainId, account, isPublicDataLoading, isUserDataLoading }: Props) {
   const { syncChain, currentChainId } = useSyncChain()
   const isWrongChain = !!account && currentChainId !== Number(chainId)
+  const isMobile = useIsMobile()
 
   // Lender selection
   const allLenderKeys = useMemo(
@@ -209,8 +211,8 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
   return (
     <div className="space-y-4">
       {/* Lender selector */}
-      <div className="flex items-center gap-3">
-        <label className="text-sm font-medium">Lender:</label>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="text-sm font-medium shrink-0">Lender:</label>
         <SearchableSelect
           options={lenderOptions}
           value={selectedLender}
@@ -218,7 +220,7 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
           placeholder="Search lenders..."
         />
         {lenderBalances.size > 0 && (
-          <span className="text-xs text-base-content/50">{'\u25CF'} = has balance</span>
+          <span className="text-xs text-base-content/50 shrink-0">{'\u25CF'} = has balance</span>
         )}
       </div>
 
@@ -323,7 +325,7 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
       {/* Two column: Market table + Action panel */}
       <div className="flex gap-4 items-start">
         {/* Left: Market table (read-only, highlights driven by action panel) */}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <TradingMarketTable
             pools={allPools}
             userPositions={userPositions}
@@ -384,8 +386,8 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
       </div>
 
       {/* Mobile action panel modal */}
-      {showMobileAction && (
-        <div className="modal modal-open md:hidden" onClick={() => setShowMobileAction(false)}>
+      {isMobile && showMobileAction && (
+        <div className="modal modal-open" onClick={() => setShowMobileAction(false)}>
           <div className="modal-box max-w-sm" onClick={(e) => e.stopPropagation()}>
             <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => setShowMobileAction(false)}>✕</button>
 

@@ -8,6 +8,7 @@ import { AmountQuickButtons } from './AmountQuickButtons'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
 import { lenderSupportsSubAccounts } from './helpers'
+import { HealthFactorProjection } from './HealthFactorProjection'
 
 export const RepayAction: React.FC<ActionPanelProps> = ({
   pool,
@@ -20,6 +21,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   lenderKey,
   nativeToken,
   nativeBalance,
+  subAccount,
 }) => {
   const [amount, setAmount] = useState('')
   const [isAll, setIsAll] = useState(false)
@@ -35,7 +37,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
   const needsAccount = hasSubAccounts && !selectedAccountId
 
-  const { result, loading, executingPermission, executingMain, permissions, hasPermissions, permissionsCompleted, allPermissionsDone, error, fetchAction, executeNextPermission, executeMain, resetState } =
+  const { result, simulation, loading, executingPermission, executingMain, permissions, hasPermissions, permissionsCompleted, allPermissionsDone, error, fetchAction, executeNextPermission, executeMain, resetState } =
     useActionExecution({
       actionType: 'Repay',
       pool,
@@ -45,6 +47,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
       payAsset: canUseNative && useNative ? zeroAddress : undefined,
       accountId: hasSubAccounts ? selectedAccountId ?? undefined : undefined,
       chainId,
+      subAccount,
     })
 
   // Reset when pool changes
@@ -162,6 +165,12 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
       >
         {loading ? <span className="loading loading-spinner loading-xs" /> : 'Prepare Repay'}
       </button>
+
+      {/* Projected health factor */}
+      <HealthFactorProjection
+        simulation={simulation}
+        currentHealth={subAccount?.health ?? null}
+      />
 
       {result && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">
