@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 const THEMES = [
   'terminal',
@@ -16,6 +17,8 @@ const THEMES = [
 
 export function ThemeSwitcher() {
   const [theme, setTheme] = useState<string>('synthwave')
+  const [showModal, setShowModal] = useState(false)
+  const isMobile = useIsMobile()
 
   // Initialize from localStorage & apply once on mount
   useEffect(() => {
@@ -35,17 +38,105 @@ export function ThemeSwitcher() {
     window.localStorage.setItem('theme', theme)
   }, [theme])
 
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme)
+    setShowModal(false)
+  }
+
+  // Mobile: Icon button + modal
+  if (isMobile) {
+    return (
+      <>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm btn-circle"
+          onClick={() => setShowModal(true)}
+          aria-label="Change theme"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+            className="w-5 h-5"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4.098 19.902a3.75 3.75 0 005.304 0l6.401-6.402M6.75 21A3.75 3.75 0 013 17.25V4.125C3 3.504 3.504 3 4.125 3h5.25c.621 0 1.125.504 1.125 1.125v4.072M6.75 21a3.75 3.75 0 003.75-3.75V8.197M6.75 21h13.125c.621 0 1.125-.504 1.125-1.125v-5.25c0-.621-.504-1.125-1.125-1.125h-4.072M10.5 8.197l2.88-2.88c.438-.439 1.15-.439 1.59 0l3.712 3.713c.44.44.44 1.152 0 1.59l-2.879 2.88M6.75 17.25h.008v.008H6.75v-.008z"
+            />
+          </svg>
+        </button>
+
+        {showModal && (
+          <div className="modal modal-open" onClick={() => setShowModal(false)}>
+            <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+              <h3 className="font-bold text-lg mb-4">Choose Theme</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {THEMES.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className={`btn btn-sm ${theme === t ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => handleThemeChange(t)}
+                  >
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <div className="modal-action">
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setShowModal(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
+
+  // Desktop: Dropdown with current theme shown
   return (
-    <select
-      className="select select-bordered select-sm"
-      value={theme}
-      onChange={(e) => setTheme(e.target.value)}
-    >
-      {THEMES.map((t) => (
-        <option key={t} value={t}>
-          {t.charAt(0).toUpperCase() + t.slice(1)}
-        </option>
-      ))}
-    </select>
+    <div className="dropdown dropdown-end">
+      <label tabIndex={0} className="btn btn-ghost btn-sm gap-1">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={1.5}
+          stroke="currentColor"
+          className="w-4 h-4"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4.098 19.902a3.75 3.75 0 005.304 0l6.401-6.402M6.75 21A3.75 3.75 0 013 17.25V4.125C3 3.504 3.504 3 4.125 3h5.25c.621 0 1.125.504 1.125 1.125v4.072M6.75 21a3.75 3.75 0 003.75-3.75V8.197M6.75 21h13.125c.621 0 1.125-.504 1.125-1.125v-5.25c0-.621-.504-1.125-1.125-1.125h-4.072M10.5 8.197l2.88-2.88c.438-.439 1.15-.439 1.59 0l3.712 3.713c.44.44.44 1.152 0 1.59l-2.879 2.88M6.75 17.25h.008v.008H6.75v-.008z"
+          />
+        </svg>
+        <span className="text-xs">{theme.charAt(0).toUpperCase() + theme.slice(1)}</span>
+      </label>
+      <ul
+        tabIndex={0}
+        className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-40 mt-2"
+      >
+        {THEMES.map((t) => (
+          <li key={t}>
+            <button
+              type="button"
+              className={`text-sm ${theme === t ? 'active' : ''}`}
+              onClick={() => setTheme(t)}
+            >
+              {t.charAt(0).toUpperCase() + t.slice(1)}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
