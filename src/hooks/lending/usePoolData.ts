@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { BACKEND_BASE_URL } from '../../config/backend'
 
-// @ts-ignore
-const BACKEND_BASE_URL = `https://portal.1delta.io` // import.meta.env.VITE_MARGIN_API_URL
 const endpointLendingLatest = `${BACKEND_BASE_URL}/v1/data/lending/latest?chains=`
 
 // ============================================================================

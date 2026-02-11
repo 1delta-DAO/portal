@@ -42,7 +42,8 @@ interface PoolsApiResponse {
 // Endpoint
 // ============================================================================
 
-const BACKEND_BASE_URL = `https://portal.1delta.io`
+import { BACKEND_BASE_URL } from '../../config/backend'
+
 const endpointPools = `${BACKEND_BASE_URL}/v1/data/lending/pools`
 
 function buildPoolsUrl(base: string, chainIds?: (number | string)[], lenders?: string[]) {

@@ -1,4 +1,4 @@
-const BACKEND_BASE_URL = 'https://portal.1delta.io/v1'
+import { BACKEND_BASE_URL } from '../../config/backend'
 
 // ============================================================================
 // E-Mode List
@@ -30,7 +30,7 @@ export async function fetchEModeList(params: {
     qs.append('lenders', params.lender)
     qs.append('chains', params.chain)
 
-    const res = await fetch(`${BACKEND_BASE_URL}/data/lending/e-mode?${qs}`)
+    const res = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/e-mode?${qs}`)
 
     if (!res.ok) {
       const text = await res.text().catch(() => '')
@@ -110,7 +110,7 @@ export async function fetchEModeAnalysis(params: {
     qs.set('lender', params.lender)
     qs.set('chain', params.chain)
 
-    const res = await fetch(`${BACKEND_BASE_URL}/data/lending/e-mode/analysis?${qs}`, {
+    const res = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/e-mode/analysis?${qs}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params.body),
@@ -166,7 +166,7 @@ export async function fetchEModeSwitch(params: {
     qs.set('lender', params.lender)
     qs.set('eMode', String(params.eMode))
 
-    const res = await fetch(`${BACKEND_BASE_URL}/actions/lending/e-mode?${qs}`)
+    const res = await fetch(`${BACKEND_BASE_URL}/v1/actions/lending/e-mode?${qs}`)
 
     if (!res.ok) {
       const text = await res.text().catch(() => '')

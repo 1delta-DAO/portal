@@ -82,7 +82,9 @@ export interface LendingActionResultWithSimulation {
   error?: string
 }
 
-const LENDING_ACTIONS_BASE = 'https://portal.1delta.io/v1/actions/lending'
+import { BACKEND_BASE_URL } from '../../config/backend'
+
+const LENDING_ACTIONS_BASE = `${BACKEND_BASE_URL}/v1/actions/lending`
 
 export async function fetchLendingAction(
   params: LendingActionParams

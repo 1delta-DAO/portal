@@ -24,13 +24,6 @@ interface RpcCallApiResponse {
 // Types for the parse endpoint
 // ============================================================================
 
-interface JsonRpcResponse {
-  jsonrpc: '2.0'
-  id: number
-  result?: string
-  error?: { code: number; message: string }
-}
-
 interface ParseApiResponse {
   ok: boolean
   data: LenderUserDataEntry[]
@@ -52,7 +45,7 @@ export interface FetchUserDataResult {
 // Constants
 // ============================================================================
 
-const BACKEND_BASE_URL = 'https://portal.1delta.io/v1/data'
+import { BACKEND_BASE_URL } from '../../config/backend'
 
 // ============================================================================
 // Helpers
@@ -91,18 +84,18 @@ export async function fetchUserDataViaRpc(
 ): Promise<FetchUserDataResult> {
   // Step 1: Get RPC call descriptors from backend
   const rpcCallUrl =
-    `${BACKEND_BASE_URL}/lending/user-positions/rpc-call` +
+    `${BACKEND_BASE_URL}/v1/data/lending/user-positions/rpc-call` +
     `?chain=${chainId}&account=${account}`
 
-  const { data: { rpcCallId, rpcCalls } } = await fetchApi<RpcCallApiResponse>(
-    'rpc-call', rpcCallUrl
-  )
+  const {
+    data: { rpcCallId, rpcCalls },
+  } = await fetchApi<RpcCallApiResponse>('rpc-call', rpcCallUrl)
 
   // Step 2: Execute JSON-RPC calls via user's own RPC provider
   const rawResponses = await executeRpcCallsWithRetry(chainId, rpcCalls)
 
   // Step 3: Send results to parse endpoint
-  const parseUrl = `${BACKEND_BASE_URL}/lending/user-positions/parse`
+  const parseUrl = `${BACKEND_BASE_URL}/v1/data/lending/user-positions/parse`
   const { data, summary } = await fetchApi<ParseApiResponse>('parse', parseUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

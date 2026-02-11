@@ -1,4 +1,6 @@
-const WORKER_ENDPOINT = `https://portal.1delta.io/v1/data/prices/latest-asof?hoursAgo=`
+import { BACKEND_BASE_URL } from '../../config/backend'
+
+const WORKER_ENDPOINT = `${BACKEND_BASE_URL}/v1/data/prices/latest-asof?hoursAgo=`
 
 interface OracleData {
   [key: string]: number

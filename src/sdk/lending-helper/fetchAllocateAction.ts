@@ -3,7 +3,9 @@ import { AssetBalanceSnapshot } from '../../contexts/Simulation/simulateLenderSe
 import { CreateTxnResponse, fetchTransactionData } from './fetchFromApi';
 import { generateAllocationActionsForApi } from './toApiParams';
 
-const ALLOCATE_ENDPOINT = 'https://portal.1delta.io/v1/actions/allocate'
+import { BACKEND_BASE_URL } from '../../config/backend'
+
+const ALLOCATE_ENDPOINT = `${BACKEND_BASE_URL}/v1/actions/allocate`
 
 // ---- Allocate-specific types and function ----
 

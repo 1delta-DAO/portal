@@ -1,12 +1,13 @@
 import { useState, useCallback } from 'react'
 import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
 import type { TradingOperation, TradingQuote, Tx } from './types'
+import { BACKEND_BASE_URL } from '../../../config/backend'
 
 const ENDPOINTS: Record<TradingOperation, string> = {
-  Loop: 'https://portal.1delta.io/v1/actions/loop/leverage',
-  ColSwap: 'https://portal.1delta.io/v1/actions/loop/collateral-swap',
-  DebtSwap: 'https://portal.1delta.io/v1/actions/loop/debt-swap',
-  Close: 'https://portal.1delta.io/v1/actions/loop/close',
+  Loop: `${BACKEND_BASE_URL}/v1/actions/loop/leverage`,
+  ColSwap: `${BACKEND_BASE_URL}/v1/actions/loop/collateral-swap`,
+  DebtSwap: `${BACKEND_BASE_URL}/v1/actions/loop/debt-swap`,
+  Close: `${BACKEND_BASE_URL}/v1/actions/loop/close`,
 }
 
 interface QuoteDeltas {

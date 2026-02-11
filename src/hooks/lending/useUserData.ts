@@ -126,8 +126,9 @@ export interface UserDataResult {
 // Endpoint
 // ============================================================================
 
-const BACKEND_BASE_URL = 'https://portal.1delta.io/v1'
-const endpointUserData = `${BACKEND_BASE_URL}/lending/user-positions`
+import { BACKEND_BASE_URL } from '../../config/backend'
+
+const endpointUserData = `${BACKEND_BASE_URL}/v1/lending/user-positions`
 const USE_RPC_FETCH = true
 
 // ============================================================================

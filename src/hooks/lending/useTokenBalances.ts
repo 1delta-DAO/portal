@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 
-const BACKEND_BASE_URL = 'https://portal.1delta.io/v1/data'
+import { BACKEND_BASE_URL } from '../../config/backend'
 
 export interface TokenBalance {
   address: string
@@ -41,7 +41,7 @@ export function useTokenBalances(params: {
     enabled,
     queryFn: async () => {
       const url =
-        `${BACKEND_BASE_URL}/token/balances` +
+        `${BACKEND_BASE_URL}/v1/data/token/balances` +
         `?chainId=${chainId}` +
         `&account=${account}` +
         `&assets=${encodeURIComponent(assets.join(','))}`
