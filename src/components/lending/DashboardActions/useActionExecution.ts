@@ -24,7 +24,8 @@ export function useActionExecution(params: {
   /** Chain ID string for query invalidation */
   chainId?: string
 }) {
-  const { actionType, pool, account, amount, isAll, payAsset, receiveAsset, accountId, chainId } = params
+  const { actionType, pool, account, amount, isAll, payAsset, receiveAsset, accountId, chainId } =
+    params
   const { data: signer } = useWalletClient()
   const walletChainId = useChainId()
   const queryClient = useQueryClient()
@@ -32,7 +33,9 @@ export function useActionExecution(params: {
   /** Verify wallet is on the expected chain before sending any transaction */
   const assertChain = () => {
     if (chainId && walletChainId !== Number(chainId)) {
-      throw new Error(`Wallet is on chain ${walletChainId} but expected chain ${chainId}. Please switch chains.`)
+      throw new Error(
+        `Wallet is on chain ${walletChainId} but expected chain ${chainId}. Please switch chains.`
+      )
     }
   }
 
@@ -40,16 +43,19 @@ export function useActionExecution(params: {
   const [loading, setLoading] = useState(false)
   const [executingPermission, setExecutingPermission] = useState(false)
   const [executingMain, setExecutingMain] = useState(false)
-  const [permissionDone, setPermissionDone] = useState(false)
+  /** Number of permissions that have been successfully executed */
+  const [permissionsCompleted, setPermissionsCompleted] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
-  const hasPermission = !!result?.permission
+  const permissions = result?.permissions ?? []
+  const hasPermissions = permissions.length > 0
+  const allPermissionsDone = hasPermissions && permissionsCompleted >= permissions.length
   const executing = executingPermission || executingMain
 
   const resetState = () => {
     setResult(null)
     setError(null)
-    setPermissionDone(false)
+    setPermissionsCompleted(0)
   }
 
   const fetchAction = async () => {
@@ -57,11 +63,11 @@ export function useActionExecution(params: {
     setLoading(true)
     setError(null)
     setResult(null)
-    setPermissionDone(false)
+    setPermissionsCompleted(0)
 
     const decimals = pool.asset.decimals ?? 18
     const parsedAmount = parseUnits(amount || '0', decimals)
-
+    console.log('pool', pool)
     const response = await fetchLendingAction({
       marketUid: pool.marketUid,
       operator: account,
@@ -82,19 +88,21 @@ export function useActionExecution(params: {
     setResult(response.data ?? null)
   }
 
-  const executePermission = async () => {
-    if (!signer || !result?.permission) return
+  /** Execute the next pending permission transaction */
+  const executeNextPermission = async () => {
+    if (!signer || !hasPermissions || permissionsCompleted >= permissions.length) return
     setExecutingPermission(true)
     setError(null)
 
     try {
       assertChain()
+      const perm = permissions[permissionsCompleted]
       await signer.sendTransaction({
-        to: result.permission.to as Address,
-        data: result.permission.data as Hex,
-        value: BigInt(result.permission.value ?? 0),
+        to: perm.to as Address,
+        data: perm.data as Hex,
+        value: BigInt(perm.value ?? 0),
       })
-      setPermissionDone(true)
+      setPermissionsCompleted((prev) => prev + 1)
     } catch (e: any) {
       console.error('Permission tx failed:', e)
       setError(e.message ?? 'Permission transaction failed')
@@ -135,11 +143,13 @@ export function useActionExecution(params: {
     executing,
     executingPermission,
     executingMain,
-    hasPermission,
-    permissionDone,
+    permissions,
+    hasPermissions,
+    permissionsCompleted,
+    allPermissionsDone,
     error,
     fetchAction,
-    executePermission,
+    executeNextPermission,
     executeMain,
     resetState,
   }

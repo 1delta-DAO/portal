@@ -63,7 +63,7 @@ export interface UserSubAccount {
   balanceData: UserBalanceData
   aprData: UserAprData
   userConfig: UserConfigEntry
-  positions: (UserPositionEntry | number)[]
+  positions: UserPositionEntry[]
 }
 
 export interface LenderUserDataEntry {
@@ -138,11 +138,7 @@ const USE_RPC_FETCH = true
  * useUserData
  * Fetches user lending positions from the /lending/user-positions endpoint.
  */
-export function useUserData(params: {
-  chainId: string
-  account?: string
-  enabled?: boolean
-}) {
+export function useUserData(params: { chainId: string; account?: string; enabled?: boolean }) {
   const { chainId, account } = params
   const enabled = (params.enabled ?? true) && !!account
 
@@ -162,7 +158,11 @@ export function useUserData(params: {
         const text = await r.text().catch(() => '')
         throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
       }
-      const json = await r.json() as { ok: boolean; data: LenderUserDataEntry[]; summary: UserDataSummary }
+      const json = (await r.json()) as {
+        ok: boolean
+        data: LenderUserDataEntry[]
+        summary: UserDataSummary
+      }
       if (!json.ok) {
         throw new Error('API returned ok: false')
       }

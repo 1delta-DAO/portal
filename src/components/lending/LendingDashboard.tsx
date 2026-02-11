@@ -16,6 +16,7 @@ import {
 import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'
 import { WalletConnect } from '../connect'
 import { formatUsd, abbreviateUsd, formatTokenAmount, computeLenderTvl } from '../../utils/format'
+import { EModeBadge } from './EModeAnalysisModal'
 
 interface Props {
   lenderData: LenderData | undefined
@@ -338,6 +339,7 @@ export function LendingDashboard({ lenderData, userData, chainId, account, isPub
                       {sub.health!.toFixed(2)}
                     </span>
                   )}
+                  <EModeBadge subAccount={sub} lender={selectedLender} chainId={chainId} />
                 </button>
               )
             })}

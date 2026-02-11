@@ -32,7 +32,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
   const needsAccount = hasSubAccounts && !selectedAccountId
 
-  const { result, loading, executingPermission, executingMain, hasPermission, permissionDone, error, fetchAction, executePermission, executeMain, resetState } =
+  const { result, loading, executingPermission, executingMain, permissions, hasPermissions, permissionsCompleted, allPermissionsDone, error, fetchAction, executeNextPermission, executeMain, resetState } =
     useActionExecution({
       actionType: 'Borrow',
       pool,
@@ -151,18 +151,32 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
         {loading ? <span className="loading loading-spinner loading-xs" /> : 'Prepare Borrow'}
       </button>
 
-      {result && hasPermission && !permissionDone && (
-        <button
-          type="button"
-          className="btn btn-warning btn-sm w-full"
-          disabled={executingPermission}
-          onClick={executePermission}
-        >
-          {executingPermission ? <span className="loading loading-spinner loading-xs" /> : 'Approve Permission'}
-        </button>
+      {result && hasPermissions && !allPermissionsDone && (
+        <div className="space-y-1">
+          <span className="text-xs text-base-content/60">Approvals ({permissionsCompleted}/{permissions.length})</span>
+          {permissions.map((perm, i) => {
+            const done = i < permissionsCompleted
+            const isCurrent = i === permissionsCompleted
+            return (
+              <button
+                key={i}
+                type="button"
+                className={`btn btn-sm w-full ${done ? 'btn-disabled btn-outline btn-success' : isCurrent ? 'btn-warning' : 'btn-outline btn-ghost'}`}
+                disabled={!isCurrent || executingPermission}
+                onClick={isCurrent ? executeNextPermission : undefined}
+              >
+                {done ? `\u2713 ${perm.info || `Approval ${i + 1}`}` : isCurrent && executingPermission ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  perm.info || `Approval ${i + 1}`
+                )}
+              </button>
+            )
+          })}
+        </div>
       )}
 
-      {result && (!hasPermission || permissionDone) && (
+      {result && (!hasPermissions || allPermissionsDone) && (
         <button
           type="button"
           className="btn btn-success btn-sm w-full"

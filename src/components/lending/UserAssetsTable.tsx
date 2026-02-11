@@ -103,7 +103,7 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
                       <div className="flex items-center gap-2">
                         <div className="bg-base-300 rounded-full w-6 h-6 flex items-center justify-center overflow-hidden flex-shrink-0">
                           {logoURI ? (
-                            <img src={logoURI} width={18} height={18} alt={symbol} className="rounded-full" />
+                            <img src={logoURI} width={18} height={18} alt={symbol} className="rounded-full object-cover w-4.5 h-4.5" />
                           ) : (
                             <span className="text-[10px] font-bold">{symbol.slice(0, 2)}</span>
                           )}

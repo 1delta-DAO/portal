@@ -17,9 +17,13 @@ export interface LendingTransaction {
   value: string
 }
 
+export interface LendingPermission extends LendingTransaction {
+  info?: string
+}
+
 export interface LendingActionResponse {
   transaction: LendingTransaction
-  permission: LendingTransaction & { info?: string }
+  permissions: LendingPermission[]
 }
 
 export interface LendingActionResult {
@@ -59,6 +63,49 @@ export async function fetchLendingAction(
     }
 
     const json = (await res.json()) as LendingActionResponse
+    return { success: true, data: json }
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message ?? 'Unknown error',
+    }
+  }
+}
+
+// ============================================================================
+// Enable / Disable Collateral
+// ============================================================================
+
+export interface CollateralToggleParams {
+  marketUid: string
+  enabled: boolean
+}
+
+export interface CollateralToggleResult {
+  success: boolean
+  data?: LendingTransaction
+  error?: string
+}
+
+export async function fetchCollateralToggle(
+  params: CollateralToggleParams
+): Promise<CollateralToggleResult> {
+  try {
+    const qs = new URLSearchParams()
+    qs.set('marketUid', params.marketUid)
+    qs.set('enabled', String(params.enabled))
+
+    const res = await fetch(`${LENDING_ACTIONS_BASE}/enable-collateral?${qs}`)
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      return {
+        success: false,
+        error: `HTTP ${res.status}: ${text || res.statusText}`,
+      }
+    }
+
+    const json = (await res.json()) as LendingTransaction
     return { success: true, data: json }
   } catch (err: any) {
     return {

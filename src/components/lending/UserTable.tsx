@@ -1,7 +1,10 @@
 // src/components/UserLenderPositionsTable.tsx
-import React from 'react'
+import React, { useState } from 'react'
 import { lenderDisplayName } from '@1delta/lib-utils'
 import type { RawCurrency } from '@1delta/lib-utils'
+import { Address, Hex } from 'viem'
+import { useWalletClient, useChainId } from 'wagmi'
+import { useQueryClient } from '@tanstack/react-query'
 import type {
   UserDataResult,
   LenderUserDataEntry,
@@ -10,6 +13,8 @@ import type {
 } from '../../hooks/lending/useUserData'
 import { useTokenLists } from '../../hooks/useTokenLists'
 import { abbreviateUsd } from '../../utils/format'
+import { fetchCollateralToggle } from '../../sdk/lending-helper/fetchLendingAction'
+
 
 interface UserLenderPositionsTableProps {
   account?: string
@@ -58,7 +63,83 @@ function collectSubAccountPositions(sub: UserSubAccount): TaggedPosition[] {
   return result
 }
 
-const PositionsList: React.FC<{ positions: TaggedPosition[]; tokens: Record<string, RawCurrency> }> = ({ positions, tokens }) => {
+// ---------------------------------------------------------------------------
+// Collateral Toggle
+// ---------------------------------------------------------------------------
+
+const CollateralToggle: React.FC<{
+  marketUid: string
+  enabled: boolean
+  account: string
+  chainId: string
+}> = ({ marketUid, enabled, account, chainId }) => {
+  const { data: signer } = useWalletClient()
+  const walletChainId = useChainId()
+  const queryClient = useQueryClient()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleToggle = async () => {
+    if (!signer || busy) return
+    setBusy(true)
+    setError(null)
+
+    try {
+      if (walletChainId !== Number(chainId)) {
+        throw new Error(`Please switch to chain ${chainId}`)
+      }
+
+      const res = await fetchCollateralToggle({ marketUid, enabled: !enabled })
+      if (!res.success || !res.data) {
+        throw new Error(res.error ?? 'Failed to build collateral toggle tx')
+      }
+
+      await signer.sendTransaction({
+        to: res.data.to as Address,
+        data: res.data.data as Hex,
+        value: BigInt(res.data.value ?? 0),
+      })
+
+      // Refresh user data to recalculate health factors
+      queryClient.invalidateQueries({ queryKey: ['userData', chainId, account] })
+      queryClient.invalidateQueries({ queryKey: ['lendingBalances', chainId, account] })
+    } catch (e: any) {
+      console.error('Collateral toggle failed:', e)
+      setError(e.shortMessage ?? e.message ?? 'Transaction failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="inline-flex items-center gap-1">
+      <input
+        type="checkbox"
+        className={`toggle toggle-xs ${enabled ? 'toggle-success' : ''}`}
+        checked={enabled}
+        disabled={busy || !signer}
+        onChange={handleToggle}
+      />
+      {busy && <span className="loading loading-spinner loading-xs" />}
+      {error && (
+        <span className="text-error text-[9px] max-w-[120px] truncate" title={error}>
+          {error}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Position badges
+// ---------------------------------------------------------------------------
+
+const PositionsList: React.FC<{
+  positions: TaggedPosition[]
+  tokens: Record<string, RawCurrency>
+  account?: string
+  chainId: string
+}> = ({ positions, tokens, account, chainId }) => {
   if (positions.length === 0) return null
 
   return (
@@ -83,7 +164,7 @@ const PositionsList: React.FC<{ positions: TaggedPosition[]; tokens: Record<stri
               {pos.tag}
             </span>
             {token?.logoURI ? (
-              <img src={token.logoURI} alt={symbol} className="w-3.5 h-3.5 rounded-full" />
+              <img src={token.logoURI} alt={symbol} className="w-3.5 h-3.5 rounded-full object-cover" />
             ) : null}
             <span className="text-[10px]">
               {symbol || `${pos.underlying.slice(0, 6)}...${pos.underlying.slice(-4)}`}
@@ -93,6 +174,14 @@ const PositionsList: React.FC<{ positions: TaggedPosition[]; tokens: Record<stri
                 ? `${Number(pos.debt || 0).toFixed(4)} ($${formatUsd(pos.debtUSD)})`
                 : `${Number(pos.deposits || 0).toFixed(4)} ($${formatUsd(pos.depositsUSD)})`}
             </span>
+            {pos.tag === 'collateral' && account && (
+              <CollateralToggle
+                marketUid={pos.marketUid}
+                enabled={pos.collateralEnabled}
+                account={account}
+                chainId={chainId}
+              />
+            )}
           </div>
         )
       })}
@@ -290,6 +379,8 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                             <PositionsList
                               positions={collectSubAccountPositions(subs[0] ?? entry.data[0])}
                               tokens={tokens}
+                              account={account}
+                              chainId={chainId}
                             />
                           </td>
                         </>
@@ -327,7 +418,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                               <HealthBadge health={sub.health} />
                             </td>
                             <td>
-                              <PositionsList positions={positions} tokens={tokens} />
+                              <PositionsList positions={positions} tokens={tokens} account={account} chainId={chainId} />
                             </td>
                           </tr>
                         )
