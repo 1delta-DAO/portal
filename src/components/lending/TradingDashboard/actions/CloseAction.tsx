@@ -13,7 +13,6 @@ import { useTradingQuotes } from '../useTradingQuotes'
 export const CloseAction: React.FC<TradingActionProps> = ({
   allPools,
   userPositions,
-  selectedLender,
   chainId,
   account,
   accountId,
@@ -47,10 +46,8 @@ export const CloseAction: React.FC<TradingActionProps> = ({
   const handleFetchQuotes = () => {
     if (!collateralPool || !debtPool) return
     fetchQuotes('Close', {
-      chainId,
-      lender: selectedLender,
-      collateralAssetIn: collateralPool.asset.address,
-      debtAssetOut: debtPool.asset.address,
+      marketUidIn: collateralPool.marketUid,
+      marketUidOut: debtPool.marketUid,
       amount: parseUnits(amount || '0', collateralPool.asset.decimals).toString(),
       slippage: parseFloat(slippage) || 0.3,
       irModeOut: LendingMode.VARIABLE,

@@ -288,7 +288,7 @@ export const LenderOperationSelectionRow: React.FC<LenderOperationSelectionRowPr
                           value={borrowCapacityAfter}
                           prefix="$"
                           tone="warning"
-                          maximumFractionDigits={1}
+                          maximumFractionDigits={2}
                         />
                       )}
                     </div>

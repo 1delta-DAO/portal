@@ -13,7 +13,6 @@ import { useTradingQuotes } from '../useTradingQuotes'
 export const DebtSwapAction: React.FC<TradingActionProps> = ({
   allPools,
   userPositions,
-  selectedLender,
   chainId,
   account,
   accountId,
@@ -47,10 +46,8 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
   const handleFetchQuotes = () => {
     if (!debtInPool || !debtOutPool) return
     fetchQuotes('DebtSwap', {
-      chainId,
-      lender: selectedLender,
-      debtAssetIn: debtInPool.asset.address,
-      debtAssetOut: debtOutPool.asset.address,
+      marketUidIn: debtInPool.marketUid,
+      marketUidOut: debtOutPool.marketUid,
       amount: parseUnits(amount || '0', debtOutPool.asset.decimals).toString(),
       slippage: parseFloat(slippage) || 0.3,
       irModeIn: LendingMode.VARIABLE,

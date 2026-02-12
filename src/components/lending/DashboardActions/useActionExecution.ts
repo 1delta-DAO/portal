@@ -4,54 +4,11 @@ import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserSubAccount } from '../../../hooks/lending/useUserData'
 import {
   fetchLendingAction,
-  fetchLendingActionWithSimulation,
-  type LendingActionBody,
   type LendingActionResponseWithSimulation,
   type LendingActionSimulation,
 } from '../../../sdk/lending-helper/fetchLendingAction'
 import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
 import type { ActionType } from './types'
-
-function buildSimulationBody(sub: UserSubAccount): LendingActionBody {
-  const bd = sub.balanceData
-  const ad = sub.aprData
-  return {
-    balanceData: {
-      deposits: bd.deposits,
-      debt: bd.debt,
-      adjustedDebt: bd.adjustedDebt,
-      collateral: bd.collateral,
-      collateralAllActive: bd.collateralAllActive,
-      borrowDiscountedCollateral: bd.borrowDiscountedCollateral,
-      borrowDiscountedCollateralAllActive: bd.borrowDiscountedCollateralAllActive,
-      nav: bd.nav,
-      deposits24h: bd.deposits24h,
-      debt24h: bd.debt24h,
-      nav24h: bd.nav24h,
-      rewards: bd.rewards,
-    },
-    aprData: {
-      apr: ad.apr,
-      depositApr: ad.depositApr,
-      borrowApr: ad.borrowApr,
-      rewardApr: ad.rewardApr,
-      rewardDepositApr: ad.rewardDepositApr,
-      rewardBorrowApr: ad.rewardBorrowApr,
-      intrinsicApr: ad.stakingApr,
-      intrinsicDepositApr: ad.stakingDepositApr,
-      intrinsicBorrowApr: ad.stakingBorrowApr,
-      rewards: ad.rewards,
-    },
-    modeId: sub.userConfig.selectedMode,
-    positions: sub.positions.map((p) => ({
-      marketUid: p.marketUid,
-      depositsUSD: p.depositsUSD,
-      debtUSD: p.debtUSD,
-      debtStableUSD: p.debtStableUSD,
-      collateralEnabled: p.collateralEnabled,
-    })),
-  }
-}
 
 export function useActionExecution(params: {
   actionType: ActionType
@@ -67,7 +24,7 @@ export function useActionExecution(params: {
   accountId?: string
   /** Chain ID string for query invalidation */
   chainId?: string
-  /** Active sub-account — when provided, uses POST for simulation */
+  /** Active sub-account — when provided, enables simulation via `simulate` param */
   subAccount?: UserSubAccount
 }) {
   const { actionType, pool, account, amount, isAll, payAsset, receiveAsset, accountId, chainId, subAccount } =
@@ -116,9 +73,10 @@ export function useActionExecution(params: {
       accountId,
     }
 
-    const response = subAccount
-      ? await fetchLendingActionWithSimulation(actionParams, buildSimulationBody(subAccount))
-      : await fetchLendingAction(actionParams)
+    const response = await fetchLendingAction({
+      ...actionParams,
+      simulate: !!subAccount,
+    })
 
     setLoading(false)
     if (!response.success) {

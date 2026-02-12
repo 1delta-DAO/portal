@@ -7,7 +7,6 @@ import {
   fetchEModeSwitch,
   type EModeCategory,
   type EModeAnalysisEntry,
-  type EModeAnalysisBody,
 } from '../../sdk/lending-helper/fetchEMode'
 
 // ============================================================================
@@ -118,34 +117,13 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
       }
 
       // 2. If the user has positions, run the analysis
-      if (hasPositions) {
-        const body: EModeAnalysisBody = {
+      if (hasPositions && account) {
+        const analysisRes = await fetchEModeAnalysis({
+          lender,
+          chain: chainId,
+          operator: account,
           accountId: subAccount.accountId,
-          health: subAccount.health,
-          borrowCapacityUSD: subAccount.borrowCapacityUSD,
-          balanceData: {
-            collateral: subAccount.balanceData.collateral,
-            adjustedDebt: subAccount.balanceData.adjustedDebt,
-            deposits: subAccount.balanceData.deposits,
-            debt: subAccount.balanceData.debt,
-            borrowDiscountedCollateral: subAccount.balanceData.borrowDiscountedCollateral,
-            nav: subAccount.balanceData.nav,
-          },
-          positions: subAccount.positions.map((p) => ({
-            marketUid: p.marketUid,
-            depositsUSD: p.depositsUSD,
-            debtUSD: p.debtUSD,
-            debtStableUSD: p.debtStableUSD,
-            collateralEnabled: p.collateralEnabled,
-          })),
-          userConfig: {
-            selectedMode: subAccount.userConfig.selectedMode,
-            id: subAccount.userConfig.id,
-            isWhitelisted: subAccount.userConfig.isWhitelisted,
-          },
-        }
-
-        const analysisRes = await fetchEModeAnalysis({ lender, chain: chainId, body })
+        })
         if (cancelled) return
 
         if (analysisRes.success && analysisRes.data) {

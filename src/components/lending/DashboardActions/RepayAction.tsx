@@ -61,10 +61,15 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   const debtToken = userPosition
     ? parseAmount(userPosition.debt) + parseAmount(userPosition.debtStable)
     : 0
-  const currentAmount = parseAmount(amount)
-  const overMax = debtToken > 0 && currentAmount > debtToken + 1e-9
 
   const activeBal = canUseNative && useNative ? nativeBalance : walletBalance
+  const activeBalToken = parseAmount(activeBal?.balance ?? 0)
+  const repayMax = debtToken > 0 && activeBalToken > 0
+    ? Math.min(debtToken, activeBalToken)
+    : debtToken
+
+  const currentAmount = parseAmount(amount)
+  const overMax = repayMax > 0 && currentAmount > repayMax + 1e-9
 
   const handleQuickSelect = (val: string) => {
     setIsAll(false)
@@ -73,8 +78,8 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
 
   const handleIsAllChange = (checked: boolean) => {
     setIsAll(checked)
-    if (checked && debtToken > 0) {
-      setAmount(formatTokenForInput(debtToken))
+    if (checked && repayMax > 0) {
+      setAmount(formatTokenForInput(repayMax))
     }
   }
 
@@ -125,7 +130,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
       <div className="form-control">
         <div className="flex justify-between items-center mb-1">
           <span className="label-text text-xs">Amount</span>
-          <AmountQuickButtons maxAmount={debtToken} onSelect={handleQuickSelect} />
+          <AmountQuickButtons maxAmount={repayMax} onSelect={handleQuickSelect} onMax={() => handleIsAllChange(true)} />
         </div>
         <input
           type="text"
@@ -138,20 +143,9 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
         />
       </div>
 
-      {/* Repay full balance toggle */}
-      <label className="label cursor-pointer justify-start gap-2 py-0">
-        <input
-          type="checkbox"
-          className="checkbox checkbox-primary checkbox-xs"
-          checked={isAll}
-          onChange={(e) => handleIsAllChange(e.target.checked)}
-        />
-        <span className="label-text text-xs">Repay full balance</span>
-      </label>
-
       {overMax && !isAll && (
         <div className="text-[10px] text-error">
-          Exceeds repayable debt ({formatTokenAmount(debtToken)}).
+          Exceeds repayable amount ({formatTokenAmount(repayMax)}).
         </div>
       )}
 

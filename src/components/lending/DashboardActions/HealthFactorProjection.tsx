@@ -56,11 +56,11 @@ export const HealthFactorProjection: React.FC<{
         <span className="text-base-content/60">Borrow Capacity:</span>
         <div className="flex items-center gap-1.5">
           <span className="font-semibold">
-            ${simulation.pre.borrowCapacity.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            ${simulation.pre.borrowCapacity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
           <span className="text-base-content/40">{'\u2192'}</span>
           <span className="badge badge-xs font-semibold">
-            ${simulation.post.borrowCapacity.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            ${simulation.post.borrowCapacity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
       </div>

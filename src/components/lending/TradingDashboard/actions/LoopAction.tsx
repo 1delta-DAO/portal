@@ -16,7 +16,6 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   allPools,
   userPositions,
   walletBalances,
-  selectedLender,
   chainId,
   account,
   accountId,
@@ -85,23 +84,21 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   const maxBorrowable = debtPos ? Number(debtPos.borrowable) : 0
 
   const handleFetchQuotes = () => {
-    if (!collateralPool || !debtPool || !selectedPayCurrency) return
+    if (!collateralPool || !debtPool) return
     fetchQuotes('Loop', {
-      chainId,
-      lender: selectedLender,
-      collateralAsset: collateralPool.asset.address,
-      debtAsset: debtPool.asset.address,
-      payAsset: selectedPayCurrency.address,
-      payAmount: parseUnits(payAmount || '0', selectedPayCurrency.decimals).toString(),
+      marketUidIn: debtPool.marketUid,
+      marketUidOut: collateralPool.marketUid,
       debtAmount: parseUnits(debtAmount || '0', debtPool.asset.decimals).toString(),
       slippage: parseFloat(slippage) || 0.3,
       borrowMode: LendingMode.VARIABLE,
       usePendleMintRedeem: false,
+      ...(selectedPayCurrency ? { payAsset: selectedPayCurrency.address } : {}),
+      ...(selectedPayCurrency && payAmount ? { payAmount: parseUnits(payAmount, selectedPayCurrency.decimals).toString() } : {}),
       ...(accountId ? { accountId } : {}),
     }, account)
   }
 
-  const canFetch = !!collateralPool && !!debtPool && !!selectedPayCurrency && (!!debtAmount || !!payAmount)
+  const canFetch = !!collateralPool && !!debtPool && !!debtAmount
 
   return (
     <div className="space-y-3">

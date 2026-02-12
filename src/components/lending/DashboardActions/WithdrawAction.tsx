@@ -110,7 +110,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
       <div className="form-control">
         <div className="flex justify-between items-center mb-1">
           <span className="label-text text-xs">Amount</span>
-          <AmountQuickButtons maxAmount={withdrawableToken} onSelect={handleQuickSelect} />
+          <AmountQuickButtons maxAmount={withdrawableToken} onSelect={handleQuickSelect} onMax={() => handleIsAllChange(true)} />
         </div>
         <input
           type="text"
@@ -122,17 +122,6 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
           disabled={!pool}
         />
       </div>
-
-      {/* Withdraw full balance toggle */}
-      <label className="label cursor-pointer justify-start gap-2 py-0">
-        <input
-          type="checkbox"
-          className="checkbox checkbox-primary checkbox-xs"
-          checked={isAll}
-          onChange={(e) => handleIsAllChange(e.target.checked)}
-        />
-        <span className="label-text text-xs">Withdraw full balance</span>
-      </label>
 
       {overMax && !isAll && (
         <div className="text-[10px] text-error">

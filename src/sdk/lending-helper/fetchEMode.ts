@@ -79,47 +79,21 @@ export interface EModeAnalysisResult {
   error?: string
 }
 
-export interface EModeAnalysisBody {
-  accountId?: string
-  health: number | null
-  borrowCapacityUSD: number
-  balanceData: {
-    collateral: number
-    adjustedDebt: number
-    deposits: number
-    debt: number
-    borrowDiscountedCollateral?: number
-    nav?: number
-  }
-  positions: {
-    marketUid: string
-    depositsUSD: number
-    debtUSD: number
-    debtStableUSD: number
-    collateralEnabled: boolean
-  }[]
-  userConfig: {
-    selectedMode: number
-    id?: string
-    isWhitelisted?: boolean
-  }
-}
-
 export async function fetchEModeAnalysis(params: {
   lender: string
   chain: string
-  body: EModeAnalysisBody
+  operator: string
+  accountId?: string
 }): Promise<EModeAnalysisResult> {
   try {
     const qs = new URLSearchParams()
     qs.set('lender', params.lender)
     qs.set('chain', params.chain)
+    qs.set('operator', params.operator)
+    qs.set('simulate', 'true')
+    if (params.accountId) qs.set('accountId', params.accountId)
 
-    const res = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/e-mode/analysis?${qs}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params.body),
-    })
+    const res = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/e-mode/analysis?${qs}`)
 
     if (!res.ok) {
       const text = await res.text().catch(() => '')
