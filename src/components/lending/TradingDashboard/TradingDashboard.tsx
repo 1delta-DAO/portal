@@ -13,6 +13,7 @@ import { ColSwapAction } from './actions/ColSwapAction'
 import { DebtSwapAction } from './actions/DebtSwapAction'
 import { CloseAction } from './actions/CloseAction'
 import type { TradingOperation, SelectedPool, TableHighlight } from './types'
+import { CollateralToggle } from '../UserTable'
 import { useIsMobile } from '../../../hooks/useIsMobile'
 
 interface Props {
@@ -305,9 +306,19 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
                   <div className="flex flex-col min-w-0">
                     <span className="text-sm font-medium">{pool.asset.symbol}</span>
                     {Number(position.deposits) > 0 && (
-                      <span className="text-xs text-success truncate">
-                        +{formatTokenAmount(position.deposits)} (${formatUsd(position.depositsUSD)})
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-success truncate">
+                          +{formatTokenAmount(position.deposits)} (${formatUsd(position.depositsUSD)})
+                        </span>
+                        {account && (
+                          <CollateralToggle
+                            marketUid={pool.marketUid}
+                            enabled={position.collateralEnabled}
+                            account={account}
+                            chainId={chainId}
+                          />
+                        )}
+                      </div>
                     )}
                     {Number(position.debt) > 0 && (
                       <span className="text-xs text-error truncate">

@@ -152,10 +152,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
       </button>
 
       {/* Projected health factor */}
-      <HealthFactorProjection
-        simulation={simulation}
-        currentHealth={subAccount?.health ?? null}
-      />
+      <HealthFactorProjection simulation={simulation} />
 
       {result && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">

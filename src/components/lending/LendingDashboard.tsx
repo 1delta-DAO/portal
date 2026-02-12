@@ -21,6 +21,7 @@ import { SearchableSelect, type SearchableSelectOption } from './SearchableSelec
 import { WalletConnect } from '../connect'
 import { formatUsd, abbreviateUsd, formatTokenAmount, computeLenderTvl } from '../../utils/format'
 import { EModeBadge } from './EModeAnalysisModal'
+import { CollateralToggle } from './UserTable'
 import { useIsMobile } from '../../hooks/useIsMobile'
 
 interface Props {
@@ -422,9 +423,19 @@ export function LendingDashboard({
                   <div className="flex flex-col min-w-0">
                     <span className="text-sm font-medium">{pool.asset.symbol}</span>
                     {Number(position.deposits) > 0 && (
-                      <span className="text-xs text-success truncate">
-                        +{formatTokenAmount(position.deposits)} (${formatUsd(position.depositsUSD)})
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-success truncate">
+                          +{formatTokenAmount(position.deposits)} (${formatUsd(position.depositsUSD)})
+                        </span>
+                        {account && (
+                          <CollateralToggle
+                            marketUid={pool.marketUid}
+                            enabled={position.collateralEnabled}
+                            account={account}
+                            chainId={chainId}
+                          />
+                        )}
+                      </div>
                     )}
                     {Number(position.debt) > 0 && (
                       <span className="text-xs text-error truncate">

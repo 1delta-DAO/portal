@@ -43,6 +43,13 @@ function buildSimulationBody(sub: UserSubAccount): LendingActionBody {
       rewards: ad.rewards,
     },
     modeId: sub.userConfig.selectedMode,
+    positions: sub.positions.map((p) => ({
+      marketUid: p.marketUid,
+      depositsUSD: p.depositsUSD,
+      debtUSD: p.debtUSD,
+      debtStableUSD: p.debtStableUSD,
+      collateralEnabled: p.collateralEnabled,
+    })),
   }
 }
 

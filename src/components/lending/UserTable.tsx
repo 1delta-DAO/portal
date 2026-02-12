@@ -66,7 +66,7 @@ function collectSubAccountPositions(sub: UserSubAccount): TaggedPosition[] {
 // Collateral Toggle
 // ---------------------------------------------------------------------------
 
-const CollateralToggle: React.FC<{
+export const CollateralToggle: React.FC<{
   marketUid: string
   enabled: boolean
   account: string

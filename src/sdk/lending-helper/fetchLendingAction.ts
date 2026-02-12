@@ -64,12 +64,25 @@ export interface LendingActionBody {
     rewards: Record<string, unknown>
   }
   modeId: number
+  positions: {
+    marketUid: string
+    depositsUSD: number
+    debtUSD: number
+    debtStableUSD: number
+    collateralEnabled: boolean
+  }[]
+}
+
+export interface SimulationState {
+  healthFactor: number | null
+  borrowCapacity: number
+  balanceData: LendingActionBody['balanceData']
+  aprData: LendingActionBody['aprData']
 }
 
 export interface LendingActionSimulation {
-  balanceData: LendingActionBody['balanceData']
-  aprData: LendingActionBody['aprData']
-  healthFactor: number | null
+  pre: SimulationState
+  post: SimulationState
 }
 
 export interface LendingActionResponseWithSimulation extends LendingActionResponse {
