@@ -15,6 +15,8 @@ interface UserAssetsTableProps {
   tokens: Record<string, RawCurrency>
   filterOwned: boolean
   onFilterOwnedChange: (v: boolean) => void
+  selectedAsset: string | null
+  onAssetClick: (address: string) => void
 }
 
 export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
@@ -24,6 +26,8 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
   tokens,
   filterOwned,
   onFilterOwnedChange,
+  selectedAsset,
+  onAssetClick,
 }) => {
   const totalUsd = useMemo(
     () => balances.reduce((sum, b) => sum + b.balanceUSD, 0),
@@ -82,7 +86,7 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
       {/* Table */}
       <div className="rounded-box border border-base-300 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="table table-zebra table-sm w-full">
+          <table className="table table-sm w-full">
             <thead>
               <tr>
                 <th>Asset</th>
@@ -97,8 +101,16 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
                 const symbol = b.symbol || token?.symbol || ''
                 const name = b.name || token?.name || ''
 
+                const isSelected = selectedAsset === b.address.toLowerCase()
+
                 return (
-                  <tr key={b.address}>
+                  <tr
+                    key={b.address}
+                    className={`cursor-pointer transition-colors ${
+                      isSelected ? 'bg-primary/10' : 'hover:bg-base-200'
+                    }`}
+                    onClick={() => onAssetClick(b.address)}
+                  >
                     <td>
                       <div className="flex items-center gap-2">
                         <div className="bg-base-300 rounded-full w-6 h-6 flex items-center justify-center overflow-hidden flex-shrink-0">

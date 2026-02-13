@@ -510,7 +510,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
       {/* Per-lender groups with sub-account rows */}
       <div className="rounded-box border border-base-300 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="table table-zebra table-sm w-full">
+          <table className="table table-sm w-full">
             <thead>
               <tr>
                 <th>Lender / Account</th>

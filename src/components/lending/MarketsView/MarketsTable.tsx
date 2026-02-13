@@ -88,7 +88,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
     <div className="flex-1 min-w-0 rounded-box border border-base-300 overflow-hidden">
       {/* ── Desktop table ── */}
       <div className="hidden md:block overflow-x-auto">
-        <table className="table table-zebra table-sm table-fixed w-full">
+        <table className="table table-sm table-fixed w-full">
           <thead>
             <tr>
               <th>Asset</th>
@@ -122,7 +122,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                 <tr
                   key={`${p.chainId}-${p.lenderKey}-${p.underlyingAddress}`}
                   className={`h-[75px] cursor-pointer transition-colors ${
-                    selected ? 'bg-primary/10' : 'hover:bg-base-200'
+                    selected ? 'bg-primary/10' : 'hover:bg-base-content/5'
                   }`}
                   onClick={() => onRowClick(p)}
                 >
@@ -260,7 +260,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
             <div
               key={`m-${p.chainId}-${p.lenderKey}-${p.underlyingAddress}`}
               className={`p-3 cursor-pointer transition-colors ${
-                selected ? 'bg-primary/10' : 'active:bg-base-200'
+                selected ? 'bg-primary/10' : 'active:bg-base-content/5'
               }`}
               onClick={() => onRowClick(p)}
             >

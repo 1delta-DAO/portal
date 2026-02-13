@@ -6,6 +6,8 @@ export interface SearchableSelectOption {
   label: string
   /** Optional leading indicator (e.g. "● " for balance marker) */
   indicator?: string
+  /** Optional icon URL displayed before the label */
+  icon?: string
 }
 
 interface SearchableSelectProps {
@@ -70,9 +72,12 @@ export function SearchableSelect({
           className={`select select-bordered select-sm flex items-center text-left w-full ${className}`}
           onClick={() => setIsOpen(true)}
         >
-          <span className="truncate">
+          <span className="truncate flex items-center gap-1.5 pr-4">
             {selectedOption ? (
               <>
+                {selectedOption.icon && (
+                  <img src={selectedOption.icon} alt="" className="w-4 h-4 rounded-full" />
+                )}
                 {selectedOption.indicator && (
                   <span className="opacity-60">{selectedOption.indicator}</span>
                 )}
@@ -112,6 +117,9 @@ export function SearchableSelect({
                     }`}
                     onClick={() => handleSelect(opt.value)}
                   >
+                    {opt.icon && (
+                      <img src={opt.icon} alt="" className="w-4 h-4 rounded-full inline-block mr-1.5 align-middle" />
+                    )}
                     {opt.indicator && (
                       <span className="opacity-60 text-xs mr-1">{opt.indicator}</span>
                     )}
@@ -150,9 +158,12 @@ export function SearchableSelect({
         className="select select-bordered select-sm flex items-center text-left w-full"
         onClick={() => setIsOpen((prev) => !prev)}
       >
-        <span className="truncate">
+        <span className="truncate flex items-center gap-1.5 pr-4">
           {selectedOption ? (
             <>
+              {selectedOption.icon && (
+                <img src={selectedOption.icon} alt="" className="w-4 h-4 rounded-full" />
+              )}
               {selectedOption.indicator && (
                 <span className="opacity-60">{selectedOption.indicator}</span>
               )}
@@ -198,6 +209,9 @@ export function SearchableSelect({
                   }`}
                   onClick={() => handleSelect(opt.value)}
                 >
+                  {opt.icon && (
+                    <img src={opt.icon} alt="" className="w-4 h-4 rounded-full" />
+                  )}
                   {opt.indicator && (
                     <span className="opacity-60 text-xs">{opt.indicator}</span>
                   )}

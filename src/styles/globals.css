@@ -21,7 +21,19 @@
     corporate,
     synthwave,
     cyberpunk,
-    luxury;
+    luxury,
+    dracula,
+    retro,
+    nord,
+    aqua,
+    night,
+    sunset,
+    dim,
+    coffee,
+    autumn,
+    valentine,
+    cupcake,
+    business;
 }
 
 @plugin "daisyui/theme" {
@@ -35,8 +47,8 @@
 
   /* Base background + text */
   --color-base-100: #020617; /* main background (near black) */
-  --color-base-200: #020617;
-  --color-base-300: #0b1120;
+  --color-base-200: #06101f; /* zebra-stripe / subtle surface lift */
+  --color-base-300: #0b1a2e; /* borders, deeper surfaces */
   --color-base-content: #bbf7d0; /* soft green-ish text */
 
   /* Primary = neon green */
@@ -74,4 +86,52 @@
   /* Subtle depth, no noise */
   --depth: 0.5;
   --noise: 0;
+}
+
+/* Terminal theme: extra padding for dropdown/menu containers to prevent overlap */
+[data-theme='terminal'] .dropdown-content,
+[data-theme='terminal'] .menu {
+  padding: 0.5rem;
+  gap: 0.25rem;
+}
+
+[data-theme='terminal'] .dropdown-content li > a,
+[data-theme='terminal'] .dropdown-content li > button,
+[data-theme='terminal'] .menu li > a,
+[data-theme='terminal'] .menu li > button {
+  padding: 0.5rem 0.75rem;
+}
+
+/* Dropdown containers that float absolutely – more breathing room */
+[data-theme='terminal'] [class*='dropdown-content'],
+[data-theme='terminal'] .absolute[class*='overflow-auto'],
+[data-theme='terminal'] .absolute[class*='overflow-y-auto'] {
+  padding-block: 0.5rem;
+}
+
+/* Select triggers: prevent content from clipping into the chevron arrow */
+[data-theme='terminal'] .select {
+  padding-right: 2.5rem;
+}
+
+/* Modal boxes in terminal – a bit more inner spacing */
+[data-theme='terminal'] .modal-box {
+  padding: 1.75rem;
+}
+
+/* Cards and bordered containers – more padding so content doesn't crowd edges */
+[data-theme='terminal'] .card-body {
+  padding: 1.25rem;
+}
+
+[data-theme='terminal'] .rounded-box[class*='border'],
+[data-theme='terminal'] .rounded-lg[class*='border'] {
+  padding: 0.75rem;
+}
+
+/* Table rows: ensure hover is always distinct from zebra stripes */
+[data-theme='terminal'] .table tbody tr:hover,
+[data-theme='terminal'] .table-zebra tbody tr:hover {
+  --tw-bg-opacity: 1;
+  background-color: #0f2318; /* dark green tint – clearly visible on both base-100 and base-200 */
 }

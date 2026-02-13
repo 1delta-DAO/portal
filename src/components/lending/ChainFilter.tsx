@@ -1,4 +1,4 @@
-import { getChainName } from '@1delta/lib-utils'
+import { getChainShortName } from '@1delta/lib-utils'
 import React from 'react'
 import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'
 
@@ -20,7 +20,8 @@ export const ChainFilterSelect: React.FC<ChainFilterSelectProps> = ({
     { value: 'all', label: 'All chains' },
     ...uniqueChains.map((c) => ({
       value: c,
-      label: getChainName(c),
+      label: getChainShortName(c),
+      icon: `https://raw.githubusercontent.com/1delta-DAO/chains/main/${c}.webp`,
     })),
   ]
 

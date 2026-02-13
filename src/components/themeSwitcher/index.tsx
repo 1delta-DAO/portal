@@ -1,7 +1,7 @@
 // src/components/themeSwitcher.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useIsMobile } from '../../hooks/useIsMobile'
 
 const THEMES = [
@@ -13,6 +13,18 @@ const THEMES = [
   'synthwave',
   'cyberpunk',
   'luxury',
+  'dracula',
+  'retro',
+  'nord',
+  'aqua',
+  'night',
+  'sunset',
+  'dim',
+  'coffee',
+  'autumn',
+  'valentine',
+  'cupcake',
+  'business',
 ] as const
 
 export function ThemeSwitcher() {
@@ -102,9 +114,27 @@ export function ThemeSwitcher() {
   }
 
   // Desktop: Dropdown with current theme shown
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
   return (
-    <div className="dropdown dropdown-end">
-      <label tabIndex={0} className="btn btn-ghost btn-sm gap-1">
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm gap-1"
+        onClick={() => setOpen((prev) => !prev)}
+      >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
@@ -120,23 +150,28 @@ export function ThemeSwitcher() {
           />
         </svg>
         <span className="text-xs">{theme.charAt(0).toUpperCase() + theme.slice(1)}</span>
-      </label>
-      <ul
-        tabIndex={0}
-        className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-40 mt-2"
-      >
-        {THEMES.map((t) => (
-          <li key={t}>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full p-2 shadow-lg bg-base-100 rounded-box mt-2 grid grid-cols-2 gap-1 w-56 z-50 border border-base-300">
+          {THEMES.map((t) => (
             <button
+              key={t}
               type="button"
-              className={`text-sm ${theme === t ? 'active' : ''}`}
-              onClick={() => setTheme(t)}
+              className={`text-sm text-left px-2.5 py-1.5 rounded-btn transition-colors ${
+                theme === t
+                  ? 'bg-primary text-primary-content font-medium'
+                  : 'hover:bg-base-200'
+              }`}
+              onClick={() => {
+                setTheme(t)
+                setOpen(false)
+              }}
             >
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
-          </li>
-        ))}
-      </ul>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

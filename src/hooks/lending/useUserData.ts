@@ -128,8 +128,8 @@ export interface UserDataResult {
 
 import { BACKEND_BASE_URL } from '../../config/backend'
 
-const endpointUserData = `${BACKEND_BASE_URL}/v1/lending/user-positions`
-const USE_RPC_FETCH = true
+const endpointUserData = `${BACKEND_BASE_URL}/v1/data/lending/user-positions`
+const USE_RPC_FETCH = false
 
 // ============================================================================
 // Hook

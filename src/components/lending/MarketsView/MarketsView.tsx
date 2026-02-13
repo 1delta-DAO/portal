@@ -307,9 +307,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h2 className="text-2xl font-bold">Lending Markets</h2>
-          <p className="text-sm text-base-content/70">
-            Flattened view of pools enriched with APR, utilization and exposure.
-          </p>
+          <p className="text-sm text-base-content/70">Deposit into lending pools to earn yield.</p>
           <p className="text-xs text-base-content/50 mt-1">{getChainName(chainId)}</p>
         </div>
 

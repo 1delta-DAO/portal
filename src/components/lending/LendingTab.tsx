@@ -37,6 +37,9 @@ export function LenderTab() {
   // Filter markets to owned assets toggle
   const [filterOwned, setFilterOwned] = useState(false)
 
+  // Single-asset filter (click a row in UserAssetsTable)
+  const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
+
   const { lenderData, isPublicDataLoading } = useMarginPublicData(effectiveChainId)
   const { userData, isUserDataLoading, error, refetch } = useUserData({
     chainId: effectiveChainId,
@@ -52,11 +55,12 @@ export function LenderTab() {
 
   const isLoading = isPublicDataLoading || isUserDataLoading
 
-  // Build external asset filter: comma-separated addresses when checkbox is on
+  // Build external asset filter: single clicked asset takes precedence, then owned filter
   const externalAssetFilter = useMemo(() => {
+    if (selectedAsset) return selectedAsset
     if (!filterOwned || lendingBalances.length === 0) return ''
     return lendingBalances.map((b) => b.address.toLowerCase()).join(',')
-  }, [filterOwned, lendingBalances])
+  }, [selectedAsset, filterOwned, lendingBalances])
 
   return (
     <div className="space-y-4">
@@ -145,6 +149,11 @@ export function LenderTab() {
                   tokens={tokens}
                   filterOwned={filterOwned}
                   onFilterOwnedChange={setFilterOwned}
+                  selectedAsset={selectedAsset}
+                  onAssetClick={(address) => {
+                    const addr = address.toLowerCase()
+                    setSelectedAsset((prev) => (prev === addr ? null : addr))
+                  }}
                 />
               )}
 

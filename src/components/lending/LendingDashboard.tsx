@@ -95,6 +95,7 @@ export function LendingDashboard({
   const lenderOptions: SearchableSelectOption[] = lenders.map((l) => ({
     value: l,
     label: lenderDisplayNameFull(l),
+    icon: `https://raw.githubusercontent.com/1delta-DAO/protocol-icons/main/lender/${l.toLowerCase()}.webp`,
     indicator: lenderBalances.has(l) ? '\u25CF ' : undefined,
   }))
 
@@ -359,7 +360,12 @@ export function LendingDashboard({
                       {sub.health!.toFixed(2)}
                     </span>
                   )}
-                  <EModeBadge subAccount={sub} lender={selectedLender} chainId={chainId} account={account} />
+                  <EModeBadge
+                    subAccount={sub}
+                    lender={selectedLender}
+                    chainId={chainId}
+                    account={account}
+                  />
                 </button>
               )
             })}
@@ -425,7 +431,8 @@ export function LendingDashboard({
                     {Number(position.deposits) > 0 && (
                       <div className="flex items-center gap-1">
                         <span className="text-xs text-success truncate">
-                          +{formatTokenAmount(position.deposits)} (${formatUsd(position.depositsUSD)})
+                          +{formatTokenAmount(position.deposits)} ($
+                          {formatUsd(position.depositsUSD)})
                         </span>
                         {account && (
                           <CollateralToggle
