@@ -426,23 +426,13 @@ export function LendingDashboard({
                     alt={pool.asset.symbol}
                     className="rounded-full object-cover w-8 h-8 shrink-0"
                   />
-                  <div className="flex flex-col min-w-0">
+                  <div className="flex flex-col min-w-0 flex-1">
                     <span className="text-sm font-medium">{pool.asset.symbol}</span>
                     {Number(position.deposits) > 0 && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-success truncate">
-                          +{formatTokenAmount(position.deposits)} ($
-                          {formatUsd(position.depositsUSD)})
-                        </span>
-                        {account && (
-                          <CollateralToggle
-                            marketUid={pool.marketUid}
-                            enabled={position.collateralEnabled}
-                            account={account}
-                            chainId={chainId}
-                          />
-                        )}
-                      </div>
+                      <span className="text-xs text-success truncate">
+                        +{formatTokenAmount(position.deposits)} ($
+                        {formatUsd(position.depositsUSD)})
+                      </span>
                     )}
                     {Number(position.debt) > 0 && (
                       <span className="text-xs text-error truncate">
@@ -450,6 +440,17 @@ export function LendingDashboard({
                       </span>
                     )}
                   </div>
+                  {Number(position.deposits) > 0 && account && (
+                    <div className="flex flex-col items-center shrink-0">
+                      <span className="text-[9px] text-base-content/50 leading-tight">Coll.</span>
+                      <CollateralToggle
+                        marketUid={pool.marketUid}
+                        enabled={position.collateralEnabled}
+                        account={account}
+                        chainId={chainId}
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -206,7 +206,7 @@ const MobileSummaryCard: React.FC<{ summary: any }> = ({ summary }) => (
   <div className="grid grid-cols-2 gap-2">
     <div className="card bg-base-200 p-3">
       <div className="text-xs text-base-content/60">Net Worth</div>
-      <div className="text-lg font-bold">${abbreviateUsd(summary.totalNetWorth)}</div>
+      <div className="text-lg font-bold">{abbreviateUsd(summary.totalNetWorth)}</div>
       {summary.totalNetWorth24h != null && summary.totalNetWorth24h !== 0 && (
         <div
           className={`text-xs ${
@@ -223,11 +223,11 @@ const MobileSummaryCard: React.FC<{ summary: any }> = ({ summary }) => (
     </div>
     <div className="card bg-base-200 p-3">
       <div className="text-xs text-base-content/60">Deposits</div>
-      <div className="text-sm font-semibold">${abbreviateUsd(summary.totalDepositsUSD)}</div>
+      <div className="text-sm font-semibold">{abbreviateUsd(summary.totalDepositsUSD)}</div>
     </div>
     <div className="card bg-base-200 p-3">
       <div className="text-xs text-base-content/60">Debt</div>
-      <div className="text-sm font-semibold">${abbreviateUsd(summary.totalDebtUSD)}</div>
+      <div className="text-sm font-semibold">{abbreviateUsd(summary.totalDebtUSD)}</div>
     </div>
     {summary.overallLeverage > 1 && (
       <div className="card bg-base-200 p-3 col-span-2">
