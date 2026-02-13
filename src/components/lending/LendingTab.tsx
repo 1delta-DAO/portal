@@ -1,7 +1,7 @@
 // src/components/LenderTab.tsx
 import React, { useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
-import { getAvailableMarginChainIds } from '@1delta/lib-utils'
+import { useChains } from '../../hooks/useChains'
 import { UserLenderPositionsTable } from './UserTable'
 import { UserAssetsTable } from './UserAssetsTable'
 import { LendingPoolsTable } from './MarketsView'
@@ -17,12 +17,11 @@ import { TradingDashboard } from './TradingDashboard'
 
 type SubTab = 'earn' | 'lending' | 'operations' | 'trading'
 
-const chains = getAvailableMarginChainIds()
-
 const SHOW_OPERATIONS_TAB = false
 
 export function LenderTab() {
   const { address: account } = useAccount()
+  const chains = useChains()
 
   // shared chain filter state
   const [selectedChain, setSelectedChain] = useState<string>('1')

@@ -9,6 +9,7 @@ import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
 import { lenderSupportsSubAccounts } from './helpers'
 import { HealthFactorProjection } from './HealthFactorProjection'
+import { TransactionSuccess } from './TransactionSuccess'
 
 export const BorrowAction: React.FC<ActionPanelProps> = ({
   pool,
@@ -33,9 +34,8 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   }, [accountId])
 
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
-  const needsAccount = hasSubAccounts && !selectedAccountId
 
-  const { result, simulation, loading, executingPermission, executingMain, permissions, hasPermissions, permissionsCompleted, allPermissionsDone, error, fetchAction, executeNextPermission, executeMain, resetState } =
+  const { result, simulation, loading, executingPermission, executingMain, permissions, hasPermissions, permissionsCompleted, allPermissionsDone, error, txSuccess, executeNextPermission, executeMain, resetState, dismissSuccess } =
     useActionExecution({
       actionType: 'Borrow',
       pool,
@@ -60,6 +60,18 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
     ? parseAmount(userPosition.debt) + parseAmount(userPosition.debtStable)
     : 0
   const borrowableToken = userPosition ? parseAmount(userPosition.borrowable) : 0
+
+  if (txSuccess) {
+    return (
+      <TransactionSuccess
+        actionType={txSuccess.actionType}
+        amount={txSuccess.amount}
+        symbol={txSuccess.symbol}
+        hash={txSuccess.hash}
+        onDismiss={() => { dismissSuccess(); setAmount('') }}
+      />
+    )
+  }
 
   return (
     <div className="space-y-3">
@@ -147,14 +159,12 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
 
       {error && <div className="text-error text-xs wrap-break-word">{error}</div>}
 
-      <button
-        type="button"
-        className="btn btn-primary btn-sm w-full"
-        disabled={loading || !pool || !account || needsAccount}
-        onClick={fetchAction}
-      >
-        {loading ? <span className="loading loading-spinner loading-xs" /> : 'Prepare Borrow'}
-      </button>
+      {loading && (
+        <div className="flex items-center justify-center gap-2 py-1 text-xs text-base-content/60">
+          <span className="loading loading-spinner loading-xs" />
+          <span>Simulating...</span>
+        </div>
+      )}
 
       {/* Projected health factor */}
       <HealthFactorProjection simulation={simulation} />
