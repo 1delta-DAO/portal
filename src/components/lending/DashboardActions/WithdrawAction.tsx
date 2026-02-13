@@ -35,18 +35,33 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
 
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
-  const { result, simulation, loading, executingPermission, executingMain, permissions, hasPermissions, permissionsCompleted, allPermissionsDone, error, txSuccess, executeNextPermission, executeMain, resetState, dismissSuccess } =
-    useActionExecution({
-      actionType: 'Withdraw',
-      pool,
-      account,
-      amount,
-      isAll,
-      receiveAsset: canUseNative && useNative ? zeroAddress : undefined,
-      accountId: hasSubAccounts ? selectedAccountId ?? undefined : undefined,
-      chainId,
-      subAccount,
-    })
+  const {
+    result,
+    simulation,
+    loading,
+    executingPermission,
+    executingMain,
+    permissions,
+    hasPermissions,
+    permissionsCompleted,
+    allPermissionsDone,
+    error,
+    txSuccess,
+    executeNextPermission,
+    executeMain,
+    resetState,
+    dismissSuccess,
+  } = useActionExecution({
+    actionType: 'Withdraw',
+    pool,
+    account,
+    amount,
+    isAll,
+    receiveAsset: canUseNative && useNative ? zeroAddress : undefined,
+    accountId: hasSubAccounts ? (selectedAccountId ?? undefined) : undefined,
+    chainId,
+    subAccount,
+  })
 
   // Reset when pool changes
   useEffect(() => {
@@ -68,8 +83,8 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
 
   const handleIsAllChange = (checked: boolean) => {
     setIsAll(checked)
-    if (checked && depositsToken > 0) {
-      setAmount(formatTokenForInput(depositsToken))
+    if (checked && withdrawableToken > 0) {
+      setAmount(formatTokenForInput(withdrawableToken))
     }
   }
 
@@ -80,7 +95,11 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
         amount={txSuccess.amount}
         symbol={txSuccess.symbol}
         hash={txSuccess.hash}
-        onDismiss={() => { dismissSuccess(); setAmount(''); setIsAll(false) }}
+        onDismiss={() => {
+          dismissSuccess()
+          setAmount('')
+          setIsAll(false)
+        }}
       />
     )
   }
@@ -122,7 +141,11 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
       <div className="form-control">
         <div className="flex justify-between items-center mb-1">
           <span className="label-text text-xs">Amount</span>
-          <AmountQuickButtons maxAmount={withdrawableToken} onSelect={handleQuickSelect} onMax={() => handleIsAllChange(true)} />
+          <AmountQuickButtons
+            maxAmount={withdrawableToken}
+            onSelect={handleQuickSelect}
+            onMax={() => handleIsAllChange(true)}
+          />
         </div>
         <input
           type="text"
@@ -130,7 +153,10 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
           className="input input-bordered input-sm w-full"
           placeholder="0.0"
           value={amount}
-          onChange={(e) => { setIsAll(false); setAmount(e.target.value) }}
+          onChange={(e) => {
+            setIsAll(false)
+            setAmount(e.target.value)
+          }}
           disabled={!pool}
         />
       </div>
@@ -155,7 +181,9 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
 
       {result && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">
-          <span className="text-xs text-base-content/60">Approvals ({permissionsCompleted}/{permissions.length})</span>
+          <span className="text-xs text-base-content/60">
+            Approvals ({permissionsCompleted}/{permissions.length})
+          </span>
           {permissions.map((perm, i) => {
             const done = i < permissionsCompleted
             const isCurrent = i === permissionsCompleted
@@ -167,7 +195,9 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
                 disabled={!isCurrent || executingPermission}
                 onClick={isCurrent ? executeNextPermission : undefined}
               >
-                {done ? `\u2713 ${perm.description || `Approval ${i + 1}`}` : isCurrent && executingPermission ? (
+                {done ? (
+                  `\u2713 ${perm.description || `Approval ${i + 1}`}`
+                ) : isCurrent && executingPermission ? (
                   <span className="loading loading-spinner loading-xs" />
                 ) : (
                   perm.description || `Approval ${i + 1}`
@@ -185,7 +215,11 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
           disabled={executingMain}
           onClick={executeMain}
         >
-          {executingMain ? <span className="loading loading-spinner loading-xs" /> : 'Execute Withdraw'}
+          {executingMain ? (
+            <span className="loading loading-spinner loading-xs" />
+          ) : (
+            'Execute Withdraw'
+          )}
         </button>
       )}
     </div>
