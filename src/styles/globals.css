@@ -15,6 +15,11 @@
 @plugin "daisyui" {
   themes:
     terminal,
+    nebula,
+    mars,
+    aurora,
+    cosmos,
+    ember,
     light --default,
     dark --prefersdark,
     forest,
@@ -84,6 +89,190 @@
   --border: 1px;
 
   /* Subtle depth, no noise */
+  --depth: 0.5;
+  --noise: 0;
+}
+
+/* ──────────────────────────────────────────
+   SPACE THEMES
+   ────────────────────────────────────────── */
+
+@plugin "daisyui/theme" {
+  name: 'nebula';
+  color-scheme: dark;
+
+  --color-base-100: #0a0015;
+  --color-base-200: #130025;
+  --color-base-300: #1f0040;
+  --color-base-content: #e8d5f5;
+
+  --color-primary: #a855f7;
+  --color-primary-content: #1a0030;
+
+  --color-secondary: #ec4899;
+  --color-secondary-content: #2a0020;
+
+  --color-accent: #c084fc;
+  --color-accent-content: #1a0030;
+
+  --color-neutral: #0a0015;
+  --color-neutral-content: #e5e7eb;
+
+  --color-info: #818cf8;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
+
+  --radius-selector: 0.375rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0.5;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: 'mars';
+  color-scheme: dark;
+
+  --color-base-100: #1a0a05;
+  --color-base-200: #2a1208;
+  --color-base-300: #3d1c0e;
+  --color-base-content: #fcd5b8;
+
+  --color-primary: #ef4444;
+  --color-primary-content: #1a0505;
+
+  --color-secondary: #f97316;
+  --color-secondary-content: #1a0d05;
+
+  --color-accent: #fb923c;
+  --color-accent-content: #1a0d05;
+
+  --color-neutral: #1a0a05;
+  --color-neutral-content: #e5e7eb;
+
+  --color-info: #60a5fa;
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+  --color-error: #dc2626;
+
+  --radius-selector: 0.375rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0.5;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: 'aurora';
+  color-scheme: dark;
+
+  --color-base-100: #020c15;
+  --color-base-200: #051525;
+  --color-base-300: #0a2035;
+  --color-base-content: #ccfbf1;
+
+  --color-primary: #14b8a6;
+  --color-primary-content: #021a16;
+
+  --color-secondary: #06b6d4;
+  --color-secondary-content: #021a20;
+
+  --color-accent: #2dd4bf;
+  --color-accent-content: #021a16;
+
+  --color-neutral: #020c15;
+  --color-neutral-content: #e5e7eb;
+
+  --color-info: #38bdf8;
+  --color-success: #22c55e;
+  --color-warning: #facc15;
+  --color-error: #f87171;
+
+  --radius-selector: 0.375rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0.5;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: 'cosmos';
+  color-scheme: dark;
+
+  --color-base-100: #000510;
+  --color-base-200: #000a1a;
+  --color-base-300: #001030;
+  --color-base-content: #e0e7ff;
+
+  --color-primary: #6366f1;
+  --color-primary-content: #0a0a2e;
+
+  --color-secondary: #8b5cf6;
+  --color-secondary-content: #0f0a2e;
+
+  --color-accent: #a78bfa;
+  --color-accent-content: #0f0a2e;
+
+  --color-neutral: #000510;
+  --color-neutral-content: #e5e7eb;
+
+  --color-info: #38bdf8;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
+
+  --radius-selector: 0.375rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0.5;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: 'ember';
+  color-scheme: dark;
+
+  --color-base-100: #1a1210;
+  --color-base-200: #251a16;
+  --color-base-300: #32221c;
+  --color-base-content: #fde8d8;
+
+  --color-primary: #f97316;
+  --color-primary-content: #1a0d05;
+
+  --color-secondary: #ea580c;
+  --color-secondary-content: #1a0905;
+
+  --color-accent: #fb923c;
+  --color-accent-content: #1a0d05;
+
+  --color-neutral: #1a1210;
+  --color-neutral-content: #e5e7eb;
+
+  --color-info: #38bdf8;
+  --color-success: #4ade80;
+  --color-warning: #facc15;
+  --color-error: #ef4444;
+
+  --radius-selector: 0.375rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
   --depth: 0.5;
   --noise: 0;
 }

@@ -6,6 +6,11 @@ import { useIsMobile } from '../../hooks/useIsMobile'
 
 const THEMES = [
   'terminal',
+  'nebula',
+  'mars',
+  'aurora',
+  'cosmos',
+  'ember',
   'light',
   'dark',
   'forest',
