@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { LenderTab } from './components/lending/LendingTab'
 import { ThemeSwitcher } from './components/themeSwitcher'
 import { WalletConnect } from './components/connect'
+import { BlackHoleLogo } from './components/BlackHoleLogo'
 import { fetchLenderMetaFromDirAndInitialize } from '@1delta/margin-fetcher'
 import { fetchLenderLabels } from '@1delta/lib-utils'
 
@@ -14,8 +15,12 @@ export default function App() {
   return (
     <div className="min-h-screen bg-base-200 text-base-content overflow-x-hidden">
       <div className="navbar bg-base-100 shadow-lg fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 lg:px-8 ">
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-3xl font-bold text-primary truncate">Allocator</h1>
+        <div className="flex-1 min-w-0 gap">
+          <h1 className="text-xl sm:text-3xl">
+            <span className="text-primary">P</span>
+            <BlackHoleLogo />
+            <span className="text-primary">RTAL</span>
+          </h1>
         </div>
         <div className="flex gap-2 items-center">
           <ThemeSwitcher />
