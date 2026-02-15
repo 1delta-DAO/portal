@@ -87,9 +87,10 @@ export async function fetchUserDataViaRpc(
   account: string
 ): Promise<FetchUserDataResult> {
   // Step 1: Get RPC call descriptors from backend
+  const batches = chainId === '1' ? `&batchSize=500` : ''
   const rpcCallUrl =
     `${BACKEND_BASE_URL}/v1/data/lending/user-positions/rpc-call` +
-    `?chain=${chainId}&account=${account}`
+    `?chain=${chainId}&account=${account}${batches}`
 
   const {
     data: { rpcCallId, rpcCalls },

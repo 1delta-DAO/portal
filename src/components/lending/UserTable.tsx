@@ -335,7 +335,7 @@ const MobileLenderCard: React.FC<{
               <span className="text-xs text-base-content/50">{subs.length} accounts</span>
             )}
           </div>
-          {hasSingleSub && <HealthBadge health={entry.healthFactor} />}
+          {hasSingleSub && <HealthBadge health={entry.healthFactor ?? subs[0]?.health} />}
         </div>
 
         {/* Single sub-account inline */}
@@ -622,7 +622,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                             </div>
                           </td>
                           <td>
-                            <HealthBadge health={entry.healthFactor} />
+                            <HealthBadge health={entry.healthFactor ?? subs[0]?.health} />
                           </td>
                           <td>
                             <PositionsList
