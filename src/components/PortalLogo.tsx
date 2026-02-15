@@ -1,71 +1,106 @@
 export function PortalLogo({ className = '' }: { className?: string }) {
   return (
     <svg
-      className={`inline-block ${className}`}
+      className={className}
       viewBox="0 0 400 400"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
-      style={{ width: '1.15em', height: '1.15em', verticalAlign: '-0.18em' }}
     >
       <defs>
-        <radialGradient id="bh-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="var(--color-base-100)" />
-          <stop offset="55%" stopColor="var(--color-primary)" stopOpacity="0.15" />
-          <stop offset="80%" stopColor="var(--color-primary)" stopOpacity="0.5" />
-          <stop offset="100%" stopColor="var(--color-accent)" />
-        </radialGradient>
-
-        <linearGradient id="bh-disk" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="var(--color-accent)" />
-          <stop offset="50%" stopColor="var(--color-primary)" />
-          <stop offset="100%" stopColor="var(--color-accent)" />
-        </linearGradient>
-
         <filter id="bh-blur" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="10" />
         </filter>
       </defs>
 
-      {/* outer glow */}
+      {/* outer glow (background) */}
       <circle cx="200" cy="200" r="120" fill="var(--color-primary)" filter="url(#bh-blur)" />
 
-      {/* accretion disk */}
-      <ellipse
-        cx="200"
-        cy="200"
-        rx="175"
-        ry="30"
-        fill="var(--color-primary)"
+      {/* Top portions of accretion disk (behind black hole) */}
+      <path
+        d="M 25 200 A 175 35 0 0 1 375 200"
+        fill="none"
+        stroke="var(--color-primary)"
+        strokeWidth="8"
+        opacity="0.3"
+      />
+      <path
+        d="M 50 200 A 150 30 0 0 1 350 200"
+        fill="none"
+        stroke="var(--color-primary)"
+        strokeWidth="12"
+        opacity="0.4"
+      />
+      <path
+        d="M 75 200 A 125 25 0 0 1 325 200"
+        fill="none"
+        stroke="var(--color-primary)"
+        strokeWidth="14"
+        opacity="0.5"
+      />
+      <path
+        d="M 95 200 A 105 20 0 0 1 305 200"
+        fill="none"
         stroke="var(--color-primary)"
         strokeWidth="16"
-        transform="rotate(-180 200 200)"
-        opacity="0.85"
+        opacity="0.6"
       />
-
-      <ellipse
-        cx="200"
-        cy="200"
-        rx="185"
-        ry="15"
-        fill="var(--color-base-100)"
-        stroke="var(--color-base-100)"
-        strokeWidth="12"
-        transform="rotate(-180 200 200)"
-        opacity="1"
+      <path
+        d="M 110 200 A 90 15 0 0 1 290 200"
+        fill="none"
+        stroke="var(--color-accent)"
+        strokeWidth="10"
+        opacity="0.7"
       />
 
       {/* inner black hole */}
       <circle cx="200" cy="200" r="78" fill="var(--color-base-100)" />
 
-      {/* subtle rim highlight */}
+      {/* Bottom portions of accretion disk (in front of black hole) */}
+      <path
+        d="M 25 200 A 175 35 0 0 0 375 200"
+        fill="none"
+        stroke="var(--color-primary)"
+        strokeWidth="8"
+        opacity="0.4"
+      />
+      <path
+        d="M 50 200 A 150 30 0 0 0 350 200"
+        fill="none"
+        stroke="var(--color-primary)"
+        strokeWidth="12"
+        opacity="0.6"
+      />
+      <path
+        d="M 75 200 A 125 25 0 0 0 325 200"
+        fill="none"
+        stroke="var(--color-primary)"
+        strokeWidth="14"
+        opacity="0.7"
+      />
+      <path
+        d="M 95 200 A 105 20 0 0 0 305 200"
+        fill="none"
+        stroke="var(--color-primary)"
+        strokeWidth="16"
+        opacity="0.8"
+      />
+      <path
+        d="M 110 200 A 90 15 0 0 0 290 200"
+        fill="none"
+        stroke="var(--color-accent)"
+        strokeWidth="10"
+        opacity="0.95"
+      />
+
+      {/* event horizon rim highlight */}
       <circle
         cx="200"
         cy="200"
-        r="83"
+        r="78"
         fill="none"
         stroke="var(--color-base-content)"
-        strokeOpacity="0.1"
-        strokeWidth="30"
+        strokeOpacity="0.2"
+        strokeWidth="2"
       />
     </svg>
   )
