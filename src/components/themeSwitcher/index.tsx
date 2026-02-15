@@ -33,7 +33,7 @@ const THEMES = [
 ] as const
 
 export function ThemeSwitcher() {
-  const [theme, setTheme] = useState<string>('synthwave')
+  const [theme, setTheme] = useState<string>('terminal')
   const [showModal, setShowModal] = useState(false)
   const isMobile = useIsMobile()
 
@@ -103,11 +103,7 @@ export function ThemeSwitcher() {
                 ))}
               </div>
               <div className="modal-action">
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  onClick={() => setShowModal(false)}
-                >
+                <button type="button" className="btn btn-sm" onClick={() => setShowModal(false)}>
                   Close
                 </button>
               </div>
@@ -163,9 +159,7 @@ export function ThemeSwitcher() {
               key={t}
               type="button"
               className={`text-sm text-left px-2.5 py-1.5 rounded-btn transition-colors ${
-                theme === t
-                  ? 'bg-primary text-primary-content font-medium'
-                  : 'hover:bg-base-200'
+                theme === t ? 'bg-primary text-primary-content font-medium' : 'hover:bg-base-200'
               }`}
               onClick={() => {
                 setTheme(t)
