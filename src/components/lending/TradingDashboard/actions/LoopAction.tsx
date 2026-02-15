@@ -39,8 +39,17 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
   // Quotes
   const {
-    quotes, permissions, selectedIndex, loading, executing, error,
-    fetchQuotes, selectQuote, executePermission, executeQuote, reset,
+    quotes,
+    permissions,
+    selectedIndex,
+    loading,
+    executing,
+    error,
+    fetchQuotes,
+    selectQuote,
+    executePermission,
+    executeQuote,
+    reset,
   } = useTradingQuotes({ chainId, account })
 
   // Derive pay currencies from selected pools
@@ -55,7 +64,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     }
 
     // Add native token if wrapped native is in the list
-    const hasWrappedNative = assets.some(a => isWNative(a))
+    const hasWrappedNative = assets.some((a) => isWNative(a))
     if (hasWrappedNative && chainTokens[zeroAddress]) {
       assets.unshift(chainTokens[zeroAddress] as RawCurrency)
     }
@@ -63,7 +72,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     return assets
   }, [collateralPool, debtPool, chainTokens])
 
-  const selectedPayCurrency = payCurrencies.find(c => c.address === payCurrencyAddress) ?? null
+  const selectedPayCurrency = payCurrencies.find((c) => c.address === payCurrencyAddress) ?? null
 
   // Reset pay currency when pools change
   useEffect(() => {
@@ -85,17 +94,23 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
   const handleFetchQuotes = () => {
     if (!collateralPool || !debtPool) return
-    fetchQuotes('Loop', {
-      marketUidIn: debtPool.marketUid,
-      marketUidOut: collateralPool.marketUid,
-      debtAmount: parseUnits(debtAmount || '0', debtPool.asset.decimals).toString(),
-      slippage: parseFloat(slippage) || 0.3,
-      borrowMode: LendingMode.VARIABLE,
-      usePendleMintRedeem: false,
-      ...(selectedPayCurrency ? { payAsset: selectedPayCurrency.address } : {}),
-      ...(selectedPayCurrency && payAmount ? { payAmount: parseUnits(payAmount, selectedPayCurrency.decimals).toString() } : {}),
-      ...(accountId ? { accountId } : {}),
-    }, account)
+    fetchQuotes(
+      'Loop',
+      {
+        marketUidIn: debtPool.marketUid,
+        marketUidOut: collateralPool.marketUid,
+        debtAmount: parseUnits(debtAmount || '0', debtPool.asset.decimals).toString(),
+        slippage: parseFloat(slippage) || 0.3,
+        borrowMode: LendingMode.VARIABLE,
+        usePendleMintRedeem: false,
+        ...(selectedPayCurrency ? { payAsset: selectedPayCurrency.address } : {}),
+        ...(selectedPayCurrency && payAmount
+          ? { payAmount: parseUnits(payAmount, selectedPayCurrency.decimals).toString() }
+          : {}),
+        ...(accountId ? { accountId } : {}),
+      },
+      account
+    )
   }
 
   const canFetch = !!collateralPool && !!debtPool && !!debtAmount
@@ -134,7 +149,10 @@ export const LoopAction: React.FC<TradingActionProps> = ({
           className="input input-bordered input-sm w-full"
           placeholder="0.0"
           value={debtAmount}
-          onChange={(e) => { setDebtAmount(e.target.value); reset() }}
+          onChange={(e) => {
+            setDebtAmount(e.target.value)
+            reset()
+          }}
         />
         {debtPos && Number(debtPos.borrowable) > 0 && (
           <span className="text-[10px] text-base-content/50 mt-0.5">
@@ -148,7 +166,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
         <label className="label-text text-xs mb-1">Pay With (Margin)</label>
         {payCurrencies.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
-            {payCurrencies.map(c => {
+            {payCurrencies.map((c) => {
               const isActive = payCurrencyAddress === c.address
               return (
                 <button
@@ -159,9 +177,18 @@ export const LoopAction: React.FC<TradingActionProps> = ({
                       ? 'border-primary bg-primary/10 ring-1 ring-primary'
                       : 'border-base-300 bg-base-200/50 hover:bg-base-200'
                   }`}
-                  onClick={() => { setPayCurrencyAddress(c.address); setPayAmount('') }}
+                  onClick={() => {
+                    setPayCurrencyAddress(c.address)
+                    setPayAmount('')
+                  }}
                 >
-                  <img src={c.logoURI} width={16} height={16} alt={c.symbol} className="rounded-full object-cover w-4 h-4" />
+                  <img
+                    src={c.logoURI}
+                    width={16}
+                    height={16}
+                    alt={c.symbol}
+                    className="rounded-full object-contain w-4 h-4"
+                  />
                   <span className="font-medium">{c.symbol}</span>
                 </button>
               )
@@ -173,33 +200,40 @@ export const LoopAction: React.FC<TradingActionProps> = ({
       </div>
 
       {/* Pay amount + wallet balance */}
-      {selectedPayCurrency && (() => {
-        const wb = walletBalances.get(selectedPayCurrency.address.toLowerCase())
-        return (
-          <div className="form-control">
-            {wb && parseFloat(wb.balance) > 0 && (
-              <div className="text-xs flex justify-between px-1 mb-1">
-                <span className="text-base-content/60">Wallet balance:</span>
-                <span className="font-medium">
-                  {formatTokenAmount(wb.balance)} {selectedPayCurrency.symbol} (${formatUsd(wb.balanceUSD)})
-                </span>
+      {selectedPayCurrency &&
+        (() => {
+          const wb = walletBalances.get(selectedPayCurrency.address.toLowerCase())
+          return (
+            <div className="form-control">
+              {wb && parseFloat(wb.balance) > 0 && (
+                <div className="text-xs flex justify-between px-1 mb-1">
+                  <span className="text-base-content/60">Wallet balance:</span>
+                  <span className="font-medium">
+                    {formatTokenAmount(wb.balance)} {selectedPayCurrency.symbol} ($
+                    {formatUsd(wb.balanceUSD)})
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between mb-0.5">
+                <label className="label-text text-xs">Pay Amount</label>
+                {wb ? (
+                  <AmountQuickButtons maxAmount={Number(wb.balance)} onSelect={setPayAmount} />
+                ) : null}
               </div>
-            )}
-            <div className="flex items-center justify-between mb-0.5">
-              <label className="label-text text-xs">Pay Amount</label>
-              {wb ? <AmountQuickButtons maxAmount={Number(wb.balance)} onSelect={setPayAmount} /> : null}
+              <input
+                type="text"
+                inputMode="decimal"
+                className="input input-bordered input-sm w-full"
+                placeholder="0.0"
+                value={payAmount}
+                onChange={(e) => {
+                  setPayAmount(e.target.value)
+                  reset()
+                }}
+              />
             </div>
-            <input
-              type="text"
-              inputMode="decimal"
-              className="input input-bordered input-sm w-full"
-              placeholder="0.0"
-              value={payAmount}
-              onChange={(e) => { setPayAmount(e.target.value); reset() }}
-            />
-          </div>
-        )
-      })()}
+          )
+        })()}
 
       {/* Slippage */}
       <SlippageInput value={slippage} onChange={setSlippage} />

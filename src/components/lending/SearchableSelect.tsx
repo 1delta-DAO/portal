@@ -123,7 +123,7 @@ export function SearchableSelect({
                     {opt.indicator && (
                       <span className="opacity-60 text-xs mr-1">{opt.indicator}</span>
                     )}
-                    {opt.label}
+                    <span className="truncate" title={opt.label}>{opt.label}</span>
                   </button>
                 ))}
                 {filtered.length === 0 && (
@@ -204,18 +204,18 @@ export function SearchableSelect({
               <li key={opt.value}>
                 <button
                   type="button"
-                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-base-200 transition-colors cursor-pointer flex items-center gap-1 ${
+                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-base-200 transition-colors cursor-pointer flex items-center gap-1 min-w-0 ${
                     opt.value === value ? 'bg-primary/10 font-medium' : ''
                   }`}
                   onClick={() => handleSelect(opt.value)}
                 >
                   {opt.icon && (
-                    <img src={opt.icon} alt="" className="w-4 h-4 rounded-full" />
+                    <img src={opt.icon} alt="" className="w-4 h-4 rounded-full shrink-0" />
                   )}
                   {opt.indicator && (
-                    <span className="opacity-60 text-xs">{opt.indicator}</span>
+                    <span className="opacity-60 text-xs shrink-0">{opt.indicator}</span>
                   )}
-                  {opt.label}
+                  <span className="truncate" title={opt.label}>{opt.label}</span>
                 </button>
               </li>
             ))}

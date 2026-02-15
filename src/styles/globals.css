@@ -45,11 +45,6 @@
   name: 'terminal';
   color-scheme: dark;
 
-  /* Global font for this theme (optional, but nice for terminal feel) */
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
-    monospace;
-
   /* Base background + text */
   --color-base-100: #020617; /* main background (near black) */
   --color-base-200: #06101f; /* zebra-stripe / subtle surface lift */
@@ -277,6 +272,15 @@
   --noise: 0;
 }
 
+/* Terminal theme: apply monospace font outside the daisyui/theme plugin so the full
+   font-stack is preserved (the plugin strips it to generic `monospace`, which triggers
+   browsers' 13px monospace default and shrinks every rem-based dimension). */
+[data-theme='terminal'] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  font-size: 16px; /* pin root font-size so 1rem stays 16px */
+}
+
 /* Terminal theme: extra padding for dropdown/menu containers to prevent overlap */
 [data-theme='terminal'] .dropdown-content,
 [data-theme='terminal'] .menu {
@@ -308,15 +312,6 @@
   padding: 1.75rem;
 }
 
-/* Cards and bordered containers – more padding so content doesn't crowd edges */
-[data-theme='terminal'] .card-body {
-  padding: 1.25rem;
-}
-
-[data-theme='terminal'] .rounded-box[class*='border'],
-[data-theme='terminal'] .rounded-lg[class*='border'] {
-  padding: 0.75rem;
-}
 
 /* Table rows: ensure hover is always distinct from zebra stripes */
 [data-theme='terminal'] .table tbody tr:hover,

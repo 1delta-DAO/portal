@@ -53,16 +53,22 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
     const q = search.toLowerCase()
     const filtered = pools.filter(
       (p) =>
-        !q ||
-        p.asset.symbol.toLowerCase().includes(q) ||
-        p.asset.name.toLowerCase().includes(q)
+        !q || p.asset.symbol.toLowerCase().includes(q) || p.asset.name.toLowerCase().includes(q)
     )
 
     return [...filtered].sort((a, b) => {
       const posA = userPositions.get(a.marketUid)
       const posB = userPositions.get(b.marketUid)
-      const valA = posA ? (positionType === 'debt' ? Number(posA.debt) + Number(posA.debtStable) : Number(posA.deposits)) : 0
-      const valB = posB ? (positionType === 'debt' ? Number(posB.debt) + Number(posB.debtStable) : Number(posB.deposits)) : 0
+      const valA = posA
+        ? positionType === 'debt'
+          ? Number(posA.debt) + Number(posA.debtStable)
+          : Number(posA.deposits)
+        : 0
+      const valB = posB
+        ? positionType === 'debt'
+          ? Number(posB.debt) + Number(posB.debtStable)
+          : Number(posB.deposits)
+        : 0
       if (valA > 0 && valB === 0) return -1
       if (valB > 0 && valA === 0) return 1
       return a.asset.symbol.localeCompare(b.asset.symbol)
@@ -99,7 +105,7 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
               width={20}
               height={20}
               alt={value.asset.symbol}
-              className="rounded-full object-cover w-5 h-5"
+              className="rounded-full object-contain w-5 h-5"
             />
             <span className="truncate">{value.asset.symbol}</span>
           </>
@@ -145,12 +151,14 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
                   width={20}
                   height={20}
                   alt={pool.asset.symbol}
-                  className="rounded-full object-cover w-5 h-5 shrink-0"
+                  className="rounded-full object-contain w-5 h-5 shrink-0"
                 />
                 <div className="flex flex-col min-w-0">
                   <span className="font-medium">{pool.asset.symbol}</span>
                   {posText && (
-                    <span className={`text-[10px] ${positionType === 'debt' ? 'text-error/70' : 'text-success/70'}`}>
+                    <span
+                      className={`text-[10px] ${positionType === 'debt' ? 'text-error/70' : 'text-success/70'}`}
+                    >
                       {posText}
                     </span>
                   )}

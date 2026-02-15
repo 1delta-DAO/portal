@@ -62,7 +62,7 @@ export const ExposureCell: React.FC<ExposureCellProps> = ({ exposures, chainToke
             width={ICON_SIZE}
             height={ICON_SIZE}
             alt={symbol}
-            className="rounded-full object-cover"
+            className="rounded-full object-contain"
             style={{ width: ICON_SIZE, height: ICON_SIZE }}
           />
         ) : (
@@ -118,7 +118,9 @@ export const ExposureCell: React.FC<ExposureCellProps> = ({ exposures, chainToke
             >
               {collaterals.length > 0 && (
                 <div className="mb-1">
-                  <span className="text-[10px] font-semibold text-base-content/60">Collaterals</span>
+                  <span className="text-[10px] font-semibold text-base-content/60">
+                    Collaterals
+                  </span>
                   <div className="flex flex-wrap gap-1 mt-0.5">
                     {collaterals.map((a, i) => renderIcon(a, i))}
                   </div>

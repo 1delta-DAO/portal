@@ -14,7 +14,6 @@ import { abbreviateUsd } from '../../utils/format'
 import { fetchCollateralToggle } from '../../sdk/lending-helper/fetchLendingAction'
 import { useIsMobile } from '../../hooks/useIsMobile'
 
-
 interface UserLenderPositionsTableProps {
   account?: string
   chainId: string
@@ -39,11 +38,11 @@ function extractPositions(positions: (UserPositionEntry | number)[]): UserPositi
 function getActiveLenders(raw: LenderUserDataEntry[] | undefined): LenderUserDataEntry[] {
   if (!raw?.length) return []
   return raw
-    .filter((entry) =>
-      entry.netWorth !== 0 ||
-      entry.data.some((sub) => extractPositions(sub.positions).length > 0)
+    .filter(
+      (entry) =>
+        entry.balanceData.nav !== 0 || entry.data.some((sub) => extractPositions(sub.positions).length > 0)
     )
-    .sort((a, b) => b.netWorth - a.netWorth)
+    .sort((a, b) => b.balanceData.nav - a.balanceData.nav)
 }
 
 type TaggedPosition = UserPositionEntry & { tag: 'collateral' | 'debt' }
@@ -149,14 +148,18 @@ const PositionsList: React.FC<{
             title={tooltip}
           >
             <span
-              className={`text-[9px] font-bold uppercase ${
+              className={`text-[9px] font-bold uppercase leading-none ${
                 pos.tag === 'debt' ? 'text-error' : 'text-success'
               }`}
             >
               {pos.tag}
             </span>
             {token?.logoURI ? (
-              <img src={token.logoURI} alt={symbol} className="w-3.5 h-3.5 rounded-full object-cover" />
+              <img
+                src={token.logoURI}
+                alt={symbol}
+                className="w-3.5 h-3.5 rounded-full object-contain"
+              />
             ) : null}
             <span className="text-[10px]">
               {symbol || `${pos.underlying.slice(0, 6)}...${pos.underlying.slice(-4)}`}
@@ -186,11 +189,7 @@ function HealthBadge({ health }: { health: number | null }) {
   return (
     <span
       className={`badge badge-sm ${
-        health < 1.1
-          ? 'badge-error'
-          : health < 1.3
-            ? 'badge-warning'
-            : 'badge-success'
+        health < 1.1 ? 'badge-error' : health < 1.3 ? 'badge-warning' : 'badge-success'
       }`}
     >
       {health.toFixed(2)}
@@ -202,41 +201,58 @@ function HealthBadge({ health }: { health: number | null }) {
 // Mobile Card Components
 // ---------------------------------------------------------------------------
 
-const MobileSummaryCard: React.FC<{ summary: any }> = ({ summary }) => (
-  <div className="grid grid-cols-2 gap-2">
-    <div className="card bg-base-200 p-3">
-      <div className="text-xs text-base-content/60">Net Worth</div>
-      <div className="text-lg font-bold">{abbreviateUsd(summary.totalNetWorth)}</div>
-      {summary.totalNetWorth24h != null && summary.totalNetWorth24h !== 0 && (
-        <div
-          className={`text-xs ${
-            summary.totalNetWorth - summary.totalNetWorth24h >= 0 ? 'text-success' : 'text-error'
-          }`}
-        >
-          {(((summary.totalNetWorth - summary.totalNetWorth24h) / summary.totalNetWorth24h) * 100).toFixed(2)}% 24h
+const MobileSummaryCard: React.FC<{ summary: any }> = ({ summary }) => {
+  const bd = summary.balanceData
+  const ad = summary.aprData
+  const totalApr = (ad?.apr ?? 0) + (ad?.intrinsicApr ?? 0)
+  const iy = ad?.intrinsicApr ?? 0
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <div className="card bg-base-200 p-3">
+        <div className="text-xs text-base-content/60">Net Worth</div>
+        <div className="text-lg font-bold">{abbreviateUsd(bd?.nav ?? 0)}</div>
+        {bd?.nav24h != null && bd.nav24h !== 0 && (
+          <div
+            className={`text-xs ${
+              bd.nav - bd.nav24h >= 0 ? 'text-success' : 'text-error'
+            }`}
+          >
+            {(((bd.nav - bd.nav24h) / bd.nav24h) * 100).toFixed(2)}% 24h
+          </div>
+        )}
+      </div>
+      <div className="card bg-base-200 p-3">
+        <div className="text-xs text-base-content/60">Net APR</div>
+        <div className="text-lg font-bold">
+          {totalApr.toFixed(2)}%
+          {iy > 0 && (
+            <span
+              className="badge badge-xs bg-success/15 text-success border-0 ml-1 cursor-help"
+              title={`Base APR: ${(ad?.apr ?? 0).toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}%`}
+            >
+              +{iy.toFixed(1)}%
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="card bg-base-200 p-3">
+        <div className="text-xs text-base-content/60">Deposits</div>
+        <div className="text-sm font-semibold">{abbreviateUsd(bd?.deposits ?? 0)}</div>
+      </div>
+      <div className="card bg-base-200 p-3">
+        <div className="text-xs text-base-content/60">Debt</div>
+        <div className="text-sm font-semibold">{abbreviateUsd(bd?.debt ?? 0)}</div>
+      </div>
+      {summary.overallLeverage > 1 && (
+        <div className="card bg-base-200 p-3 col-span-2">
+          <div className="text-xs text-base-content/60">Leverage</div>
+          <div className="text-sm font-semibold">{summary.overallLeverage.toFixed(2)}x</div>
         </div>
       )}
     </div>
-    <div className="card bg-base-200 p-3">
-      <div className="text-xs text-base-content/60">Net APR</div>
-      <div className="text-lg font-bold">{summary.avgNetApr.toFixed(2)}%</div>
-    </div>
-    <div className="card bg-base-200 p-3">
-      <div className="text-xs text-base-content/60">Deposits</div>
-      <div className="text-sm font-semibold">{abbreviateUsd(summary.totalDepositsUSD)}</div>
-    </div>
-    <div className="card bg-base-200 p-3">
-      <div className="text-xs text-base-content/60">Debt</div>
-      <div className="text-sm font-semibold">{abbreviateUsd(summary.totalDebtUSD)}</div>
-    </div>
-    {summary.overallLeverage > 1 && (
-      <div className="card bg-base-200 p-3 col-span-2">
-        <div className="text-xs text-base-content/60">Leverage</div>
-        <div className="text-sm font-semibold">{summary.overallLeverage.toFixed(2)}x</div>
-      </div>
-    )}
-  </div>
-)
+  )
+}
 
 const MobileSubAccountCard: React.FC<{
   sub: UserSubAccount
@@ -261,7 +277,17 @@ const MobileSubAccountCard: React.FC<{
         </div>
         <div>
           <span className="text-base-content/60">APR: </span>
-          <span className="font-semibold">{sub.aprData.apr.toFixed(2)}%</span>
+          <span className="font-semibold">
+            {(sub.aprData.apr + sub.aprData.intrinsicApr).toFixed(2)}%
+          </span>
+          {sub.aprData.intrinsicApr > 0 && (
+            <span
+              className="badge badge-xs bg-success/15 text-success border-0 ml-1 cursor-help"
+              title={`Base APR: ${sub.aprData.apr.toFixed(2)}% + Intrinsic yield: ${sub.aprData.intrinsicApr.toFixed(2)}%`}
+            >
+              +{sub.aprData.intrinsicApr.toFixed(1)}%
+            </span>
+          )}
         </div>
         <div>
           <span className="text-base-content/60">Deposits: </span>
@@ -275,7 +301,12 @@ const MobileSubAccountCard: React.FC<{
       {positions.length > 0 && (
         <div>
           <div className="text-xs text-base-content/60 mb-1">Positions:</div>
-          <PositionsList positions={positions} tokens={tokens} account={account} chainId={chainId} />
+          <PositionsList
+            positions={positions}
+            tokens={tokens}
+            account={account}
+            chainId={chainId}
+          />
         </div>
       )}
     </div>
@@ -313,19 +344,29 @@ const MobileLenderCard: React.FC<{
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
                 <span className="text-base-content/60">NAV: </span>
-                <span className="font-semibold">{abbreviateUsd(entry.netWorth)}</span>
+                <span className="font-semibold">{abbreviateUsd(entry.balanceData.nav)}</span>
               </div>
               <div>
                 <span className="text-base-content/60">APR: </span>
-                <span className="font-semibold">{entry.netApr.toFixed(2)}%</span>
+                <span className="font-semibold">
+                  {(entry.aprData.apr + entry.aprData.intrinsicApr).toFixed(2)}%
+                </span>
+                {entry.aprData.intrinsicApr > 0 && (
+                  <span
+                    className="badge badge-xs bg-success/15 text-success border-0 ml-1 cursor-help"
+                    title={`Base APR: ${entry.aprData.apr.toFixed(2)}% + Intrinsic yield: ${entry.aprData.intrinsicApr.toFixed(2)}%`}
+                  >
+                    +{entry.aprData.intrinsicApr.toFixed(1)}%
+                  </span>
+                )}
               </div>
               <div>
                 <span className="text-base-content/60">Deposits: </span>
-                <span className="font-semibold">{abbreviateUsd(entry.totalDepositsUSD)}</span>
+                <span className="font-semibold">{abbreviateUsd(entry.balanceData.deposits)}</span>
               </div>
               <div>
                 <span className="text-base-content/60">Debt: </span>
-                <span className="font-semibold">{abbreviateUsd(entry.totalDebtUSD)}</span>
+                <span className="font-semibold">{abbreviateUsd(entry.balanceData.debt)}</span>
               </div>
             </div>
             <div>
@@ -445,6 +486,12 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
     )
   }
 
+  // Summary derived values
+  const sbd = summary?.balanceData
+  const sad = summary?.aprData
+  const sTotalApr = (sad?.apr ?? 0) + (sad?.intrinsicApr ?? 0)
+  const sIy = sad?.intrinsicApr ?? 0
+
   // Desktop layout with table
   return (
     <div className="w-full max-w-6xl mx-auto p-4 space-y-4">
@@ -468,18 +515,17 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
         <div className="stats stats-horizontal shadow w-full overflow-x-auto">
           <div className="stat">
             <div className="stat-title">Total Net Worth</div>
-            <div className="stat-value text-lg">${formatUsd(summary.totalNetWorth)}</div>
-            {summary.totalNetWorth24h != null && summary.totalNetWorth24h !== 0 && (
+            <div className="stat-value text-lg">${formatUsd(sbd?.nav ?? 0)}</div>
+            {sbd?.nav24h != null && sbd.nav24h !== 0 && (
               <div
                 className={`stat-desc ${
-                  summary.totalNetWorth - summary.totalNetWorth24h >= 0
+                  sbd.nav - sbd.nav24h >= 0
                     ? 'text-success'
                     : 'text-error'
                 }`}
               >
                 {(
-                  ((summary.totalNetWorth - summary.totalNetWorth24h) /
-                    summary.totalNetWorth24h) *
+                  ((sbd.nav - sbd.nav24h) / sbd.nav24h) *
                   100
                 ).toFixed(2)}
                 % 24h
@@ -488,15 +534,25 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
           </div>
           <div className="stat">
             <div className="stat-title">Total Deposits</div>
-            <div className="stat-value text-lg">${formatUsd(summary.totalDepositsUSD)}</div>
+            <div className="stat-value text-lg">${formatUsd(sbd?.deposits ?? 0)}</div>
           </div>
           <div className="stat">
             <div className="stat-title">Total Debt</div>
-            <div className="stat-value text-lg">${formatUsd(summary.totalDebtUSD)}</div>
+            <div className="stat-value text-lg">${formatUsd(sbd?.debt ?? 0)}</div>
           </div>
           <div className="stat">
             <div className="stat-title">Net APR</div>
-            <div className="stat-value text-lg">{summary.avgNetApr.toFixed(2)}%</div>
+            <div className="stat-value text-lg flex items-center gap-1">
+              {sTotalApr.toFixed(2)}%
+              {sIy > 0 && (
+                <span
+                  className="badge badge-sm bg-success/15 text-success border-0 cursor-help"
+                  title={`Base APR: ${(sad?.apr ?? 0).toFixed(2)}% + Intrinsic yield: ${sIy.toFixed(2)}%`}
+                >
+                  +{sIy.toFixed(1)}%
+                </span>
+              )}
+            </div>
           </div>
           {summary.overallLeverage > 1 && (
             <div className="stat">
@@ -547,17 +603,23 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                       </td>
                       {hasSingleSub && (
                         <>
-                          <td className="text-xs font-semibold">
-                            {abbreviateUsd(entry.netWorth)}
-                          </td>
-                          <td className="text-xs">
-                            {abbreviateUsd(entry.totalDepositsUSD)}
-                          </td>
-                          <td className="text-xs">
-                            {abbreviateUsd(entry.totalDebtUSD)}
-                          </td>
-                          <td className="text-xs font-semibold">
-                            {entry.netApr.toFixed(2)}%
+                          <td className="text-xs font-semibold">{abbreviateUsd(entry.balanceData.nav)}</td>
+                          <td className="text-xs">{abbreviateUsd(entry.balanceData.deposits)}</td>
+                          <td className="text-xs">{abbreviateUsd(entry.balanceData.debt)}</td>
+                          <td>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-semibold">
+                                {(entry.aprData.apr + entry.aprData.intrinsicApr).toFixed(2)}%
+                              </span>
+                              {entry.aprData.intrinsicApr > 0 && (
+                                <span
+                                  className="badge badge-xs bg-success/15 text-success border-0 cursor-help"
+                                  title={`Base APR: ${entry.aprData.apr.toFixed(2)}% + Intrinsic yield: ${entry.aprData.intrinsicApr.toFixed(2)}%`}
+                                >
+                                  +{entry.aprData.intrinsicApr.toFixed(1)}%
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td>
                             <HealthBadge health={entry.healthFactor} />
@@ -585,27 +647,41 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                               <span className="text-xs font-medium text-base-content/70">
                                 #{idx + 1}
                               </span>
-                              <span className="text-[10px] text-base-content/40 ml-1" title={sub.accountId}>
+                              <span
+                                className="text-[10px] text-base-content/40 ml-1"
+                                title={sub.accountId}
+                              >
                                 {sub.accountId.slice(0, 8)}...
                               </span>
                             </td>
-                            <td className="text-xs font-semibold">
-                              {abbreviateUsd(bal.nav)}
-                            </td>
-                            <td className="text-xs">
-                              {abbreviateUsd(bal.deposits)}
-                            </td>
-                            <td className="text-xs">
-                              {abbreviateUsd(bal.debt)}
-                            </td>
-                            <td className="text-xs font-semibold">
-                              {sub.aprData.apr.toFixed(2)}%
+                            <td className="text-xs font-semibold">{abbreviateUsd(bal.nav)}</td>
+                            <td className="text-xs">{abbreviateUsd(bal.deposits)}</td>
+                            <td className="text-xs">{abbreviateUsd(bal.debt)}</td>
+                            <td>
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs font-semibold">
+                                  {(sub.aprData.apr + sub.aprData.intrinsicApr).toFixed(2)}%
+                                </span>
+                                {sub.aprData.intrinsicApr > 0 && (
+                                  <span
+                                    className="badge badge-xs bg-success/15 text-success border-0 cursor-help"
+                                    title={`Base APR: ${sub.aprData.apr.toFixed(2)}% + Intrinsic yield: ${sub.aprData.intrinsicApr.toFixed(2)}%`}
+                                  >
+                                    +{sub.aprData.intrinsicApr.toFixed(1)}%
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td>
                               <HealthBadge health={sub.health} />
                             </td>
                             <td>
-                              <PositionsList positions={positions} tokens={tokens} account={account} chainId={chainId} />
+                              <PositionsList
+                                positions={positions}
+                                tokens={tokens}
+                                account={account}
+                                chainId={chainId}
+                              />
                             </td>
                           </tr>
                         )

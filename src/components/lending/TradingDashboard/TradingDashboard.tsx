@@ -1,12 +1,16 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import { lenderDisplayNameFull } from '@1delta/lib-utils'
 import type { LenderData, PoolDataItem } from '../../../hooks/lending/usePoolData'
-import type { UserDataResult, UserPositionEntry, UserSubAccount } from '../../../hooks/lending/useUserData'
+import type {
+  UserDataResult,
+  UserPositionEntry,
+  UserSubAccount,
+} from '../../../hooks/lending/useUserData'
 import { useTokenBalances } from '../../../hooks/lending/useTokenBalances'
 import { useSyncChain } from '../../../hooks/useSyncChain'
 import { SearchableSelect, type SearchableSelectOption } from '../SearchableSelect'
 import { WalletConnect } from '../../connect'
-import { computeLenderTvl } from '../../../utils/format'
+import { computeLenderTvl, abbreviateUsd, formatUsd, formatTokenAmount } from '../../../utils/format'
 import { TradingMarketTable } from './TradingMarketTable'
 import { LoopAction } from './actions/LoopAction'
 import { ColSwapAction } from './actions/ColSwapAction'
@@ -25,29 +29,6 @@ interface Props {
   isUserDataLoading: boolean
 }
 
-function abbreviateUsd(v: number): string {
-  if (!Number.isFinite(v) || v === 0) return '$0'
-  const abs = Math.abs(v)
-  const sign = v < 0 ? '-' : ''
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`
-  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`
-  return `${sign}$${abs.toFixed(2)}`
-}
-
-function formatUsd(v: number) {
-  if (!Number.isFinite(v)) return '0'
-  return v.toLocaleString(undefined, { maximumFractionDigits: v < 1000 ? 2 : 0 })
-}
-
-function formatTokenAmount(v: number | string): string {
-  const num = typeof v === 'string' ? parseFloat(v) : v
-  if (!Number.isFinite(num) || num === 0) return '0'
-  if (num < 0.0001) return '<0.0001'
-  if (num < 1) return num.toFixed(6)
-  if (num < 1000) return num.toFixed(4)
-  return num.toLocaleString(undefined, { maximumFractionDigits: 2 })
-}
-
 const OPERATIONS: TradingOperation[] = ['Loop', 'ColSwap', 'DebtSwap', 'Close']
 const OP_LABELS: Record<TradingOperation, string> = {
   Loop: 'Loop',
@@ -56,16 +37,20 @@ const OP_LABELS: Record<TradingOperation, string> = {
   Close: 'Close',
 }
 
-export function TradingDashboard({ lenderData, userData, chainId, account, isPublicDataLoading, isUserDataLoading }: Props) {
+export function TradingDashboard({
+  lenderData,
+  userData,
+  chainId,
+  account,
+  isPublicDataLoading,
+  isUserDataLoading,
+}: Props) {
   const { syncChain, currentChainId } = useSyncChain()
   const isWrongChain = !!account && currentChainId !== Number(chainId)
   const isMobile = useIsMobile()
 
   // Lender selection
-  const allLenderKeys = useMemo(
-    () => Object.keys(lenderData ?? {}),
-    [lenderData]
-  )
+  const allLenderKeys = useMemo(() => Object.keys(lenderData ?? {}), [lenderData])
 
   const [selectedLender, setSelectedLender] = useState('')
   const [selectedSubAccountId, setSelectedSubAccountId] = useState<string | null>(null)
@@ -79,7 +64,7 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
     if (!userData.raw) return map
     for (const entry of userData.raw) {
       if (entry.chainId !== chainId) continue
-      const total = entry.totalDepositsUSD + entry.totalDebtUSD
+      const total = entry.balanceData.deposits + entry.balanceData.debt
       if (total > 0) map.set(entry.lender, total)
     }
     return map
@@ -112,7 +97,7 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
   // Sub-accounts
   const subAccounts: UserSubAccount[] = useMemo(() => {
     if (!selectedLender || !userData.raw) return []
-    const entry = userData.raw.find(e => e.chainId === chainId && e.lender === selectedLender)
+    const entry = userData.raw.find((e) => e.chainId === chainId && e.lender === selectedLender)
     return entry?.data ?? []
   }, [userData, chainId, selectedLender])
 
@@ -125,7 +110,7 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
   }, [subAccounts])
 
   const activeSubAccount = useMemo(
-    () => subAccounts.find(s => s.accountId === selectedSubAccountId) ?? null,
+    () => subAccounts.find((s) => s.accountId === selectedSubAccountId) ?? null,
     [subAccounts, selectedSubAccountId]
   )
 
@@ -140,7 +125,11 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
     [allPools]
   )
 
-  const { balances: walletBalances } = useTokenBalances({ chainId, account, assets: poolAssetAddresses })
+  const { balances: walletBalances } = useTokenBalances({
+    chainId,
+    account,
+    assets: poolAssetAddresses,
+  })
 
   // User positions scoped to selected sub-account, keyed by marketUid
   const userPositions = useMemo(() => {
@@ -176,7 +165,7 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
 
   // Table highlights from action panel's pool selections
   const tableHighlights: TableHighlight[] = useMemo(
-    () => selectedPools.map(sp => ({ marketUid: sp.pool.marketUid, role: sp.role })),
+    () => selectedPools.map((sp) => ({ marketUid: sp.pool.marketUid, role: sp.role })),
     [selectedPools]
   )
 
@@ -240,9 +229,14 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
           <div className="flex flex-wrap gap-2">
             {subAccounts.map((sub, i) => {
               const isActive = sub.accountId === selectedSubAccountId
-              const healthBadge = sub.health != null
-                ? sub.health < 1.1 ? 'badge-error' : sub.health < 1.3 ? 'badge-warning' : 'badge-success'
-                : null
+              const healthBadge =
+                sub.health != null
+                  ? sub.health < 1.1
+                    ? 'badge-error'
+                    : sub.health < 1.3
+                      ? 'badge-warning'
+                      : 'badge-success'
+                  : null
 
               return (
                 <button
@@ -272,15 +266,31 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
           {/* Summary stats */}
           {lenderSummary && (
             <div className="flex gap-4 items-center text-xs flex-wrap">
-              <span>Deposits: <span className="font-semibold text-success">${formatUsd(lenderSummary.deposits)}</span></span>
-              <span>Debt: <span className="font-semibold text-error">${formatUsd(lenderSummary.debt)}</span></span>
-              <span>Net: <span className="font-semibold">${formatUsd(lenderSummary.nav)}</span></span>
+              <span>
+                Deposits:{' '}
+                <span className="font-semibold text-success">
+                  ${formatUsd(lenderSummary.deposits)}
+                </span>
+              </span>
+              <span>
+                Debt:{' '}
+                <span className="font-semibold text-error">${formatUsd(lenderSummary.debt)}</span>
+              </span>
+              <span>
+                Net: <span className="font-semibold">${formatUsd(lenderSummary.nav)}</span>
+              </span>
               {lenderSummary.health != null && (
                 <div className="flex items-center gap-1">
                   <span>Health:</span>
-                  <span className={`badge badge-sm font-semibold ${
-                    lenderSummary.health < 1.1 ? 'badge-error' : lenderSummary.health < 1.3 ? 'badge-warning' : 'badge-success'
-                  }`}>
+                  <span
+                    className={`badge badge-sm font-semibold ${
+                      lenderSummary.health < 1.1
+                        ? 'badge-error'
+                        : lenderSummary.health < 1.3
+                          ? 'badge-warning'
+                          : 'badge-success'
+                    }`}
+                  >
                     {lenderSummary.health.toFixed(2)}
                   </span>
                 </div>
@@ -301,7 +311,7 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
                     width={32}
                     height={32}
                     alt={pool.asset.symbol}
-                    className="rounded-full object-cover w-8 h-8 shrink-0"
+                    className="rounded-full object-contain w-8 h-8 shrink-0"
                   />
                   <div className="flex flex-col min-w-0 flex-1">
                     <span className="text-sm font-medium">{pool.asset.symbol}</span>
@@ -355,7 +365,10 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
                 type="button"
                 role="tab"
                 className={`tab ${activeOperation === op ? 'tab-active' : ''}`}
-                onClick={() => { setActiveOperation(op); setSelectedPools([]) }}
+                onClick={() => {
+                  setActiveOperation(op)
+                  setSelectedPools([])
+                }}
               >
                 {OP_LABELS[op]}
               </button>
@@ -401,7 +414,13 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
       {isMobile && showMobileAction && (
         <div className="modal modal-open" onClick={() => setShowMobileAction(false)}>
           <div className="modal-box max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => setShowMobileAction(false)}>✕</button>
+            <button
+              type="button"
+              className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+              onClick={() => setShowMobileAction(false)}
+            >
+              ✕
+            </button>
 
             <div className="space-y-3">
               {/* Operation tabs */}
@@ -412,7 +431,10 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
                     type="button"
                     role="tab"
                     className={`tab ${activeOperation === op ? 'tab-active' : ''}`}
-                    onClick={() => { setActiveOperation(op); setSelectedPools([]) }}
+                    onClick={() => {
+                      setActiveOperation(op)
+                      setSelectedPools([])
+                    }}
                   >
                     {OP_LABELS[op]}
                   </button>
@@ -421,9 +443,17 @@ export function TradingDashboard({ lenderData, userData, chainId, account, isPub
 
               {/* Wallet / chain guards */}
               {!account ? (
-                <div className="w-full flex justify-center"><WalletConnect /></div>
+                <div className="w-full flex justify-center">
+                  <WalletConnect />
+                </div>
               ) : isWrongChain ? (
-                <button type="button" className="btn btn-warning btn-sm w-full" onClick={() => syncChain(Number(chainId))}>Switch Wallet Chain</button>
+                <button
+                  type="button"
+                  className="btn btn-warning btn-sm w-full"
+                  onClick={() => syncChain(Number(chainId))}
+                >
+                  Switch Wallet Chain
+                </button>
               ) : (
                 <>
                   {activeOperation === 'Loop' && <LoopAction {...actionProps} />}

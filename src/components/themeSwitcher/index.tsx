@@ -36,6 +36,8 @@ export function ThemeSwitcher() {
   const [theme, setTheme] = useState<string>('terminal')
   const [showModal, setShowModal] = useState(false)
   const isMobile = useIsMobile()
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
 
   // Initialize from localStorage & apply once on mount
   useEffect(() => {
@@ -54,6 +56,18 @@ export function ThemeSwitcher() {
     document.documentElement.setAttribute('data-theme', theme)
     window.localStorage.setItem('theme', theme)
   }, [theme])
+
+  // Close dropdown on outside click (desktop only)
+  useEffect(() => {
+    if (isMobile || !open) return
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open, isMobile])
 
   const handleThemeChange = (newTheme: string) => {
     setTheme(newTheme)
@@ -115,20 +129,6 @@ export function ThemeSwitcher() {
   }
 
   // Desktop: Dropdown with current theme shown
-  const dropdownRef = useRef<HTMLDivElement>(null)
-  const [open, setOpen] = useState(false)
-
-  useEffect(() => {
-    if (!open) return
-    function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
-
   return (
     <div className="relative" ref={dropdownRef}>
       <button

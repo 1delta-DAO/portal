@@ -29,10 +29,7 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
   selectedAsset,
   onAssetClick,
 }) => {
-  const totalUsd = useMemo(
-    () => balances.reduce((sum, b) => sum + b.balanceUSD, 0),
-    [balances]
-  )
+  const totalUsd = useMemo(() => balances.reduce((sum, b) => sum + b.balanceUSD, 0), [balances])
 
   if (isLoading) {
     return (
@@ -115,7 +112,13 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
                       <div className="flex items-center gap-2">
                         <div className="bg-base-300 rounded-full w-6 h-6 flex items-center justify-center overflow-hidden flex-shrink-0">
                           {logoURI ? (
-                            <img src={logoURI} width={18} height={18} alt={symbol} className="rounded-full object-cover w-4.5 h-4.5" />
+                            <img
+                              src={logoURI}
+                              width={18}
+                              height={18}
+                              alt={symbol}
+                              className="rounded-full object-contain w-4.5 h-4.5"
+                            />
                           ) : (
                             <span className="text-[10px] font-bold">{symbol.slice(0, 2)}</span>
                           )}
@@ -123,7 +126,9 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
                         <div className="flex flex-col min-w-0">
                           <span className="font-semibold text-xs truncate">{symbol}</span>
                           {name && name !== symbol && (
-                            <span className="text-[10px] text-base-content/60 truncate">{name}</span>
+                            <span className="text-[10px] text-base-content/60 truncate">
+                              {name}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -133,9 +138,7 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
                         maximumFractionDigits: 6,
                       })}
                     </td>
-                    <td className="text-right text-xs font-semibold">
-                      ${formatUsd(b.balanceUSD)}
-                    </td>
+                    <td className="text-right text-xs font-semibold">${formatUsd(b.balanceUSD)}</td>
                   </tr>
                 )
               })}

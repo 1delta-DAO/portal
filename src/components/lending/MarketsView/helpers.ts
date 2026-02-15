@@ -11,9 +11,11 @@ export function computePoolMetrics(pool: PoolEntry) {
 
   const utilization = totalDeposits > 0 ? totalDebt / totalDeposits : 0
   const apr = parseFloat(pool.depositRate) || 0
+  const borrowApr = parseFloat(pool.variableBorrowRate) || 0
+  const intrinsicYield = parseFloat(pool.intrinsicYield ?? '') || 0
   const price = totalDeposits > 0 ? totalDepositsUSD / totalDeposits : 0
 
-  return { utilization, apr, price }
+  return { utilization, apr, borrowApr, intrinsicYield, price }
 }
 
 /** Resolve a PoolEntry to its corresponding PoolDataItem from lenderData */

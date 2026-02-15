@@ -1,4 +1,4 @@
-export function BlackHoleLogo({ className = '' }: { className?: string }) {
+export function PortalLogo({ className = '' }: { className?: string }) {
   return (
     <svg
       className={`inline-block ${className}`}

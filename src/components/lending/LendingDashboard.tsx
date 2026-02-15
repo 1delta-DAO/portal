@@ -20,6 +20,7 @@ import {
 import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'
 import { WalletConnect } from '../connect'
 import { formatUsd, abbreviateUsd, formatTokenAmount, computeLenderTvl } from '../../utils/format'
+import { sortPools, type SortKey, LtvBadge } from './Dashboard'
 import { EModeBadge } from './EModeAnalysisModal'
 import { CollateralToggle } from './UserTable'
 import { useIsMobile } from '../../hooks/useIsMobile'
@@ -32,14 +33,6 @@ interface Props {
   isPublicDataLoading: boolean
   isUserDataLoading: boolean
 }
-
-type SortKey =
-  | 'symbol'
-  | 'depositApr'
-  | 'borrowApr'
-  | 'totalDepositsUSD'
-  | 'totalDebtUSD'
-  | 'totalLiquidityUSD'
 
 export function LendingDashboard({
   lenderData,
@@ -73,7 +66,7 @@ export function LendingDashboard({
     if (!userData.raw) return map
     for (const entry of userData.raw) {
       if (entry.chainId !== chainId) continue
-      const total = entry.totalDepositsUSD + entry.totalDebtUSD
+      const total = entry.balanceData.deposits + entry.balanceData.debt
       if (total > 0) map.set(entry.lender, total)
     }
     return map
@@ -156,57 +149,10 @@ export function LendingDashboard({
   })
 
   // Filtered & sorted pools
-  const pools = useMemo(() => {
-    let result = allPools
-
-    // Search filter
-    if (assetSearch.trim()) {
-      const q = assetSearch.toLowerCase()
-      result = result.filter(
-        (p) =>
-          p.asset.symbol.toLowerCase().includes(q) ||
-          p.asset.name.toLowerCase().includes(q) ||
-          p.asset.address.toLowerCase().includes(q)
-      )
-    }
-
-    // Sort
-    return [...result].sort((a, b) => {
-      let aVal: number | string
-      let bVal: number | string
-      switch (sortKey) {
-        case 'symbol':
-          aVal = a.asset.symbol.toLowerCase()
-          bVal = b.asset.symbol.toLowerCase()
-          break
-        case 'depositApr':
-          aVal = a.depositRate
-          bVal = b.depositRate
-          break
-        case 'borrowApr':
-          aVal = a.variableBorrowRate
-          bVal = b.variableBorrowRate
-          break
-        case 'totalDepositsUSD':
-          aVal = a.totalDepositsUSD
-          bVal = b.totalDepositsUSD
-          break
-        case 'totalDebtUSD':
-          aVal = a.totalDebtUSD
-          bVal = b.totalDebtUSD
-          break
-        case 'totalLiquidityUSD':
-          aVal = a.totalLiquidityUSD
-          bVal = b.totalLiquidityUSD
-          break
-        default:
-          aVal = 0
-          bVal = 0
-      }
-      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
-      return sortDir === 'asc' ? cmp : -cmp
-    })
-  }, [allPools, assetSearch, sortKey, sortDir])
+  const pools = useMemo(
+    () => sortPools(allPools, assetSearch, sortKey, sortDir),
+    [allPools, assetSearch, sortKey, sortDir]
+  )
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -375,16 +321,6 @@ export function LendingDashboard({
           {lenderSummary && (
             <div className="flex gap-4 items-center text-xs flex-wrap">
               <span>
-                Deposits:{' '}
-                <span className="font-semibold text-success">
-                  ${formatUsd(lenderSummary.deposits)}
-                </span>
-              </span>
-              <span>
-                Debt:{' '}
-                <span className="font-semibold text-error">${formatUsd(lenderSummary.debt)}</span>
-              </span>
-              <span>
                 Net: <span className="font-semibold">${formatUsd(lenderSummary.nav)}</span>
               </span>
               {lenderSummary.health != null && (
@@ -406,53 +342,110 @@ export function LendingDashboard({
             </div>
           )}
 
-          {/* Position cards for the selected sub-account */}
+          {/* Position cards for the selected sub-account — split by collateral & debt */}
           {activePositions.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-              {activePositions.map(({ position, pool }) => (
-                <div
-                  key={pool.marketUid}
-                  className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
-                    selectedPool?.marketUid === pool.marketUid
-                      ? 'bg-primary/15 ring-1 ring-primary'
-                      : 'bg-base-200/50 hover:bg-base-200'
-                  }`}
-                  onClick={() => handlePoolSelect(pool)}
-                >
-                  <img
-                    src={pool.asset.logoURI}
-                    width={32}
-                    height={32}
-                    alt={pool.asset.symbol}
-                    className="rounded-full object-cover w-8 h-8 shrink-0"
-                  />
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-sm font-medium">{pool.asset.symbol}</span>
-                    {Number(position.deposits) > 0 && (
-                      <span className="text-xs text-success truncate">
-                        +{formatTokenAmount(position.deposits)} ($
-                        {formatUsd(position.depositsUSD)})
+            <div className="space-y-2">
+              {/* Collateral row */}
+              {activePositions.some(({ position }) => Number(position.deposits) > 0) && (
+                <div>
+                  <span className="text-xs font-semibold text-success mb-1 block">
+                    Deposits
+                    {lenderSummary && (
+                      <span className="font-normal text-base-content/60">
+                        {' '}
+                        — ${formatUsd(lenderSummary.deposits)}
                       </span>
                     )}
-                    {Number(position.debt) > 0 && (
-                      <span className="text-xs text-error truncate">
-                        -{formatTokenAmount(position.debt)} (${formatUsd(position.debtUSD)})
-                      </span>
-                    )}
+                  </span>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                    {activePositions
+                      .filter(({ position }) => Number(position.deposits) > 0)
+                      .map(({ position, pool }) => (
+                        <div
+                          key={pool.marketUid}
+                          className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                            selectedPool?.marketUid === pool.marketUid
+                              ? 'bg-primary/15 ring-1 ring-primary'
+                              : 'bg-base-200/50 hover:bg-base-200'
+                          }`}
+                          onClick={() => handlePoolSelect(pool)}
+                        >
+                          <img
+                            src={pool.asset.logoURI}
+                            width={32}
+                            height={32}
+                            alt={pool.asset.symbol}
+                            className="rounded-full object-contain w-8 h-8 shrink-0"
+                          />
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <span className="text-sm font-medium">{pool.asset.symbol}</span>
+                            <span className="text-xs text-success truncate">
+                              +{formatTokenAmount(position.deposits)} ($
+                              {formatUsd(position.depositsUSD)})
+                            </span>
+                          </div>
+                          {account && (
+                            <div className="flex flex-col items-center shrink-0">
+                              <span className="text-[9px] text-base-content/50 leading-tight">
+                                Coll.
+                              </span>
+                              <CollateralToggle
+                                marketUid={pool.marketUid}
+                                enabled={position.collateralEnabled}
+                                account={account}
+                                chainId={chainId}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ))}
                   </div>
-                  {Number(position.deposits) > 0 && account && (
-                    <div className="flex flex-col items-center shrink-0">
-                      <span className="text-[9px] text-base-content/50 leading-tight">Coll.</span>
-                      <CollateralToggle
-                        marketUid={pool.marketUid}
-                        enabled={position.collateralEnabled}
-                        account={account}
-                        chainId={chainId}
-                      />
-                    </div>
-                  )}
                 </div>
-              ))}
+              )}
+
+              {/* Debt row */}
+              {activePositions.some(({ position }) => Number(position.debt) > 0) && (
+                <div>
+                  <span className="text-xs font-semibold text-error mb-1 block">
+                    Debt
+                    {lenderSummary && (
+                      <span className="font-normal text-base-content/60">
+                        {' '}
+                        — ${formatUsd(lenderSummary.debt)}
+                      </span>
+                    )}
+                  </span>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                    {activePositions
+                      .filter(({ position }) => Number(position.debt) > 0)
+                      .map(({ position, pool }) => (
+                        <div
+                          key={pool.marketUid}
+                          className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                            selectedPool?.marketUid === pool.marketUid
+                              ? 'bg-primary/15 ring-1 ring-primary'
+                              : 'bg-base-200/50 hover:bg-base-200'
+                          }`}
+                          onClick={() => handlePoolSelect(pool)}
+                        >
+                          <img
+                            src={pool.asset.logoURI}
+                            width={32}
+                            height={32}
+                            alt={pool.asset.symbol}
+                            className="rounded-full object-contain w-8 h-8 shrink-0"
+                          />
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <span className="text-sm font-medium">{pool.asset.symbol}</span>
+                            <span className="text-xs text-error truncate">
+                              -{formatTokenAmount(position.debt)} (${formatUsd(position.debtUSD)})
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -508,6 +501,7 @@ export function LendingDashboard({
                       <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </th>
+                  <th>LTV</th>
                   <th
                     className="cursor-pointer select-none"
                     onClick={() => toggleSort('totalDepositsUSD')}
@@ -543,8 +537,9 @@ export function LendingDashboard({
                   const userPos = userPositions.get(pool.marketUid)
                   const hasPosition =
                     userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
-                  const depositApr = pool.depositRate.toFixed(2)
-                  const borrowApr = pool.variableBorrowRate.toFixed(2)
+                  const iy = pool.intrinsicYield ?? 0
+                  const depositTotal = pool.depositRate + iy
+                  const borrowTotal = pool.variableBorrowRate + iy
 
                   return (
                     <tr
@@ -554,15 +549,15 @@ export function LendingDashboard({
                       }`}
                       onClick={() => handlePoolSelect(pool)}
                     >
-                      <td>
-                        <div className="flex items-center gap-2">
+                      <td className="max-w-40">
+                        <div className="flex items-center gap-2 min-w-0">
                           <div className="relative shrink-0 w-7 h-7">
                             <img
                               src={pool.asset.logoURI}
                               width={28}
                               height={28}
                               alt={pool.asset.symbol}
-                              className="rounded-full object-cover w-7 h-7"
+                              className="rounded-full object-contain w-7 h-7"
                             />
                             {hasPosition && (
                               <span
@@ -571,8 +566,11 @@ export function LendingDashboard({
                               />
                             )}
                           </div>
-                          <div className="flex flex-col">
-                            <span className="font-medium text-sm">
+                          <div className="flex flex-col min-w-0">
+                            <span
+                              className="font-medium text-sm truncate"
+                              title={pool.asset.symbol}
+                            >
                               {pool.asset.symbol}
                               {pool.isFrozen && (
                                 <span
@@ -583,15 +581,47 @@ export function LendingDashboard({
                                 </span>
                               )}
                             </span>
-                            <span className="text-xs text-base-content/60">{pool.asset.name}</span>
+                            <span
+                              className="text-xs text-base-content/60 truncate"
+                              title={pool.asset.name}
+                            >
+                              {pool.asset.name}
+                            </span>
                           </div>
                         </div>
                       </td>
                       <td>
-                        <span className="text-sm font-medium text-success">{depositApr}%</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm font-medium text-success">
+                            {depositTotal.toFixed(2)}%
+                          </span>
+                          {iy > 0 && (
+                            <span
+                              className="badge badge-xs bg-success/15 text-success border-0 cursor-help"
+                              title={`Base rate: ${pool.depositRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}%`}
+                            >
+                              +{iy.toFixed(1)}%
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td>
-                        <span className="text-sm font-medium text-warning">{borrowApr}%</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm font-medium text-warning">
+                            {borrowTotal.toFixed(2)}%
+                          </span>
+                          {iy > 0 && (
+                            <span
+                              className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help"
+                              title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}% (paid by borrower)`}
+                            >
+                              +{iy.toFixed(1)}%
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <LtvBadge config={pool.config} variant="cell" />
                       </td>
                       <td>
                         <span className="text-xs" title={`$${formatUsd(pool.totalDepositsUSD)}`}>
@@ -613,7 +643,7 @@ export function LendingDashboard({
                 })}
                 {pools.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center py-6 text-sm text-base-content/60">
+                    <td colSpan={7} className="text-center py-6 text-sm text-base-content/60">
                       No pools match your search.
                     </td>
                   </tr>
@@ -656,6 +686,9 @@ export function LendingDashboard({
               const userPos = userPositions.get(pool.marketUid)
               const hasPosition =
                 userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
+              const mIy = pool.intrinsicYield ?? 0
+              const mDepTotal = pool.depositRate + mIy
+              const mBorTotal = pool.variableBorrowRate + mIy
 
               return (
                 <div
@@ -671,36 +704,58 @@ export function LendingDashboard({
                           width={28}
                           height={28}
                           alt={pool.asset.symbol}
-                          className="rounded-full object-cover w-7 h-7"
+                          className="rounded-full object-contain w-7 h-7"
                         />
                         {hasPosition && (
                           <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100" />
                         )}
                       </div>
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-sm">
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-semibold text-sm truncate" title={pool.asset.symbol}>
                           {pool.asset.symbol}
                           {pool.isFrozen && (
                             <span className="ml-1 text-warning text-xs">&#x2744;</span>
                           )}
                         </span>
-                        <span className="text-[11px] text-base-content/60">{pool.asset.name}</span>
+                        <span
+                          className="text-[11px] text-base-content/60 truncate"
+                          title={pool.asset.name}
+                        >
+                          {pool.asset.name}
+                        </span>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="font-bold text-sm text-success">
-                        {pool.depositRate.toFixed(2)}%
-                      </span>
+                    <div className="text-right shrink-0">
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="font-bold text-sm text-success">
+                          {mDepTotal.toFixed(2)}%
+                        </span>
+                        {mIy > 0 && (
+                          <span
+                            className="badge badge-xs bg-success/15 text-success border-0"
+                            title={`Base rate: ${pool.depositRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
+                          >
+                            +{mIy.toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-base-content/50 block">Deposit APR</span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between mt-2 text-xs text-base-content/70">
                     <span>
                       Borrow:{' '}
-                      <span className="text-warning font-medium">
-                        {pool.variableBorrowRate.toFixed(2)}%
-                      </span>
+                      <span className="text-warning font-medium">{mBorTotal.toFixed(2)}%</span>
+                      {mIy > 0 && (
+                        <span
+                          className="badge badge-xs bg-warning/15 text-warning border-0 ml-1"
+                          title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
+                        >
+                          +{mIy.toFixed(1)}%
+                        </span>
+                      )}
                     </span>
+                    <LtvBadge config={pool.config} variant="inline" />
                     <span>Dep: {abbreviateUsd(pool.totalDepositsUSD)}</span>
                     <span>Liq: {abbreviateUsd(pool.totalLiquidityUSD)}</span>
                   </div>
@@ -740,7 +795,7 @@ export function LendingDashboard({
                 width={32}
                 height={32}
                 alt={selectedPool.asset.symbol}
-                className="rounded-full object-cover w-8 h-8 shrink-0"
+                className="rounded-full object-contain w-8 h-8 shrink-0"
               />
               <div className="flex flex-col min-w-0">
                 <span className="font-medium text-sm">{selectedPool.asset.symbol}</span>
@@ -870,7 +925,7 @@ export function LendingDashboard({
                   width={32}
                   height={32}
                   alt={selectedPool.asset.symbol}
-                  className="rounded-full object-cover w-8 h-8 shrink-0"
+                  className="rounded-full object-contain w-8 h-8 shrink-0"
                 />
                 <div className="flex flex-col min-w-0">
                   <span className="font-medium text-sm">{selectedPool.asset.symbol}</span>

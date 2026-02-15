@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { LenderTab } from './components/lending/LendingTab'
 import { ThemeSwitcher } from './components/themeSwitcher'
 import { WalletConnect } from './components/connect'
-import { BlackHoleLogo } from './components/BlackHoleLogo'
+import { PortalLogo } from './components/PortalLogo'
 import { fetchLenderMetaFromDirAndInitialize } from '@1delta/margin-fetcher'
 import { fetchLenderLabels } from '@1delta/lib-utils'
 
@@ -18,7 +18,7 @@ export default function App() {
         <div className="flex-1 min-w-0 gap">
           <h1 className="text-xl sm:text-3xl">
             <span className="text-primary">P</span>
-            <BlackHoleLogo />
+            <PortalLogo />
             <span className="text-primary">RTAL</span>
           </h1>
         </div>

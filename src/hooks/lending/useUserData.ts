@@ -23,18 +23,18 @@ export interface UserPositionEntry {
 }
 
 export interface UserBalanceData {
-  borrowDiscountedCollateral: number
-  borrowDiscountedCollateralAllActive: number
+  borrowDiscountedCollateral?: number
+  borrowDiscountedCollateralAllActive?: number
   collateral: number
   collateralAllActive: number
   deposits: number
   debt: number
-  adjustedDebt: number
+  adjustedDebt?: number
   nav: number
   deposits24h: number
   debt24h: number
   nav24h: number
-  rewards: Record<string, unknown>
+  rewards?: Record<string, unknown>
 }
 
 export interface UserAprData {
@@ -45,9 +45,9 @@ export interface UserAprData {
   rewardApr: number
   rewardDepositApr: number
   rewardBorrowApr: number
-  stakingApr: number
-  stakingDepositApr: number
-  stakingBorrowApr: number
+  intrinsicApr: number
+  intrinsicDepositApr: number
+  intrinsicBorrowApr: number
 }
 
 export interface UserConfigEntry {
@@ -70,17 +70,10 @@ export interface LenderUserDataEntry {
   account: string
   chainId: string
   lender: string
-  totalDepositsUSD: number
-  totalDebtUSD: number
-  netWorth: number
-  netWorth24h: number
-  depositApr: number
-  borrowApr: number
-  netApr: number
-  rewardApr: number
+  balanceData: UserBalanceData
+  aprData: UserAprData
   healthFactor: number | null
   leverage: number
-  collateral: number
   data: UserSubAccount[]
 }
 
@@ -97,14 +90,8 @@ export interface ChainSummary {
 }
 
 export interface UserDataSummary {
-  totalDepositsUSD: number
-  totalDebtUSD: number
-  totalNetWorth: number
-  totalNetWorth24h: number
-  avgDepositApr: number
-  avgBorrowApr: number
-  avgNetApr: number
-  totalRewardApr: number
+  balanceData: UserBalanceData
+  aprData: UserAprData
   overallLeverage: number
   activeLenders: number
   activeChains: number
