@@ -10,14 +10,14 @@ import { useTokenBalances } from '../../../hooks/lending/useTokenBalances'
 import { useSyncChain } from '../../../hooks/useSyncChain'
 import { SearchableSelect, type SearchableSelectOption } from '../SearchableSelect'
 import { WalletConnect } from '../../connect'
-import { computeLenderTvl, abbreviateUsd, formatUsd, formatTokenAmount } from '../../../utils/format'
+import { computeLenderTvl } from '../../../utils/format'
 import { TradingMarketTable } from './TradingMarketTable'
 import { LoopAction } from './actions/LoopAction'
 import { ColSwapAction } from './actions/ColSwapAction'
 import { DebtSwapAction } from './actions/DebtSwapAction'
 import { CloseAction } from './actions/CloseAction'
 import type { TradingOperation, SelectedPool, TableHighlight } from './types'
-import { CollateralToggle } from '../UserTable'
+import { YourPositions, type PositionSummary } from '../YourPositions'
 import { useIsMobile } from '../../../hooks/useIsMobile'
 
 interface Props {
@@ -144,11 +144,23 @@ export function TradingDashboard({
   }, [activeSubAccount])
 
   // Balance summary
-  const lenderSummary = useMemo(() => {
+  const lenderSummary: PositionSummary | null = useMemo(() => {
     if (!activeSubAccount) return null
     const bd = activeSubAccount.balanceData
     if (bd.deposits === 0 && bd.debt === 0) return null
-    return { deposits: bd.deposits, debt: bd.debt, nav: bd.nav, health: activeSubAccount.health }
+    const ad = activeSubAccount.aprData
+    return {
+      deposits: bd.deposits,
+      debt: bd.debt,
+      nav: bd.nav,
+      health: activeSubAccount.health,
+      apr: ad.apr,
+      depositApr: ad.depositApr,
+      borrowApr: ad.borrowApr,
+      intrinsicApr: ad.intrinsicApr,
+      intrinsicDepositApr: ad.intrinsicDepositApr,
+      intrinsicBorrowApr: ad.intrinsicBorrowApr,
+    }
   }, [activeSubAccount])
 
   // Active positions for cards
@@ -222,126 +234,16 @@ export function TradingDashboard({
         </div>
       )}
       {account && !isUserDataLoading && subAccounts.length > 0 && (
-        <div className="rounded-box border border-base-300 p-4 space-y-3">
-          <h3 className="text-sm font-semibold">Your Positions</h3>
-
-          {/* Sub-account chips */}
-          <div className="flex flex-wrap gap-2">
-            {subAccounts.map((sub, i) => {
-              const isActive = sub.accountId === selectedSubAccountId
-              const healthBadge =
-                sub.health != null
-                  ? sub.health < 1.1
-                    ? 'badge-error'
-                    : sub.health < 1.3
-                      ? 'badge-warning'
-                      : 'badge-success'
-                  : null
-
-              return (
-                <button
-                  key={sub.accountId}
-                  type="button"
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer border ${
-                    isActive
-                      ? 'border-primary bg-primary/10 ring-1 ring-primary'
-                      : 'border-base-300 bg-base-200/50 hover:bg-base-200'
-                  }`}
-                  onClick={() => setSelectedSubAccountId(sub.accountId)}
-                >
-                  <span className="font-semibold">#{i + 1}</span>
-                  <span className="text-base-content/70">
-                    NAV: <span className="font-medium">{abbreviateUsd(sub.balanceData.nav)}</span>
-                  </span>
-                  {healthBadge && (
-                    <span className={`badge badge-xs font-semibold ${healthBadge}`}>
-                      {sub.health!.toFixed(2)}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Summary stats */}
-          {lenderSummary && (
-            <div className="flex gap-4 items-center text-xs flex-wrap">
-              <span>
-                Deposits:{' '}
-                <span className="font-semibold text-success">
-                  ${formatUsd(lenderSummary.deposits)}
-                </span>
-              </span>
-              <span>
-                Debt:{' '}
-                <span className="font-semibold text-error">${formatUsd(lenderSummary.debt)}</span>
-              </span>
-              <span>
-                Net: <span className="font-semibold">${formatUsd(lenderSummary.nav)}</span>
-              </span>
-              {lenderSummary.health != null && (
-                <div className="flex items-center gap-1">
-                  <span>Health:</span>
-                  <span
-                    className={`badge badge-sm font-semibold ${
-                      lenderSummary.health < 1.1
-                        ? 'badge-error'
-                        : lenderSummary.health < 1.3
-                          ? 'badge-warning'
-                          : 'badge-success'
-                    }`}
-                  >
-                    {lenderSummary.health.toFixed(2)}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Position cards */}
-          {activePositions.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-              {activePositions.map(({ position, pool }) => (
-                <div
-                  key={pool.marketUid}
-                  className="flex items-center gap-2 p-2 rounded-lg bg-base-200/50"
-                >
-                  <img
-                    src={pool.asset.logoURI}
-                    width={32}
-                    height={32}
-                    alt={pool.asset.symbol}
-                    className="rounded-full object-contain w-8 h-8 shrink-0"
-                  />
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-sm font-medium">{pool.asset.symbol}</span>
-                    {Number(position.deposits) > 0 && (
-                      <span className="text-xs text-success truncate">
-                        +{formatTokenAmount(position.deposits)} (${formatUsd(position.depositsUSD)})
-                      </span>
-                    )}
-                    {Number(position.debt) > 0 && (
-                      <span className="text-xs text-error truncate">
-                        -{formatTokenAmount(position.debt)} (${formatUsd(position.debtUSD)})
-                      </span>
-                    )}
-                  </div>
-                  {Number(position.deposits) > 0 && account && (
-                    <div className="flex flex-col items-center shrink-0">
-                      <span className="text-[9px] text-base-content/50 leading-tight">Coll.</span>
-                      <CollateralToggle
-                        marketUid={pool.marketUid}
-                        enabled={position.collateralEnabled}
-                        account={account}
-                        chainId={chainId}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <YourPositions
+          subAccounts={subAccounts}
+          selectedSubAccountId={selectedSubAccountId}
+          onSubAccountChange={setSelectedSubAccountId}
+          summary={lenderSummary}
+          activePositions={activePositions}
+          account={account}
+          chainId={chainId}
+          selectedLender={selectedLender}
+        />
       )}
 
       {/* Two column: Market table + Action panel */}
