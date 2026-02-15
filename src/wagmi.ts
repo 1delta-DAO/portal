@@ -18,15 +18,16 @@ export const evmTransportsWagmi = Object.assign(
   ...evmChainWagmi.map(({ id }) => {
     return {
       // @ts-ignore
-      [id]: http(RPC_OVERRIDES[String(id)]),
+      [id]: http(RPC_OVERRIDES[String(id)], { batch: true }),
     }
   })
 )
 
 export const config = getDefaultConfig({
-  appName: 'Allocator',
+  appName: 'Portal',
   projectId: 'id',
   chains: evmChainWagmi as any,
   transports: evmTransportsWagmi,
   ssr: false,
+  pollingInterval: 30_000,
 })

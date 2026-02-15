@@ -66,7 +66,7 @@ export function useSendLendingTransaction(params: {
         })
 
         if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash })
+          await publicClient.waitForTransactionReceipt({ hash, pollingInterval: 12_000 })
         }
 
         invalidateQueries()
