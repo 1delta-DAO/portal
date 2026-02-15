@@ -181,11 +181,18 @@ export function LendingDashboard({
     const bd = activeSubAccount.balanceData
     if (bd.deposits === 0 && bd.debt === 0) return null
 
+    const ad = activeSubAccount.aprData
     return {
       deposits: bd.deposits,
       debt: bd.debt,
       nav: bd.nav,
       health: activeSubAccount.health,
+      apr: ad.apr,
+      depositApr: ad.depositApr,
+      borrowApr: ad.borrowApr,
+      intrinsicApr: ad.intrinsicApr,
+      intrinsicDepositApr: ad.intrinsicDepositApr,
+      intrinsicBorrowApr: ad.intrinsicBorrowApr,
     }
   }, [activeSubAccount])
 
@@ -323,6 +330,20 @@ export function LendingDashboard({
               <span>
                 Net: <span className="font-semibold">${formatUsd(lenderSummary.nav)}</span>
               </span>
+              <div className="flex items-center gap-1">
+                <span>APR:</span>
+                <span className={`font-semibold ${lenderSummary.apr + lenderSummary.intrinsicApr >= 0 ? 'text-success' : 'text-error'}`}>
+                  {(lenderSummary.apr + lenderSummary.intrinsicApr).toFixed(2)}%
+                </span>
+                {lenderSummary.intrinsicApr > 0 && (
+                  <span
+                    className="badge badge-xs bg-success/15 text-success border-0 cursor-help"
+                    title={`Base APR: ${lenderSummary.apr.toFixed(2)}% + Intrinsic yield: ${lenderSummary.intrinsicApr.toFixed(2)}%`}
+                  >
+                    +{lenderSummary.intrinsicApr.toFixed(1)}%
+                  </span>
+                )}
+              </div>
               {lenderSummary.health != null && (
                 <div className="flex items-center gap-1">
                   <span>Health:</span>
@@ -348,13 +369,25 @@ export function LendingDashboard({
               {/* Collateral row */}
               {activePositions.some(({ position }) => Number(position.deposits) > 0) && (
                 <div>
-                  <span className="text-xs font-semibold text-success mb-1 block">
+                  <span className="text-xs font-semibold text-success mb-1 flex items-center gap-1 flex-wrap">
                     Deposits
                     {lenderSummary && (
-                      <span className="font-normal text-base-content/60">
-                        {' '}
-                        — ${formatUsd(lenderSummary.deposits)}
-                      </span>
+                      <>
+                        <span className="font-normal text-base-content/60">
+                          — ${formatUsd(lenderSummary.deposits)}
+                        </span>
+                        <span className="font-medium">
+                          {(lenderSummary.depositApr + lenderSummary.intrinsicDepositApr).toFixed(2)}%
+                        </span>
+                        {lenderSummary.intrinsicDepositApr > 0 && (
+                          <span
+                            className="badge badge-xs bg-success/15 text-success border-0 cursor-help"
+                            title={`Base rate: ${lenderSummary.depositApr.toFixed(2)}% + Intrinsic yield: ${lenderSummary.intrinsicDepositApr.toFixed(2)}%`}
+                          >
+                            +{lenderSummary.intrinsicDepositApr.toFixed(1)}%
+                          </span>
+                        )}
+                      </>
                     )}
                   </span>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
@@ -406,13 +439,25 @@ export function LendingDashboard({
               {/* Debt row */}
               {activePositions.some(({ position }) => Number(position.debt) > 0) && (
                 <div>
-                  <span className="text-xs font-semibold text-error mb-1 block">
+                  <span className="text-xs font-semibold text-error mb-1 flex items-center gap-1 flex-wrap">
                     Debt
                     {lenderSummary && (
-                      <span className="font-normal text-base-content/60">
-                        {' '}
-                        — ${formatUsd(lenderSummary.debt)}
-                      </span>
+                      <>
+                        <span className="font-normal text-base-content/60">
+                          — ${formatUsd(lenderSummary.debt)}
+                        </span>
+                        <span className="font-medium">
+                          {(lenderSummary.borrowApr + lenderSummary.intrinsicBorrowApr).toFixed(2)}%
+                        </span>
+                        {lenderSummary.intrinsicBorrowApr > 0 && (
+                          <span
+                            className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help"
+                            title={`Base rate: ${lenderSummary.borrowApr.toFixed(2)}% + Intrinsic yield: ${lenderSummary.intrinsicBorrowApr.toFixed(2)}%`}
+                          >
+                            +{lenderSummary.intrinsicBorrowApr.toFixed(1)}%
+                          </span>
+                        )}
+                      </>
                     )}
                   </span>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
