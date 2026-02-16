@@ -36,7 +36,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   // Pagination
-  const [pageSize, setPageSize] = useState<number>(5)
+  const [pageSize, setPageSize] = useState<number>(10)
   const [page, setPage] = useState<number>(1)
 
   // Extra filters
@@ -51,7 +51,13 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   // Mobile deposit modal
   const [showMobileDeposit, setShowMobileDeposit] = useState(false)
 
-  const { pools, isPoolsLoading: loading, isFetchingMore, hasMore, count: serverCount } = useFlattenedPools({
+  const {
+    pools,
+    isPoolsLoading: loading,
+    isFetchingMore,
+    hasMore,
+    count: serverCount,
+  } = useFlattenedPools({
     chainId,
     enabled: !!chainId,
   })
