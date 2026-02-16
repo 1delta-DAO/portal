@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo } from 'react'
+import { useInfiniteQuery } from '@tanstack/react-query'
 
 // ============================================================================
 // Types for the /lending/pools API response
@@ -36,7 +37,7 @@ interface PoolsApiResponse {
   data: {
     start: number
     count: number
-    pools: PoolEntry[]
+    items: PoolEntry[]
   }
   error?: { code: string; message: string }
 }
@@ -49,16 +50,26 @@ import { BACKEND_BASE_URL } from '../../config/backend'
 
 const endpointPools = `${BACKEND_BASE_URL}/v1/data/lending/pools`
 
-function buildPoolsUrl(base: string, chainIds?: (number | string)[], lenders?: string[]) {
+/** Number of items to request per API page */
+const API_PAGE_SIZE = 500
+
+function buildPoolsUrl(
+  base: string,
+  chainIds?: (number | string)[],
+  lenders?: string[],
+  start?: number,
+  count?: number
+) {
   const url = new URL(base)
 
-  const appendArray = (key: string, values?: (string | number)[]) => {
-    if (!values || values.length === 0) return
-    values.forEach((v) => url.searchParams.append(key, String(v)))
+  if (chainIds && chainIds.length > 0) {
+    chainIds.forEach((v) => url.searchParams.append('chainId', String(v)))
   }
-
-  appendArray('chainId', chainIds)
-  appendArray('lender', lenders)
+  if (lenders && lenders.length > 0) {
+    lenders.forEach((v) => url.searchParams.append('lender', String(v)))
+  }
+  if (start !== undefined) url.searchParams.set('start', String(start))
+  if (count !== undefined) url.searchParams.set('count', String(count))
 
   return url.toString()
 }
@@ -70,6 +81,7 @@ function buildPoolsUrl(base: string, chainIds?: (number | string)[], lenders?: s
 /**
  * useFlattenedPools
  * Fetches from the /lending/pools endpoint filtered by chainId and lender.
+ * Uses infinite query to paginate through all results in chunks of API_PAGE_SIZE.
  */
 export function useFlattenedPools(params: {
   chainId?: string
@@ -80,12 +92,26 @@ export function useFlattenedPools(params: {
   const lender = params?.lender
   const enabled = params?.enabled ?? true
 
-  const url = buildPoolsUrl(endpointPools, chainId ? [chainId] : [], lender ? [lender] : [])
-
-  const { data, isLoading, isFetching, error } = useQuery<PoolsApiResponse>({
-    queryKey: ['flattenedPools', url],
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    error,
+  } = useInfiniteQuery<PoolsApiResponse>({
+    queryKey: ['flattenedPools', chainId ?? '', lender ?? ''],
     enabled,
-    queryFn: async () => {
+    initialPageParam: 0 as number,
+    queryFn: async ({ pageParam }) => {
+      const url = buildPoolsUrl(
+        endpointPools,
+        chainId ? [chainId] : [],
+        lender ? [lender] : [],
+        pageParam as number,
+        API_PAGE_SIZE
+      )
       const r = await fetch(url)
       if (!r.ok) {
         const text = await r.text().catch(() => '')
@@ -99,17 +125,42 @@ export function useFlattenedPools(params: {
 
       return json
     },
+    getNextPageParam: (lastPage, allPages) => {
+      const totalFetched = allPages.reduce((sum, p) => sum + p.data.items.length, 0)
+      // Reached the end: fewer items returned than requested
+      if (lastPage.data.items.length < API_PAGE_SIZE) return undefined
+      // Reached the end: fetched all available items
+      if (lastPage.data.count > 0 && totalFetched >= lastPage.data.count) return undefined
+      return totalFetched
+    },
     refetchInterval: 8 * 60 * 1000,
     staleTime: 30_000,
     retry: 1,
     refetchOnWindowFocus: false,
   })
 
+  // Auto-fetch remaining pages so all data is available for client-side filtering
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage()
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  // Flatten all pages into a single array
+  const pools = useMemo(() => {
+    if (!data?.pages) return []
+    return data.pages.flatMap((page) => page.data.items)
+  }, [data])
+
+  const totalServerCount = data?.pages?.[0]?.data?.count ?? 0
+
   return {
-    pools: data?.data?.pools ?? [],
-    count: data?.data?.count ?? 0,
+    pools,
+    count: totalServerCount,
     isPoolsLoading: isLoading,
     isPoolsFetching: isFetching,
+    isFetchingMore: isFetchingNextPage,
+    hasMore: !!hasNextPage,
     error,
   }
 }

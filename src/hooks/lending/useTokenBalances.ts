@@ -18,7 +18,7 @@ interface BalancesApiResponse {
     chainId: string
     account: string
     count: number
-    balances: TokenBalance[]
+    items: TokenBalance[]
   }
   error?: { code: string; message: string }
 }
@@ -60,7 +60,7 @@ export function useTokenBalances(params: {
       }
 
       const map = new Map<string, TokenBalance>()
-      for (const bal of json.data.balances) {
+      for (const bal of json.data.items) {
         map.set(bal.address.toLowerCase(), bal)
       }
       return map

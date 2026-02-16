@@ -9,7 +9,7 @@ interface LendingBalancesApiResponse {
     chainId: string
     account: string
     count: number
-    balances: TokenBalance[]
+    items: TokenBalance[]
   }
   error?: { code: string; message: string }
 }
@@ -45,7 +45,7 @@ export function useLendingBalances(params: {
         throw new Error(json.error?.message ?? 'Lending balances API returned success: false')
       }
 
-      return json.data.balances
+      return json.data.items
     },
     staleTime: 30_000,
     refetchInterval: 60_000,

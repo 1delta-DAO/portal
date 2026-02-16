@@ -41,7 +41,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
 
   // Extra filters
   const [maxUtilPct, setMaxUtilPct] = useState<string>('90')
-  const [minDepositsUsd, setMinDepositsUsd] = useState<string>('10000')
+  const [minDepositsUsd, setMinDepositsUsd] = useState<string>('100000')
   const [minAprPct, setMinAprPct] = useState<string>('1')
   const [assetFilter, setAssetFilter] = useState<string>('')
 
@@ -51,7 +51,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   // Mobile deposit modal
   const [showMobileDeposit, setShowMobileDeposit] = useState(false)
 
-  const { pools, isPoolsLoading: loading } = useFlattenedPools({
+  const { pools, isPoolsLoading: loading, isFetchingMore, hasMore, count: serverCount } = useFlattenedPools({
     chainId,
     enabled: !!chainId,
   })
@@ -338,7 +338,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
             value={pageSize}
             onChange={(e) => setPageSize(parseInt(e.target.value, 10))}
           >
-            <option value={5}>5 / page</option>
+            <option value={10}>10 / page</option>
             <option value={20}>20 / page</option>
             <option value={50}>50 / page</option>
             <option value={100}>100 / page</option>
@@ -405,6 +405,14 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
         </div>
       </div>
 
+      {/* Progressive loading indicator */}
+      {isFetchingMore && (
+        <div className="flex items-center gap-2 text-xs text-base-content/60">
+          <span className="loading loading-spinner loading-xs" />
+          Loading more markets ({pools.length} of {serverCount || '...'})
+        </div>
+      )}
+
       {/* Desktop: two-column layout; Mobile: full-width card list */}
       <div className="flex gap-4 items-start">
         <MarketsTable
@@ -421,6 +429,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
           currentPage={currentPage}
           totalPages={totalPages}
           onGoToPage={goToPage}
+          isFetchingMore={isFetchingMore}
         />
 
         {/* Desktop action panel — hidden on mobile */}

@@ -20,6 +20,7 @@ interface MarketsTableProps {
   currentPage: number
   totalPages: number
   onGoToPage: (page: number) => void
+  isFetchingMore?: boolean
 }
 
 export const MarketsTable: React.FC<MarketsTableProps> = ({
@@ -36,6 +37,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
   currentPage,
   totalPages,
   onGoToPage,
+  isFetchingMore,
 }) => {
   const isRowSelected = (entry: PoolEntry) =>
     selectedEntry !== null &&
@@ -59,6 +61,12 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
               {startIndex + 1}&ndash;{endIndex}
             </span>{' '}
             of <span className="font-semibold">{totalItems}</span> pools
+            {isFetchingMore && (
+              <span className="inline-flex items-center gap-1 ml-1">
+                <span className="loading loading-spinner loading-xs" />
+                loading more…
+              </span>
+            )}
           </>
         )}
       </div>

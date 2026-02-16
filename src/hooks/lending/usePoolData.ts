@@ -9,7 +9,7 @@ const endpointLendingLatest = `${BACKEND_BASE_URL}/v1/data/lending/latest?chains
 
 interface LendingLatestApiResponse {
   success: boolean
-  data: { data: LenderEntryRaw[] }
+  data: { count: number; items: LenderEntryRaw[] }
   error?: { code: string; message: string }
 }
 
@@ -118,7 +118,7 @@ export function useMarginPublicData(chainId: string) {
       }
 
       const transformed: LenderData = {}
-      for (const entry of json.data.data) {
+      for (const entry of json.data.items) {
         transformed[entry.lender] = entry.markets
       }
       return transformed

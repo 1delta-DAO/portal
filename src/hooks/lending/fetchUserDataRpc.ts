@@ -28,7 +28,7 @@ interface RpcCallApiResponse {
 interface ParseApiResponse {
   success: boolean
   data: {
-    data: LenderUserDataEntry[]
+    items: LenderUserDataEntry[]
     summary: UserDataSummary
   }
   error?: { code: string; message: string }
@@ -107,5 +107,5 @@ export async function fetchUserDataViaRpc(
     body: JSON.stringify({ rpcCallId, rawResponses }),
   })
 
-  return { data: parseResult.data.data, summary: parseResult.data.summary }
+  return { data: parseResult.data.items, summary: parseResult.data.summary }
 }

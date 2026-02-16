@@ -148,13 +148,13 @@ export function useUserData(params: { chainId: string; account?: string; enabled
       }
       const json = (await r.json()) as {
         success: boolean
-        data: { data: LenderUserDataEntry[]; summary: UserDataSummary }
+        data: { items: LenderUserDataEntry[]; summary: UserDataSummary }
         error?: { code: string; message: string }
       }
       if (!json.success) {
         throw new Error(json.error?.message ?? 'API returned success: false')
       }
-      return { raw: json.data.data, summary: json.data.summary }
+      return { raw: json.data.items, summary: json.data.summary }
     },
     refetchInterval: 5 * 60 * 1000,
     staleTime: 30_000,
