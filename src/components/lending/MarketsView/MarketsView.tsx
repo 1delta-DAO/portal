@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { getChainName, isWNative, lenderDisplayNameFull } from '@1delta/lib-utils'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { getChainName, isWNative, lenderDisplayNameFull, SupportedChainId } from '@1delta/lib-utils'
 import { zeroAddress } from 'viem'
 import { useFlattenedPools, type PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import type { LenderData } from '../../../hooks/lending/usePoolData'
@@ -11,6 +11,17 @@ import { computePoolMetrics, resolvePoolDataItem, type SortKey } from './helpers
 import { MarketsTable } from './MarketsTable'
 import { DepositPanel } from './DepositPanel'
 import { useIsMobile } from '../../../hooks/useIsMobile'
+
+const HIGH_LIQUIDITY_CHAINS: ReadonlySet<string> = new Set([
+  SupportedChainId.PLASMA_MAINNET,
+  SupportedChainId.ETHEREUM_MAINNET,
+  SupportedChainId.ARBITRUM_ONE,
+  SupportedChainId.BASE,
+])
+
+function getDefaultMinDepositsUsd(chainId?: string): string {
+  return chainId && HIGH_LIQUIDITY_CHAINS.has(chainId) ? '100000' : '25000'
+}
 
 interface LendingPoolsTableProps {
   chainId?: string
@@ -41,9 +52,10 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
 
   // Extra filters
   const [maxUtilPct, setMaxUtilPct] = useState<string>('90')
-  const [minDepositsUsd, setMinDepositsUsd] = useState<string>('100000')
+  const [minDepositsUsd, setMinDepositsUsd] = useState<string>(() => getDefaultMinDepositsUsd(chainId))
   const [minAprPct, setMinAprPct] = useState<string>('1')
   const [assetFilter, setAssetFilter] = useState<string>('')
+  const userOverrodeMinDeposits = useRef(false)
 
   // Pool selection for deposit
   const [selectedEntry, setSelectedEntry] = useState<PoolEntry | null>(null)
@@ -252,6 +264,13 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   const endIndex = Math.min(startIndex + pageSize, totalItems)
   const paginatedPools = filteredAndSortedPools.slice(startIndex, endIndex)
 
+  // Reset minDepositsUsd to chain-appropriate default on chain switch (unless user overrode)
+  useEffect(() => {
+    if (!userOverrodeMinDeposits.current) {
+      setMinDepositsUsd(getDefaultMinDepositsUsd(chainId))
+    }
+  }, [chainId])
+
   useEffect(() => {
     setPage(1)
   }, [
@@ -393,7 +412,10 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
             className="input input-bordered input-xs"
             placeholder="e.g. 100000"
             value={minDepositsUsd}
-            onChange={(e) => setMinDepositsUsd(e.target.value)}
+            onChange={(e) => {
+              userOverrodeMinDeposits.current = true
+              setMinDepositsUsd(e.target.value)
+            }}
           />
         </div>
 

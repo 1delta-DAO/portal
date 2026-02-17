@@ -51,7 +51,7 @@ import { BACKEND_BASE_URL } from '../../config/backend'
 const endpointPools = `${BACKEND_BASE_URL}/v1/data/lending/pools`
 
 /** Number of items to request per API page */
-const API_PAGE_SIZE = 500
+const API_PAGE_SIZE = 100
 
 function buildPoolsUrl(
   base: string,
@@ -92,52 +92,45 @@ export function useFlattenedPools(params: {
   const lender = params?.lender
   const enabled = params?.enabled ?? true
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextPage,
-    error,
-  } = useInfiniteQuery<PoolsApiResponse>({
-    queryKey: ['flattenedPools', chainId ?? '', lender ?? ''],
-    enabled,
-    initialPageParam: 0 as number,
-    queryFn: async ({ pageParam }) => {
-      const url = buildPoolsUrl(
-        endpointPools,
-        chainId ? [chainId] : [],
-        lender ? [lender] : [],
-        pageParam as number,
-        API_PAGE_SIZE
-      )
-      const r = await fetch(url)
-      if (!r.ok) {
-        const text = await r.text().catch(() => '')
-        throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
-      }
-      const json = (await r.json()) as PoolsApiResponse
+  const { data, isLoading, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage, error } =
+    useInfiniteQuery<PoolsApiResponse>({
+      queryKey: ['flattenedPools', chainId ?? '', lender ?? ''],
+      enabled,
+      initialPageParam: 0 as number,
+      queryFn: async ({ pageParam }) => {
+        const url = buildPoolsUrl(
+          endpointPools,
+          chainId ? [chainId] : [],
+          lender ? [lender] : [],
+          pageParam as number,
+          API_PAGE_SIZE
+        )
+        const r = await fetch(url)
+        if (!r.ok) {
+          const text = await r.text().catch(() => '')
+          throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
+        }
+        const json = (await r.json()) as PoolsApiResponse
 
-      if (!json.success) {
-        throw new Error(json.error?.message ?? 'Pools API returned success: false')
-      }
+        if (!json.success) {
+          throw new Error(json.error?.message ?? 'Pools API returned success: false')
+        }
 
-      return json
-    },
-    getNextPageParam: (lastPage, allPages) => {
-      const totalFetched = allPages.reduce((sum, p) => sum + p.data.items.length, 0)
-      // Reached the end: fewer items returned than requested
-      if (lastPage.data.items.length < API_PAGE_SIZE) return undefined
-      // Reached the end: fetched all available items
-      if (lastPage.data.count > 0 && totalFetched >= lastPage.data.count) return undefined
-      return totalFetched
-    },
-    refetchInterval: 8 * 60 * 1000,
-    staleTime: 30_000,
-    retry: 1,
-    refetchOnWindowFocus: false,
-  })
+        return json
+      },
+      getNextPageParam: (lastPage, allPages) => {
+        const totalFetched = allPages.reduce((sum, p) => sum + p.data.items.length, 0)
+        // Reached the end: fewer items returned than requested
+        if (lastPage.data.items.length < API_PAGE_SIZE) return undefined
+        // Reached the end: fetched all available items
+        if (lastPage.data.count > 0 && totalFetched >= lastPage.data.count) return undefined
+        return totalFetched
+      },
+      refetchInterval: 8 * 60 * 1000,
+      staleTime: 30_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    })
 
   // Auto-fetch remaining pages so all data is available for client-side filtering
   useEffect(() => {
