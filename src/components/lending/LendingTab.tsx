@@ -6,18 +6,14 @@ import { UserLenderPositionsTable } from './UserTable'
 import { UserAssetsTable } from './UserAssetsTable'
 import { LendingPoolsTable } from './MarketsView'
 import { ChainFilterSelect } from './ChainFilter'
-import { LenderOperationsBuilder } from './LenderOperationsBuilder'
 import { useUserData } from '../../hooks/lending/useUserData'
 import { useMarginPublicData } from '../../hooks/lending/usePoolData'
 import { useLendingBalances } from '../../hooks/lending/useLendingBalances'
 import { useTokenLists } from '../../hooks/useTokenLists'
-import { useMainPrices } from '../../hooks/prices/useMainPrices'
 import { LendingDashboard } from './LendingDashboard'
 import { TradingDashboard } from './TradingDashboard'
 
-type SubTab = 'earn' | 'lending' | 'operations' | 'trading'
-
-const SHOW_OPERATIONS_TAB = false
+type SubTab = 'earn' | 'lending' | 'trading'
 
 export function LenderTab() {
   const { address: account } = useAccount()
@@ -45,7 +41,6 @@ export function LenderTab() {
     chainId: effectiveChainId,
     account,
   })
-  const { data: prices } = useMainPrices()
   const { data: tokens } = useTokenLists(effectiveChainId)
   const {
     balances: lendingBalances,
@@ -84,17 +79,6 @@ export function LenderTab() {
           >
             Lending
           </button>
-
-          {SHOW_OPERATIONS_TAB && (
-            <button
-              type="button"
-              role="tab"
-              className={`tab tab-sm ${activeTab === 'operations' ? 'tab-active' : ''}`}
-              onClick={() => setActiveTab('operations')}
-            >
-              Operations
-            </button>
-          )}
 
           <button
             type="button"
@@ -187,18 +171,6 @@ export function LenderTab() {
           account={account}
           isPublicDataLoading={isPublicDataLoading}
           isUserDataLoading={isUserDataLoading}
-        />
-      )}
-
-      {activeTab === 'operations' && (
-        <LenderOperationsBuilder
-          prices={prices}
-          chainId={effectiveChainId}
-          userDataResult={userData}
-          lenderData={lenderData}
-          isLoading={isLoading}
-          error={error}
-          refetch={refetch}
         />
       )}
 
