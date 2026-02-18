@@ -43,7 +43,7 @@ export async function fetchEModeList(params: {
       return { success: false, error: json.error?.message ?? 'API error' }
     }
 
-    const rawEntries: any[] = json.data?.data ?? []
+    const rawEntries: any[] = json.data?.items ?? json.data?.data ?? []
 
     // Normalize from API shape (lenderKey/eModes/category) to our types
     const data: EModeLenderEntry[] = rawEntries.map((entry: any) => ({
