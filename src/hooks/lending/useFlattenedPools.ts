@@ -14,6 +14,8 @@ export interface PoolExposure {
 
 export interface PoolEntry {
   chainId: string
+  marketUid: string
+  name: string
   lenderKey: string
   underlyingAddress: string
   assetGroup: string

@@ -421,10 +421,10 @@ export function LendingDashboard({
                               )}
                             </span>
                             <span
-                              className="text-xs text-base-content/60 truncate"
-                              title={pool.asset.name}
+                              className="text-[11px] text-base-content/60 truncate"
+                              title={pool.name}
                             >
-                              {pool.asset.name}
+                              {pool.name}
                             </span>
                           </div>
                         </div>
@@ -558,9 +558,9 @@ export function LendingDashboard({
                         </span>
                         <span
                           className="text-[11px] text-base-content/60 truncate"
-                          title={pool.asset.name}
+                          title={pool.name}
                         >
-                          {pool.asset.name}
+                          {pool.name}
                         </span>
                       </div>
                     </div>
@@ -637,9 +637,11 @@ export function LendingDashboard({
                 className="rounded-full object-contain w-8 h-8 shrink-0"
               />
               <div className="flex flex-col min-w-0">
-                <span className="font-medium text-sm">{selectedPool.asset.symbol}</span>
-                <span className="text-xs text-base-content/60 truncate">
-                  {selectedPool.asset.name}
+                <span className="font-medium text-sm truncate" title={selectedPool.name}>
+                  {selectedPool.name}
+                </span>
+                <span className="text-xs text-base-content/60 truncate" title={selectedPool.asset.symbol}>
+                  {selectedPool.asset.symbol}
                 </span>
               </div>
             </div>
@@ -767,9 +769,11 @@ export function LendingDashboard({
                   className="rounded-full object-contain w-8 h-8 shrink-0"
                 />
                 <div className="flex flex-col min-w-0">
-                  <span className="font-medium text-sm">{selectedPool.asset.symbol}</span>
-                  <span className="text-xs text-base-content/60 truncate">
-                    {selectedPool.asset.name}
+                  <span className="font-medium text-sm truncate" title={selectedPool.name}>
+                    {selectedPool.name}
+                  </span>
+                  <span className="text-xs text-base-content/60 truncate" title={selectedPool.asset.symbol}>
+                    {selectedPool.asset.symbol}
                   </span>
                 </div>
               </div>

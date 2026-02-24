@@ -166,10 +166,10 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                           )}
                         </span>
                         <span
-                          className="text-xs text-base-content/60 truncate"
-                          title={pool.asset.name}
+                          className="text-[11px] text-base-content/60 truncate"
+                          title={pool.name}
                         >
-                          {pool.asset.name}
+                          {pool.name}
                         </span>
                       </div>
                     </div>
@@ -299,9 +299,9 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                     </span>
                     <span
                       className="text-[11px] text-base-content/60 truncate"
-                      title={pool.asset.name}
+                      title={pool.name}
                     >
-                      {pool.asset.name}
+                      {pool.name}
                     </span>
                   </div>
                 </div>

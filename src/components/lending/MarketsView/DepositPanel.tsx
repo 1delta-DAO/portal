@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { lenderDisplayName, type RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '@1delta/lib-utils'
 import type { PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry, UserSubAccount } from '../../../hooks/lending/useUserData'
@@ -67,18 +67,22 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
             className="rounded-full object-contain w-8 h-8 shrink-0"
           />
           <div className="flex flex-col min-w-0">
-            <span className="font-medium text-sm">{resolvedPool.asset.symbol}</span>
-            <span className="text-xs text-base-content/60 truncate">
-              {lenderDisplayName(selectedEntry!.lenderKey)}
+            <span className="font-medium text-sm truncate" title={selectedEntry!.name}>
+              {selectedEntry!.name}
+            </span>
+            <span className="text-xs text-base-content/60 truncate" title={resolvedPool.asset.symbol}>
+              {resolvedPool.asset.symbol}
             </span>
           </div>
         </div>
       ) : selectedEntry ? (
         <div className="flex items-center gap-2 p-2 rounded-lg bg-base-200">
           <div className="flex flex-col min-w-0">
-            <span className="font-medium text-sm">{selectedEntry.assetGroup}</span>
-            <span className="text-xs text-base-content/60 truncate">
-              {lenderDisplayName(selectedEntry.lenderKey)}
+            <span className="font-medium text-sm truncate" title={selectedEntry.name}>
+              {selectedEntry.name}
+            </span>
+            <span className="text-xs text-base-content/60 truncate" title={selectedEntry.assetGroup}>
+              {selectedEntry.assetGroup}
             </span>
           </div>
         </div>

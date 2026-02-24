@@ -31,6 +31,7 @@ export type LenderData = {
 
 export interface PoolDataItem {
   marketUid: string
+  name: string
   underlying: string
   asset: PoolAsset
   totalDeposits: number

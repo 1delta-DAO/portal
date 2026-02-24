@@ -168,7 +168,8 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
         (p) =>
           p.underlyingAddress.toLowerCase().includes(q) ||
           p.lenderKey.toLowerCase().includes(q) ||
-          p.assetGroup.toLowerCase().includes(q)
+          p.assetGroup.toLowerCase().includes(q) ||
+          p.name.toLowerCase().includes(q)
       )
     }
 
@@ -302,10 +303,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   }
 
   const handleRowClick = (entry: PoolEntry) => {
-    const isSame =
-      selectedEntry &&
-      selectedEntry.lenderKey === entry.lenderKey &&
-      selectedEntry.underlyingAddress === entry.underlyingAddress
+    const isSame = selectedEntry && selectedEntry.marketUid === entry.marketUid
 
     if (isSame) {
       setSelectedEntry(null)

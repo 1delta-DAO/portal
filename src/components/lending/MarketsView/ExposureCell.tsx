@@ -9,7 +9,7 @@ interface ExposureCellProps {
 
 function collectUnique(exposures: PoolExposure[], side: 'collaterals' | 'debts'): string[] {
   const set = new Set<string>()
-  for (const ex of exposures) {
+  for (const ex of exposures ?? []) {
     const list = side === 'collaterals' ? ex.collaterals : ex.debts
     list?.forEach((a) => set.add(a.toLowerCase()))
   }

@@ -26,7 +26,5 @@ export function resolvePoolDataItem(
   if (!lenderData) return null
   const pools = lenderData[entry.lenderKey]
   if (!pools) return null
-  return (
-    pools.find((p) => p.underlying.toLowerCase() === entry.underlyingAddress.toLowerCase()) ?? null
-  )
+  return pools.find((p) => p.marketUid === entry.marketUid) ?? null
 }

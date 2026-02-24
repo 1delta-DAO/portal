@@ -1,10 +1,10 @@
 import React from 'react'
-import { lenderDisplayName } from '@1delta/lib-utils'
 import type { PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import { abbreviateUsd, formatUsd } from '../../../utils/format'
 import { getFormattedPrice } from '../../../utils/price'
 import { computePoolMetrics, type SortKey } from './helpers'
 import { ExposureCell } from './ExposureCell'
+import { lenderDisplayName } from '@1delta/lib-utils'
 
 interface MarketsTableProps {
   pools: PoolEntry[]
@@ -40,9 +40,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
   isFetchingMore,
 }) => {
   const isRowSelected = (entry: PoolEntry) =>
-    selectedEntry !== null &&
-    selectedEntry.lenderKey === entry.lenderKey &&
-    selectedEntry.underlyingAddress === entry.underlyingAddress
+    selectedEntry !== null && selectedEntry.marketUid === entry.marketUid
 
   const sortIndicator = (key: SortKey) =>
     sortKey === key ? (
@@ -99,12 +97,10 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
         <table className="table table-sm table-fixed w-full">
           <thead>
             <tr>
-              <th>Asset</th>
-              <th>Lender</th>
+              <th>Market</th>
               <th className="cursor-pointer" onClick={() => onToggleSort('apr')}>
                 Deposit APR{sortIndicator('apr')}
               </th>
-              <th>Borrow APR</th>
               <th className="cursor-pointer" onClick={() => onToggleSort('utilization')}>
                 Utilization{sortIndicator('utilization')}
               </th>
@@ -120,7 +116,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
           </thead>
           <tbody>
             {pools.map((p) => {
-              const { utilization, apr, borrowApr, intrinsicYield, price } = computePoolMetrics(p)
+              const { utilization, apr, intrinsicYield, price } = computePoolMetrics(p)
               const utilPct = utilization * 100
               const totalDepositsUSD = parseFloat(p.totalDepositsUsd) || 0
               const totalDebtUSD = parseFloat(p.totalDebtUsd) || 0
@@ -129,7 +125,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
 
               return (
                 <tr
-                  key={`${p.chainId}-${p.lenderKey}-${p.underlyingAddress}`}
+                  key={p.marketUid}
                   className={`h-[75px] cursor-pointer transition-colors ${
                     selected ? 'bg-primary/10' : 'hover:bg-base-content/5'
                   }`}
@@ -150,22 +146,17 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                           {p.assetGroup.charAt(0)}
                         </div>
                       )}
-                      <span
-                        className="font-medium truncate"
-                        title={chainTokens[p.underlyingAddress]?.symbol ?? p.assetGroup}
-                      >
-                        {chainTokens[p.underlyingAddress]?.symbol ?? p.assetGroup}
-                      </span>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex flex-col text-xs min-w-0">
-                      <span
-                        className="font-semibold line-clamp-2 wrap-break-word"
-                        title={lenderDisplayName(p.lenderKey)}
-                      >
-                        {lenderDisplayName(p.lenderKey)}
-                      </span>
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-medium truncate" title={p.name}>
+                          {p.name}
+                        </span>
+                        <span
+                          className="text-[11px] text-base-content/60 truncate"
+                          title={p.lenderKey}
+                        >
+                          {lenderDisplayName(p.lenderKey)}
+                        </span>
+                      </div>
                     </div>
                   </td>
                   <td>
@@ -177,21 +168,6 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                         <span
                           className="badge badge-xs bg-success/15 text-success border-0 cursor-help"
                           title={`Base rate: ${apr.toFixed(2)}% + Intrinsic yield: ${intrinsicYield.toFixed(2)}%`}
-                        >
-                          +{intrinsicYield.toFixed(1)}%
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex items-center gap-1 text-xs">
-                      <span className="font-semibold text-warning">
-                        {(borrowApr + intrinsicYield).toFixed(2)}%
-                      </span>
-                      {intrinsicYield > 0 && (
-                        <span
-                          className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help"
-                          title={`Base rate: ${borrowApr.toFixed(2)}% + Intrinsic yield: ${intrinsicYield.toFixed(2)}% (paid by borrower)`}
                         >
                           +{intrinsicYield.toFixed(1)}%
                         </span>
@@ -242,7 +218,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
 
             {totalItems === 0 && (
               <tr>
-                <td colSpan={9} className="text-center py-6 text-sm">
+                <td colSpan={7} className="text-center py-6 text-sm">
                   No pools match your filters.
                 </td>
               </tr>
@@ -322,17 +298,11 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                     </div>
                   )}
                   <div className="flex flex-col min-w-0">
-                    <span
-                      className="font-semibold text-sm truncate"
-                      title={chainTokens[p.underlyingAddress]?.symbol ?? p.assetGroup}
-                    >
-                      {chainTokens[p.underlyingAddress]?.symbol ?? p.assetGroup}
+                    <span className="font-semibold text-sm truncate" title={p.name}>
+                      {p.name}
                     </span>
-                    <span
-                      className="text-[11px] text-base-content/60 line-clamp-2 wrap-break-word"
-                      title={lenderDisplayName(p.lenderKey)}
-                    >
-                      {lenderDisplayName(p.lenderKey)}
+                    <span className="text-[11px] text-base-content/60 truncate" title={p.lenderKey}>
+                      {p.lenderKey}
                     </span>
                   </div>
                 </div>

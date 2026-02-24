@@ -1,7 +1,7 @@
 // src/components/lending/LendingPoolSelectionModal.tsx
 import React, { useMemo, useState } from 'react'
 import { List } from 'react-window'
-import { lenderDisplayName, type RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '@1delta/lib-utils'
 import { FlattenedPoolWithUserData } from '../../hooks/lending/prepareMixedData'
 import { ValuePill } from './Pill'
 
@@ -141,13 +141,13 @@ const LendingPoolList: React.FC<LendingPoolListProps> = ({ pools, onSelect, onCl
                 {/* 25% – Asset */}
                 <div className="min-w-0 md:basis-1/4 md:max-w-[25%]">{renderAsset(asset)}</div>
 
-                {/* 50% – Lender + Pool */}
+                {/* 50% – Name + Lender */}
                 <div className="flex flex-col min-w-0 md:basis-1/2 md:max-w-[50%]">
-                  <span className="text-xs text-base-content/70 truncate">
-                    {lenderDisplayName(p.lender)}
+                  <span className="text-xs font-medium text-base-content truncate" title={p.poolData.name}>
+                    {p.poolData.name}
                   </span>
-                  <span className="text-[11px] text-base-content/50 truncate">
-                    Pool: {p.marketUid}
+                  <span className="text-[11px] text-base-content/50 truncate" title={p.lender}>
+                    {p.lender}
                   </span>
                 </div>
 
@@ -199,12 +199,14 @@ const LendingPoolList: React.FC<LendingPoolListProps> = ({ pools, onSelect, onCl
           {/* 25% – Asset */}
           <div className="min-w-0 md:basis-1/4 md:max-w-[25%]">{renderAsset(asset)}</div>
 
-          {/* 50% – Lender + Pool */}
+          {/* 50% – Name + Lender */}
           <div className="flex flex-col min-w-0 md:basis-1/2 md:max-w-[50%]">
-            <span className="text-xs text-base-content/70 truncate">
-              {lenderDisplayName(p.lender)}
+            <span className="text-xs font-medium text-base-content truncate" title={p.poolData.name}>
+              {p.poolData.name}
             </span>
-            <span className="text-[11px] text-base-content/50 truncate">Pool: {p.marketUid}</span>
+            <span className="text-[11px] text-base-content/50 truncate" title={p.lender}>
+              {p.lender}
+            </span>
           </div>
 
           {/* 25% – TVL + APR + user data */}

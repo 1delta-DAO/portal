@@ -209,7 +209,7 @@ export const LendingActionTab = ({ lenderData, actionType, chainId }: Props) => 
           </option>
           {poolList.map((pool) => (
             <option key={pool.marketUid} value={pool.marketUid}>
-              {pool.asset.symbol ?? pool.marketUid}
+              {pool.name ?? pool.asset.symbol ?? pool.marketUid}
             </option>
           ))}
         </select>
