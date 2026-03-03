@@ -8,8 +8,39 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 export interface PoolExposure {
   debts: string[] | null
   label: string
-  configId: number
+  configId: string
   collaterals: string[] | null
+}
+
+export interface PoolAssetInfo {
+  chainId: string
+  address: string
+  symbol: string
+  name: string
+  decimals: number
+  logoURI: string
+  assetGroup: string
+  currencyId: string
+  props?: Record<string, unknown>
+}
+
+export interface PoolPriceInfo {
+  priceUsd: number
+  priceTs: string
+  priceUsd24h: number
+  priceTs24h: string
+  priceChange24h: number
+}
+
+export interface PoolOraclePrice {
+  oraclePrice: number
+  oraclePriceUSD: number
+}
+
+export interface PoolUnderlyingInfo {
+  asset: PoolAssetInfo
+  prices: PoolPriceInfo
+  oraclePrice: PoolOraclePrice
 }
 
 export interface PoolEntry {
@@ -18,7 +49,6 @@ export interface PoolEntry {
   name: string
   lenderKey: string
   underlyingAddress: string
-  assetGroup: string
   depositRate: string
   variableBorrowRate: string
   stableBorrowRate: string
@@ -29,9 +59,14 @@ export interface PoolEntry {
   totalDepositsUsd: string
   totalDebtUsd: string
   totalLiquidityUsd: string
+  borrowLiquidity: string
+  withdrawLiquidity: string
+  depositable: string
   utilization: string
-  configIds: number[]
+  configIds: string[]
   exposures: PoolExposure[]
+  rewards: unknown | null
+  underlyingInfo: PoolUnderlyingInfo
 }
 
 interface PoolsApiResponse {

@@ -155,7 +155,6 @@ export function LenderTab() {
           )}
           <LendingPoolsTable
             chainId={effectiveChainId}
-            lenderData={lenderData}
             account={account}
             externalAssetFilter={externalAssetFilter}
             userData={userData}

@@ -81,8 +81,8 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
             <span className="font-medium text-sm truncate" title={selectedEntry.name}>
               {selectedEntry.name}
             </span>
-            <span className="text-xs text-base-content/60 truncate" title={selectedEntry.assetGroup}>
-              {selectedEntry.assetGroup}
+            <span className="text-xs text-base-content/60 truncate" title={selectedEntry.underlyingInfo?.asset?.symbol}>
+              {selectedEntry.underlyingInfo?.asset?.symbol ?? selectedEntry.name}
             </span>
           </div>
         </div>

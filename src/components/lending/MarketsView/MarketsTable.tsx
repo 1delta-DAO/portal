@@ -39,6 +39,8 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
   onGoToPage,
   isFetchingMore,
 }) => {
+  const getAsset = (p: PoolEntry) => p.underlyingInfo?.asset
+
   const isRowSelected = (entry: PoolEntry) =>
     selectedEntry !== null && selectedEntry.marketUid === entry.marketUid
 
@@ -133,17 +135,17 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                 >
                   <td>
                     <div className="flex items-center gap-2 min-w-0" title={p.underlyingAddress}>
-                      {chainTokens[p.underlyingAddress]?.logoURI ? (
+                      {getAsset(p)?.logoURI ? (
                         <img
-                          src={chainTokens[p.underlyingAddress].logoURI}
+                          src={getAsset(p)!.logoURI}
                           width={24}
                           height={24}
-                          alt={p.assetGroup}
+                          alt={getAsset(p)!.symbol}
                           className="rounded-full object-contain w-6 h-6 shrink-0"
                         />
                       ) : (
                         <div className="bg-base-300 rounded-full w-6 h-6 shrink-0 flex items-center justify-center text-xs font-bold">
-                          {p.assetGroup.charAt(0)}
+                          {(getAsset(p)?.symbol ?? p.name).charAt(0)}
                         </div>
                       )}
                       <div className="flex flex-col min-w-0">
@@ -284,17 +286,17 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
               {/* Row 1: Asset + APR */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  {chainTokens[p.underlyingAddress]?.logoURI ? (
+                  {getAsset(p)?.logoURI ? (
                     <img
-                      src={chainTokens[p.underlyingAddress].logoURI}
+                      src={getAsset(p)!.logoURI}
                       width={28}
                       height={28}
-                      alt={p.assetGroup}
+                      alt={getAsset(p)!.symbol}
                       className="rounded-full object-contain w-7 h-7 shrink-0"
                     />
                   ) : (
                     <div className="bg-base-300 rounded-full w-7 h-7 shrink-0 flex items-center justify-center text-xs font-bold">
-                      {p.assetGroup.charAt(0)}
+                      {(getAsset(p)?.symbol ?? p.name).charAt(0)}
                     </div>
                   )}
                   <div className="flex flex-col min-w-0">

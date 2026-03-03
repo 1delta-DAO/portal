@@ -17,8 +17,12 @@ interface QuoteDeltas {
   deltas?: Array<{ amountUSD: number; position: string }>
 }
 
-function normalizeQuotes(_operation: TradingOperation, rawQuotes: any[]): TradingQuote[] {
-  return rawQuotes.map((q) => {
+function normalizeQuotes(
+  _operation: TradingOperation,
+  rawQuotes: any[],
+  alternatives: Tx[] = []
+): TradingQuote[] {
+  return rawQuotes.map((q, i) => {
     let aggregator = 'Unknown'
     let tradeAmountIn = 0
     let tradeAmountOut = 0
@@ -39,13 +43,17 @@ function normalizeQuotes(_operation: TradingOperation, rawQuotes: any[]): Tradin
       }
     }
 
+    // Transaction data comes from actions.alternatives (matched by index),
+    // or falls back to tx on the quote object itself
+    const tx: Tx = alternatives[i] ?? q.tx ?? { to: '', data: '', value: '0' }
+
     return {
       aggregator,
       tradeAmountIn,
       tradeAmountOut,
       positionCollateralUSD,
       positionDebtUSD,
-      tx: q.tx as Tx,
+      tx,
     }
   })
 }
@@ -100,7 +108,8 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
         if (!envelope.success) {
           throw new Error(envelope.error?.message ?? 'API error')
         }
-        const quotes = normalizeQuotes(operation, envelope.data?.quotes ?? [])
+        const alternatives: Tx[] = envelope.actions?.alternatives ?? []
+        const quotes = normalizeQuotes(operation, envelope.data?.quotes ?? [], alternatives)
         const permissions: Tx[] = envelope.actions?.permissions ?? []
 
         setState((s) => ({

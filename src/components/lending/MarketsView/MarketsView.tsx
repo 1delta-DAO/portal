@@ -2,12 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { getChainName, isWNative, lenderDisplayNameFull, SupportedChainId } from '@1delta/lib-utils'
 import { zeroAddress } from 'viem'
 import { useFlattenedPools, type PoolEntry } from '../../../hooks/lending/useFlattenedPools'
-import type { LenderData } from '../../../hooks/lending/usePoolData'
 import type { UserDataResult } from '../../../hooks/lending/useUserData'
 import { useTokenBalances } from '../../../hooks/lending/useTokenBalances'
 import { useTokenLists } from '../../../hooks/useTokenLists'
-import { computeLenderTvl } from '../../../utils/format'
-import { computePoolMetrics, resolvePoolDataItem, type SortKey } from './helpers'
+import { computePoolMetrics, poolEntryToPoolDataItem, type SortKey } from './helpers'
 import { MarketsTable } from './MarketsTable'
 import { DepositPanel } from './DepositPanel'
 import { useIsMobile } from '../../../hooks/useIsMobile'
@@ -23,9 +21,15 @@ function getDefaultMinDepositsUsd(chainId?: string): string {
   return chainId && HIGH_LIQUIDITY_CHAINS.has(chainId) ? '100000' : '25000'
 }
 
+/** Compute TVL for a lender directly from PoolEntry[] */
+function computeLenderTvlFromPools(pools: PoolEntry[], lender: string): number {
+  return pools
+    .filter((p) => p.lenderKey === lender)
+    .reduce((sum, p) => sum + (parseFloat(p.totalDepositsUsd) || 0) - (parseFloat(p.totalDebtUsd) || 0), 0)
+}
+
 interface LendingPoolsTableProps {
   chainId?: string
-  lenderData?: LenderData
   account?: string
   externalAssetFilter?: string
   userData?: UserDataResult
@@ -33,7 +37,6 @@ interface LendingPoolsTableProps {
 
 export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   chainId,
-  lenderData,
   account,
   externalAssetFilter,
   userData,
@@ -67,7 +70,6 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     pools,
     isPoolsLoading: loading,
     isFetchingMore,
-    hasMore,
     count: serverCount,
   } = useFlattenedPools({
     chainId,
@@ -84,10 +86,10 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     )
   }
 
-  // Resolve selected PoolEntry -> PoolDataItem via lenderData
+  // Convert selected PoolEntry to PoolDataItem using inline asset data
   const resolvedPool = useMemo(
-    () => (selectedEntry ? resolvePoolDataItem(selectedEntry, lenderData) : null),
-    [selectedEntry, lenderData]
+    () => (selectedEntry ? poolEntryToPoolDataItem(selectedEntry) : null),
+    [selectedEntry]
   )
 
   // Whether the selected pool's underlying is wrapped native
@@ -136,23 +138,23 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
 
   // User position for the selected pool (first sub-account with a matching position)
   const selectedUserPosition = useMemo(() => {
-    if (!resolvedPool || selectedSubAccounts.length === 0) return null
+    if (!selectedEntry || selectedSubAccounts.length === 0) return null
     for (const sub of selectedSubAccounts) {
       for (const pos of sub.positions) {
-        if (typeof pos === 'object' && pos !== null && pos.marketUid === resolvedPool.marketUid) {
+        if (typeof pos === 'object' && pos !== null && pos.marketUid === selectedEntry.marketUid) {
           return pos
         }
       }
     }
     return null
-  }, [resolvedPool, selectedSubAccounts])
+  }, [selectedEntry, selectedSubAccounts])
 
   const lenders = useMemo(() => {
     const keys = Array.from(new Set(pools.map((p) => p.lenderKey)))
     return keys.sort(
-      (a, b) => computeLenderTvl(lenderData?.[b] ?? []) - computeLenderTvl(lenderData?.[a] ?? [])
+      (a, b) => computeLenderTvlFromPools(pools, b) - computeLenderTvlFromPools(pools, a)
     )
-  }, [pools, lenderData])
+  }, [pools])
 
   // Filtering + sorting
   const filteredAndSortedPools = useMemo(() => {
@@ -168,7 +170,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
         (p) =>
           p.underlyingAddress.toLowerCase().includes(q) ||
           p.lenderKey.toLowerCase().includes(q) ||
-          p.assetGroup.toLowerCase().includes(q) ||
+          (p.underlyingInfo?.asset?.assetGroup ?? '').toLowerCase().includes(q) ||
           p.name.toLowerCase().includes(q)
       )
     }
@@ -177,7 +179,8 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       const q = assetFilter.toLowerCase()
       result = result.filter(
         (p) =>
-          p.assetGroup.toLowerCase().includes(q) || p.underlyingAddress.toLowerCase().includes(q)
+          (p.underlyingInfo?.asset?.assetGroup ?? '').toLowerCase().includes(q) ||
+          p.underlyingAddress.toLowerCase().includes(q)
       )
     }
 
@@ -322,8 +325,6 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     )
   }
 
-  const showDepositPanel = !!lenderData
-
   return (
     <div className="w-full max-w-6xl mx-auto p-4 space-y-4 overflow-hidden">
       {/* Top row: title + main controls */}
@@ -459,26 +460,24 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
         />
 
         {/* Desktop action panel — hidden on mobile */}
-        {showDepositPanel && (
-          <div className="hidden md:block">
-            <DepositPanel
-              selectedEntry={selectedEntry}
-              resolvedPool={resolvedPool}
-              walletBalance={selectedWalletBal}
-              account={account}
-              chainId={chainId}
-              nativeToken={nativeToken}
-              nativeBalance={nativeBalance}
-              subAccounts={selectedSubAccounts}
-              lenderKey={selectedEntry?.lenderKey}
-              userPosition={selectedUserPosition}
-            />
-          </div>
-        )}
+        <div className="hidden md:block">
+          <DepositPanel
+            selectedEntry={selectedEntry}
+            resolvedPool={resolvedPool}
+            walletBalance={selectedWalletBal}
+            account={account}
+            chainId={chainId}
+            nativeToken={nativeToken}
+            nativeBalance={nativeBalance}
+            subAccounts={selectedSubAccounts}
+            lenderKey={selectedEntry?.lenderKey}
+            userPosition={selectedUserPosition}
+          />
+        </div>
       </div>
 
       {/* Mobile deposit modal */}
-      {isMobile && showMobileDeposit && selectedEntry && showDepositPanel && (
+      {isMobile && showMobileDeposit && selectedEntry && (
         <div className="modal modal-open" onClick={() => setShowMobileDeposit(false)}>
           <div className="modal-box max-w-sm" onClick={(e) => e.stopPropagation()}>
             <button
