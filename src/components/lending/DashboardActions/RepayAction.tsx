@@ -37,18 +37,33 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
 
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
-  const { result, simulation, loading, executingPermission, executingMain, permissions, hasPermissions, permissionsCompleted, allPermissionsDone, error, txSuccess, executeNextPermission, executeMain, resetState, dismissSuccess } =
-    useActionExecution({
-      actionType: 'Repay',
-      pool,
-      account,
-      amount,
-      isAll,
-      payAsset: canUseNative && useNative ? zeroAddress : undefined,
-      accountId: hasSubAccounts ? selectedAccountId ?? undefined : undefined,
-      chainId,
-      subAccount,
-    })
+  const {
+    result,
+    simulation,
+    loading,
+    executingPermission,
+    executingMain,
+    permissions,
+    hasPermissions,
+    permissionsCompleted,
+    allPermissionsDone,
+    error,
+    txSuccess,
+    executeNextPermission,
+    executeMain,
+    resetState,
+    dismissSuccess,
+  } = useActionExecution({
+    actionType: 'Repay',
+    pool,
+    account,
+    amount,
+    isAll,
+    payAsset: canUseNative && useNative ? zeroAddress : undefined,
+    accountId: hasSubAccounts ? (selectedAccountId ?? undefined) : undefined,
+    chainId,
+    subAccount,
+  })
 
   // Reset when pool changes
   useEffect(() => {
@@ -64,12 +79,12 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
 
   const activeBal = canUseNative && useNative ? nativeBalance : walletBalance
   const activeBalToken = parseAmount(activeBal?.balance ?? 0)
-  const repayMax = debtToken > 0 && activeBalToken > 0
-    ? Math.min(debtToken, activeBalToken)
-    : debtToken
+  const repayMax = debtToken > 0 ? Math.min(debtToken, activeBalToken) : 0
 
   const currentAmount = parseAmount(amount)
-  const overMax = repayMax > 0 && currentAmount > repayMax + 1e-9
+  const overWallet = activeBalToken > 0 && currentAmount > activeBalToken + 1e-9
+  const overDebt = debtToken > 0 && currentAmount > debtToken + 1e-9
+  const overMax = overWallet || overDebt
 
   const handleQuickSelect = (val: string) => {
     setIsAll(false)
@@ -90,7 +105,11 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
         amount={txSuccess.amount}
         symbol={txSuccess.symbol}
         hash={txSuccess.hash}
-        onDismiss={() => { dismissSuccess(); setAmount(''); setIsAll(false) }}
+        onDismiss={() => {
+          dismissSuccess()
+          setAmount('')
+          setIsAll(false)
+        }}
       />
     )
   }
@@ -119,10 +138,10 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
       )}
 
       {/* Wallet balance */}
-      {activeBal && parseFloat(activeBal.balance) > 0 && (
+      {activeBal && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Wallet balance:</span>
-          <span className="font-medium">
+          <span className={`font-medium ${activeBalToken === 0 ? 'text-base-content/40' : ''}`}>
             {formatTokenAmount(activeBal.balance)} (${formatUsd(activeBal.balanceUSD)})
           </span>
         </div>
@@ -133,7 +152,8 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Outstanding debt:</span>
           <span className="text-error font-medium">
-            {formatTokenAmount(debtToken)} (${formatUsd(userPosition.debtUSD + userPosition.debtStableUSD)})
+            {formatTokenAmount(debtToken)} ($
+            {formatUsd(userPosition.debtUSD + userPosition.debtStableUSD)})
           </span>
         </div>
       )}
@@ -142,7 +162,11 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
       <div className="form-control">
         <div className="flex justify-between items-center mb-1">
           <span className="label-text text-xs">Amount</span>
-          <AmountQuickButtons maxAmount={repayMax} onSelect={handleQuickSelect} onMax={() => handleIsAllChange(true)} />
+          <AmountQuickButtons
+            maxAmount={repayMax}
+            onSelect={handleQuickSelect}
+            onMax={() => handleIsAllChange(true)}
+          />
         </div>
         <input
           type="text"
@@ -150,14 +174,22 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
           className="input input-bordered input-sm w-full"
           placeholder="0.0"
           value={amount}
-          onChange={(e) => { setIsAll(false); setAmount(e.target.value) }}
+          onChange={(e) => {
+            setIsAll(false)
+            setAmount(e.target.value)
+          }}
           disabled={!pool}
         />
       </div>
 
-      {overMax && !isAll && (
+      {overWallet && !isAll && (
         <div className="text-[10px] text-error">
-          Exceeds repayable amount ({formatTokenAmount(repayMax)}).
+          Exceeds wallet balance ({formatTokenAmount(activeBalToken)}).
+        </div>
+      )}
+      {overDebt && !overWallet && !isAll && (
+        <div className="text-[10px] text-error">
+          Exceeds outstanding debt ({formatTokenAmount(debtToken)}).
         </div>
       )}
 
@@ -173,9 +205,11 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
       {/* Projected health factor */}
       <HealthFactorProjection simulation={simulation} />
 
-      {result && hasPermissions && !allPermissionsDone && (
+      {result && !overMax && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">
-          <span className="text-xs text-base-content/60">Approvals ({permissionsCompleted}/{permissions.length})</span>
+          <span className="text-xs text-base-content/60">
+            Approvals ({permissionsCompleted}/{permissions.length})
+          </span>
           {permissions.map((perm, i) => {
             const done = i < permissionsCompleted
             const isCurrent = i === permissionsCompleted
@@ -187,7 +221,9 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
                 disabled={!isCurrent || executingPermission}
                 onClick={isCurrent ? executeNextPermission : undefined}
               >
-                {done ? `\u2713 ${perm.description || `Approval ${i + 1}`}` : isCurrent && executingPermission ? (
+                {done ? (
+                  `\u2713 ${perm.description || `Approval ${i + 1}`}`
+                ) : isCurrent && executingPermission ? (
                   <span className="loading loading-spinner loading-xs" />
                 ) : (
                   perm.description || `Approval ${i + 1}`
@@ -198,14 +234,18 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      {result && (!hasPermissions || allPermissionsDone) && (
+      {result && !overMax && (!hasPermissions || allPermissionsDone) && (
         <button
           type="button"
           className="btn btn-success btn-sm w-full"
           disabled={executingMain}
           onClick={executeMain}
         >
-          {executingMain ? <span className="loading loading-spinner loading-xs" /> : 'Execute Repay'}
+          {executingMain ? (
+            <span className="loading loading-spinner loading-xs" />
+          ) : (
+            'Execute Repay'
+          )}
         </button>
       )}
     </div>

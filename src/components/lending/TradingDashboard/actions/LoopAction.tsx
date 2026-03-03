@@ -8,7 +8,7 @@ import { PoolSelectorDropdown } from '../PoolSelectorDropdown'
 import { SlippageInput } from '../SlippageInput'
 import { QuoteCard } from '../QuoteCard'
 import { AmountQuickButtons } from '../../DashboardActions/AmountQuickButtons'
-import { formatTokenAmount, formatUsd } from '../../DashboardActions/format'
+import { formatTokenAmount, formatUsd, parseAmount } from '../../DashboardActions/format'
 import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes } from '../useTradingQuotes'
 
@@ -91,6 +91,13 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   // Max amounts
   const debtPos = debtPool ? userPositions.get(debtPool.marketUid) : null
   const maxBorrowable = debtPos ? Number(debtPos.borrowable) : 0
+
+  // Pay wallet balance + overMax
+  const payWalletBalance = selectedPayCurrency
+    ? walletBalances.get(selectedPayCurrency.address.toLowerCase()) ?? null
+    : null
+  const payWalletAmount = payWalletBalance ? parseFloat(payWalletBalance.balance) : 0
+  const payOverMax = payWalletAmount > 0 && parseAmount(payAmount) > payWalletAmount + 1e-9
 
   const handleFetchQuotes = () => {
     if (!collateralPool || !debtPool) return
@@ -200,40 +207,41 @@ export const LoopAction: React.FC<TradingActionProps> = ({
       </div>
 
       {/* Pay amount + wallet balance */}
-      {selectedPayCurrency &&
-        (() => {
-          const wb = walletBalances.get(selectedPayCurrency.address.toLowerCase())
-          return (
-            <div className="form-control">
-              {wb && parseFloat(wb.balance) > 0 && (
-                <div className="text-xs flex justify-between px-1 mb-1">
-                  <span className="text-base-content/60">Wallet balance:</span>
-                  <span className="font-medium">
-                    {formatTokenAmount(wb.balance)} {selectedPayCurrency.symbol} ($
-                    {formatUsd(wb.balanceUSD)})
-                  </span>
-                </div>
-              )}
-              <div className="flex items-center justify-between mb-0.5">
-                <label className="label-text text-xs">Pay Amount</label>
-                {wb ? (
-                  <AmountQuickButtons maxAmount={Number(wb.balance)} onSelect={setPayAmount} />
-                ) : null}
-              </div>
-              <input
-                type="text"
-                inputMode="decimal"
-                className="input input-bordered input-sm w-full"
-                placeholder="0.0"
-                value={payAmount}
-                onChange={(e) => {
-                  setPayAmount(e.target.value)
-                  reset()
-                }}
-              />
+      {selectedPayCurrency && (
+        <div className="form-control">
+          {payWalletBalance && (
+            <div className="text-xs flex justify-between px-1 mb-1">
+              <span className="text-base-content/60">Wallet balance:</span>
+              <span className={`font-medium ${payWalletAmount === 0 ? 'text-base-content/40' : ''}`}>
+                {formatTokenAmount(payWalletBalance.balance)} {selectedPayCurrency.symbol} ($
+                {formatUsd(payWalletBalance.balanceUSD)})
+              </span>
             </div>
-          )
-        })()}
+          )}
+          <div className="flex items-center justify-between mb-0.5">
+            <label className="label-text text-xs">Pay Amount</label>
+            {payWalletBalance ? (
+              <AmountQuickButtons maxAmount={payWalletAmount} onSelect={setPayAmount} />
+            ) : null}
+          </div>
+          <input
+            type="text"
+            inputMode="decimal"
+            className="input input-bordered input-sm w-full"
+            placeholder="0.0"
+            value={payAmount}
+            onChange={(e) => {
+              setPayAmount(e.target.value)
+              reset()
+            }}
+          />
+          {payOverMax && (
+            <div className="text-[10px] text-error mt-0.5">
+              Exceeds wallet balance ({formatTokenAmount(payWalletAmount)}).
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Slippage */}
       <SlippageInput value={slippage} onChange={setSlippage} />
@@ -242,7 +250,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
       <button
         type="button"
         className="btn btn-primary btn-sm w-full"
-        disabled={!canFetch || loading}
+        disabled={!canFetch || loading || payOverMax}
         onClick={handleFetchQuotes}
       >
         {loading ? 'Fetching quotes...' : 'Get Loop Quotes'}
@@ -283,7 +291,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
       )}
 
       {/* Execute */}
-      {selectedIndex !== null && (
+      {selectedIndex !== null && !payOverMax && (
         <button
           type="button"
           className="btn btn-success btn-sm w-full"

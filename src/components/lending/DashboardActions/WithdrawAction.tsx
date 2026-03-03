@@ -179,7 +179,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
       {/* Projected health factor */}
       <HealthFactorProjection simulation={simulation} />
 
-      {result && hasPermissions && !allPermissionsDone && (
+      {result && !overMax && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">
           <span className="text-xs text-base-content/60">
             Approvals ({permissionsCompleted}/{permissions.length})
@@ -208,7 +208,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      {result && (!hasPermissions || allPermissionsDone) && (
+      {result && !overMax && (!hasPermissions || allPermissionsDone) && (
         <button
           type="button"
           className="btn btn-success btn-sm w-full"

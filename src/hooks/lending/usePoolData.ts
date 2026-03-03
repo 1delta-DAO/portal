@@ -4,7 +4,7 @@ import { BACKEND_BASE_URL } from '../../config/backend'
 const endpointLendingLatest = `${BACKEND_BASE_URL}/v1/data/lending/latest?chains=`
 
 // ============================================================================
-// Types for the /lending/latest API response (flat array)
+// Types for the /lending/latest API response (new format)
 // ============================================================================
 
 interface LendingLatestApiResponse {
@@ -15,9 +15,53 @@ interface LendingLatestApiResponse {
 
 interface LenderEntryRaw {
   chainId: string
-  lender: string
+  lenderKey: string
   lastFetched: number
-  markets: PoolDataItem[]
+  markets: RawMarket[]
+}
+
+/** Shape of each market as returned by the new /lending/latest API */
+interface RawMarket {
+  marketUid: string
+  name: string
+  totalDeposits: number
+  totalDebtStable: number
+  totalDebt: number
+  totalLiquidity: number
+  totalDepositsUsd: number
+  totalDebtStableUsd: number
+  totalDebtUsd: number
+  totalLiquidityUsd: number
+  depositRate: number
+  variableBorrowRate: number
+  stableBorrowRate: number
+  intrinsicYield: number
+  rewards: Record<string, unknown>
+  config: Record<string, PoolConfig>
+  caps: { borrowCap: number | null; supplyCap: number | null; debtCeiling: number | null } | null
+  flags: {
+    isActive: boolean | null
+    isFrozen: boolean | null
+    hasStable: boolean | null
+    borrowingEnabled: boolean | null
+    collateralActive: boolean | null
+  } | null
+  underlyingInfo: {
+    asset: {
+      chainId: string
+      decimals: number
+      name: string
+      address: string
+      symbol: string
+      logoURI: string
+      assetGroup: string
+      currencyId: string
+      props?: Record<string, unknown>
+    }
+    oraclePrice: { oraclePrice: number | null; oraclePriceUsd: number | null } | null
+    prices: Record<string, unknown> | null
+  }
+  params?: any
 }
 
 // ============================================================================
@@ -92,6 +136,56 @@ export interface PoolConfig {
 }
 
 // ============================================================================
+// Transform
+// ============================================================================
+
+function rawMarketToPoolDataItem(raw: RawMarket): PoolDataItem {
+  const info = raw.underlyingInfo
+  const asset = info.asset
+  return {
+    marketUid: raw.marketUid,
+    name: raw.name,
+    underlying: asset.address,
+    asset: {
+      chainId: asset.chainId,
+      decimals: asset.decimals,
+      name: asset.name,
+      address: asset.address,
+      symbol: asset.symbol,
+      logoURI: asset.logoURI,
+      assetGroup: asset.assetGroup,
+      currencyId: asset.currencyId,
+      pendle: asset.props?.pendle as PendleAssetData | undefined,
+    },
+    totalDeposits: raw.totalDeposits,
+    totalDebtStable: raw.totalDebtStable,
+    totalDebt: raw.totalDebt,
+    totalLiquidity: raw.totalLiquidity,
+    totalDepositsUSD: raw.totalDepositsUsd,
+    totalDebtStableUSD: raw.totalDebtStableUsd,
+    totalDebtUSD: raw.totalDebtUsd,
+    totalLiquidityUSD: raw.totalLiquidityUsd,
+    depositRate: raw.depositRate,
+    variableBorrowRate: raw.variableBorrowRate,
+    stableBorrowRate: raw.stableBorrowRate,
+    intrinsicYield: raw.intrinsicYield,
+    rewards: raw.rewards ?? {},
+    config: raw.config ?? {},
+    borrowCap: raw.caps?.borrowCap ?? 0,
+    supplyCap: raw.caps?.supplyCap ?? 0,
+    debtCeiling: raw.caps?.debtCeiling ?? 0,
+    collateralActive: raw.flags?.collateralActive ?? true,
+    borrowingEnabled: raw.flags?.borrowingEnabled ?? true,
+    hasStable: raw.flags?.hasStable ?? false,
+    isActive: raw.flags?.isActive ?? true,
+    isFrozen: raw.flags?.isFrozen ?? false,
+    oraclePrice: info.oraclePrice?.oraclePrice ?? undefined,
+    oraclePriceUSD: info.oraclePrice?.oraclePriceUsd ?? undefined,
+    params: raw.params,
+  }
+}
+
+// ============================================================================
 // Hooks
 // ============================================================================
 
@@ -120,7 +214,7 @@ export function useMarginPublicData(chainId: string) {
 
       const transformed: LenderData = {}
       for (const entry of json.data.items) {
-        transformed[entry.lender] = entry.markets
+        transformed[entry.lenderKey] = entry.markets.map(rawMarketToPoolDataItem)
       }
       return transformed
     },

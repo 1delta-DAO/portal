@@ -56,7 +56,7 @@ export function poolEntryToPoolDataItem(entry: PoolEntry): PoolDataItem {
     hasStable: false,
     isActive: true,
     isFrozen: false,
-    oraclePrice: info.oraclePrice?.oraclePrice,
-    oraclePriceUSD: info.oraclePrice?.oraclePriceUSD,
+    oraclePrice: info.oraclePrice?.oraclePrice ?? undefined,
+    oraclePriceUSD: info.oraclePrice?.oraclePriceUsd ?? undefined,
   }
 }

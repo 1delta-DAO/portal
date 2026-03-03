@@ -60,6 +60,8 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
     ? parseAmount(userPosition.debt) + parseAmount(userPosition.debtStable)
     : 0
   const borrowableToken = userPosition ? parseAmount(userPosition.borrowable) : 0
+  const currentAmount = parseAmount(amount)
+  const overMax = borrowableToken > 0 && currentAmount > borrowableToken + 1e-9
 
   if (txSuccess) {
     return (
@@ -157,6 +159,12 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
         />
       </div>
 
+      {overMax && (
+        <div className="text-[10px] text-error">
+          Exceeds borrowable amount ({formatTokenAmount(borrowableToken)}).
+        </div>
+      )}
+
       {error && <div className="text-error text-xs wrap-break-word">{error}</div>}
 
       {loading && (
@@ -169,7 +177,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
       {/* Projected health factor */}
       <HealthFactorProjection simulation={simulation} />
 
-      {result && hasPermissions && !allPermissionsDone && (
+      {result && !overMax && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">
           <span className="text-xs text-base-content/60">Approvals ({permissionsCompleted}/{permissions.length})</span>
           {permissions.map((perm, i) => {
@@ -194,7 +202,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      {result && (!hasPermissions || allPermissionsDone) && (
+      {result && !overMax && (!hasPermissions || allPermissionsDone) && (
         <button
           type="button"
           className="btn btn-success btn-sm w-full"

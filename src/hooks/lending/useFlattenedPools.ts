@@ -33,8 +33,8 @@ export interface PoolPriceInfo {
 }
 
 export interface PoolOraclePrice {
-  oraclePrice: number
-  oraclePriceUSD: number
+  oraclePrice: number | null
+  oraclePriceUsd: number | null
 }
 
 export interface PoolUnderlyingInfo {

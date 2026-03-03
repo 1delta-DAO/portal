@@ -3,7 +3,7 @@ import { isWNative } from '@1delta/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
-import { formatTokenAmount, formatUsd } from './format'
+import { formatTokenAmount, formatUsd, parseAmount } from './format'
 import { AmountQuickButtons } from './AmountQuickButtons'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
@@ -59,6 +59,8 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
 
   const activeBal = canUseNative && useNative ? nativeBalance : walletBalance
   const walletAmount = activeBal ? parseFloat(activeBal.balance) : 0
+  const currentAmount = parseAmount(amount)
+  const overMax = walletAmount > 0 && currentAmount > walletAmount + 1e-9
 
   if (txSuccess) {
     return (
@@ -96,10 +98,10 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       )}
 
       {/* Wallet balance */}
-      {activeBal && walletAmount > 0 && (
+      {activeBal && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Wallet balance:</span>
-          <span className="font-medium">
+          <span className={`font-medium ${walletAmount === 0 ? 'text-base-content/40' : ''}`}>
             {formatTokenAmount(activeBal.balance)} (${formatUsd(activeBal.balanceUSD)})
           </span>
         </div>
@@ -132,6 +134,12 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
         />
       </div>
 
+      {overMax && (
+        <div className="text-[10px] text-error">
+          Exceeds wallet balance ({formatTokenAmount(walletAmount)}).
+        </div>
+      )}
+
       {error && <div className="text-error text-xs wrap-break-word">{error}</div>}
 
       {loading && (
@@ -144,7 +152,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       {/* Projected health factor */}
       <HealthFactorProjection simulation={simulation} />
 
-      {result && hasPermissions && !allPermissionsDone && (
+      {result && !overMax && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">
           <span className="text-xs text-base-content/60">Approvals ({permissionsCompleted}/{permissions.length})</span>
           {permissions.map((perm, i) => {
@@ -169,7 +177,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      {result && (!hasPermissions || allPermissionsDone) && (
+      {result && !overMax && (!hasPermissions || allPermissionsDone) && (
         <button
           type="button"
           className="btn btn-success btn-sm w-full"
