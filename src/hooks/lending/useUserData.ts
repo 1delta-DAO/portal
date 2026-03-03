@@ -7,19 +7,37 @@ import { fetchUserDataViaRpc } from './fetchUserDataRpc'
 
 export interface UserPositionEntry {
   marketUid: string
-  underlying: string
+  underlying?: string
   deposits: number | string
   debtStable: number | string
   debt: number | string
   depositsUSD: number
   debtStableUSD: number
   debtUSD: number
-  stableBorrowRate: string
+  depositsUSDOracle?: number
+  debtStableUSDOracle?: number
+  debtUSDOracle?: number
+  stableBorrowRate?: string
   collateralEnabled: boolean
   claimableRewards: number
   withdrawable: number | string
   borrowable: number | string
   isAllowed?: boolean
+  underlyingInfo?: {
+    asset: {
+      chainId: string
+      address: string
+      symbol: string
+      name: string
+      decimals: number
+      logoURI: string
+      assetGroup: string
+      currencyId: string
+      props?: Record<string, unknown> | null
+    }
+    oraclePrice: { oraclePrice: number | null; oraclePriceUsd: number | null } | null
+    prices: Record<string, unknown> | null
+  }
 }
 
 export interface UserBalanceData {
@@ -110,6 +128,75 @@ export interface UserDataResult {
 }
 
 // ============================================================================
+// Raw API response type (no top-level balanceData/aprData/healthFactor)
+// ============================================================================
+
+export interface RawLenderUserDataEntry {
+  account: string
+  chainId: string
+  lender: string
+  balanceData?: UserBalanceData
+  aprData?: UserAprData
+  healthFactor?: number | null
+  leverage?: number
+  data: UserSubAccount[]
+}
+
+// ============================================================================
+// Transform
+// ============================================================================
+
+const ZERO_BALANCE_DATA: UserBalanceData = {
+  collateral: 0,
+  collateralAllActive: 0,
+  deposits: 0,
+  debt: 0,
+  nav: 0,
+  deposits24h: 0,
+  debt24h: 0,
+  nav24h: 0,
+}
+
+const ZERO_APR_DATA: UserAprData = {
+  apr: 0,
+  borrowApr: 0,
+  depositApr: 0,
+  rewards: {},
+  rewardApr: 0,
+  rewardDepositApr: 0,
+  rewardBorrowApr: 0,
+  intrinsicApr: 0,
+  intrinsicDepositApr: 0,
+  intrinsicBorrowApr: 0,
+}
+
+function transformUserDataEntry(raw: RawLenderUserDataEntry): LenderUserDataEntry {
+  const subs = raw.data ?? []
+
+  // Use top-level if provided, otherwise derive from first sub-account
+  const balanceData =
+    raw.balanceData ?? (subs.length > 0 ? subs[0].balanceData : ZERO_BALANCE_DATA)
+  const aprData = raw.aprData ?? (subs.length > 0 ? subs[0].aprData : ZERO_APR_DATA)
+  const healthFactor = raw.healthFactor !== undefined ? raw.healthFactor : (subs[0]?.health ?? null)
+  const leverage =
+    raw.leverage ??
+    (balanceData.deposits > 0 && balanceData.nav > 0
+      ? balanceData.deposits / balanceData.nav
+      : 0)
+
+  return {
+    account: raw.account,
+    chainId: raw.chainId,
+    lender: raw.lender,
+    balanceData,
+    aprData,
+    healthFactor,
+    leverage,
+    data: subs,
+  }
+}
+
+// ============================================================================
 // Endpoint
 // ============================================================================
 
@@ -138,7 +225,10 @@ export function useUserData(params: { chainId: string; account?: string; enabled
     queryFn: async () => {
       if (USE_RPC_FETCH) {
         const result = await fetchUserDataViaRpc(chainId, account!)
-        return { raw: result.data, summary: result.summary }
+        return {
+          raw: result.data.map(transformUserDataEntry),
+          summary: result.summary,
+        }
       }
 
       const r = await fetch(url)
@@ -148,13 +238,16 @@ export function useUserData(params: { chainId: string; account?: string; enabled
       }
       const json = (await r.json()) as {
         success: boolean
-        data: { items: LenderUserDataEntry[]; summary: UserDataSummary }
+        data: { items: RawLenderUserDataEntry[]; summary: UserDataSummary }
         error?: { code: string; message: string }
       }
       if (!json.success) {
         throw new Error(json.error?.message ?? 'API returned success: false')
       }
-      return { raw: json.data.items, summary: json.data.summary }
+      return {
+        raw: json.data.items.map(transformUserDataEntry),
+        summary: json.data.summary,
+      }
     },
     refetchInterval: 5 * 60 * 1000,
     staleTime: 30_000,

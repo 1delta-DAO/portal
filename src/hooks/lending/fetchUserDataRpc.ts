@@ -1,4 +1,4 @@
-import type { LenderUserDataEntry, UserDataSummary } from './useUserData'
+import type { RawLenderUserDataEntry, UserDataSummary } from './useUserData'
 import { executeRpcCallsWithRetry } from './executeRpcCalls'
 
 // ============================================================================
@@ -28,7 +28,7 @@ interface RpcCallApiResponse {
 interface ParseApiResponse {
   success: boolean
   data: {
-    items: LenderUserDataEntry[]
+    items: RawLenderUserDataEntry[]
     summary: UserDataSummary
   }
   error?: { code: string; message: string }
@@ -38,10 +38,10 @@ interface ParseApiResponse {
 // Output type
 // ============================================================================
 
-export type UserDataApiResponseData = LenderUserDataEntry[]
+export type UserDataApiResponseData = RawLenderUserDataEntry[]
 
 export interface FetchUserDataResult {
-  data: LenderUserDataEntry[]
+  data: RawLenderUserDataEntry[]
   summary: UserDataSummary
 }
 

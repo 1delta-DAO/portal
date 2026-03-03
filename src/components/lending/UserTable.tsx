@@ -136,10 +136,11 @@ const PositionsList: React.FC<{
   return (
     <div className="flex flex-wrap gap-1.5">
       {positions.map((pos) => {
-        const token = tokens[pos.underlying.toLowerCase()]
+        const addr = pos.underlying ?? pos.underlyingInfo?.asset?.address ?? ''
+        const token = addr ? tokens[addr.toLowerCase()] : undefined
         const symbol = token?.symbol ?? ''
         const name = token?.name ?? ''
-        const tooltip = name && name !== symbol ? `${name} (${symbol})` : symbol || pos.underlying
+        const tooltip = name && name !== symbol ? `${name} (${symbol})` : symbol || addr
 
         return (
           <div
@@ -162,7 +163,7 @@ const PositionsList: React.FC<{
               />
             ) : null}
             <span className="text-[10px]">
-              {symbol || `${pos.underlying.slice(0, 6)}...${pos.underlying.slice(-4)}`}
+              {symbol || (addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '??')}
             </span>
             <span className="opacity-70">
               {pos.tag === 'debt'
