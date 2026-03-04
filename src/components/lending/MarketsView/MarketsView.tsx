@@ -112,7 +112,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     assets: selectedAssets,
   })
   const selectedWalletBal = useMemo(() => {
-    if (!selectedEntry) return null
+    if (!selectedEntry?.underlyingAddress) return null
     return walletBalances.get(selectedEntry.underlyingAddress.toLowerCase()) ?? null
   }, [selectedEntry, walletBalances])
 
