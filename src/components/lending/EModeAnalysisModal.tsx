@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import type { UserSubAccount } from '../../hooks/lending/useUserData'
+import { usePoolConfigData } from '../../hooks/lending/usePoolData'
 import { useSendLendingTransaction } from '../../hooks/useSendLendingTransaction'
 import {
   fetchEModeList,
@@ -81,6 +82,20 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
   const [switchError, setSwitchError] = useState<string | null>(null)
   const [switchSuccess, setSwitchSuccess] = useState<number | null>(null)
 
+  // Pool config data — already cached by react-query, used as fallback source for e-mode categories
+  const { data: configGroups } = usePoolConfigData(chainId, lender)
+
+  // Derive e-mode categories from pool config groups (no extra API call needed)
+  const derivedCategories = useMemo(() => {
+    if (!configGroups || configGroups.length === 0) return []
+    const seen = new Map<number, string>()
+    for (const g of configGroups) {
+      const cat = Number(g.category)
+      if (!seen.has(cat)) seen.set(cat, g.label)
+    }
+    return Array.from(seen, ([id, label]) => ({ id, label }))
+  }, [configGroups])
+
   const currentMode = subAccount.userConfig.selectedMode
   const hasPositions = subAccount.positions.some(
     (p) => p.depositsUSD > 0 || p.debtUSD > 0
@@ -93,21 +108,23 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
       setLoading(true)
       setError(null)
 
-      // 1. Fetch available e-mode categories
+      // 1. Try fetching e-mode categories from API
+      let cats: EModeCategory[] = []
       const listRes = await fetchEModeList({ lender, chain: chainId })
       if (cancelled) return
 
-      if (!listRes.success || !listRes.data) {
-        setError(listRes.error ?? 'Failed to load e-mode categories')
-        setLoading(false)
-        return
+      if (listRes.success && listRes.data) {
+        const entry = listRes.data.find(
+          (e) => e.lender === lender && e.chainId === chainId
+        )
+        cats = entry?.categories ?? []
       }
 
-      // Find the entry for this lender/chain
-      const entry = listRes.data.find(
-        (e) => e.lender === lender && e.chainId === chainId
-      )
-      const cats = entry?.categories ?? []
+      // 2. Fall back to categories derived from pool config data
+      if (cats.length === 0 && derivedCategories.length > 0) {
+        cats = derivedCategories
+      }
+
       setCategories(cats)
 
       // If only one mode (or none), no analysis needed
@@ -116,7 +133,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
         return
       }
 
-      // 2. If the user has positions, run the analysis
+      // 3. If the user has positions, run the analysis
       if (hasPositions && account) {
         const analysisRes = await fetchEModeAnalysis({
           lender,
@@ -139,7 +156,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
 
     load()
     return () => { cancelled = true }
-  }, [lender, chainId, subAccount, hasPositions])
+  }, [lender, chainId, subAccount, hasPositions, derivedCategories])
 
   // Build a lookup from analysis results
   const analysisMap = new Map<number, EModeAnalysisEntry>()

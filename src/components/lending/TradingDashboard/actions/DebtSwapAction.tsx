@@ -12,7 +12,7 @@ import { useTradingQuotes } from '../useTradingQuotes'
 import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
 
 export const DebtSwapAction: React.FC<TradingActionProps> = ({
-  allPools,
+  borrowablePools,
   userPositions,
   subAccounts,
   chainId,
@@ -76,7 +76,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
       )}
 
       <PoolSelectorDropdown
-        pools={allPools}
+        pools={borrowablePools}
         value={debtInPool}
         onChange={setDebtInPool}
         userPositions={userPositions}
@@ -85,7 +85,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
       />
 
       <PoolSelectorDropdown
-        pools={allPools}
+        pools={borrowablePools}
         value={debtOutPool}
         onChange={setDebtOutPool}
         userPositions={userPositions}

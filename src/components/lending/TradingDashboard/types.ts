@@ -39,6 +39,10 @@ export interface QuoteResponse {
 
 export interface TradingActionProps {
   allPools: PoolDataItem[]
+  /** Pools available as collateral (filtered by selected config, or all pools if no config). */
+  collateralPools: PoolDataItem[]
+  /** Pools available as borrowable (filtered by selected config, or all pools if no config). */
+  borrowablePools: PoolDataItem[]
   userPositions: Map<string, UserPositionEntry>
   walletBalances: Map<string, TokenBalance>
   subAccounts: UserSubAccount[]

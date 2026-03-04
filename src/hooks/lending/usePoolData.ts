@@ -186,6 +186,63 @@ function rawMarketToPoolDataItem(raw: RawMarket): PoolDataItem {
 }
 
 // ============================================================================
+// Types for the /pools/by-config API response
+// ============================================================================
+
+interface PoolsByConfigApiResponse {
+  success: boolean
+  data: { count: number; items: PoolConfigGroup[] }
+  error?: { code: string; message: string }
+}
+
+export interface PoolConfigGroup {
+  lenderKey: string
+  chainId: string
+  configId: string
+  label: string
+  category: string
+  collaterals: ConfigMarketItem[] | null
+  borrowables: ConfigMarketItem[] | null
+}
+
+export interface ConfigMarketItem {
+  marketUid: string
+  depositRate: number
+  borrowFactor: number
+  totalDebtUsd: number
+  intrinsicYield: number | null
+  underlyingInfo: {
+    asset: {
+      name: string
+      symbol: string
+      address: string
+      chainId: string
+      logoURI: string
+      decimals: number
+      assetGroup: string
+      currencyId: string
+      intrinsicYield: number | null
+      props?: Record<string, unknown> | null
+    }
+    prices: {
+      priceUsd: number
+      priceUsd24h: number
+      priceTs: string
+      priceTs24h: string
+    } | null
+    oraclePrice: {
+      oraclePrice: number
+      oraclePriceUsd: number
+    } | null
+  }
+  collateralFactor: number
+  stableBorrowRate: number
+  totalDepositsUsd: number
+  variableBorrowRate: number
+  borrowCollateralFactor: number
+}
+
+// ============================================================================
 // Hooks
 // ============================================================================
 
@@ -229,4 +286,30 @@ export function useMarginPublicData(chainId: string) {
     isPublicDataFetching: isFetching,
     error,
   }
+}
+
+/**
+ * Fetches pool data grouped by e-mode / pool configuration for a specific chain + lender.
+ */
+export function usePoolConfigData(chainId: string, lenderKey: string) {
+  return useQuery<PoolConfigGroup[]>({
+    queryKey: ['poolsByConfig', chainId, lenderKey],
+    queryFn: async () => {
+      const url = `${BACKEND_BASE_URL}/v1/data/lending/pools/by-config?chains=${chainId}&lenders=${lenderKey}`
+      const r = await fetch(url)
+      if (!r.ok) {
+        const text = await r.text().catch(() => '')
+        throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
+      }
+      const json = (await r.json()) as PoolsByConfigApiResponse
+      if (!json.success) {
+        throw new Error(json.error?.message ?? 'API returned success: false')
+      }
+      return json.data.items
+    },
+    enabled: !!chainId && !!lenderKey,
+    refetchInterval: 5 * 60 * 1000,
+    staleTime: 5_000,
+    retry: 1,
+  })
 }

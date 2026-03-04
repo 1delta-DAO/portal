@@ -12,7 +12,7 @@ import { useTradingQuotes } from '../useTradingQuotes'
 import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
 
 export const ColSwapAction: React.FC<TradingActionProps> = ({
-  allPools,
+  collateralPools,
   userPositions,
   subAccounts,
   chainId,
@@ -76,7 +76,7 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
       )}
 
       <PoolSelectorDropdown
-        pools={allPools}
+        pools={collateralPools}
         value={colInPool}
         onChange={setColInPool}
         userPositions={userPositions}
@@ -85,7 +85,7 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
       />
 
       <PoolSelectorDropdown
-        pools={allPools}
+        pools={collateralPools}
         value={colOutPool}
         onChange={setColOutPool}
         userPositions={userPositions}

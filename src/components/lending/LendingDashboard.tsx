@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react'
 import { isWNative, lenderDisplayNameFull } from '@1delta/lib-utils'
 import { zeroAddress } from 'viem'
 import type { LenderData, PoolDataItem } from '../../hooks/lending/usePoolData'
+import { usePoolConfigData } from '../../hooks/lending/usePoolData'
+import { ConfigMarketView } from './ConfigMarketView'
 import type {
   UserDataResult,
   UserPositionEntry,
@@ -52,6 +54,9 @@ export function LendingDashboard({
   const [selectedSubAccountId, setSelectedSubAccountId] = useState<string | null>(null)
   const [selectedPool, setSelectedPool] = useState<PoolDataItem | null>(null)
   const [actionTab, setActionTab] = useState<ActionType>('Deposit')
+
+  // View mode: default flat list vs config-grouped view
+  const [viewMode, setViewMode] = useState<'default' | 'config'>('default')
 
   // Search & sort state
   const [assetSearch, setAssetSearch] = useState('')
@@ -125,6 +130,12 @@ export function LendingDashboard({
     if (!selectedLender || !lenderData) return []
     return lenderData[selectedLender] ?? []
   }, [lenderData, selectedLender])
+
+  // Config-grouped pool data (fetched when config view is active)
+  const { data: configGroups, isLoading: isConfigLoading } = usePoolConfigData(
+    chainId,
+    selectedLender
+  )
 
   // Token lists for native token lookup
   const { data: chainTokens } = useTokenLists(chainId)
@@ -292,8 +303,47 @@ export function LendingDashboard({
 
       {/* Two column layout: Markets + Action Panel */}
       <div className="flex gap-4 items-start">
-        {/* Left: Market data table */}
-        <div className="flex-1 min-w-0 rounded-box border border-base-300 overflow-hidden">
+        {/* Left: Market data */}
+        <div className="flex-1 min-w-0">
+          {/* View mode toggle */}
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <div className="flex items-center gap-0.5 bg-base-200 rounded-lg p-0.5">
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'default'
+                    ? 'bg-base-100 shadow-sm text-base-content'
+                    : 'text-base-content/60 hover:text-base-content'
+                }`}
+                onClick={() => setViewMode('default')}
+              >
+                Default
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'config'
+                    ? 'bg-base-100 shadow-sm text-base-content'
+                    : 'text-base-content/60 hover:text-base-content'
+                }`}
+                onClick={() => setViewMode('config')}
+              >
+                Config
+              </button>
+            </div>
+          </div>
+
+          {viewMode === 'config' ? (
+            <ConfigMarketView
+              configGroups={configGroups ?? []}
+              allPools={allPools}
+              selectedMarketUid={selectedPool?.marketUid}
+              onPoolSelect={handlePoolSelect}
+              userPositions={userPositions}
+              isLoading={isConfigLoading}
+            />
+          ) : (
+          <div className="rounded-box border border-base-300 overflow-hidden">
           {/* Search + legend */}
           <div className="p-2 border-b border-base-300 flex items-center gap-3">
             <input
@@ -607,6 +657,8 @@ export function LendingDashboard({
               </div>
             )}
           </div>
+          </div>
+          )}
         </div>
 
         {/* Right: Action panel — desktop only */}

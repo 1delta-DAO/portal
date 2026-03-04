@@ -14,7 +14,8 @@ import { useTradingQuotes } from '../useTradingQuotes'
 import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
 
 export const LoopAction: React.FC<TradingActionProps> = ({
-  allPools,
+  collateralPools,
+  borrowablePools,
   userPositions,
   walletBalances,
   subAccounts,
@@ -141,7 +142,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
       {/* Collateral pool */}
       <PoolSelectorDropdown
-        pools={allPools}
+        pools={collateralPools}
         value={collateralPool}
         onChange={setCollateralPool}
         userPositions={userPositions}
@@ -151,7 +152,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
       {/* Debt pool */}
       <PoolSelectorDropdown
-        pools={allPools}
+        pools={borrowablePools}
         value={debtPool}
         onChange={setDebtPool}
         userPositions={userPositions}

@@ -107,7 +107,10 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
               alt={value.asset.symbol}
               className="rounded-full object-contain w-5 h-5"
             />
-            <span className="truncate">{value.asset.symbol}</span>
+            <span className="truncate">
+              {value.asset.symbol}
+              <span className="text-base-content/50 ml-1 text-[11px]">{value.asset.name}</span>
+            </span>
           </>
         ) : (
           <span className="text-base-content/50">Select asset...</span>
@@ -154,7 +157,10 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
                   className="rounded-full object-contain w-5 h-5 shrink-0"
                 />
                 <div className="flex flex-col min-w-0">
-                  <span className="font-medium">{pool.asset.symbol}</span>
+                  <span className="font-medium">
+                    {pool.asset.symbol}
+                    <span className="text-base-content/50 ml-1 font-normal">{pool.asset.name}</span>
+                  </span>
                   {posText && (
                     <span
                       className={`text-[10px] ${positionType === 'debt' ? 'text-error/70' : 'text-success/70'}`}

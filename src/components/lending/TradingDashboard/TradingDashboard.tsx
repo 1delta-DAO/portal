@@ -1,6 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import { lenderDisplayNameFull } from '@1delta/lib-utils'
 import type { LenderData, PoolDataItem } from '../../../hooks/lending/usePoolData'
+import { usePoolConfigData } from '../../../hooks/lending/usePoolData'
+import { ConfigMarketView } from '../ConfigMarketView'
 import type {
   UserDataResult,
   UserPositionEntry,
@@ -57,6 +59,8 @@ export function TradingDashboard({
   const [activeOperation, setActiveOperation] = useState<TradingOperation>('Loop')
   const [selectedPools, setSelectedPools] = useState<SelectedPool[]>([])
   const [showMobileAction, setShowMobileAction] = useState(false)
+  const [viewMode, setViewMode] = useState<'default' | 'config'>('default')
+  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
 
   // Lender balances for sorting
   const lenderBalances = useMemo(() => {
@@ -119,6 +123,43 @@ export function TradingDashboard({
     if (!selectedLender || !lenderData) return []
     return lenderData[selectedLender] ?? []
   }, [lenderData, selectedLender])
+
+  // Config-grouped pool data
+  const { data: configGroups, isLoading: isConfigLoading } = usePoolConfigData(
+    chainId,
+    selectedLender
+  )
+
+  // Auto-select first config when config groups load
+  React.useEffect(() => {
+    if (configGroups && configGroups.length > 0 && !selectedConfigId) {
+      setSelectedConfigId(configGroups[0].configId)
+    }
+  }, [configGroups, selectedConfigId])
+
+  // Reset config selection when lender changes
+  React.useEffect(() => {
+    setSelectedConfigId(null)
+  }, [selectedLender])
+
+  // Active config group
+  const activeConfigGroup = useMemo(
+    () => configGroups?.find((g) => g.configId === selectedConfigId) ?? null,
+    [configGroups, selectedConfigId]
+  )
+
+  // Filtered pools based on selected config
+  const collateralPools = useMemo(() => {
+    if (!activeConfigGroup?.collaterals) return allPools
+    const uids = new Set(activeConfigGroup.collaterals.map((c) => c.marketUid))
+    return allPools.filter((p) => uids.has(p.marketUid))
+  }, [allPools, activeConfigGroup])
+
+  const borrowablePools = useMemo(() => {
+    if (!activeConfigGroup?.borrowables) return allPools
+    const uids = new Set(activeConfigGroup.borrowables.map((b) => b.marketUid))
+    return allPools.filter((p) => uids.has(p.marketUid))
+  }, [allPools, activeConfigGroup])
 
   const poolAssetAddresses = useMemo(
     () => [...new Set(allPools.map((p) => p.underlying))],
@@ -205,6 +246,8 @@ export function TradingDashboard({
 
   const actionProps = {
     allPools,
+    collateralPools,
+    borrowablePools,
     userPositions,
     walletBalances,
     subAccounts,
@@ -256,15 +299,76 @@ export function TradingDashboard({
       <div className="flex gap-4 items-start">
         {/* Left: Market table (read-only, highlights driven by action panel) */}
         <div className="flex-1 min-w-0">
-          <TradingMarketTable
-            pools={allPools}
-            userPositions={userPositions}
-            highlights={tableHighlights}
-          />
+          {/* View mode toggle */}
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <div className="flex items-center gap-0.5 bg-base-200 rounded-lg p-0.5">
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'default'
+                    ? 'bg-base-100 shadow-sm text-base-content'
+                    : 'text-base-content/60 hover:text-base-content'
+                }`}
+                onClick={() => setViewMode('default')}
+              >
+                Default
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'config'
+                    ? 'bg-base-100 shadow-sm text-base-content'
+                    : 'text-base-content/60 hover:text-base-content'
+                }`}
+                onClick={() => setViewMode('config')}
+              >
+                Config
+              </button>
+            </div>
+          </div>
+
+          {viewMode === 'config' ? (
+            <ConfigMarketView
+              configGroups={configGroups ?? []}
+              allPools={allPools}
+              selectedConfigId={selectedConfigId}
+              onConfigChange={setSelectedConfigId}
+              onPoolSelect={(pool) => {
+                handlePoolSelectionChange([{ pool, role: 'output' }])
+              }}
+              userPositions={userPositions}
+              highlights={tableHighlights}
+              isLoading={isConfigLoading}
+            />
+          ) : (
+            <TradingMarketTable
+              pools={allPools}
+              userPositions={userPositions}
+              highlights={tableHighlights}
+            />
+          )}
         </div>
 
         {/* Right: Action panel — desktop only */}
         <div className="hidden md:block w-96 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
+          {/* Config selector */}
+          {configGroups && configGroups.length > 0 && (
+            <div>
+              <label className="label-text text-xs mb-1 block">Configuration</label>
+              <select
+                className="select select-bordered select-xs w-full"
+                value={selectedConfigId ?? ''}
+                onChange={(e) => setSelectedConfigId(e.target.value)}
+              >
+                {configGroups.map((g) => (
+                  <option key={g.configId} value={g.configId}>
+                    {g.label || `Config ${g.configId}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Operation tabs */}
           <div role="tablist" className="tabs tabs-boxed tabs-xs">
             {OPERATIONS.map((op) => (
@@ -331,6 +435,24 @@ export function TradingDashboard({
             </button>
 
             <div className="space-y-3">
+              {/* Config selector */}
+              {configGroups && configGroups.length > 0 && (
+                <div>
+                  <label className="label-text text-xs mb-1 block">Configuration</label>
+                  <select
+                    className="select select-bordered select-xs w-full"
+                    value={selectedConfigId ?? ''}
+                    onChange={(e) => setSelectedConfigId(e.target.value)}
+                  >
+                    {configGroups.map((g) => (
+                      <option key={g.configId} value={g.configId}>
+                        {g.label || `Config ${g.configId}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Operation tabs */}
               <div role="tablist" className="tabs tabs-boxed tabs-xs">
                 {OPERATIONS.map((op) => (
