@@ -11,14 +11,17 @@ import { AmountQuickButtons } from '../../DashboardActions/AmountQuickButtons'
 import { formatTokenAmount, formatUsd, parseAmount } from '../../DashboardActions/format'
 import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes } from '../useTradingQuotes'
+import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
 
 export const LoopAction: React.FC<TradingActionProps> = ({
   allPools,
   userPositions,
   walletBalances,
+  subAccounts,
   chainId,
   account,
   accountId,
+  onAccountIdChange,
   onPoolSelectionChange,
 }) => {
   const { data: chainTokens } = useTokenLists(chainId)
@@ -120,10 +123,22 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     )
   }
 
+  const allowCreateAccount = !!selectedPayCurrency && !!payAmount
+
   const canFetch = !!collateralPool && !!debtPool && !!debtAmount
 
   return (
     <div className="space-y-3">
+      {/* Sub-account */}
+      {(subAccounts.length > 0 || allowCreateAccount) && (
+        <SubAccountSelector
+          subAccounts={subAccounts}
+          selectedAccountId={accountId ?? null}
+          onChange={onAccountIdChange}
+          allowCreate={allowCreateAccount}
+        />
+      )}
+
       {/* Collateral pool */}
       <PoolSelectorDropdown
         pools={allPools}

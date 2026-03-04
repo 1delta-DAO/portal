@@ -1,5 +1,5 @@
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
-import type { UserPositionEntry } from '../../../hooks/lending/useUserData'
+import type { UserPositionEntry, UserSubAccount } from '../../../hooks/lending/useUserData'
 import type { TokenBalance } from '../../../hooks/lending/useTokenBalances'
 
 export type TradingOperation = 'Loop' | 'ColSwap' | 'DebtSwap' | 'Close'
@@ -41,9 +41,11 @@ export interface TradingActionProps {
   allPools: PoolDataItem[]
   userPositions: Map<string, UserPositionEntry>
   walletBalances: Map<string, TokenBalance>
+  subAccounts: UserSubAccount[]
   selectedLender: string
   chainId: string
   account?: string
   accountId?: string
+  onAccountIdChange: (accountId: string | null) => void
   onPoolSelectionChange: (selections: SelectedPool[]) => void
 }

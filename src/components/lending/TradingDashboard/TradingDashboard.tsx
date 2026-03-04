@@ -191,6 +191,10 @@ export function TradingDashboard({
     setSelectedPools(selections)
   }, [])
 
+  const handleAccountIdChange = useCallback((id: string | null) => {
+    setSelectedSubAccountId(id)
+  }, [])
+
   if (isPublicDataLoading) {
     return (
       <div className="flex justify-center items-center py-10">
@@ -203,10 +207,12 @@ export function TradingDashboard({
     allPools,
     userPositions,
     walletBalances,
+    subAccounts,
     selectedLender,
     chainId,
     account,
     accountId: selectedSubAccountId ?? undefined,
+    onAccountIdChange: handleAccountIdChange,
     onPoolSelectionChange: handlePoolSelectionChange,
   }
 

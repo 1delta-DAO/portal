@@ -9,13 +9,16 @@ import { QuoteCard } from '../QuoteCard'
 import { AmountQuickButtons } from '../../DashboardActions/AmountQuickButtons'
 import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes } from '../useTradingQuotes'
+import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
 
 export const CloseAction: React.FC<TradingActionProps> = ({
   allPools,
   userPositions,
+  subAccounts,
   chainId,
   account,
   accountId,
+  onAccountIdChange,
   onPoolSelectionChange,
 }) => {
   const [collateralPool, setCollateralPool] = useState<PoolDataItem | null>(null)
@@ -62,6 +65,15 @@ export const CloseAction: React.FC<TradingActionProps> = ({
 
   return (
     <div className="space-y-3">
+      {subAccounts.length > 0 && (
+        <SubAccountSelector
+          subAccounts={subAccounts}
+          selectedAccountId={accountId ?? null}
+          onChange={onAccountIdChange}
+          allowCreate={false}
+        />
+      )}
+
       <PoolSelectorDropdown
         pools={allPools}
         value={collateralPool}
