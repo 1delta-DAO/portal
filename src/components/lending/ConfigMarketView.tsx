@@ -380,14 +380,14 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
               {type === 'collateral' ? (
                 <>
                   <th>LTV</th>
-                  <th>Deposit APR</th>
-                  <th>Total Deposits</th>
+                  <th>APR</th>
+                  <th>Deposits</th>
                 </>
               ) : (
                 <>
-                  <th>Borrow APR</th>
-                  <th>Liquidity</th>
-                  <th>Total Debt</th>
+                  <th>APR</th>
+                  <th>Liq.</th>
+                  <th>Debt</th>
                 </>
               )}
             </tr>

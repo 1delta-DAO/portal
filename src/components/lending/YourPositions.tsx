@@ -26,7 +26,7 @@ export interface YourPositionsProps {
   activePositions: { position: UserPositionEntry; pool: PoolDataItem }[]
   account: string
   chainId: string
-  /** Enables EModeBadge on sub-account chips when set */
+  /** Enables borrow mode badge on sub-account chips when set */
   selectedLender?: string
   /** Highlights a position card */
   selectedPoolMarketUid?: string

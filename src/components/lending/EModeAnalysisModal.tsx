@@ -11,7 +11,7 @@ import {
 } from '../../sdk/lending-helper/fetchEMode'
 
 // ============================================================================
-// E-Mode Button — shows current mode, opens the analysis modal on click
+// Mode Button — shows current borrow mode, opens the analysis modal on click
 // ============================================================================
 
 interface EModeBadgeProps {
@@ -34,9 +34,9 @@ export const EModeBadge: React.FC<EModeBadgeProps> = ({ subAccount, lender, chai
           e.stopPropagation()
           setOpen(true)
         }}
-        title="View e-mode options"
+        title="Borrow mode — defines collateral and debt parameters"
       >
-        <span className="text-[9px] font-bold uppercase">E-Mode</span>
+        <span className="text-[9px] font-bold uppercase">Mode</span>
         <span className="text-[10px]">{mode === 0 ? 'Off' : `#${mode}`}</span>
       </button>
 
@@ -54,7 +54,7 @@ export const EModeBadge: React.FC<EModeBadgeProps> = ({ subAccount, lender, chai
 }
 
 // ============================================================================
-// E-Mode Analysis Modal
+// Mode Analysis Modal
 // ============================================================================
 
 interface EModeAnalysisModalProps {
@@ -189,7 +189,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
     const res = await fetchEModeSwitch({ chainId, lender, eMode: targetMode })
 
     if (!res.success || !res.data) {
-      setSwitchError(res.error ?? 'Failed to build e-mode switch transaction')
+      setSwitchError(res.error ?? 'Failed to build mode switch transaction')
       setSwitchingMode(null)
       return
     }
@@ -215,7 +215,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-base-300">
-          <h3 className="font-semibold text-sm">E-Mode Options</h3>
+          <h3 className="font-semibold text-sm" title="Borrow mode — defines collateral and debt parameters">Mode Options</h3>
           <button type="button" className="btn btn-ghost btn-xs" onClick={onClose}>
             ✕
           </button>
@@ -228,7 +228,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
             Current mode:{' '}
             <span className="font-semibold text-base-content">
               {currentMode === 0
-                ? 'Default (No E-Mode)'
+                ? 'Default'
                 : categories.find((c) => c.id === currentMode)?.label ?? `Mode #${currentMode}`}
             </span>
           </div>
@@ -267,7 +267,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
 
           {!loading && !error && categories.length <= 1 && (
             <div className="text-sm text-base-content/60 text-center py-4">
-              No additional e-mode categories available for this lender.
+              No additional borrow modes available for this lender.
             </div>
           )}
 
