@@ -83,6 +83,9 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
           selectedAccountId={selectedAccountId}
           onChange={setSelectedAccountId}
           allowCreate
+          chainId={chainId}
+          lender={lenderKey}
+          account={account}
         />
       )}
 

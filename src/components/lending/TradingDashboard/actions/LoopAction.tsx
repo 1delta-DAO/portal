@@ -19,6 +19,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   userPositions,
   walletBalances,
   subAccounts,
+  selectedLender,
   chainId,
   account,
   accountId,
@@ -137,6 +138,9 @@ export const LoopAction: React.FC<TradingActionProps> = ({
           selectedAccountId={accountId ?? null}
           onChange={onAccountIdChange}
           allowCreate={allowCreateAccount}
+          chainId={chainId}
+          lender={selectedLender}
+          account={account}
         />
       )}
 
