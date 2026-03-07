@@ -7,7 +7,7 @@ export function WalletConnect() {
   const { disconnect } = useDisconnect()
   const { openConnectModal } = useConnectModal()
   const [open, setOpen] = useState(false)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>()
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   if (!isConnected) {
     return (

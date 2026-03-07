@@ -33,7 +33,7 @@ const THEMES = [
 ] as const
 
 export function ThemeSwitcher() {
-  const [theme, setTheme] = useState<string>('terminal')
+  const [theme, setTheme] = useState<string>('autumn')
   const [showModal, setShowModal] = useState(false)
   const isMobile = useIsMobile()
   const dropdownRef = useRef<HTMLDivElement>(null)

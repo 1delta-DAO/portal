@@ -19,6 +19,8 @@ interface Props {
   /** Controlled config selection (optional — uses internal state if not provided). */
   selectedConfigId?: string | null
   onConfigChange?: (configId: string) => void
+  /** The user's active e-mode category string — matching configs are visually emphasized. */
+  userActiveCategory?: string | null
 }
 
 const PAGE_SIZE = 8
@@ -58,6 +60,7 @@ export const ConfigMarketView: React.FC<Props> = ({
   isLoading,
   selectedConfigId: controlledConfigId,
   onConfigChange,
+  userActiveCategory,
 }) => {
   const [internalConfigId, setInternalConfigId] = useState<string | null>(null)
   const [page, setPage] = useState(0)
@@ -73,10 +76,19 @@ export const ConfigMarketView: React.FC<Props> = ({
     }
   }
 
-  // Sort config groups by total liquidity descending
+  // Sort config groups: user's active e-mode first, then by total liquidity descending
   const sortedGroups = useMemo(
-    () => [...configGroups].sort((a, b) => configTotalLiquidity(b) - configTotalLiquidity(a)),
-    [configGroups]
+    () =>
+      [...configGroups].sort((a, b) => {
+        if (userActiveCategory != null) {
+          const aIsActive = a.category === userActiveCategory
+          const bIsActive = b.category === userActiveCategory
+          if (aIsActive && !bIsActive) return -1
+          if (bIsActive && !aIsActive) return 1
+        }
+        return configTotalLiquidity(b) - configTotalLiquidity(a)
+      }),
+    [configGroups, userActiveCategory]
   )
 
   // Pagination
@@ -158,18 +170,24 @@ export const ConfigMarketView: React.FC<Props> = ({
             <tbody>
               {pagedGroups.map((g) => {
                 const isActive = g.configId === selectedConfigId
+                const isUserMode = userActiveCategory != null && g.category === userActiveCategory
                 const liquidity = configTotalLiquidity(g)
                 return (
                   <tr
                     key={g.configId}
                     className={`cursor-pointer transition-colors ${
-                      isActive ? 'bg-primary/10' : 'hover:bg-base-200'
+                      isActive ? 'bg-primary/10' : isUserMode ? 'bg-success/5' : 'hover:bg-base-200'
                     }`}
                     onClick={() => setSelectedConfigId(g.configId)}
                   >
                     <td>
                       <span className="font-medium text-sm">
                         {g.label || `Config ${g.configId}`}
+                        {isUserMode && (
+                          <span className="ml-1.5 text-[9px] font-medium text-success/80 bg-success/10 px-1 py-0.5 rounded align-middle">
+                            active
+                          </span>
+                        )}
                       </span>
                     </td>
                     <td>
@@ -194,18 +212,24 @@ export const ConfigMarketView: React.FC<Props> = ({
         <div className="md:hidden divide-y divide-base-300">
           {pagedGroups.map((g) => {
             const isActive = g.configId === selectedConfigId
+            const isUserMode = userActiveCategory != null && g.category === userActiveCategory
             const liquidity = configTotalLiquidity(g)
             return (
               <div
                 key={`m-${g.configId}`}
                 className={`p-3 cursor-pointer transition-colors ${
-                  isActive ? 'bg-primary/10' : 'active:bg-base-200'
+                  isActive ? 'bg-primary/10' : isUserMode ? 'bg-success/5' : 'active:bg-base-200'
                 }`}
                 onClick={() => setSelectedConfigId(g.configId)}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-sm">
                     {g.label || `Config ${g.configId}`}
+                    {isUserMode && (
+                      <span className="ml-1.5 text-[9px] font-medium text-success/80 bg-success/10 px-1 py-0.5 rounded align-middle">
+                        active
+                      </span>
+                    )}
                   </span>
                   <span className="text-xs text-base-content/70" title={`$${formatUsd(liquidity)}`}>
                     {abbreviateUsd(liquidity)}

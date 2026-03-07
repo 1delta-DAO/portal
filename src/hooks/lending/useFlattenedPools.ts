@@ -108,6 +108,8 @@ function buildPoolsUrl(
   if (start !== undefined) url.searchParams.set('start', String(start))
   if (count !== undefined) url.searchParams.set('count', String(count))
 
+  url.searchParams.set('includeExposures', 'true')
+
   return url.toString()
 }
 

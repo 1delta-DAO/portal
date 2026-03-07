@@ -13,6 +13,7 @@ import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
 
 export const ColSwapAction: React.FC<TradingActionProps> = ({
   collateralPools,
+  preferredCollateralUids,
   userPositions,
   subAccounts,
   chainId,
@@ -82,6 +83,7 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
         userPositions={userPositions}
         label="Collateral In (Withdraw)"
         positionType="deposits"
+        preferredUids={preferredCollateralUids}
       />
 
       <PoolSelectorDropdown
@@ -91,6 +93,7 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
         userPositions={userPositions}
         label="Collateral Out (Deposit)"
         positionType="deposits"
+        preferredUids={preferredCollateralUids}
       />
 
       {/* Amount */}

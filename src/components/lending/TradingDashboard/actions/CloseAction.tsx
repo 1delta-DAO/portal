@@ -14,6 +14,8 @@ import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
 export const CloseAction: React.FC<TradingActionProps> = ({
   collateralPools,
   borrowablePools,
+  preferredCollateralUids,
+  preferredBorrowableUids,
   userPositions,
   subAccounts,
   chainId,
@@ -82,6 +84,7 @@ export const CloseAction: React.FC<TradingActionProps> = ({
         userPositions={userPositions}
         label="Collateral (Sell)"
         positionType="deposits"
+        preferredUids={preferredCollateralUids}
       />
 
       <PoolSelectorDropdown
@@ -91,6 +94,7 @@ export const CloseAction: React.FC<TradingActionProps> = ({
         userPositions={userPositions}
         label="Debt (Repay)"
         positionType="debt"
+        preferredUids={preferredBorrowableUids}
       />
 
       {/* Amount */}

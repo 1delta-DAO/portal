@@ -1,7 +1,7 @@
 // src/components/lending/LendingPoolSelectionModal.tsx
 import React, { useMemo, useState } from 'react'
 import { List } from 'react-window'
-import type { RawCurrency } from '@1delta/lib-utils'
+import { lenderDisplayName, type RawCurrency } from '@1delta/lib-utils'
 import { FlattenedPoolWithUserData } from '../../hooks/lending/prepareMixedData'
 import { ValuePill } from './Pill'
 

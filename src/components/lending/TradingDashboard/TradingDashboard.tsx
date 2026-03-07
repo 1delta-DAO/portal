@@ -148,18 +148,38 @@ export function TradingDashboard({
     [configGroups, selectedConfigId]
   )
 
-  // Filtered pools based on selected config
-  const collateralPools = useMemo(() => {
-    if (!activeConfigGroup?.collaterals) return allPools
-    const uids = new Set(activeConfigGroup.collaterals.map((c) => c.marketUid))
-    return allPools.filter((p) => uids.has(p.marketUid))
-  }, [allPools, activeConfigGroup])
+  // Preferred pools from selected config (bumped to top in dropdowns)
+  const preferredCollateralUids = useMemo(() => {
+    if (!activeConfigGroup?.collaterals) return new Set<string>()
+    return new Set(activeConfigGroup.collaterals.map((c) => c.marketUid))
+  }, [activeConfigGroup])
 
-  const borrowablePools = useMemo(() => {
-    if (!activeConfigGroup?.borrowables) return allPools
-    const uids = new Set(activeConfigGroup.borrowables.map((b) => b.marketUid))
-    return allPools.filter((p) => uids.has(p.marketUid))
-  }, [allPools, activeConfigGroup])
+  const preferredBorrowableUids = useMemo(() => {
+    if (!activeConfigGroup?.borrowables) return new Set<string>()
+    return new Set(activeConfigGroup.borrowables.map((b) => b.marketUid))
+  }, [activeConfigGroup])
+
+  // User's active e-mode category (as string to match PoolConfigGroup.category)
+  const userActiveCategory = activeSubAccount
+    ? String(activeSubAccount.userConfig.selectedMode)
+    : null
+
+  // Config groups sorted with active e-mode first (for <select> dropdowns)
+  const sortedConfigGroups = useMemo(() => {
+    if (!configGroups) return []
+    if (userActiveCategory == null) return configGroups
+    return [...configGroups].sort((a, b) => {
+      const aIsActive = a.category === userActiveCategory
+      const bIsActive = b.category === userActiveCategory
+      if (aIsActive && !bIsActive) return -1
+      if (bIsActive && !aIsActive) return 1
+      return 0
+    })
+  }, [configGroups, userActiveCategory])
+
+  // All pools available as collateral / borrowable (unfiltered)
+  const collateralPools = allPools
+  const borrowablePools = allPools
 
   const poolAssetAddresses = useMemo(
     () => [...new Set(allPools.map((p) => p.underlying))],
@@ -248,6 +268,8 @@ export function TradingDashboard({
     allPools,
     collateralPools,
     borrowablePools,
+    preferredCollateralUids,
+    preferredBorrowableUids,
     userPositions,
     walletBalances,
     subAccounts,
@@ -339,6 +361,7 @@ export function TradingDashboard({
               userPositions={userPositions}
               highlights={tableHighlights}
               isLoading={isConfigLoading}
+              userActiveCategory={userActiveCategory}
             />
           ) : (
             <TradingMarketTable
@@ -352,7 +375,7 @@ export function TradingDashboard({
         {/* Right: Action panel — desktop only */}
         <div className="hidden md:block w-96 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
           {/* Config selector */}
-          {configGroups && configGroups.length > 0 && (
+          {sortedConfigGroups.length > 0 && (
             <div>
               <label className="label-text text-xs mb-1 block">Configuration</label>
               <select
@@ -360,11 +383,14 @@ export function TradingDashboard({
                 value={selectedConfigId ?? ''}
                 onChange={(e) => setSelectedConfigId(e.target.value)}
               >
-                {configGroups.map((g) => (
-                  <option key={g.configId} value={g.configId}>
-                    {g.label || `Config ${g.configId}`}
-                  </option>
-                ))}
+                {sortedConfigGroups.map((g) => {
+                  const isUserMode = userActiveCategory !== null && g.category === userActiveCategory
+                  return (
+                    <option key={g.configId} value={g.configId}>
+                      {isUserMode ? '\u2713 ' : ''}{g.label || `Config ${g.configId}`}{isUserMode ? ' (active)' : ''}
+                    </option>
+                  )
+                })}
               </select>
             </div>
           )}
@@ -435,24 +461,6 @@ export function TradingDashboard({
             </button>
 
             <div className="space-y-3">
-              {/* Config selector */}
-              {configGroups && configGroups.length > 0 && (
-                <div>
-                  <label className="label-text text-xs mb-1 block">Configuration</label>
-                  <select
-                    className="select select-bordered select-xs w-full"
-                    value={selectedConfigId ?? ''}
-                    onChange={(e) => setSelectedConfigId(e.target.value)}
-                  >
-                    {configGroups.map((g) => (
-                      <option key={g.configId} value={g.configId}>
-                        {g.label || `Config ${g.configId}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
               {/* Operation tabs */}
               <div role="tablist" className="tabs tabs-boxed tabs-xs">
                 {OPERATIONS.map((op) => (

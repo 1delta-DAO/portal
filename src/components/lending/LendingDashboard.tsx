@@ -341,6 +341,7 @@ export function LendingDashboard({
               onPoolSelect={handlePoolSelect}
               userPositions={userPositions}
               isLoading={isConfigLoading}
+              userActiveCategory={activeSubAccount ? String(activeSubAccount.userConfig.selectedMode) : null}
             />
           ) : (
           <div className="rounded-box border border-base-300 overflow-hidden">

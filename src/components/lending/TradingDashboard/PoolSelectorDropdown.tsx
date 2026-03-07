@@ -10,6 +10,8 @@ interface PoolSelectorDropdownProps {
   label: string
   positionType: 'deposits' | 'debt'
   disabled?: boolean
+  /** MarketUids from the active config — these are sorted to the top. */
+  preferredUids?: Set<string>
 }
 
 function fmtBal(v: number | string): string {
@@ -34,6 +36,7 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
   label,
   positionType,
   disabled,
+  preferredUids,
 }) => {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -48,7 +51,7 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // Sort pools: those with relevant position first, then alphabetical
+  // Sort pools: preferred (config group) first, then positions, then alphabetical
   const sorted = useMemo(() => {
     const q = search.toLowerCase()
     const filtered = pools.filter(
@@ -56,7 +59,18 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
         !q || p.asset.symbol.toLowerCase().includes(q) || p.asset.name.toLowerCase().includes(q)
     )
 
+    const hasPreferred = preferredUids && preferredUids.size > 0
+
     return [...filtered].sort((a, b) => {
+      // Preferred pools first
+      if (hasPreferred) {
+        const prefA = preferredUids.has(a.marketUid)
+        const prefB = preferredUids.has(b.marketUid)
+        if (prefA && !prefB) return -1
+        if (prefB && !prefA) return 1
+      }
+
+      // Then by position balance
       const posA = userPositions.get(a.marketUid)
       const posB = userPositions.get(b.marketUid)
       const valA = posA
@@ -73,7 +87,7 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
       if (valB > 0 && valA === 0) return 1
       return a.asset.symbol.localeCompare(b.asset.symbol)
     })
-  }, [pools, search, userPositions, positionType])
+  }, [pools, search, userPositions, positionType, preferredUids])
 
   const getPositionText = (pool: PoolDataItem): string | null => {
     const pos = userPositions.get(pool.marketUid)
@@ -132,44 +146,69 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
           {sorted.length === 0 && (
             <div className="px-3 py-2 text-xs text-base-content/50">No assets found</div>
           )}
-          {sorted.map((pool) => {
+          {sorted.map((pool, idx) => {
             const posText = getPositionText(pool)
             const isSelected = value?.marketUid === pool.marketUid
+            const hasPreferred = preferredUids && preferredUids.size > 0
+            const isPreferred = hasPreferred && preferredUids.has(pool.marketUid)
+
+            // Show separator between preferred and non-preferred groups
+            const prevPool = idx > 0 ? sorted[idx - 1] : null
+            const showSeparator =
+              hasPreferred &&
+              !isPreferred &&
+              prevPool &&
+              preferredUids.has(prevPool.marketUid)
 
             return (
-              <button
-                key={pool.marketUid}
-                type="button"
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-left hover:bg-base-200 text-xs ${
-                  isSelected ? 'bg-base-200 font-medium' : ''
-                }`}
-                onClick={() => {
-                  onChange(pool)
-                  setOpen(false)
-                  setSearch('')
-                }}
-              >
-                <img
-                  src={pool.asset.logoURI}
-                  width={20}
-                  height={20}
-                  alt={pool.asset.symbol}
-                  className="rounded-full object-contain w-5 h-5 shrink-0"
-                />
-                <div className="flex flex-col min-w-0">
-                  <span className="font-medium">
-                    {pool.asset.symbol}
-                    <span className="text-base-content/50 ml-1 font-normal">{pool.asset.name}</span>
-                  </span>
-                  {posText && (
-                    <span
-                      className={`text-[10px] ${positionType === 'debt' ? 'text-error/70' : 'text-success/70'}`}
-                    >
-                      {posText}
+              <React.Fragment key={pool.marketUid}>
+                {showSeparator && (
+                  <div className="border-t border-base-300 mx-2 my-1">
+                    <span className="text-[10px] text-base-content/40 px-0.5">Other</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-left text-xs ${
+                    isSelected
+                      ? 'bg-base-200 font-medium'
+                      : isPreferred
+                        ? 'bg-primary/5 hover:bg-primary/10'
+                        : 'hover:bg-base-200'
+                  } ${!isPreferred && hasPreferred ? 'opacity-50' : ''}`}
+                  onClick={() => {
+                    onChange(pool)
+                    setOpen(false)
+                    setSearch('')
+                  }}
+                >
+                  <img
+                    src={pool.asset.logoURI}
+                    width={20}
+                    height={20}
+                    alt={pool.asset.symbol}
+                    className="rounded-full object-contain w-5 h-5 shrink-0"
+                  />
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      {pool.asset.symbol}
+                      <span className="text-base-content/50 ml-0.5 font-normal">{pool.asset.name}</span>
+                      {isPreferred && (
+                        <span className="ml-auto text-[9px] font-medium text-primary/70 bg-primary/10 px-1 py-0.5 rounded">
+                          config
+                        </span>
+                      )}
                     </span>
-                  )}
-                </div>
-              </button>
+                    {posText && (
+                      <span
+                        className={`text-[10px] ${positionType === 'debt' ? 'text-error/70' : 'text-success/70'}`}
+                      >
+                        {posText}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              </React.Fragment>
             )
           })}
         </div>

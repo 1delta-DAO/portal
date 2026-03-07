@@ -75,7 +75,7 @@ export function YourPositions({
               onClick={() => onSubAccountChange(sub.accountId)}
             >
               <span className="font-semibold">#{i + 1}</span>
-              <span className="text-base-content/70">
+              <span className="text-base-content/70" title={`Deposits: $${formatUsd(sub.balanceData.deposits)} | Debt: $${formatUsd(sub.balanceData.debt)} | NAV: $${formatUsd(sub.balanceData.nav)}`}>
                 NAV: <span className="font-medium">{abbreviateUsd(sub.balanceData.nav)}</span>
               </span>
               {healthBadge && (
@@ -99,7 +99,7 @@ export function YourPositions({
       {/* Summary stats for selected sub-account */}
       {summary && (
         <div className="flex gap-4 items-center text-xs flex-wrap">
-          <span>
+          <span title={`Deposits: $${formatUsd(summary.deposits)} | Debt: $${formatUsd(summary.debt)} | NAV: $${formatUsd(summary.nav)}`}>
             Net: <span className="font-semibold">${formatUsd(summary.nav)}</span>
           </span>
           <div className="flex items-center gap-1">
@@ -147,7 +147,7 @@ export function YourPositions({
                 Deposits
                 {summary && (
                   <>
-                    <span className="font-normal text-base-content/60">
+                    <span className="font-normal text-base-content/60" title={`$${summary.deposits.toLocaleString(undefined, { maximumFractionDigits: 6 })}`}>
                       — ${formatUsd(summary.deposits)}
                     </span>
                     <span className="font-medium">
@@ -188,7 +188,7 @@ export function YourPositions({
                       />
                       <div className="flex flex-col min-w-0 flex-1">
                         <span className="text-sm font-medium">{pool.asset.symbol}</span>
-                        <span className="text-xs text-success truncate">
+                        <span className="text-xs text-success truncate" title={`${position.deposits} ($${formatUsd(position.depositsUSD)})`}>
                           +{formatTokenAmount(position.deposits)} ($
                           {formatUsd(position.depositsUSD)})
                         </span>
@@ -219,7 +219,7 @@ export function YourPositions({
                 Debt
                 {summary && (
                   <>
-                    <span className="font-normal text-base-content/60">
+                    <span className="font-normal text-base-content/60" title={`$${summary.debt.toLocaleString(undefined, { maximumFractionDigits: 6 })}`}>
                       — ${formatUsd(summary.debt)}
                     </span>
                     <span className="font-medium">
@@ -260,7 +260,7 @@ export function YourPositions({
                       />
                       <div className="flex flex-col min-w-0 flex-1">
                         <span className="text-sm font-medium">{pool.asset.symbol}</span>
-                        <span className="text-xs text-error truncate">
+                        <span className="text-xs text-error truncate" title={`${position.debt} ($${formatUsd(position.debtUSD)})`}>
                           -{formatTokenAmount(position.debt)} (${formatUsd(position.debtUSD)})
                         </span>
                       </div>

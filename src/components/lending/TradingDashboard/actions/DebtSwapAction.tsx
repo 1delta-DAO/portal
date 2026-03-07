@@ -13,6 +13,7 @@ import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
 
 export const DebtSwapAction: React.FC<TradingActionProps> = ({
   borrowablePools,
+  preferredBorrowableUids,
   userPositions,
   subAccounts,
   chainId,
@@ -82,6 +83,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
         userPositions={userPositions}
         label="Borrow (New Debt)"
         positionType="debt"
+        preferredUids={preferredBorrowableUids}
       />
 
       <PoolSelectorDropdown
@@ -91,6 +93,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
         userPositions={userPositions}
         label="Repay (Existing Debt)"
         positionType="debt"
+        preferredUids={preferredBorrowableUids}
       />
 
       {/* Amount */}

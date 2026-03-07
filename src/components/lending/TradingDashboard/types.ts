@@ -39,10 +39,14 @@ export interface QuoteResponse {
 
 export interface TradingActionProps {
   allPools: PoolDataItem[]
-  /** Pools available as collateral (filtered by selected config, or all pools if no config). */
+  /** All pools (dropdowns show all, with preferred ones bumped to top). */
   collateralPools: PoolDataItem[]
-  /** Pools available as borrowable (filtered by selected config, or all pools if no config). */
+  /** All pools (dropdowns show all, with preferred ones bumped to top). */
   borrowablePools: PoolDataItem[]
+  /** MarketUids from the active config group — shown first in the collateral dropdown. */
+  preferredCollateralUids: Set<string>
+  /** MarketUids from the active config group — shown first in the borrowable dropdown. */
+  preferredBorrowableUids: Set<string>
   userPositions: Map<string, UserPositionEntry>
   walletBalances: Map<string, TokenBalance>
   subAccounts: UserSubAccount[]

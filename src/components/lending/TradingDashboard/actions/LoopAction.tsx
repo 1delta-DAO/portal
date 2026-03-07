@@ -12,10 +12,101 @@ import { formatTokenAmount, formatUsd, parseAmount } from '../../DashboardAction
 import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes } from '../useTradingQuotes'
 import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
+import {
+  fetchLoopRangeWithSimulation,
+  fetchLoopRange,
+  type LoopRangeEntry,
+} from '../../../../sdk/lending-helper/fetchLoopRange'
+
+function LoopRangeInfo({
+  loopRange,
+  loading,
+  debtSymbol,
+  onSetMax,
+}: {
+  loopRange: LoopRangeEntry | null
+  loading: boolean
+  debtSymbol: string
+  onSetMax: (amount: number) => void
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-base-content/50 px-1 py-1.5">
+        <span className="loading loading-spinner loading-xs" />
+        Loading max loop size...
+      </div>
+    )
+  }
+
+  if (!loopRange) return null
+
+  const { modeAnalysis } = loopRange
+  const inUserMode = modeAnalysis.userModeRange
+  const needsModeSwitch = modeAnalysis.userMode !== modeAnalysis.targetMode
+
+  return (
+    <div className="rounded-lg border border-base-300 bg-base-200/40 px-2.5 py-2 space-y-1.5 text-xs">
+      <div className="flex items-center justify-between">
+        <span className="text-base-content/60 font-medium">Max Loop Size</span>
+        <button
+          type="button"
+          className="text-primary hover:underline cursor-pointer text-[11px] font-medium"
+          onClick={() => onSetMax(loopRange.amount)}
+        >
+          Use max
+        </button>
+      </div>
+
+      {/* Best-case (target e-mode) */}
+      <div className="flex items-center justify-between">
+        <span className="text-base-content/70">
+          {needsModeSwitch ? 'Target e-mode' : 'Max'}
+        </span>
+        <span className="font-medium">
+          {loopRange.amount.toFixed(4)} {debtSymbol}{' '}
+          <span className="text-base-content/50">(${formatUsd(loopRange.amountUSD)})</span>
+        </span>
+      </div>
+
+      {/* Current e-mode range (shown only if different from target) */}
+      {needsModeSwitch && inUserMode && (
+        <div className="flex items-center justify-between">
+          <span className="text-base-content/70">Current e-mode</span>
+          <span className="font-medium">
+            {inUserMode.amount.toFixed(4)} {debtSymbol}{' '}
+            <span className="text-base-content/50">(${formatUsd(inUserMode.amountUSD)})</span>
+          </span>
+        </div>
+      )}
+
+      {needsModeSwitch && !inUserMode && (
+        <div className="text-warning/80">
+          Pair not available in your current e-mode
+        </div>
+      )}
+
+      {/* Mode switch indicator */}
+      {needsModeSwitch && (
+        <div className={`flex items-center gap-1 text-[11px] ${
+          modeAnalysis.canSwitchToTargetMode ? 'text-success/80' : 'text-warning/80'
+        }`}>
+          <span>{modeAnalysis.canSwitchToTargetMode ? '\u2713' : '\u26A0'}</span>
+          <span>
+            {modeAnalysis.canSwitchToTargetMode
+              ? `Can switch to e-mode ${modeAnalysis.targetMode} for better range`
+              : `Cannot switch to e-mode ${modeAnalysis.targetMode} (conflicts with existing positions)`}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export const LoopAction: React.FC<TradingActionProps> = ({
   collateralPools,
   borrowablePools,
+  preferredCollateralUids,
+  preferredBorrowableUids,
   userPositions,
   walletBalances,
   subAccounts,
@@ -93,6 +184,78 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     onPoolSelectionChange(selections)
   }, [collateralPool, debtPool, onPoolSelectionChange])
 
+  // Loop range (max leverage size)
+  const [loopRange, setLoopRange] = useState<LoopRangeEntry | null>(null)
+  const [loopRangeLoading, setLoopRangeLoading] = useState(false)
+
+  const activeSubAccount = useMemo(
+    () => subAccounts.find((s) => s.accountId === accountId) ?? null,
+    [subAccounts, accountId]
+  )
+
+  useEffect(() => {
+    if (!collateralPool || !debtPool || !selectedLender || !chainId) {
+      setLoopRange(null)
+      return
+    }
+
+    let cancelled = false
+    setLoopRangeLoading(true)
+
+    const run = async () => {
+      const filterParams = {
+        lender: selectedLender,
+        chainId,
+        marketUidIn: debtPool.marketUid,
+        marketUidOut: collateralPool.marketUid,
+      }
+
+      const result = activeSubAccount
+        ? await fetchLoopRangeWithSimulation({
+            ...filterParams,
+            body: {
+              balanceData: {
+                borrowDiscountedCollateral: activeSubAccount.balanceData.borrowDiscountedCollateral ?? 0,
+                collateral: activeSubAccount.balanceData.collateral,
+                debt: activeSubAccount.balanceData.debt,
+                adjustedDebt: activeSubAccount.balanceData.adjustedDebt ?? 0,
+                deposits: activeSubAccount.balanceData.deposits,
+                nav: activeSubAccount.balanceData.nav,
+                deposits24h: activeSubAccount.balanceData.deposits24h,
+                debt24h: activeSubAccount.balanceData.debt24h,
+                nav24h: activeSubAccount.balanceData.nav24h,
+              },
+              aprData: activeSubAccount.aprData,
+              modeId: String(activeSubAccount.userConfig.selectedMode),
+              positions: activeSubAccount.positions.map((p) => ({
+                marketUid: p.marketUid,
+                depositsUSD: p.depositsUSD,
+                debtUSD: p.debtUSD,
+                debtStableUSD: p.debtStableUSD,
+                collateralEnabled: p.collateralEnabled,
+              })),
+            },
+          })
+        : account
+          ? await fetchLoopRange({ ...filterParams, account })
+          : null
+
+      if (cancelled || !result) return
+      setLoopRange(result.success && result.data?.length ? result.data[0] : null)
+      setLoopRangeLoading(false)
+    }
+
+    run()
+    return () => { cancelled = true }
+  }, [
+    collateralPool?.marketUid,
+    debtPool?.marketUid,
+    selectedLender,
+    chainId,
+    account,
+    activeSubAccount,
+  ])
+
   // Max amounts
   const debtPos = debtPool ? userPositions.get(debtPool.marketUid) : null
   const maxBorrowable = debtPos ? Number(debtPos.borrowable) : 0
@@ -152,6 +315,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
         userPositions={userPositions}
         label="Collateral (Deposit Into)"
         positionType="deposits"
+        preferredUids={preferredCollateralUids}
       />
 
       {/* Debt pool */}
@@ -162,6 +326,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
         userPositions={userPositions}
         label="Debt (Borrow From)"
         positionType="debt"
+        preferredUids={preferredBorrowableUids}
       />
 
       {/* Debt amount */}
@@ -187,6 +352,19 @@ export const LoopAction: React.FC<TradingActionProps> = ({
           </span>
         )}
       </div>
+
+      {/* Loop range info */}
+      {collateralPool && debtPool && (
+        <LoopRangeInfo
+          loopRange={loopRange}
+          loading={loopRangeLoading}
+          debtSymbol={debtPool.asset.symbol}
+          onSetMax={(amount) => {
+            setDebtAmount(String(amount))
+            reset()
+          }}
+        />
+      )}
 
       {/* Pay currency */}
       <div className="form-control">
