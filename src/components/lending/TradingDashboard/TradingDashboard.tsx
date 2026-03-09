@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { lenderDisplayNameFull } from '@1delta/lib-utils'
 import type { LenderData, PoolDataItem } from '../../../hooks/lending/usePoolData'
 import { usePoolConfigData } from '../../../hooks/lending/usePoolData'
@@ -29,6 +29,8 @@ interface Props {
   account?: string
   isPublicDataLoading: boolean
   isUserDataLoading: boolean
+  initialLender?: string
+  onLenderChange?: (lender: string) => void
 }
 
 const OPERATIONS: TradingOperation[] = ['Loop', 'ColSwap', 'DebtSwap', 'Close']
@@ -46,6 +48,8 @@ export function TradingDashboard({
   account,
   isPublicDataLoading,
   isUserDataLoading,
+  initialLender,
+  onLenderChange,
 }: Props) {
   const { syncChain, currentChainId } = useSyncChain()
   const isWrongChain = !!account && currentChainId !== Number(chainId)
@@ -54,7 +58,14 @@ export function TradingDashboard({
   // Lender selection
   const allLenderKeys = useMemo(() => Object.keys(lenderData ?? {}), [lenderData])
 
-  const [selectedLender, setSelectedLender] = useState('')
+  const [selectedLender, _setSelectedLender] = useState(initialLender || '')
+  const setSelectedLender = React.useCallback(
+    (lender: string) => {
+      _setSelectedLender(lender)
+      onLenderChange?.(lender)
+    },
+    [onLenderChange]
+  )
   const [selectedSubAccountId, setSelectedSubAccountId] = useState<string | null>(null)
   const [activeOperation, setActiveOperation] = useState<TradingOperation>('Loop')
   const [selectedPools, setSelectedPools] = useState<SelectedPool[]>([])
@@ -91,12 +102,25 @@ export function TradingDashboard({
     indicator: lenderBalances.has(l) ? '\u25CF ' : undefined,
   }))
 
-  // Auto-select first lender
+  // Stable key for lender list to avoid useEffect dependency array issues
+  const lendersKey = lenders.join(',')
+
+  // Track latest selectedLender without it being an effect dependency
+  const selectedLenderRef = useRef(selectedLender)
+  selectedLenderRef.current = selectedLender
+
+  // Auto-select lender: prefer initialLender from URL, then first in sorted list.
+  // Only reacts to lender list or URL changes — NOT to selectedLender changes
+  // (to avoid feedback loop with URL sync).
   React.useEffect(() => {
-    if (lenders.length > 0 && !lenders.includes(selectedLender)) {
-      setSelectedLender(lenders[0])
+    if (lenders.length === 0) return
+    if (initialLender && lenders.includes(initialLender)) {
+      _setSelectedLender(initialLender)
+    } else if (!lenders.includes(selectedLenderRef.current)) {
+      _setSelectedLender(lenders[0])
     }
-  }, [lenders, selectedLender])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lendersKey, initialLender])
 
   // Sub-accounts
   const subAccounts: UserSubAccount[] = useMemo(() => {
@@ -344,7 +368,7 @@ export function TradingDashboard({
                 }`}
                 onClick={() => setViewMode('config')}
               >
-                Config
+                By Config
               </button>
             </div>
           </div>
@@ -384,10 +408,13 @@ export function TradingDashboard({
                 onChange={(e) => setSelectedConfigId(e.target.value)}
               >
                 {sortedConfigGroups.map((g) => {
-                  const isUserMode = userActiveCategory !== null && g.category === userActiveCategory
+                  const isUserMode =
+                    userActiveCategory !== null && g.category === userActiveCategory
                   return (
                     <option key={g.configId} value={g.configId}>
-                      {isUserMode ? '\u2713 ' : ''}{g.label || `Config ${g.configId}`}{isUserMode ? ' (active)' : ''}
+                      {isUserMode ? '\u2713 ' : ''}
+                      {g.label || `Config ${g.configId}`}
+                      {isUserMode ? ' (active)' : ''}
                     </option>
                   )
                 })}

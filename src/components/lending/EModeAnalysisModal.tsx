@@ -24,21 +24,38 @@ interface EModeBadgeProps {
 export const EModeBadge: React.FC<EModeBadgeProps> = ({ subAccount, lender, chainId, account }) => {
   const [open, setOpen] = useState(false)
   const mode = subAccount.userConfig.selectedMode
+  const { data: configGroups } = usePoolConfigData(chainId, lender)
+
+  const modeLabel = useMemo(() => {
+    const modeNum = Number(mode)
+    if (configGroups) {
+      const match = configGroups.find((g) => Number(g.category) === modeNum)
+      if (match?.label) return match.label
+    }
+    return modeNum === 0 ? 'Off' : `#${mode}`
+  }, [mode, configGroups])
 
   return (
     <>
-      <button
-        type="button"
+      <span
+        role="button"
+        tabIndex={0}
         className="badge badge-sm badge-outline gap-1 cursor-pointer hover:bg-base-200 transition-colors"
         onClick={(e) => {
           e.stopPropagation()
           setOpen(true)
         }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.stopPropagation()
+            setOpen(true)
+          }
+        }}
         title="Borrow mode — defines collateral and debt parameters"
       >
-        <span className="text-[9px] font-bold uppercase">Mode</span>
-        <span className="text-[10px]">{mode === 0 ? 'Off' : `#${mode}`}</span>
-      </button>
+        <span className="text-[9px] font-bold uppercase leading-none">Mode</span>
+        <span className="text-[10px] leading-none">{modeLabel}</span>
+      </span>
 
       {open && (
         <EModeAnalysisModal
@@ -75,6 +92,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
   const { send } = useSendLendingTransaction({ chainId, account })
 
   const [categories, setCategories] = useState<EModeCategory[]>([])
+
   const [analysis, setAnalysis] = useState<EModeAnalysisEntry[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -97,9 +115,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
   }, [configGroups])
 
   const currentMode = subAccount.userConfig.selectedMode
-  const hasPositions = subAccount.positions.some(
-    (p) => p.depositsUSD > 0 || p.debtUSD > 0
-  )
+  const hasPositions = subAccount.positions.some((p) => p.depositsUSD > 0 || p.debtUSD > 0)
 
   useEffect(() => {
     let cancelled = false
@@ -114,9 +130,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
       if (cancelled) return
 
       if (listRes.success && listRes.data) {
-        const entry = listRes.data.find(
-          (e) => e.lender === lender && e.chainId === chainId
-        )
+        const entry = listRes.data.find((e) => e.lender === lender && e.chainId === chainId)
         cats = entry?.categories ?? []
       }
 
@@ -155,7 +169,9 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
     }
 
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [lender, chainId, subAccount, hasPositions, derivedCategories])
 
   // Build a lookup from analysis results
@@ -215,7 +231,12 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-base-300">
-          <h3 className="font-semibold text-sm" title="Borrow mode — defines collateral and debt parameters">Mode Options</h3>
+          <h3
+            className="font-semibold text-sm"
+            title="Borrow mode — defines collateral and debt parameters"
+          >
+            Mode Options
+          </h3>
           <button type="button" className="btn btn-ghost btn-xs" onClick={onClose}>
             ✕
           </button>
@@ -227,9 +248,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
           <div className="text-xs text-base-content/60">
             Current mode:{' '}
             <span className="font-semibold text-base-content">
-              {currentMode === 0
-                ? 'Default'
-                : categories.find((c) => c.id === currentMode)?.label ?? `Mode #${currentMode}`}
+              {categories.find((c) => c.id === Number(currentMode))?.label ?? (Number(currentMode) === 0 ? 'Default' : `Mode #${currentMode}`)}
             </span>
           </div>
 
@@ -239,7 +258,8 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
               <span>
                 Switched to{' '}
                 <span className="font-semibold">
-                  {categories.find((c) => c.id === switchSuccess)?.label ?? `Mode #${switchSuccess}`}
+                  {categories.find((c) => c.id === switchSuccess)?.label ??
+                    `Mode #${switchSuccess}`}
                 </span>
                 . Positions are refreshing...
               </span>
@@ -294,16 +314,14 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm">{cat.label}</span>
-                        {isCurrent && (
-                          <span className="badge badge-primary badge-xs">Current</span>
-                        )}
-                        {entry && !isCurrent && (
-                          entry.canSwitch ? (
+                        {isCurrent && <span className="badge badge-primary badge-xs">Current</span>}
+                        {entry &&
+                          !isCurrent &&
+                          (entry.canSwitch ? (
                             <span className="badge badge-success badge-xs">Safe</span>
                           ) : (
                             <span className="badge badge-error badge-xs">Blocked</span>
-                          )
-                        )}
+                          ))}
                       </div>
                       <div className="flex items-center gap-2">
                         {cat.id === 0 && (

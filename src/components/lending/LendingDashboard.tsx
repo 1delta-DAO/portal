@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { isWNative, lenderDisplayNameFull } from '@1delta/lib-utils'
 import { zeroAddress } from 'viem'
 import type { LenderData, PoolDataItem } from '../../hooks/lending/usePoolData'
@@ -33,6 +33,8 @@ interface Props {
   account?: string
   isPublicDataLoading: boolean
   isUserDataLoading: boolean
+  initialLender?: string
+  onLenderChange?: (lender: string) => void
 }
 
 export function LendingDashboard({
@@ -42,6 +44,8 @@ export function LendingDashboard({
   account,
   isPublicDataLoading,
   isUserDataLoading,
+  initialLender,
+  onLenderChange,
 }: Props) {
   const { syncChain, currentChainId } = useSyncChain()
   const isWrongChain = !!account && currentChainId !== Number(chainId)
@@ -50,7 +54,14 @@ export function LendingDashboard({
   // Lender selection
   const allLenderKeys = useMemo(() => Object.keys(lenderData ?? {}), [lenderData])
 
-  const [selectedLender, setSelectedLender] = useState<string>('')
+  const [selectedLender, _setSelectedLender] = useState<string>(initialLender || '')
+  const setSelectedLender = React.useCallback(
+    (lender: string) => {
+      _setSelectedLender(lender)
+      onLenderChange?.(lender)
+    },
+    [onLenderChange]
+  )
   const [selectedSubAccountId, setSelectedSubAccountId] = useState<string | null>(null)
   const [selectedPool, setSelectedPool] = useState<PoolDataItem | null>(null)
   const [actionTab, setActionTab] = useState<ActionType>('Deposit')
@@ -96,12 +107,25 @@ export function LendingDashboard({
     indicator: lenderBalances.has(l) ? '\u25CF ' : undefined,
   }))
 
-  // Auto-select first lender (sorted list already prefers highest balance)
+  // Stable key for lender list to avoid useEffect dependency array issues
+  const lendersKey = lenders.join(',')
+
+  // Track latest selectedLender without it being an effect dependency
+  const selectedLenderRef = useRef(selectedLender)
+  selectedLenderRef.current = selectedLender
+
+  // Auto-select lender: prefer initialLender from URL, then first in sorted list.
+  // Only reacts to lender list or URL changes — NOT to selectedLender changes
+  // (to avoid feedback loop with URL sync).
   React.useEffect(() => {
-    if (lenders.length > 0 && !lenders.includes(selectedLender)) {
-      setSelectedLender(lenders[0])
+    if (lenders.length === 0) return
+    if (initialLender && lenders.includes(initialLender)) {
+      _setSelectedLender(initialLender)
+    } else if (!lenders.includes(selectedLenderRef.current)) {
+      _setSelectedLender(lenders[0])
     }
-  }, [lenders, selectedLender])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lendersKey, initialLender])
 
   // Sub-accounts for the selected lender
   const subAccounts: UserSubAccount[] = useMemo(() => {
@@ -328,7 +352,7 @@ export function LendingDashboard({
                 }`}
                 onClick={() => setViewMode('config')}
               >
-                Config
+                By Config
               </button>
             </div>
           </div>
@@ -341,106 +365,271 @@ export function LendingDashboard({
               onPoolSelect={handlePoolSelect}
               userPositions={userPositions}
               isLoading={isConfigLoading}
-              userActiveCategory={activeSubAccount ? String(activeSubAccount.userConfig.selectedMode) : null}
+              userActiveCategory={
+                activeSubAccount ? String(activeSubAccount.userConfig.selectedMode) : null
+              }
             />
           ) : (
-          <div className="rounded-box border border-base-300 overflow-hidden">
-          {/* Search + legend */}
-          <div className="p-2 border-b border-base-300 flex items-center gap-3">
-            <input
-              type="text"
-              placeholder="Search by name, symbol or address..."
-              className="input input-bordered input-sm flex-1"
-              value={assetSearch}
-              onChange={(e) => setAssetSearch(e.target.value)}
-            />
-            <span
-              className="flex items-center gap-1 text-[10px] text-base-content/50 shrink-0"
-              title="Deposits &amp; borrows are paused"
-            >
-              <span className="text-warning text-sm">&#x2744;</span> = Paused
-            </span>
-          </div>
+            <div className="rounded-box border border-base-300 overflow-hidden">
+              {/* Search + legend */}
+              <div className="p-2 border-b border-base-300 flex items-center gap-3">
+                <input
+                  type="text"
+                  placeholder="Search by name, symbol or address..."
+                  className="input input-bordered input-sm flex-1"
+                  value={assetSearch}
+                  onChange={(e) => setAssetSearch(e.target.value)}
+                />
+                <span
+                  className="flex items-center gap-1 text-[10px] text-base-content/50 shrink-0"
+                  title="Deposits &amp; borrows are paused"
+                >
+                  <span className="text-warning text-sm">&#x2744;</span> = Paused
+                </span>
+              </div>
 
-          {/* Desktop table */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="table table-sm w-full">
-              <thead>
-                <tr>
-                  <th className="cursor-pointer select-none" onClick={() => toggleSort('symbol')}>
-                    Asset
-                    {sortKey === 'symbol' && (
-                      <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="table table-sm w-full">
+                  <thead>
+                    <tr>
+                      <th
+                        className="cursor-pointer select-none"
+                        onClick={() => toggleSort('symbol')}
+                      >
+                        Asset
+                        {sortKey === 'symbol' && (
+                          <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
+                      <th
+                        className="cursor-pointer select-none"
+                        onClick={() => toggleSort('depositApr')}
+                      >
+                        Deposit APR
+                        {sortKey === 'depositApr' && (
+                          <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
+                      <th
+                        className="cursor-pointer select-none"
+                        onClick={() => toggleSort('borrowApr')}
+                      >
+                        Borrow APR
+                        {sortKey === 'borrowApr' && (
+                          <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
+                      <th>LTV</th>
+                      <th
+                        className="cursor-pointer select-none"
+                        onClick={() => toggleSort('totalDepositsUSD')}
+                      >
+                        Total Deposits
+                        {sortKey === 'totalDepositsUSD' && (
+                          <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
+                      <th
+                        className="cursor-pointer select-none"
+                        onClick={() => toggleSort('totalDebtUSD')}
+                      >
+                        Total Borrows
+                        {sortKey === 'totalDebtUSD' && (
+                          <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
+                      <th
+                        className="cursor-pointer select-none"
+                        onClick={() => toggleSort('totalLiquidityUSD')}
+                      >
+                        Liquidity
+                        {sortKey === 'totalLiquidityUSD' && (
+                          <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pools.map((pool) => {
+                      const isSelected = selectedPool?.marketUid === pool.marketUid
+                      const userPos = userPositions.get(pool.marketUid)
+                      const hasPosition =
+                        userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
+                      const iy = pool.intrinsicYield ?? 0
+                      const depositTotal = pool.depositRate + iy
+                      const borrowTotal = pool.variableBorrowRate + iy
+
+                      return (
+                        <tr
+                          key={pool.marketUid}
+                          className={`cursor-pointer transition-colors ${
+                            isSelected ? 'bg-primary/10' : 'hover:bg-base-200'
+                          }`}
+                          onClick={() => handlePoolSelect(pool)}
+                        >
+                          <td className="max-w-40">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="relative shrink-0 w-7 h-7">
+                                <img
+                                  src={pool.asset.logoURI}
+                                  width={28}
+                                  height={28}
+                                  alt={pool.asset.symbol}
+                                  className="rounded-full object-contain w-7 h-7"
+                                />
+                                {hasPosition && (
+                                  <span
+                                    className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100"
+                                    title="You have a position"
+                                  />
+                                )}
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span
+                                  className="font-medium text-sm truncate"
+                                  title={pool.asset.symbol}
+                                >
+                                  {pool.asset.symbol}
+                                  {pool.isFrozen && (
+                                    <span
+                                      className="ml-1 text-warning text-xs"
+                                      title="Deposits &amp; borrows are paused"
+                                    >
+                                      &#x2744;
+                                    </span>
+                                  )}
+                                </span>
+                                <span
+                                  className="text-[11px] text-base-content/60 truncate"
+                                  title={pool.name}
+                                >
+                                  {pool.name}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm font-medium text-success">
+                                {depositTotal.toFixed(2)}%
+                              </span>
+                              {iy > 0 && (
+                                <span
+                                  className="badge badge-xs bg-success/15 text-success border-0 cursor-help"
+                                  title={`Base rate: ${pool.depositRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}%`}
+                                >
+                                  +{iy.toFixed(1)}%
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm font-medium text-warning">
+                                {borrowTotal.toFixed(2)}%
+                              </span>
+                              {iy > 0 && (
+                                <span
+                                  className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help"
+                                  title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}% (paid by borrower)`}
+                                >
+                                  +{iy.toFixed(1)}%
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <LtvBadge config={pool.config} variant="cell" />
+                          </td>
+                          <td>
+                            <span
+                              className="text-xs"
+                              title={`$${formatUsd(pool.totalDepositsUSD)}`}
+                            >
+                              {abbreviateUsd(pool.totalDepositsUSD)}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="text-xs" title={`$${formatUsd(pool.totalDebtUSD)}`}>
+                              {abbreviateUsd(pool.totalDebtUSD)}
+                            </span>
+                          </td>
+                          <td>
+                            <span
+                              className="text-xs"
+                              title={`$${formatUsd(pool.totalLiquidityUSD)}`}
+                            >
+                              {abbreviateUsd(pool.totalLiquidityUSD)}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {pools.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="text-center py-6 text-sm text-base-content/60">
+                          No pools match your search.
+                        </td>
+                      </tr>
                     )}
-                  </th>
-                  <th
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSort('depositApr')}
-                  >
-                    Deposit APR
-                    {sortKey === 'depositApr' && (
-                      <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
-                    )}
-                  </th>
-                  <th
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSort('borrowApr')}
-                  >
-                    Borrow APR
-                    {sortKey === 'borrowApr' && (
-                      <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
-                    )}
-                  </th>
-                  <th>LTV</th>
-                  <th
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSort('totalDepositsUSD')}
-                  >
-                    Total Deposits
-                    {sortKey === 'totalDepositsUSD' && (
-                      <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
-                    )}
-                  </th>
-                  <th
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSort('totalDebtUSD')}
-                  >
-                    Total Borrows
-                    {sortKey === 'totalDebtUSD' && (
-                      <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
-                    )}
-                  </th>
-                  <th
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSort('totalLiquidityUSD')}
-                  >
-                    Liquidity
-                    {sortKey === 'totalLiquidityUSD' && (
-                      <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
-                    )}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile card list */}
+              <div className="md:hidden divide-y divide-base-300">
+                {pools.length > 0 && (
+                  <div className="flex gap-1 p-2 overflow-x-auto">
+                    {(
+                      [
+                        'depositApr',
+                        'borrowApr',
+                        'totalDepositsUSD',
+                        'totalLiquidityUSD',
+                      ] as SortKey[]
+                    ).map((key) => {
+                      const labels: Record<string, string> = {
+                        depositApr: 'Dep APR',
+                        borrowApr: 'Bor APR',
+                        totalDepositsUSD: 'Deposits',
+                        totalLiquidityUSD: 'Liquidity',
+                      }
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          className={`btn btn-xs ${sortKey === key ? 'btn-primary' : 'btn-ghost'}`}
+                          onClick={() => toggleSort(key)}
+                        >
+                          {labels[key]}
+                          {sortKey === key && (
+                            <span className="ml-0.5">
+                              {sortDir === 'asc' ? '\u2191' : '\u2193'}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
                 {pools.map((pool) => {
                   const isSelected = selectedPool?.marketUid === pool.marketUid
                   const userPos = userPositions.get(pool.marketUid)
                   const hasPosition =
                     userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
-                  const iy = pool.intrinsicYield ?? 0
-                  const depositTotal = pool.depositRate + iy
-                  const borrowTotal = pool.variableBorrowRate + iy
+                  const mIy = pool.intrinsicYield ?? 0
+                  const mDepTotal = pool.depositRate + mIy
+                  const mBorTotal = pool.variableBorrowRate + mIy
 
                   return (
-                    <tr
-                      key={pool.marketUid}
-                      className={`cursor-pointer transition-colors ${
-                        isSelected ? 'bg-primary/10' : 'hover:bg-base-200'
-                      }`}
+                    <div
+                      key={`m-${pool.marketUid}`}
+                      className={`p-3 cursor-pointer transition-colors ${isSelected ? 'bg-primary/10' : 'active:bg-base-200'}`}
                       onClick={() => handlePoolSelect(pool)}
                     >
-                      <td className="max-w-40">
-                        <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
                           <div className="relative shrink-0 w-7 h-7">
                             <img
                               src={pool.asset.logoURI}
@@ -450,25 +639,17 @@ export function LendingDashboard({
                               className="rounded-full object-contain w-7 h-7"
                             />
                             {hasPosition && (
-                              <span
-                                className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100"
-                                title="You have a position"
-                              />
+                              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100" />
                             )}
                           </div>
                           <div className="flex flex-col min-w-0">
                             <span
-                              className="font-medium text-sm truncate"
+                              className="font-semibold text-sm truncate"
                               title={pool.asset.symbol}
                             >
                               {pool.asset.symbol}
                               {pool.isFrozen && (
-                                <span
-                                  className="ml-1 text-warning text-xs"
-                                  title="Deposits &amp; borrows are paused"
-                                >
-                                  &#x2744;
-                                </span>
+                                <span className="ml-1 text-warning text-xs">&#x2744;</span>
                               )}
                             </span>
                             <span
@@ -479,186 +660,52 @@ export function LendingDashboard({
                             </span>
                           </div>
                         </div>
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1">
-                          <span className="text-sm font-medium text-success">
-                            {depositTotal.toFixed(2)}%
+                        <div className="text-right shrink-0">
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="font-bold text-sm text-success">
+                              {mDepTotal.toFixed(2)}%
+                            </span>
+                            {mIy > 0 && (
+                              <span
+                                className="badge badge-xs bg-success/15 text-success border-0"
+                                title={`Base rate: ${pool.depositRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
+                              >
+                                +{mIy.toFixed(1)}%
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-base-content/50 block">
+                            Deposit APR
                           </span>
-                          {iy > 0 && (
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-2 text-xs text-base-content/70">
+                        <span>
+                          Borrow:{' '}
+                          <span className="text-warning font-medium">{mBorTotal.toFixed(2)}%</span>
+                          {mIy > 0 && (
                             <span
-                              className="badge badge-xs bg-success/15 text-success border-0 cursor-help"
-                              title={`Base rate: ${pool.depositRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}%`}
+                              className="badge badge-xs bg-warning/15 text-warning border-0 ml-1"
+                              title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
                             >
-                              +{iy.toFixed(1)}%
+                              +{mIy.toFixed(1)}%
                             </span>
                           )}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1">
-                          <span className="text-sm font-medium text-warning">
-                            {borrowTotal.toFixed(2)}%
-                          </span>
-                          {iy > 0 && (
-                            <span
-                              className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help"
-                              title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}% (paid by borrower)`}
-                            >
-                              +{iy.toFixed(1)}%
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td>
-                        <LtvBadge config={pool.config} variant="cell" />
-                      </td>
-                      <td>
-                        <span className="text-xs" title={`$${formatUsd(pool.totalDepositsUSD)}`}>
-                          {abbreviateUsd(pool.totalDepositsUSD)}
                         </span>
-                      </td>
-                      <td>
-                        <span className="text-xs" title={`$${formatUsd(pool.totalDebtUSD)}`}>
-                          {abbreviateUsd(pool.totalDebtUSD)}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="text-xs" title={`$${formatUsd(pool.totalLiquidityUSD)}`}>
-                          {abbreviateUsd(pool.totalLiquidityUSD)}
-                        </span>
-                      </td>
-                    </tr>
+                        <LtvBadge config={pool.config} variant="inline" />
+                        <span>Dep: {abbreviateUsd(pool.totalDepositsUSD)}</span>
+                        <span>Liq: {abbreviateUsd(pool.totalLiquidityUSD)}</span>
+                      </div>
+                    </div>
                   )
                 })}
                 {pools.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="text-center py-6 text-sm text-base-content/60">
-                      No pools match your search.
-                    </td>
-                  </tr>
+                  <div className="text-center py-6 text-sm text-base-content/60">
+                    No pools match your search.
+                  </div>
                 )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile card list */}
-          <div className="md:hidden divide-y divide-base-300">
-            {pools.length > 0 && (
-              <div className="flex gap-1 p-2 overflow-x-auto">
-                {(
-                  ['depositApr', 'borrowApr', 'totalDepositsUSD', 'totalLiquidityUSD'] as SortKey[]
-                ).map((key) => {
-                  const labels: Record<string, string> = {
-                    depositApr: 'Dep APR',
-                    borrowApr: 'Bor APR',
-                    totalDepositsUSD: 'Deposits',
-                    totalLiquidityUSD: 'Liquidity',
-                  }
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      className={`btn btn-xs ${sortKey === key ? 'btn-primary' : 'btn-ghost'}`}
-                      onClick={() => toggleSort(key)}
-                    >
-                      {labels[key]}
-                      {sortKey === key && (
-                        <span className="ml-0.5">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>
-                      )}
-                    </button>
-                  )
-                })}
               </div>
-            )}
-            {pools.map((pool) => {
-              const isSelected = selectedPool?.marketUid === pool.marketUid
-              const userPos = userPositions.get(pool.marketUid)
-              const hasPosition =
-                userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
-              const mIy = pool.intrinsicYield ?? 0
-              const mDepTotal = pool.depositRate + mIy
-              const mBorTotal = pool.variableBorrowRate + mIy
-
-              return (
-                <div
-                  key={`m-${pool.marketUid}`}
-                  className={`p-3 cursor-pointer transition-colors ${isSelected ? 'bg-primary/10' : 'active:bg-base-200'}`}
-                  onClick={() => handlePoolSelect(pool)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="relative shrink-0 w-7 h-7">
-                        <img
-                          src={pool.asset.logoURI}
-                          width={28}
-                          height={28}
-                          alt={pool.asset.symbol}
-                          className="rounded-full object-contain w-7 h-7"
-                        />
-                        {hasPosition && (
-                          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100" />
-                        )}
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-semibold text-sm truncate" title={pool.asset.symbol}>
-                          {pool.asset.symbol}
-                          {pool.isFrozen && (
-                            <span className="ml-1 text-warning text-xs">&#x2744;</span>
-                          )}
-                        </span>
-                        <span
-                          className="text-[11px] text-base-content/60 truncate"
-                          title={pool.name}
-                        >
-                          {pool.name}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="flex items-center justify-end gap-1">
-                        <span className="font-bold text-sm text-success">
-                          {mDepTotal.toFixed(2)}%
-                        </span>
-                        {mIy > 0 && (
-                          <span
-                            className="badge badge-xs bg-success/15 text-success border-0"
-                            title={`Base rate: ${pool.depositRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
-                          >
-                            +{mIy.toFixed(1)}%
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-[10px] text-base-content/50 block">Deposit APR</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between mt-2 text-xs text-base-content/70">
-                    <span>
-                      Borrow:{' '}
-                      <span className="text-warning font-medium">{mBorTotal.toFixed(2)}%</span>
-                      {mIy > 0 && (
-                        <span
-                          className="badge badge-xs bg-warning/15 text-warning border-0 ml-1"
-                          title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
-                        >
-                          +{mIy.toFixed(1)}%
-                        </span>
-                      )}
-                    </span>
-                    <LtvBadge config={pool.config} variant="inline" />
-                    <span>Dep: {abbreviateUsd(pool.totalDepositsUSD)}</span>
-                    <span>Liq: {abbreviateUsd(pool.totalLiquidityUSD)}</span>
-                  </div>
-                </div>
-              )
-            })}
-            {pools.length === 0 && (
-              <div className="text-center py-6 text-sm text-base-content/60">
-                No pools match your search.
-              </div>
-            )}
-          </div>
-          </div>
+            </div>
           )}
         </div>
 
@@ -693,7 +740,10 @@ export function LendingDashboard({
                 <span className="font-medium text-sm truncate" title={selectedPool.name}>
                   {selectedPool.name}
                 </span>
-                <span className="text-xs text-base-content/60 truncate" title={selectedPool.asset.symbol}>
+                <span
+                  className="text-xs text-base-content/60 truncate"
+                  title={selectedPool.asset.symbol}
+                >
                   {selectedPool.asset.symbol}
                 </span>
               </div>
@@ -825,7 +875,10 @@ export function LendingDashboard({
                   <span className="font-medium text-sm truncate" title={selectedPool.name}>
                     {selectedPool.name}
                   </span>
-                  <span className="text-xs text-base-content/60 truncate" title={selectedPool.asset.symbol}>
+                  <span
+                    className="text-xs text-base-content/60 truncate"
+                    title={selectedPool.asset.symbol}
+                  >
                     {selectedPool.asset.symbol}
                   </span>
                 </div>
