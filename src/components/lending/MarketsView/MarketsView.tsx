@@ -168,10 +168,10 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       const q = search.toLowerCase()
       result = result.filter(
         (p) =>
-          p.underlyingAddress.toLowerCase().includes(q) ||
-          p.lenderKey.toLowerCase().includes(q) ||
+          (p.underlyingAddress ?? '').toLowerCase().includes(q) ||
+          (p.lenderKey ?? '').toLowerCase().includes(q) ||
           (p.underlyingInfo?.asset?.assetGroup ?? '').toLowerCase().includes(q) ||
-          p.name.toLowerCase().includes(q)
+          (p.name ?? '').toLowerCase().includes(q)
       )
     }
 
@@ -180,7 +180,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       result = result.filter(
         (p) =>
           (p.underlyingInfo?.asset?.assetGroup ?? '').toLowerCase().includes(q) ||
-          p.underlyingAddress.toLowerCase().includes(q)
+          (p.underlyingAddress ?? '').toLowerCase().includes(q)
       )
     }
 
@@ -188,7 +188,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       const addrs = externalAssetFilter.toLowerCase().split(',').filter(Boolean)
       if (addrs.length > 0) {
         const addrSet = new Set(addrs)
-        result = result.filter((p) => addrSet.has(p.underlyingAddress.toLowerCase()))
+        result = result.filter((p) => addrSet.has((p.underlyingAddress ?? '').toLowerCase()))
       }
     }
 
