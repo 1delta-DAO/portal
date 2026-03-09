@@ -61,6 +61,7 @@ function normalizeQuotes(
 interface QuoteState {
   quotes: TradingQuote[]
   permissions: Tx[]
+  transactions: Tx[]
   selectedIndex: number | null
   loading: boolean
   executing: boolean
@@ -73,6 +74,7 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
   const [state, setState] = useState<QuoteState>({
     quotes: [],
     permissions: [],
+    transactions: [],
     selectedIndex: null,
     loading: false,
     executing: false,
@@ -91,6 +93,7 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
         error: null,
         quotes: [],
         permissions: [],
+        transactions: [],
         selectedIndex: null,
       }))
 
@@ -110,12 +113,16 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
         }
         const alternatives: Tx[] = envelope.actions?.alternatives ?? []
         const quotes = normalizeQuotes(operation, envelope.data?.quotes ?? [], alternatives)
-        const permissions: Tx[] = envelope.actions?.permissions ?? []
+        // Permissions: check both envelope.actions and envelope.data (varies by lender)
+        const permissions: Tx[] = envelope.actions?.permissions ?? envelope.data?.permissions ?? []
+        // Transactions: collateral enable/disable (e.g. Compound V2 / Venus)
+        const transactions: Tx[] = envelope.actions?.transactions ?? envelope.data?.transactions ?? []
 
         setState((s) => ({
           ...s,
           quotes,
           permissions,
+          transactions,
           selectedIndex: quotes.length > 0 ? 0 : null,
           loading: false,
         }))
@@ -140,6 +147,16 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
     [send]
   )
 
+  const executeTransaction = useCallback(
+    async (tx: Tx) => {
+      const { ok, error: txError } = await send(tx)
+      if (!ok) {
+        setState((s) => ({ ...s, error: txError ?? 'Transaction failed' }))
+      }
+    },
+    [send]
+  )
+
   const executeQuote = useCallback(async () => {
     if (state.selectedIndex === null) return
 
@@ -157,6 +174,7 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
     setState({
       quotes: [],
       permissions: [],
+      transactions: [],
       selectedIndex: null,
       loading: false,
       executing: false,
@@ -169,6 +187,7 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
     fetchQuotes,
     selectQuote,
     executePermission,
+    executeTransaction,
     executeQuote,
     reset,
   }

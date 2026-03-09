@@ -31,8 +31,8 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
   const [isMaxOut, setIsMaxOut] = useState(false)
 
   const {
-    quotes, permissions, selectedIndex, loading, executing, error,
-    fetchQuotes, selectQuote, executePermission, executeQuote, reset,
+    quotes, permissions, transactions, selectedIndex, loading, executing, error,
+    fetchQuotes, selectQuote, executePermission, executeTransaction, executeQuote, reset,
   } = useTradingQuotes({ chainId, account })
 
   // Notify parent
@@ -151,12 +151,6 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
 
       {error && <ErrorDisplay error={error} />}
 
-      {permissions.map((tx, i) => (
-        <button key={i} type="button" className="btn btn-outline btn-sm w-full" onClick={() => executePermission(tx)}>
-          {tx.description || 'Approve'}
-        </button>
-      ))}
-
       {quotes.length > 0 && (
         <div className="space-y-1.5">
           <span className="text-xs font-medium">Quotes</span>
@@ -167,9 +161,21 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
       )}
 
       {selectedIndex !== null && (
-        <button type="button" className="btn btn-success btn-sm w-full" disabled={executing} onClick={executeQuote}>
-          {executing ? 'Executing...' : 'Execute Debt Swap'}
-        </button>
+        <div className="space-y-1.5">
+          {permissions.map((tx, i) => (
+            <button key={`perm-${i}`} type="button" className="btn btn-outline btn-sm w-full" onClick={() => executePermission(tx)}>
+              {tx.description || 'Approve'}
+            </button>
+          ))}
+          {transactions.map((tx, i) => (
+            <button key={`tx-${i}`} type="button" className="btn btn-outline btn-sm w-full" onClick={() => executeTransaction(tx)}>
+              {tx.description || 'Execute Setup Transaction'}
+            </button>
+          ))}
+          <button type="button" className="btn btn-success btn-sm w-full" disabled={executing} onClick={executeQuote}>
+            {executing ? 'Executing...' : 'Execute Debt Swap'}
+          </button>
+        </div>
       )}
     </div>
   )
