@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { LenderTab } from './components/lending/LendingTab'
 import { ThemeSwitcher } from './components/themeSwitcher'
 import { WalletConnect } from './components/connect'
@@ -34,7 +35,10 @@ export default function App() {
             {/* use theme base classes instead of fixed hex */}
             <div className="card bg-base-100 shadow-xl rounded-2xl">
               <div className="card-body p-4 sm:p-6">
-                <LenderTab />
+                <Routes>
+                  <Route path="/:tab?/:chainId?/:lender?" element={<LenderTab />} />
+                  <Route path="*" element={<Navigate to="/earn" replace />} />
+                </Routes>
               </div>
             </div>
           </div>

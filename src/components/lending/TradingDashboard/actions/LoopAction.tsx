@@ -137,6 +137,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   const {
     quotes,
     permissions,
+    transactions,
     selectedIndex,
     loading,
     executing,
@@ -144,6 +145,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     fetchQuotes,
     selectQuote,
     executePermission,
+    executeTransaction,
     executeQuote,
     reset,
   } = useTradingQuotes({ chainId, account })
@@ -457,18 +459,6 @@ export const LoopAction: React.FC<TradingActionProps> = ({
       {/* Error */}
       {error && <ErrorDisplay error={error} />}
 
-      {/* Permissions */}
-      {permissions.map((tx, i) => (
-        <button
-          key={i}
-          type="button"
-          className="btn btn-outline btn-sm w-full"
-          onClick={() => executePermission(tx)}
-        >
-          {tx.description || 'Approve'}
-        </button>
-      ))}
-
       {/* Quotes */}
       {quotes.length > 0 && (
         <div className="space-y-1.5">
@@ -488,16 +478,38 @@ export const LoopAction: React.FC<TradingActionProps> = ({
         </div>
       )}
 
-      {/* Execute */}
+      {/* Permissions, transactions, and execute — grouped together */}
       {selectedIndex !== null && !payOverMax && (
-        <button
-          type="button"
-          className="btn btn-success btn-sm w-full"
-          disabled={executing}
-          onClick={executeQuote}
-        >
-          {executing ? 'Executing...' : 'Execute Loop'}
-        </button>
+        <div className="space-y-1.5">
+          {permissions.map((tx, i) => (
+            <button
+              key={`perm-${i}`}
+              type="button"
+              className="btn btn-outline btn-sm w-full"
+              onClick={() => executePermission(tx)}
+            >
+              {tx.description || 'Approve'}
+            </button>
+          ))}
+          {transactions.map((tx, i) => (
+            <button
+              key={`tx-${i}`}
+              type="button"
+              className="btn btn-outline btn-sm w-full"
+              onClick={() => executeTransaction(tx)}
+            >
+              {tx.description || 'Execute Setup Transaction'}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="btn btn-success btn-sm w-full"
+            disabled={executing}
+            onClick={executeQuote}
+          >
+            {executing ? 'Executing...' : 'Execute Loop'}
+          </button>
+        </div>
       )}
     </div>
   )

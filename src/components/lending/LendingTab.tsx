@@ -1,5 +1,6 @@
 // src/components/LenderTab.tsx
-import React, { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { useChains } from '../../hooks/useChains'
 import { UserLenderPositionsTable } from './UserTable'
@@ -12,18 +13,42 @@ import { useLendingBalances } from '../../hooks/lending/useLendingBalances'
 import { useTokenLists } from '../../hooks/useTokenLists'
 import { LendingDashboard } from './LendingDashboard'
 import { TradingDashboard } from './TradingDashboard'
+import { tabFromSlug, slugToLender, buildPath } from '../../utils/routes'
 
-type SubTab = 'earn' | 'lending' | 'trading'
+export type SubTab = 'earn' | 'lending' | 'trading'
 
 export function LenderTab() {
   const { address: account } = useAccount()
   const chains = useChains()
+  const navigate = useNavigate()
+  const { tab: tabSlug, chainId: chainIdParam, lender: lenderParam } = useParams()
 
-  // shared chain filter state
-  const [selectedChain, setSelectedChain] = useState<string>('1')
+  // Derive state from URL params
+  const activeTab = tabFromSlug(tabSlug)
+  const selectedChain = chainIdParam || '1'
+  const initialLender = lenderParam ? slugToLender(lenderParam) : ''
 
-  // sub-tab state — Earn is the default
-  const [activeTab, setActiveTab] = useState<SubTab>('earn')
+  const setActiveTab = useCallback(
+    (tab: SubTab) => {
+      navigate(buildPath(tab, selectedChain), { replace: true })
+    },
+    [navigate, selectedChain]
+  )
+
+  const setSelectedChain = useCallback(
+    (chain: string) => {
+      // Reset lender when changing chain since lenders differ per chain
+      navigate(buildPath(activeTab, chain), { replace: true })
+    },
+    [navigate, activeTab]
+  )
+
+  const setSelectedLender = useCallback(
+    (lender: string) => {
+      navigate(buildPath(activeTab, selectedChain, lender), { replace: true })
+    },
+    [navigate, activeTab, selectedChain]
+  )
 
   const effectiveChainId = selectedChain
 
@@ -170,6 +195,8 @@ export function LenderTab() {
           account={account}
           isPublicDataLoading={isPublicDataLoading}
           isUserDataLoading={isUserDataLoading}
+          initialLender={initialLender}
+          onLenderChange={setSelectedLender}
         />
       )}
 
@@ -181,6 +208,8 @@ export function LenderTab() {
           account={account}
           isPublicDataLoading={isPublicDataLoading}
           isUserDataLoading={isUserDataLoading}
+          initialLender={initialLender}
+          onLenderChange={setSelectedLender}
         />
       )}
     </div>
