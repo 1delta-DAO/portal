@@ -2,7 +2,7 @@ import React from 'react'
 import type { PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import { abbreviateUsd, formatUsd } from '../../../utils/format'
 import { getFormattedPrice } from '../../../utils/price'
-import { computePoolMetrics, type SortKey } from './helpers'
+import { computePoolMetrics, riskGrade, riskBadgeClass, type SortKey } from './helpers'
 import { ExposureCell } from './ExposureCell'
 import { lenderDisplayName } from '@1delta/lib-utils'
 
@@ -101,7 +101,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
             <tr>
               <th>Market</th>
               <th className="cursor-pointer" onClick={() => onToggleSort('apr')}>
-                Deposit APR{sortIndicator('apr')}
+                APR{sortIndicator('apr')}
               </th>
               <th className="cursor-pointer" onClick={() => onToggleSort('utilization')}>
                 Utilization{sortIndicator('utilization')}
@@ -113,6 +113,9 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                 Liquidity{sortIndicator('totalLiquidityUSD')}
               </th>
               <th>Price</th>
+              <th className="cursor-pointer" onClick={() => onToggleSort('riskScore')}>
+                Risk{sortIndicator('riskScore')}
+              </th>
               <th>Exposures</th>
             </tr>
           </thead>
@@ -212,6 +215,22 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                     </div>
                   </td>
                   <td>
+                    {p.riskScore != null ? (
+                      <div
+                        className="tooltip tooltip-left"
+                        data-tip={`Chain: ${riskGrade(p.chainRiskScore)} · Lender: ${riskGrade(p.lenderRiskScore)}`}
+                      >
+                        <span
+                          className={`badge badge-sm ${riskBadgeClass(riskGrade(p.riskScore))} cursor-help`}
+                        >
+                          {riskGrade(p.riskScore)}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-base-content/40">—</span>
+                    )}
+                  </td>
+                  <td>
                     <ExposureCell exposures={p.exposures} chainTokens={chainTokens} />
                   </td>
                 </tr>
@@ -220,7 +239,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
 
             {totalItems === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-6 text-sm">
+                <td colSpan={8} className="text-center py-6 text-sm">
                   No pools match your filters.
                 </td>
               </tr>
@@ -247,6 +266,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                   utilization: 'Util',
                   totalDepositsUSD: 'Deposits',
                   totalLiquidityUSD: 'Liquidity',
+                  riskScore: 'Risk',
                 }
                 return (
                   <button
@@ -339,6 +359,18 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                 </span>
                 <span>Dep: {abbreviateUsd(totalDepositsUSD)}</span>
                 <span>Liq: {abbreviateUsd(totalLiquidityUSD)}</span>
+                {p.riskScore != null && (
+                  <div
+                    className="tooltip tooltip-left"
+                    data-tip={`Chain: ${riskGrade(p.chainRiskScore)} · Lender: ${riskGrade(p.lenderRiskScore)}`}
+                  >
+                    <span
+                      className={`badge badge-xs ${riskBadgeClass(riskGrade(p.riskScore))} cursor-help`}
+                    >
+                      {riskGrade(p.riskScore)}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )

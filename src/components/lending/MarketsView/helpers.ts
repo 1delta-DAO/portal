@@ -1,7 +1,29 @@
 import type { PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 
-export type SortKey = 'apr' | 'utilization' | 'totalLiquidityUSD' | 'totalDepositsUSD'
+export type SortKey = 'apr' | 'utilization' | 'totalLiquidityUSD' | 'totalDepositsUSD' | 'riskScore'
+
+/** Map a numeric risk score (1–5) to a letter grade (A = best, E = worst) */
+export function riskGrade(score: number | null | undefined): string {
+  if (score == null) return '—'
+  const grades: Record<number, string> = { 1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E' }
+  return grades[score] ?? 'F'
+}
+
+export function riskBadgeClass(grade: string): string {
+  switch (grade) {
+    case 'A':
+    case 'B':
+      return 'badge-success'
+    case 'C':
+      return 'badge-warning'
+    case 'D':
+    case 'E':
+      return 'badge-error'
+    default:
+      return 'badge-ghost'
+  }
+}
 
 /** Compute derived values from pool data */
 export function computePoolMetrics(pool: PoolEntry) {
