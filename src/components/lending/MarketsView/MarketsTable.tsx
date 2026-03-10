@@ -92,7 +92,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
       </div>
     </div>
   )
-  console.log(pools?.[0])
+
   return (
     <div className="flex-1 min-w-0 rounded-box border border-base-300 overflow-hidden">
       {/* ── Desktop table ── */}
