@@ -67,6 +67,19 @@ export interface PoolEntry {
   exposures: PoolExposure[]
   rewards: unknown | null
   underlyingInfo: PoolUnderlyingInfo
+  risk: PoolRisk | null
+}
+
+export interface PoolRiskBreakdown {
+  category: string
+  score: number | null
+  label: string
+}
+
+export interface PoolRisk {
+  score: number
+  label: string
+  breakdown: PoolRiskBreakdown[]
 }
 
 interface PoolsApiResponse {

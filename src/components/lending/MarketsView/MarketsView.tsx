@@ -237,6 +237,10 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
           aVal = parseFloat(a.totalLiquidityUsd) || 0
           bVal = parseFloat(b.totalLiquidityUsd) || 0
           break
+        case 'riskScore':
+          aVal = a.risk?.score ?? 0
+          bVal = b.risk?.score ?? 0
+          break
         default:
           aVal = 0
           bVal = 0

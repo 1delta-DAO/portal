@@ -1,7 +1,28 @@
 import type { PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 
-export type SortKey = 'apr' | 'utilization' | 'totalLiquidityUSD' | 'totalDepositsUSD'
+export type SortKey = 'apr' | 'utilization' | 'totalLiquidityUSD' | 'totalDepositsUSD' | 'riskScore'
+
+/** Derive a risk label from a numeric score (1–5) */
+export function scoreToRiskLabel(score: number | null | undefined): string {
+  if (score == null) return '—'
+  if (score <= 2) return 'low'
+  if (score <= 4) return 'medium'
+  return 'high'
+}
+
+export function riskDotColor(label: string): string {
+  switch (label) {
+    case 'low':
+      return 'bg-success'
+    case 'medium':
+      return 'bg-warning'
+    case 'high':
+      return 'bg-error'
+    default:
+      return 'bg-base-content/20'
+  }
+}
 
 /** Compute derived values from pool data */
 export function computePoolMetrics(pool: PoolEntry) {
