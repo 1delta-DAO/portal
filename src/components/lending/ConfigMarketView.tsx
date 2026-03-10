@@ -7,6 +7,7 @@ import type {
 import type { UserPositionEntry } from '../../hooks/lending/useUserData'
 import type { TableHighlight, PoolRole } from './TradingDashboard/types'
 import { abbreviateUsd, formatUsd } from '../../utils/format'
+import { riskDotColor, scoreToRiskLabel } from './MarketsView/helpers'
 
 interface Props {
   configGroups: PoolConfigGroup[]
@@ -165,6 +166,7 @@ export const ConfigMarketView: React.FC<Props> = ({
                 <th>Collaterals</th>
                 <th>Borrowables</th>
                 <th>Total Deposits</th>
+                <th>Risk</th>
               </tr>
             </thead>
             <tbody>
@@ -201,6 +203,21 @@ export const ConfigMarketView: React.FC<Props> = ({
                         {abbreviateUsd(liquidity)}
                       </span>
                     </td>
+                    <td>
+                      {g.riskLabel ? (
+                        <div
+                          className="tooltip tooltip-left"
+                          data-tip={`chain: ${scoreToRiskLabel(g.chainRiskScore)} · lender: ${scoreToRiskLabel(g.lenderRiskScore)} · token: ${scoreToRiskLabel(g.maxTokenRiskScore)}`}
+                        >
+                          <span className="inline-flex items-center gap-1.5 text-xs text-base-content/70 cursor-help">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${riskDotColor(g.riskLabel)}`} />
+                            {g.riskLabel}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-base-content/40">—</span>
+                      )}
+                    </td>
                   </tr>
                 )
               })}
@@ -231,9 +248,22 @@ export const ConfigMarketView: React.FC<Props> = ({
                       </span>
                     )}
                   </span>
-                  <span className="text-xs text-base-content/70" title={`$${formatUsd(liquidity)}`}>
-                    {abbreviateUsd(liquidity)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {g.riskLabel && (
+                      <div
+                        className="tooltip tooltip-left"
+                        data-tip={`chain: ${scoreToRiskLabel(g.chainRiskScore)} · lender: ${scoreToRiskLabel(g.lenderRiskScore)} · token: ${scoreToRiskLabel(g.maxTokenRiskScore)}`}
+                      >
+                        <span className="inline-flex items-center gap-1 text-[10px] text-base-content/60 cursor-help">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskDotColor(g.riskLabel)}`} />
+                          {g.riskLabel}
+                        </span>
+                      </div>
+                    )}
+                    <span className="text-xs text-base-content/70" title={`$${formatUsd(liquidity)}`}>
+                      {abbreviateUsd(liquidity)}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-4 text-[10px] text-base-content/60">
                   <div className="flex items-center gap-1">

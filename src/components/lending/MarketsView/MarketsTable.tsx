@@ -2,7 +2,7 @@ import React from 'react'
 import type { PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import { abbreviateUsd, formatUsd } from '../../../utils/format'
 import { getFormattedPrice } from '../../../utils/price'
-import { computePoolMetrics, riskGrade, riskBadgeClass, type SortKey } from './helpers'
+import { computePoolMetrics, riskDotColor, type SortKey } from './helpers'
 import { ExposureCell } from './ExposureCell'
 import { lenderDisplayName } from '@1delta/lib-utils'
 
@@ -215,15 +215,14 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                     </div>
                   </td>
                   <td>
-                    {p.riskScore != null ? (
+                    {p.risk ? (
                       <div
                         className="tooltip tooltip-left"
-                        data-tip={`Chain: ${riskGrade(p.chainRiskScore)} · Lender: ${riskGrade(p.lenderRiskScore)}`}
+                        data-tip={p.risk.breakdown.map((b) => `${b.category}: ${b.label}`).join(' · ')}
                       >
-                        <span
-                          className={`badge badge-sm ${riskBadgeClass(riskGrade(p.riskScore))} cursor-help`}
-                        >
-                          {riskGrade(p.riskScore)}
+                        <span className="inline-flex items-center gap-1.5 text-xs text-base-content/70 cursor-help">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${riskDotColor(p.risk.label)}`} />
+                          {p.risk.label}
                         </span>
                       </div>
                     ) : (
@@ -359,15 +358,14 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                 </span>
                 <span>Dep: {abbreviateUsd(totalDepositsUSD)}</span>
                 <span>Liq: {abbreviateUsd(totalLiquidityUSD)}</span>
-                {p.riskScore != null && (
+                {p.risk && (
                   <div
                     className="tooltip tooltip-left"
-                    data-tip={`Chain: ${riskGrade(p.chainRiskScore)} · Lender: ${riskGrade(p.lenderRiskScore)}`}
+                    data-tip={p.risk.breakdown.map((b) => `${b.category}: ${b.label}`).join(' · ')}
                   >
-                    <span
-                      className={`badge badge-xs ${riskBadgeClass(riskGrade(p.riskScore))} cursor-help`}
-                    >
-                      {riskGrade(p.riskScore)}
+                    <span className="inline-flex items-center gap-1 text-[10px] text-base-content/60 cursor-help">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskDotColor(p.risk.label)}`} />
+                      {p.risk.label}
                     </span>
                   </div>
                 )}
