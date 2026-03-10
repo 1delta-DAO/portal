@@ -195,14 +195,6 @@ interface PoolsByConfigApiResponse {
   error?: { code: string; message: string }
 }
 
-export interface ConfigRiskInfo {
-  riskScore: number | null
-  riskLabel: string
-  chainRiskScore: number | null
-  lenderRiskScore: number | null
-  maxTokenRiskScore: number | null
-}
-
 export interface PoolConfigGroup {
   lenderKey: string
   chainId: string
@@ -211,11 +203,8 @@ export interface PoolConfigGroup {
   category: string
   collaterals: ConfigMarketItem[] | null
   borrowables: ConfigMarketItem[] | null
-  riskScore: number | null
-  riskLabel: string | null
-  chainRiskScore: number | null
-  lenderRiskScore: number | null
-  maxTokenRiskScore: number | null
+  configRiskScore: number | null
+  configRiskLabel: string | null
 }
 
 export interface ConfigMarketItem {
@@ -242,6 +231,10 @@ export interface ConfigMarketItem {
       priceUsd24h: number
       priceTs: string
       priceTs24h: string
+    } | null
+    tokenRisk?: {
+      riskLabel: string
+      riskScore: number
     } | null
     oraclePrice: {
       oraclePrice: number

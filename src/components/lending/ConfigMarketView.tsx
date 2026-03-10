@@ -7,7 +7,7 @@ import type {
 import type { UserPositionEntry } from '../../hooks/lending/useUserData'
 import type { TableHighlight, PoolRole } from './TradingDashboard/types'
 import { abbreviateUsd, formatUsd } from '../../utils/format'
-import { riskDotColor, scoreToRiskLabel } from './MarketsView/helpers'
+import { riskDotColor } from './MarketsView/helpers'
 import { AssetPopover } from './AssetPopover'
 
 interface Props {
@@ -205,16 +205,11 @@ export const ConfigMarketView: React.FC<Props> = ({
                       </span>
                     </td>
                     <td>
-                      {g.riskLabel ? (
-                        <div
-                          className="tooltip tooltip-left"
-                          data-tip={`chain: ${scoreToRiskLabel(g.chainRiskScore)} · lender: ${scoreToRiskLabel(g.lenderRiskScore)} · token: ${scoreToRiskLabel(g.maxTokenRiskScore)}`}
-                        >
-                          <span className="inline-flex items-center gap-1.5 text-xs text-base-content/70 cursor-help">
-                            <span className={`w-2 h-2 rounded-full shrink-0 ${riskDotColor(g.riskLabel)}`} />
-                            {g.riskLabel}
-                          </span>
-                        </div>
+                      {g.configRiskLabel ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-base-content/70">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${riskDotColor(g.configRiskLabel)}`} />
+                          {g.configRiskLabel}
+                        </span>
                       ) : (
                         <span className="text-xs text-base-content/40">—</span>
                       )}
@@ -250,16 +245,11 @@ export const ConfigMarketView: React.FC<Props> = ({
                     )}
                   </span>
                   <div className="flex items-center gap-2">
-                    {g.riskLabel && (
-                      <div
-                        className="tooltip tooltip-left"
-                        data-tip={`chain: ${scoreToRiskLabel(g.chainRiskScore)} · lender: ${scoreToRiskLabel(g.lenderRiskScore)} · token: ${scoreToRiskLabel(g.maxTokenRiskScore)}`}
-                      >
-                        <span className="inline-flex items-center gap-1 text-[10px] text-base-content/60 cursor-help">
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskDotColor(g.riskLabel)}`} />
-                          {g.riskLabel}
-                        </span>
-                      </div>
+                    {g.configRiskLabel && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-base-content/60">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskDotColor(g.configRiskLabel)}`} />
+                        {g.configRiskLabel}
+                      </span>
                     )}
                     <span className="text-xs text-base-content/70" title={`$${formatUsd(liquidity)}`}>
                       {abbreviateUsd(liquidity)}
