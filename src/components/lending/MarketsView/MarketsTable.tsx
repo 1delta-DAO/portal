@@ -4,6 +4,7 @@ import { abbreviateUsd, formatUsd } from '../../../utils/format'
 import { getFormattedPrice } from '../../../utils/price'
 import { computePoolMetrics, riskDotColor, type SortKey } from './helpers'
 import { ExposureCell } from './ExposureCell'
+import { AssetPopover } from '../AssetPopover'
 import { lenderDisplayName } from '@1delta/lib-utils'
 
 interface MarketsTableProps {
@@ -91,7 +92,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
       </div>
     </div>
   )
-
+  console.log(pools?.[0])
   return (
     <div className="flex-1 min-w-0 rounded-box border border-base-300 overflow-hidden">
       {/* ── Desktop table ── */}
@@ -137,20 +138,12 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                   onClick={() => onRowClick(p)}
                 >
                   <td>
-                    <div className="flex items-center gap-2 min-w-0" title={p.underlyingAddress}>
-                      {getAsset(p)?.logoURI ? (
-                        <img
-                          src={getAsset(p)!.logoURI}
-                          width={24}
-                          height={24}
-                          alt={getAsset(p)!.symbol}
-                          className="rounded-full object-contain w-6 h-6 shrink-0"
-                        />
-                      ) : (
-                        <div className="bg-base-300 rounded-full w-6 h-6 shrink-0 flex items-center justify-center text-xs font-bold">
-                          {(getAsset(p)?.symbol ?? p.name).charAt(0)}
-                        </div>
-                      )}
+                    <AssetPopover
+                      address={p.underlyingAddress || p.underlyingInfo?.asset?.address}
+                      name={getAsset(p)?.name ?? p.name}
+                      symbol={getAsset(p)?.symbol ?? ''}
+                      logoURI={getAsset(p)?.logoURI}
+                    >
                       <div className="flex flex-col min-w-0">
                         <span className="font-medium truncate" title={p.name}>
                           {p.name}
@@ -162,7 +155,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                           {lenderDisplayName(p.lenderKey)}
                         </span>
                       </div>
-                    </div>
+                    </AssetPopover>
                   </td>
                   <td>
                     <div className="flex items-center gap-1 text-xs">
@@ -218,10 +211,14 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                     {p.risk ? (
                       <div
                         className="tooltip tooltip-left"
-                        data-tip={p.risk.breakdown.map((b) => `${b.category}: ${b.label}`).join(' · ')}
+                        data-tip={p.risk.breakdown
+                          .map((b) => `${b.category}: ${b.label}`)
+                          .join(' · ')}
                       >
                         <span className="inline-flex items-center gap-1.5 text-xs text-base-content/70 cursor-help">
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${riskDotColor(p.risk.label)}`} />
+                          <span
+                            className={`w-2 h-2 rounded-full shrink-0 ${riskDotColor(p.risk.label)}`}
+                          />
                           {p.risk.label}
                         </span>
                       </div>
@@ -304,28 +301,25 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
             >
               {/* Row 1: Asset + APR */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  {getAsset(p)?.logoURI ? (
-                    <img
-                      src={getAsset(p)!.logoURI}
-                      width={28}
-                      height={28}
-                      alt={getAsset(p)!.symbol}
-                      className="rounded-full object-contain w-7 h-7 shrink-0"
-                    />
-                  ) : (
-                    <div className="bg-base-300 rounded-full w-7 h-7 shrink-0 flex items-center justify-center text-xs font-bold">
-                      {(getAsset(p)?.symbol ?? p.name).charAt(0)}
+                <div className="flex items-center min-w-0 flex-1">
+                  <AssetPopover
+                    address={p.underlyingAddress || p.underlyingInfo?.asset?.address}
+                    name={getAsset(p)?.name ?? p.name}
+                    symbol={getAsset(p)?.symbol ?? ''}
+                    logoURI={getAsset(p)?.logoURI}
+                  >
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-semibold text-sm truncate" title={p.name}>
+                        {p.name}
+                      </span>
+                      <span
+                        className="text-[11px] text-base-content/60 truncate"
+                        title={p.lenderKey}
+                      >
+                        {p.lenderKey}
+                      </span>
                     </div>
-                  )}
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-semibold text-sm truncate" title={p.name}>
-                      {p.name}
-                    </span>
-                    <span className="text-[11px] text-base-content/60 truncate" title={p.lenderKey}>
-                      {p.lenderKey}
-                    </span>
-                  </div>
+                  </AssetPopover>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="flex items-center justify-end gap-1">
@@ -364,7 +358,9 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                     data-tip={p.risk.breakdown.map((b) => `${b.category}: ${b.label}`).join(' · ')}
                   >
                     <span className="inline-flex items-center gap-1 text-[10px] text-base-content/60 cursor-help">
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskDotColor(p.risk.label)}`} />
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskDotColor(p.risk.label)}`}
+                      />
                       {p.risk.label}
                     </span>
                   </div>

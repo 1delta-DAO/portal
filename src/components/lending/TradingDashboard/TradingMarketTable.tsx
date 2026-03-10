@@ -3,6 +3,7 @@ import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry } from '../../../hooks/lending/useUserData'
 import type { TableHighlight, PoolRole } from './types'
 import { abbreviateUsd, formatUsd } from '../../../utils/format'
+import { AssetPopover } from '../AssetPopover'
 import { sortPools, type SortKey, LtvBadge } from '../Dashboard'
 
 interface Props {
@@ -137,22 +138,13 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                   className={`transition-colors ${role ? ROLE_STYLES[role] : ''}`}
                 >
                   <td className="max-w-40">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="relative shrink-0 w-7 h-7">
-                        <img
-                          src={pool.asset.logoURI}
-                          width={28}
-                          height={28}
-                          alt={pool.asset.symbol}
-                          className="rounded-full object-contain w-7 h-7"
-                        />
-                        {hasPosition && (
-                          <span
-                            className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100"
-                            title="You have a position"
-                          />
-                        )}
-                      </div>
+                    <AssetPopover
+                      address={pool.underlying}
+                      name={pool.asset.name}
+                      symbol={pool.asset.symbol}
+                      logoURI={pool.asset.logoURI}
+                      positionDot={!!hasPosition}
+                    >
                       <div className="flex flex-col min-w-0">
                         <span className="font-medium text-sm truncate" title={pool.asset.symbol}>
                           {pool.asset.symbol}
@@ -172,7 +164,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                           {pool.name}
                         </span>
                       </div>
-                    </div>
+                    </AssetPopover>
                   </td>
                   <td>
                     <div className="flex items-center gap-1">
@@ -279,31 +271,27 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
               className={`p-3 transition-colors ${role ? MOBILE_ROLE_STYLES[role] : ''}`}
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className="relative shrink-0 w-7 h-7">
-                    <img
-                      src={pool.asset.logoURI}
-                      width={28}
-                      height={28}
-                      alt={pool.asset.symbol}
-                      className="rounded-full object-contain w-7 h-7"
-                    />
-                    {hasPosition && (
-                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100" />
-                    )}
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-semibold text-sm truncate" title={pool.asset.symbol}>
-                      {pool.asset.symbol}
-                      {pool.isFrozen && <span className="ml-1 text-warning text-xs">&#x2744;</span>}
-                    </span>
-                    <span
-                      className="text-[11px] text-base-content/60 truncate"
-                      title={pool.name}
-                    >
-                      {pool.name}
-                    </span>
-                  </div>
+                <div className="flex items-center min-w-0 flex-1">
+                  <AssetPopover
+                    address={pool.underlying}
+                    name={pool.asset.name}
+                    symbol={pool.asset.symbol}
+                    logoURI={pool.asset.logoURI}
+                    positionDot={!!hasPosition}
+                  >
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-semibold text-sm truncate" title={pool.asset.symbol}>
+                        {pool.asset.symbol}
+                        {pool.isFrozen && <span className="ml-1 text-warning text-xs">&#x2744;</span>}
+                      </span>
+                      <span
+                        className="text-[11px] text-base-content/60 truncate"
+                        title={pool.name}
+                      >
+                        {pool.name}
+                      </span>
+                    </div>
+                  </AssetPopover>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="flex items-center justify-end gap-1">

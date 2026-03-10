@@ -25,6 +25,7 @@ import { formatUsd, abbreviateUsd, computeLenderTvl } from '../../utils/format'
 import { sortPools, type SortKey, LtvBadge } from './Dashboard'
 import { YourPositions, type PositionSummary } from './YourPositions'
 import { useIsMobile } from '../../hooks/useIsMobile'
+import { AssetPopover } from './AssetPopover'
 
 interface Props {
   lenderData: LenderData | undefined
@@ -469,22 +470,13 @@ export function LendingDashboard({
                           onClick={() => handlePoolSelect(pool)}
                         >
                           <td className="max-w-40">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="relative shrink-0 w-7 h-7">
-                                <img
-                                  src={pool.asset.logoURI}
-                                  width={28}
-                                  height={28}
-                                  alt={pool.asset.symbol}
-                                  className="rounded-full object-contain w-7 h-7"
-                                />
-                                {hasPosition && (
-                                  <span
-                                    className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100"
-                                    title="You have a position"
-                                  />
-                                )}
-                              </div>
+                            <AssetPopover
+                              address={pool.underlying}
+                              name={pool.asset.name}
+                              symbol={pool.asset.symbol}
+                              logoURI={pool.asset.logoURI}
+                              positionDot={!!hasPosition}
+                            >
                               <div className="flex flex-col min-w-0">
                                 <span
                                   className="font-medium text-sm truncate"
@@ -507,7 +499,7 @@ export function LendingDashboard({
                                   {pool.name}
                                 </span>
                               </div>
-                            </div>
+                            </AssetPopover>
                           </td>
                           <td>
                             <div className="flex items-center gap-1">
@@ -629,19 +621,13 @@ export function LendingDashboard({
                       onClick={() => handlePoolSelect(pool)}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="relative shrink-0 w-7 h-7">
-                            <img
-                              src={pool.asset.logoURI}
-                              width={28}
-                              height={28}
-                              alt={pool.asset.symbol}
-                              className="rounded-full object-contain w-7 h-7"
-                            />
-                            {hasPosition && (
-                              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100" />
-                            )}
-                          </div>
+                        <AssetPopover
+                          address={pool.underlying}
+                          name={pool.asset.name}
+                          symbol={pool.asset.symbol}
+                          logoURI={pool.asset.logoURI}
+                          positionDot={!!hasPosition}
+                        >
                           <div className="flex flex-col min-w-0">
                             <span
                               className="font-semibold text-sm truncate"
@@ -659,7 +645,7 @@ export function LendingDashboard({
                               {pool.name}
                             </span>
                           </div>
-                        </div>
+                        </AssetPopover>
                         <div className="text-right shrink-0">
                           <div className="flex items-center justify-end gap-1">
                             <span className="font-bold text-sm text-success">

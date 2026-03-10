@@ -8,6 +8,7 @@ import type { UserPositionEntry } from '../../hooks/lending/useUserData'
 import type { TableHighlight, PoolRole } from './TradingDashboard/types'
 import { abbreviateUsd, formatUsd } from '../../utils/format'
 import { riskDotColor, scoreToRiskLabel } from './MarketsView/helpers'
+import { AssetPopover } from './AssetPopover'
 
 interface Props {
   configGroups: PoolConfigGroup[]
@@ -584,22 +585,13 @@ const AssetCell: React.FC<{ item: ConfigMarketItem; hasPosition: boolean }> = ({
 }) => {
   const asset = item.underlyingInfo.asset
   return (
-    <div className="flex items-center gap-2 min-w-0">
-      <div className="relative shrink-0 w-7 h-7">
-        <img
-          src={asset.logoURI}
-          width={28}
-          height={28}
-          alt={asset.symbol}
-          className="rounded-full object-contain w-7 h-7"
-        />
-        {hasPosition && (
-          <span
-            className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100"
-            title="You have a position"
-          />
-        )}
-      </div>
+    <AssetPopover
+      address={asset.address}
+      name={asset.name}
+      symbol={asset.symbol}
+      logoURI={asset.logoURI}
+      positionDot={hasPosition}
+    >
       <div className="flex flex-col min-w-0">
         <span className="font-medium text-sm truncate" title={asset.symbol}>
           {asset.symbol}
@@ -608,7 +600,7 @@ const AssetCell: React.FC<{ item: ConfigMarketItem; hasPosition: boolean }> = ({
           {asset.name}
         </span>
       </div>
-    </div>
+    </AssetPopover>
   )
 }
 

@@ -44,7 +44,7 @@ export function poolEntryToPoolDataItem(entry: PoolEntry): PoolDataItem {
   return {
     marketUid: entry.marketUid,
     name: entry.name,
-    underlying: entry.underlyingAddress,
+    underlying: info?.asset?.address || '',
     asset: {
       chainId: info.asset.chainId,
       decimals: info.asset.decimals,

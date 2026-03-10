@@ -2,6 +2,7 @@ import React from 'react'
 import type { PoolDataItem } from '../../hooks/lending/usePoolData'
 import type { UserPositionEntry, UserSubAccount } from '../../hooks/lending/useUserData'
 import { formatUsd, abbreviateUsd, formatTokenAmount } from '../../utils/format'
+import { AssetPopover } from './AssetPopover'
 import { EModeBadge } from './EModeAnalysisModal'
 import { CollateralToggle } from './UserTable'
 
@@ -179,20 +180,20 @@ export function YourPositions({
                       }`}
                       onClick={() => onPoolSelect?.(pool)}
                     >
-                      <img
-                        src={pool.asset.logoURI}
-                        width={32}
-                        height={32}
-                        alt={pool.asset.symbol}
-                        className="rounded-full object-contain w-8 h-8 shrink-0"
-                      />
-                      <div className="flex flex-col min-w-0 flex-1">
-                        <span className="text-sm font-medium">{pool.asset.symbol}</span>
-                        <span className="text-xs text-success truncate" title={`${position.deposits} ($${formatUsd(position.depositsUSD)})`}>
-                          +{formatTokenAmount(position.deposits)} ($
-                          {formatUsd(position.depositsUSD)})
-                        </span>
-                      </div>
+                      <AssetPopover
+                        address={pool.underlying}
+                        name={pool.asset.name}
+                        symbol={pool.asset.symbol}
+                        logoURI={pool.asset.logoURI}
+                      >
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="text-sm font-medium">{pool.asset.symbol}</span>
+                          <span className="text-xs text-success truncate" title={`${position.deposits} ($${formatUsd(position.depositsUSD)})`}>
+                            +{formatTokenAmount(position.deposits)} ($
+                            {formatUsd(position.depositsUSD)})
+                          </span>
+                        </div>
+                      </AssetPopover>
                       {account && (
                         <div className="flex flex-col items-center shrink-0">
                           <span className="text-[9px] text-base-content/50 leading-tight">
@@ -251,19 +252,19 @@ export function YourPositions({
                       }`}
                       onClick={() => onPoolSelect?.(pool)}
                     >
-                      <img
-                        src={pool.asset.logoURI}
-                        width={32}
-                        height={32}
-                        alt={pool.asset.symbol}
-                        className="rounded-full object-contain w-8 h-8 shrink-0"
-                      />
-                      <div className="flex flex-col min-w-0 flex-1">
-                        <span className="text-sm font-medium">{pool.asset.symbol}</span>
-                        <span className="text-xs text-error truncate" title={`${position.debt} ($${formatUsd(position.debtUSD)})`}>
-                          -{formatTokenAmount(position.debt)} (${formatUsd(position.debtUSD)})
-                        </span>
-                      </div>
+                      <AssetPopover
+                        address={pool.underlying}
+                        name={pool.asset.name}
+                        symbol={pool.asset.symbol}
+                        logoURI={pool.asset.logoURI}
+                      >
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="text-sm font-medium">{pool.asset.symbol}</span>
+                          <span className="text-xs text-error truncate" title={`${position.debt} ($${formatUsd(position.debtUSD)})`}>
+                            -{formatTokenAmount(position.debt)} (${formatUsd(position.debtUSD)})
+                          </span>
+                        </div>
+                      </AssetPopover>
                     </div>
                   ))}
               </div>
