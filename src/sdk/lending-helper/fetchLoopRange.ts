@@ -5,7 +5,8 @@ import { BACKEND_BASE_URL } from '../../config/backend'
 // ============================================================================
 
 export interface LoopRangeModeRange {
-  amount: number
+  amountIn: number
+  amountOut: number
   amountUSD: number
 }
 
@@ -29,6 +30,45 @@ export interface LoopRangeResult {
   success: boolean
   data?: LoopRangeEntry[]
   error?: string
+}
+
+// ============================================================================
+// Resolution helper
+// ============================================================================
+
+const ZERO_RANGE: LoopRangeModeRange = { amountIn: 0, amountOut: 0, amountUSD: 0 }
+
+/**
+ * Resolve the effective range from a raw API entry:
+ * - If canSwitchToTargetMode && targetModeRange exists → use target
+ * - Otherwise use userModeRange, defaulting to zeros if null
+ */
+function resolveLoopRangeEntry(raw: any): LoopRangeEntry {
+  const ma = raw.modeAnalysis ?? {}
+  const canSwitch = !!ma.canSwitchToTargetMode
+  const targetRange: LoopRangeModeRange | null = ma.targetModeRange
+    ? { amountIn: ma.targetModeRange.amountIn ?? 0, amountOut: ma.targetModeRange.amountOut ?? 0, amountUSD: ma.targetModeRange.amountUSD ?? 0 }
+    : null
+  const userRange: LoopRangeModeRange | null = ma.userModeRange
+    ? { amountIn: ma.userModeRange.amountIn ?? 0, amountOut: ma.userModeRange.amountOut ?? 0, amountUSD: ma.userModeRange.amountUSD ?? 0 }
+    : null
+
+  const effective =
+    canSwitch && targetRange ? targetRange : userRange ?? ZERO_RANGE
+
+  return {
+    assetLong: raw.underlyingInfoLong?.asset?.address ?? '',
+    assetShort: raw.underlyingInfoShort?.asset?.address ?? '',
+    amount: effective.amountIn,
+    amountUSD: effective.amountUSD,
+    modeAnalysis: {
+      userMode: ma.userMode ?? '0',
+      targetMode: ma.targetMode ?? '0',
+      canSwitchToTargetMode: canSwitch,
+      userModeRange: userRange,
+      targetModeRange: targetRange,
+    },
+  }
 }
 
 // ============================================================================
@@ -101,7 +141,7 @@ export async function fetchLoopRange(params: {
       return { success: false, error: json.error?.message ?? 'API error' }
     }
 
-    const data: LoopRangeEntry[] = json.data ?? []
+    const data: LoopRangeEntry[] = (json.data ?? []).map(resolveLoopRangeEntry)
     return { success: true, data }
   } catch (err: any) {
     return { success: false, error: err?.message ?? 'Unknown error' }
@@ -143,7 +183,7 @@ export async function fetchLoopRangeWithSimulation(params: {
       return { success: false, error: json.error?.message ?? 'API error' }
     }
 
-    const data: LoopRangeEntry[] = json.data ?? []
+    const data: LoopRangeEntry[] = (json.data ?? []).map(resolveLoopRangeEntry)
     return { success: true, data }
   } catch (err: any) {
     return { success: false, error: err?.message ?? 'Unknown error' }

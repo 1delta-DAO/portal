@@ -73,7 +73,7 @@ function LoopRangeInfo({
         <div className="flex items-center justify-between">
           <span className="text-base-content/70">Current e-mode</span>
           <span className="font-medium">
-            {inUserMode.amount.toFixed(4)} {debtSymbol}{' '}
+            {inUserMode.amountIn.toFixed(4)} {debtSymbol}{' '}
             <span className="text-base-content/50">(${formatUsd(inUserMode.amountUSD)})</span>
           </span>
         </div>
