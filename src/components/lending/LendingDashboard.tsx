@@ -476,6 +476,15 @@ export function LendingDashboard({
                               symbol={pool.asset.symbol}
                               logoURI={pool.asset.logoURI}
                               positionDot={!!hasPosition}
+                              marketUid={pool.marketUid}
+                              marketName={pool.name}
+                              currentUtilization={
+                                pool.totalDeposits > 0
+                                  ? pool.totalDebt / pool.totalDeposits
+                                  : undefined
+                              }
+                              currentDepositRate={depositTotal}
+                              currentBorrowRate={borrowTotal}
                             >
                               <div className="flex flex-col min-w-0">
                                 <span
@@ -627,6 +636,15 @@ export function LendingDashboard({
                           symbol={pool.asset.symbol}
                           logoURI={pool.asset.logoURI}
                           positionDot={!!hasPosition}
+                          marketUid={pool.marketUid}
+                          marketName={pool.name}
+                          currentUtilization={
+                            pool.totalDeposits > 0
+                              ? pool.totalDebt / pool.totalDeposits
+                              : undefined
+                          }
+                          currentDepositRate={mDepTotal}
+                          currentBorrowRate={mBorTotal}
                         >
                           <div className="flex flex-col min-w-0">
                             <span

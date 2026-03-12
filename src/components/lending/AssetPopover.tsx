@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { IrmDetailsButton } from './IrmDock'
 
 interface AssetPopoverProps {
   address?: string
@@ -10,13 +11,20 @@ interface AssetPopoverProps {
   children?: React.ReactNode
   /** Optional position indicator dot */
   positionDot?: boolean
+  /** If provided, shows an IRM details link in the popover */
+  marketUid?: string
+  /** Market name for the IRM panel header */
+  marketName?: string
+  /** Current utilization ratio 0–1 for the IRM chart */
+  currentUtilization?: number
+  /** Current deposit APR (%) to show in the IRM panel */
+  currentDepositRate?: number
+  /** Current borrow APR (%) to show in the IRM panel */
+  currentBorrowRate?: number
 }
 
-/** Delay (ms) before the popover hides after mouse leaves */
-const HIDE_DELAY = 250
-
 /**
- * Inline asset icon + children with a hover popover showing
+ * Inline asset icon + children with a click-triggered popover showing
  * address (copiable), name and symbol.
  *
  * The popover is rendered via a React portal so it escapes
@@ -29,15 +37,32 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
   logoURI,
   children,
   positionDot,
+  marketUid,
+  marketName,
+  currentUtilization,
+  currentDepositRate,
+  currentBorrowRate,
 }) => {
   const [copied, setCopied] = useState(false)
   const [visible, setVisible] = useState(false)
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null)
 
   const copyTimer = useRef<ReturnType<typeof setTimeout>>(null)
-  const hideTimer = useRef<ReturnType<typeof setTimeout>>(null)
   const triggerRef = useRef<HTMLDivElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
+
+  const toggle = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (visible) {
+      setVisible(false)
+      return
+    }
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setCoords({ top: rect.bottom + 6, left: rect.left })
+    }
+    setVisible(true)
+  }, [visible])
 
   const copyAddress = useCallback(
     (e: React.MouseEvent) => {
@@ -51,22 +76,18 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
     [address]
   )
 
-  const show = useCallback(() => {
-    if (hideTimer.current) clearTimeout(hideTimer.current)
-    if (triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect()
-      setCoords({ top: rect.bottom + 4, left: rect.left })
+  // Close on outside click
+  useEffect(() => {
+    if (!visible) return
+    const handler = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (!triggerRef.current?.contains(t) && !popoverRef.current?.contains(t)) {
+        setVisible(false)
+      }
     }
-    setVisible(true)
-  }, [])
-
-  const scheduleHide = useCallback(() => {
-    hideTimer.current = setTimeout(() => setVisible(false), HIDE_DELAY)
-  }, [])
-
-  const cancelHide = useCallback(() => {
-    if (hideTimer.current) clearTimeout(hideTimer.current)
-  }, [])
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [visible])
 
   // Reposition on scroll / resize while visible
   useEffect(() => {
@@ -74,7 +95,7 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
     const reposition = () => {
       if (triggerRef.current) {
         const rect = triggerRef.current.getBoundingClientRect()
-        setCoords({ top: rect.bottom + 4, left: rect.left })
+        setCoords({ top: rect.bottom + 6, left: rect.left })
       }
     }
     window.addEventListener('scroll', reposition, true)
@@ -88,7 +109,6 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
   // Cleanup timers
   useEffect(() => {
     return () => {
-      if (hideTimer.current) clearTimeout(hideTimer.current)
       if (copyTimer.current) clearTimeout(copyTimer.current)
     }
   }, [])
@@ -99,12 +119,12 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
     <>
       <div
         ref={triggerRef}
-        className="relative flex items-center gap-2 min-w-0"
-        onMouseEnter={show}
-        onMouseLeave={scheduleHide}
+        className="relative flex items-center gap-2 min-w-0 cursor-pointer select-none group"
+        onClick={toggle}
+        title="Click for details"
       >
         {/* Icon */}
-        <div className="relative shrink-0">
+        <div className="relative shrink-0 group-hover:opacity-75 transition-opacity">
           {logoURI ? (
             <img
               src={logoURI}
@@ -123,8 +143,8 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
           )}
         </div>
 
-        {/* Label content — allowed to truncate freely */}
-        <div className="min-w-0 flex-1">{children}</div>
+        {/* Label content */}
+        <div className="min-w-0 flex-1 group-hover:opacity-75 transition-opacity">{children}</div>
       </div>
 
       {/* Portal popover */}
@@ -133,23 +153,34 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
         createPortal(
           <div
             ref={popoverRef}
-            className="fixed z-[9999] shadow-lg bg-base-200 rounded-box w-60 border border-base-300 animate-in fade-in duration-150"
+            className="fixed z-9999 shadow-xl bg-base-200 rounded-box w-60 border border-base-300 animate-in fade-in zoom-in-95 duration-100 origin-top-left"
             style={{ top: coords.top, left: coords.left }}
-            onMouseEnter={cancelHide}
-            onMouseLeave={scheduleHide}
           >
             {/* Header */}
-            <div className="flex items-center gap-2 px-3 pt-3 pb-2 border-b border-base-300">
-              {logoURI && (
-                <img
-                  src={logoURI}
-                  width={20}
-                  height={20}
-                  alt={symbol}
-                  className="rounded-full w-5 h-5 shrink-0"
-                />
-              )}
-              <span className="font-semibold text-sm">{symbol}</span>
+            <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2 border-b border-base-300">
+              <div className="flex items-center gap-2">
+                {logoURI && (
+                  <img
+                    src={logoURI}
+                    width={20}
+                    height={20}
+                    alt={symbol}
+                    className="rounded-full w-5 h-5 shrink-0"
+                  />
+                )}
+                <span className="font-semibold text-sm">{symbol}</span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs btn-circle -mr-1"
+                onClick={(e) => { e.stopPropagation(); setVisible(false) }}
+                aria-label="Close"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
             </div>
 
             {/* Labeled fields */}
@@ -194,6 +225,18 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
                       </>
                     )}
                   </button>
+                </div>
+              )}
+              {marketUid && (
+                <div className="flex items-start gap-2 pt-1">
+                  <span className="text-base-content/50 shrink-0 w-14">Details</span>
+                  <IrmDetailsButton
+                    marketUid={marketUid}
+                    marketName={marketName ?? name}
+                    currentUtilization={currentUtilization}
+                    currentDepositRate={currentDepositRate}
+                    currentBorrowRate={currentBorrowRate}
+                  />
                 </div>
               )}
             </div>

@@ -6,6 +6,7 @@ import { WalletConnect } from './components/connect'
 import { PortalLogo } from './components/PortalLogo'
 import { fetchLenderMetaFromDirAndInitialize } from '@1delta/margin-fetcher'
 import { fetchLenderLabels } from '@1delta/lib-utils'
+import { IrmDockProvider } from './components/lending/IrmDock'
 
 export default function App() {
   useEffect(() => {
@@ -14,6 +15,7 @@ export default function App() {
   }, [])
 
   return (
+    <IrmDockProvider>
     <div className="min-h-screen bg-base-200 text-base-content overflow-x-hidden">
       <div className="navbar bg-base-100 shadow-lg fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 lg:px-8 ">
         <div className="flex-1 min-w-0 gap">
@@ -45,5 +47,6 @@ export default function App() {
         </div>
       </main>
     </div>
+    </IrmDockProvider>
   )
 }
