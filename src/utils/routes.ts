@@ -5,6 +5,7 @@ const SLUG_TO_TAB: Record<string, SubTab> = {
   earn: 'earn',
   lending: 'lending',
   loop: 'trading',
+  swap: 'swap',
 }
 
 /** Internal tab key → URL slug */
@@ -12,6 +13,7 @@ const TAB_TO_SLUG: Record<SubTab, string> = {
   earn: 'earn',
   lending: 'lending',
   trading: 'loop',
+  swap: 'swap',
 }
 
 export function tabFromSlug(slug: string | undefined): SubTab {

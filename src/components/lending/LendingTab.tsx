@@ -13,9 +13,10 @@ import { useLendingBalances } from '../../hooks/lending/useLendingBalances'
 import { useTokenLists } from '../../hooks/useTokenLists'
 import { LendingDashboard } from './LendingDashboard'
 import { TradingDashboard } from './TradingDashboard'
+import { SpotSwapPanel } from '../swap/SpotSwapPanel'
 import { tabFromSlug, slugToLender, buildPath } from '../../utils/routes'
 
-export type SubTab = 'earn' | 'lending' | 'trading'
+export type SubTab = 'earn' | 'lending' | 'trading' | 'swap'
 
 export function LenderTab() {
   const { address: account } = useAccount()
@@ -112,6 +113,15 @@ export function LenderTab() {
             onClick={() => setActiveTab('trading')}
           >
             Looping
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            className={`tab tab-sm ${activeTab === 'swap' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('swap')}
+          >
+            Swap
           </button>
         </div>
 
@@ -211,6 +221,10 @@ export function LenderTab() {
           initialLender={initialLender}
           onLenderChange={setSelectedLender}
         />
+      )}
+
+      {activeTab === 'swap' && (
+        <SpotSwapPanel chainId={effectiveChainId} />
       )}
     </div>
   )
