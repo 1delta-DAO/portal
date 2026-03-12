@@ -185,6 +185,13 @@ export function YourPositions({
                         name={pool.asset.name}
                         symbol={pool.asset.symbol}
                         logoURI={pool.asset.logoURI}
+                        marketUid={pool.marketUid}
+                        marketName={pool.name}
+                        currentUtilization={pool.totalDeposits > 0 ? pool.totalDebt / pool.totalDeposits : undefined}
+                        currentDepositRate={pool.depositRate + (pool.intrinsicYield ?? 0)}
+                        currentBorrowRate={pool.variableBorrowRate + (pool.intrinsicYield ?? 0)}
+                        oraclePriceUsd={pool.oraclePriceUSD}
+                        chainId={pool.asset.chainId}
                       >
                         <div className="flex flex-col min-w-0 flex-1">
                           <span className="text-sm font-medium">{pool.asset.symbol}</span>
@@ -257,6 +264,13 @@ export function YourPositions({
                         name={pool.asset.name}
                         symbol={pool.asset.symbol}
                         logoURI={pool.asset.logoURI}
+                        marketUid={pool.marketUid}
+                        marketName={pool.name}
+                        currentUtilization={pool.totalDeposits > 0 ? pool.totalDebt / pool.totalDeposits : undefined}
+                        currentDepositRate={pool.depositRate + (pool.intrinsicYield ?? 0)}
+                        currentBorrowRate={pool.variableBorrowRate + (pool.intrinsicYield ?? 0)}
+                        oraclePriceUsd={pool.oraclePriceUSD}
+                        chainId={pool.asset.chainId}
                       >
                         <div className="flex flex-col min-w-0 flex-1">
                           <span className="text-sm font-medium">{pool.asset.symbol}</span>

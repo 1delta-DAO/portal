@@ -122,7 +122,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
           </thead>
           <tbody>
             {pools.map((p) => {
-              const { utilization, apr, intrinsicYield, price } = computePoolMetrics(p)
+              const { utilization, apr, borrowApr, intrinsicYield, price } = computePoolMetrics(p)
               const utilPct = utilization * 100
               const totalDepositsUSD = parseFloat(p.totalDepositsUsd) || 0
               const totalDebtUSD = parseFloat(p.totalDebtUsd) || 0
@@ -143,6 +143,14 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                       name={getAsset(p)?.name ?? p.name}
                       symbol={getAsset(p)?.symbol ?? ''}
                       logoURI={getAsset(p)?.logoURI}
+                      marketUid={p.marketUid}
+                      marketName={p.name}
+                      currentUtilization={utilization}
+                      currentDepositRate={apr + intrinsicYield}
+                      currentBorrowRate={borrowApr + intrinsicYield}
+                      priceUsd={p.underlyingInfo?.prices?.priceUsd}
+                      oraclePriceUsd={p.underlyingInfo?.oraclePrice?.oraclePriceUsd ?? undefined}
+                      chainId={p.chainId}
                     >
                       <div className="flex flex-col min-w-0">
                         <span className="font-medium truncate" title={p.name}>
@@ -307,6 +315,14 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                     name={getAsset(p)?.name ?? p.name}
                     symbol={getAsset(p)?.symbol ?? ''}
                     logoURI={getAsset(p)?.logoURI}
+                    marketUid={p.marketUid}
+                    marketName={p.name}
+                    currentUtilization={utilization}
+                    currentDepositRate={depTotal}
+                    currentBorrowRate={borTotal}
+                    priceUsd={p.underlyingInfo?.prices?.priceUsd}
+                    oraclePriceUsd={p.underlyingInfo?.oraclePrice?.oraclePriceUsd ?? undefined}
+                    chainId={p.chainId}
                   >
                     <div className="flex flex-col min-w-0">
                       <span className="font-semibold text-sm truncate" title={p.name}>

@@ -485,6 +485,8 @@ export function LendingDashboard({
                               }
                               currentDepositRate={depositTotal}
                               currentBorrowRate={borrowTotal}
+                              oraclePriceUsd={pool.oraclePriceUSD}
+                              chainId={pool.asset.chainId}
                             >
                               <div className="flex flex-col min-w-0">
                                 <span
@@ -645,6 +647,8 @@ export function LendingDashboard({
                           }
                           currentDepositRate={mDepTotal}
                           currentBorrowRate={mBorTotal}
+                          oraclePriceUsd={pool.oraclePriceUSD}
+                          chainId={pool.asset.chainId}
                         >
                           <div className="flex flex-col min-w-0">
                             <span

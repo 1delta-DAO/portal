@@ -2,25 +2,79 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IrmDetailsButton } from './IrmDock'
 
+// ---------------------------------------------------------------------------
+// Reusable copy-to-clipboard row
+// ---------------------------------------------------------------------------
+
+function CopyRow({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout>>(null)
+
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+
+  const short = `${value.slice(0, 6)}…${value.slice(-4)}`
+
+  const copy = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    navigator.clipboard.writeText(value)
+    setCopied(true)
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => setCopied(false), 1500)
+  }, [value])
+
+  return (
+    <div className="flex items-start gap-2">
+      <span className="text-base-content/50 shrink-0 w-14">{label}</span>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 font-mono text-[11px] hover:text-primary transition-colors min-w-0"
+        onClick={copy}
+        title={`Copy ${label.toLowerCase()}: ${value}`}
+      >
+        {copied ? (
+          <span className="text-success font-sans">Copied!</span>
+        ) : (
+          <>
+            {short}
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 opacity-40 shrink-0"
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+            </svg>
+          </>
+        )}
+      </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+
+function formatPrice(v: number): string {
+  if (v >= 1) return `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+  if (v >= 0.01) return `$${v.toFixed(4)}`
+  return `$${v.toPrecision(4)}`
+}
+
 interface AssetPopoverProps {
   address?: string
   name: string
   symbol: string
   logoURI?: string
-  /** Content rendered next to the icon (labels, sub-text, etc.) */
   children?: React.ReactNode
-  /** Optional position indicator dot */
   positionDot?: boolean
-  /** If provided, shows an IRM details link in the popover */
   marketUid?: string
-  /** Market name for the IRM panel header */
   marketName?: string
-  /** Current utilization ratio 0–1 for the IRM chart */
   currentUtilization?: number
-  /** Current deposit APR (%) to show in the IRM panel */
   currentDepositRate?: number
-  /** Current borrow APR (%) to show in the IRM panel */
   currentBorrowRate?: number
+  /** Market price (from price feed) */
+  priceUsd?: number
+  /** Oracle price in USD */
+  oraclePriceUsd?: number
+  /** Chain ID for display */
+  chainId?: string
 }
 
 /**
@@ -42,12 +96,13 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
   currentUtilization,
   currentDepositRate,
   currentBorrowRate,
+  priceUsd,
+  oraclePriceUsd,
+  chainId,
 }) => {
-  const [copied, setCopied] = useState(false)
   const [visible, setVisible] = useState(false)
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null)
 
-  const copyTimer = useRef<ReturnType<typeof setTimeout>>(null)
   const triggerRef = useRef<HTMLDivElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
 
@@ -63,18 +118,6 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
     }
     setVisible(true)
   }, [visible])
-
-  const copyAddress = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation()
-      if (!address) return
-      navigator.clipboard.writeText(address)
-      setCopied(true)
-      if (copyTimer.current) clearTimeout(copyTimer.current)
-      copyTimer.current = setTimeout(() => setCopied(false), 1500)
-    },
-    [address]
-  )
 
   // Close on outside click
   useEffect(() => {
@@ -105,15 +148,6 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
       window.removeEventListener('resize', reposition)
     }
   }, [visible])
-
-  // Cleanup timers
-  useEffect(() => {
-    return () => {
-      if (copyTimer.current) clearTimeout(copyTimer.current)
-    }
-  }, [])
-
-  const short = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : ''
 
   return (
     <>
@@ -195,49 +229,48 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
                   <span className="font-medium truncate">{name}</span>
                 </div>
               )}
-              {address && (
+              {chainId && (
                 <div className="flex items-start gap-2">
-                  <span className="text-base-content/50 shrink-0 w-14">Address</span>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 font-mono text-[11px] hover:text-primary transition-colors min-w-0"
-                    onClick={copyAddress}
-                    title="Copy address"
-                  >
-                    {copied ? (
-                      <span className="text-success font-sans">Copied!</span>
-                    ) : (
-                      <>
-                        {short}
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="w-3 h-3 opacity-40 shrink-0"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                          <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                        </svg>
-                      </>
+                  <span className="text-base-content/50 shrink-0 w-14">Chain</span>
+                  <span className="font-medium">{chainId}</span>
+                </div>
+              )}
+              {address && (
+                <CopyRow label="Address" value={address} />
+              )}
+              {(priceUsd != null || oraclePriceUsd != null) && (
+                <div className="flex items-start gap-2">
+                  <span className="text-base-content/50 shrink-0 w-14">Price</span>
+                  <div className="flex flex-col gap-0.5">
+                    {priceUsd != null && (
+                      <span className="font-medium tabular-nums">
+                        {formatPrice(priceUsd)}
+                        <span className="text-base-content/40 font-normal ml-1">market</span>
+                      </span>
                     )}
-                  </button>
+                    {oraclePriceUsd != null && (
+                      <span className="font-medium tabular-nums">
+                        {formatPrice(oraclePriceUsd)}
+                        <span className="text-base-content/40 font-normal ml-1">oracle</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
               {marketUid && (
-                <div className="flex items-start gap-2 pt-1">
-                  <span className="text-base-content/50 shrink-0 w-14">Details</span>
-                  <IrmDetailsButton
-                    marketUid={marketUid}
-                    marketName={marketName ?? name}
-                    currentUtilization={currentUtilization}
-                    currentDepositRate={currentDepositRate}
-                    currentBorrowRate={currentBorrowRate}
-                  />
-                </div>
+                <>
+                  <CopyRow label="Market" value={marketUid} />
+                  <div className="flex items-start gap-2 pt-1">
+                    <span className="text-base-content/50 shrink-0 w-14">Details</span>
+                    <IrmDetailsButton
+                      marketUid={marketUid}
+                      marketName={marketName ?? name}
+                      currentUtilization={currentUtilization}
+                      currentDepositRate={currentDepositRate}
+                      currentBorrowRate={currentBorrowRate}
+                    />
+                  </div>
+                </>
               )}
             </div>
           </div>,

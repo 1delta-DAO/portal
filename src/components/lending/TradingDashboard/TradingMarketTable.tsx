@@ -144,6 +144,13 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                       symbol={pool.asset.symbol}
                       logoURI={pool.asset.logoURI}
                       positionDot={!!hasPosition}
+                      marketUid={pool.marketUid}
+                      marketName={pool.name}
+                      currentUtilization={pool.totalDeposits > 0 ? pool.totalDebt / pool.totalDeposits : undefined}
+                      currentDepositRate={depositTotal}
+                      currentBorrowRate={borrowTotal}
+                      oraclePriceUsd={pool.oraclePriceUSD}
+                      chainId={pool.asset.chainId}
                     >
                       <div className="flex flex-col min-w-0">
                         <span className="font-medium text-sm truncate" title={pool.asset.symbol}>
@@ -278,6 +285,13 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                     symbol={pool.asset.symbol}
                     logoURI={pool.asset.logoURI}
                     positionDot={!!hasPosition}
+                    marketUid={pool.marketUid}
+                    marketName={pool.name}
+                    currentUtilization={pool.totalDeposits > 0 ? pool.totalDebt / pool.totalDeposits : undefined}
+                    currentDepositRate={mDepTotal}
+                    currentBorrowRate={mBorTotal}
+                    oraclePriceUsd={pool.oraclePriceUSD}
+                    chainId={pool.asset.chainId}
                   >
                     <div className="flex flex-col min-w-0">
                       <span className="font-semibold text-sm truncate" title={pool.asset.symbol}>
