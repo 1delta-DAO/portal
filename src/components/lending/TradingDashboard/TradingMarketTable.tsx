@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry } from '../../../hooks/lending/useUserData'
 import type { TableHighlight, PoolRole } from './types'
 import { abbreviateUsd, formatUsd } from '../../../utils/format'
 import { AssetPopover } from '../AssetPopover'
 import { sortPools, type SortKey, LtvBadge } from '../Dashboard'
+
+const PAGE_SIZE = 25
 
 interface Props {
   pools: PoolDataItem[]
@@ -29,9 +31,21 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
     return map
   }, [highlights])
 
+  const [page, setPage] = useState(0)
+
   const sorted = useMemo(
     () => sortPools(pools, search, sortKey, sortDir),
     [pools, search, sortKey, sortDir]
+  )
+
+  // Reset to first page when search/sort/pool list changes
+  const sortedCount = sorted.length
+  useEffect(() => setPage(0), [search, sortKey, sortDir, sortedCount])
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  const pagedPools = useMemo(
+    () => sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [sorted, page]
   )
 
   const toggleSort = (key: SortKey) => {
@@ -122,7 +136,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
             </tr>
           </thead>
           <tbody>
-            {sorted.map((pool) => {
+            {pagedPools.map((pool) => {
               const role = highlightMap.get(pool.marketUid)
               const userPos = userPositions.get(pool.marketUid)
               const hasPosition =
@@ -224,7 +238,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                 </tr>
               )
             })}
-            {sorted.length === 0 && (
+            {pagedPools.length === 0 && (
               <tr>
                 <td colSpan={7} className="text-center py-6 text-sm text-base-content/60">
                   No pools match your search.
@@ -237,7 +251,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
 
       {/* Mobile card list */}
       <div className="md:hidden divide-y divide-base-300">
-        {sorted.length > 0 && (
+        {pagedPools.length > 0 && (
           <div className="flex gap-1 p-2 overflow-x-auto">
             {(
               ['depositApr', 'borrowApr', 'totalDepositsUSD', 'totalLiquidityUSD'] as SortKey[]
@@ -264,7 +278,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
             })}
           </div>
         )}
-        {sorted.map((pool) => {
+        {pagedPools.map((pool) => {
           const role = highlightMap.get(pool.marketUid)
           const userPos = userPositions.get(pool.marketUid)
           const hasPosition = userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
@@ -341,12 +355,43 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
             </div>
           )
         })}
-        {sorted.length === 0 && (
+        {pagedPools.length === 0 && (
           <div className="text-center py-6 text-sm text-base-content/60">
             No pools match your search.
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-3 py-2 border-t border-base-300 text-xs text-base-content/60">
+          <span>
+            {page * PAGE_SIZE + 1}&ndash;{Math.min((page + 1) * PAGE_SIZE, sorted.length)} of{' '}
+            {sorted.length}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="btn btn-xs btn-ghost"
+              disabled={page === 0}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              &lsaquo;
+            </button>
+            <span>
+              {page + 1} / {totalPages}
+            </span>
+            <button
+              type="button"
+              className="btn btn-xs btn-ghost"
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              &rsaquo;
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

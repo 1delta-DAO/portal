@@ -1,5 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { lenderDisplayNameFull } from '@1delta/lib-utils'
+import React, { useCallback, useMemo, useState } from 'react'
 import type { LenderData, PoolDataItem } from '../../../hooks/lending/usePoolData'
 import { usePoolConfigData } from '../../../hooks/lending/usePoolData'
 import { ConfigMarketView } from '../ConfigMarketView'
@@ -10,9 +9,8 @@ import type {
 } from '../../../hooks/lending/useUserData'
 import { useTokenBalances } from '../../../hooks/lending/useTokenBalances'
 import { useSyncChain } from '../../../hooks/useSyncChain'
-import { SearchableSelect, type SearchableSelectOption } from '../SearchableSelect'
 import { WalletConnect } from '../../connect'
-import { computeLenderTvl } from '../../../utils/format'
+import { useLenderSelector, LenderSelector } from '../LenderSelector'
 import { TradingMarketTable } from './TradingMarketTable'
 import { LoopAction } from './actions/LoopAction'
 import { ColSwapAction } from './actions/ColSwapAction'
@@ -55,72 +53,21 @@ export function TradingDashboard({
   const isWrongChain = !!account && currentChainId !== Number(chainId)
   const isMobile = useIsMobile()
 
-  // Lender selection
-  const allLenderKeys = useMemo(() => Object.keys(lenderData ?? {}), [lenderData])
+  // Lender selection (shared hook)
+  const { selectedLender, setSelectedLender, lenderOptions, lenderBalances } = useLenderSelector({
+    lenderData,
+    userData,
+    chainId,
+    initialLender,
+    onLenderChange,
+  })
 
-  const [selectedLender, _setSelectedLender] = useState(initialLender || '')
-  const setSelectedLender = React.useCallback(
-    (lender: string) => {
-      _setSelectedLender(lender)
-      onLenderChange?.(lender)
-    },
-    [onLenderChange]
-  )
   const [selectedSubAccountId, setSelectedSubAccountId] = useState<string | null>(null)
   const [activeOperation, setActiveOperation] = useState<TradingOperation>('Loop')
   const [selectedPools, setSelectedPools] = useState<SelectedPool[]>([])
   const [showMobileAction, setShowMobileAction] = useState(false)
   const [viewMode, setViewMode] = useState<'default' | 'config'>('default')
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
-
-  // Lender balances for sorting
-  const lenderBalances = useMemo(() => {
-    const map = new Map<string, number>()
-    if (!userData.raw) return map
-    for (const entry of userData.raw) {
-      if (entry.chainId !== chainId) continue
-      const total = entry.balanceData.deposits + entry.balanceData.debt
-      if (total > 0) map.set(entry.lender, total)
-    }
-    return map
-  }, [userData, chainId])
-
-  const lenders = useMemo(() => {
-    return [...allLenderKeys].sort((a, b) => {
-      const balA = lenderBalances.get(a) ?? 0
-      const balB = lenderBalances.get(b) ?? 0
-      if (balA > 0 && balB > 0) return balB - balA
-      if (balA > 0) return -1
-      if (balB > 0) return 1
-      return computeLenderTvl(lenderData?.[b] ?? []) - computeLenderTvl(lenderData?.[a] ?? [])
-    })
-  }, [allLenderKeys, lenderBalances, lenderData])
-
-  const lenderOptions: SearchableSelectOption[] = lenders.map((l) => ({
-    value: l,
-    label: lenderDisplayNameFull(l),
-    indicator: lenderBalances.has(l) ? '\u25CF ' : undefined,
-  }))
-
-  // Stable key for lender list to avoid useEffect dependency array issues
-  const lendersKey = lenders.join(',')
-
-  // Track latest selectedLender without it being an effect dependency
-  const selectedLenderRef = useRef(selectedLender)
-  selectedLenderRef.current = selectedLender
-
-  // Auto-select lender: prefer initialLender from URL, then first in sorted list.
-  // Only reacts to lender list or URL changes — NOT to selectedLender changes
-  // (to avoid feedback loop with URL sync).
-  React.useEffect(() => {
-    if (lenders.length === 0) return
-    if (initialLender && lenders.includes(initialLender)) {
-      _setSelectedLender(initialLender)
-    } else if (!lenders.includes(selectedLenderRef.current)) {
-      _setSelectedLender(lenders[0])
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lendersKey, initialLender])
 
   // Sub-accounts
   const subAccounts: UserSubAccount[] = useMemo(() => {
@@ -308,18 +255,12 @@ export function TradingDashboard({
   return (
     <div className="space-y-4">
       {/* Lender selector */}
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="text-sm font-medium shrink-0">Lender:</label>
-        <SearchableSelect
-          options={lenderOptions}
-          value={selectedLender}
-          onChange={handleLenderChange}
-          placeholder="Search lenders..."
-        />
-        {lenderBalances.size > 0 && (
-          <span className="text-xs text-base-content/50 shrink-0">{'\u25CF'} = has balance</span>
-        )}
-      </div>
+      <LenderSelector
+        lenderOptions={lenderOptions}
+        selectedLender={selectedLender}
+        onChange={handleLenderChange}
+        hasBalances={lenderBalances.size > 0}
+      />
 
       {/* User positions + sub-account selector */}
       {account && isUserDataLoading && (
