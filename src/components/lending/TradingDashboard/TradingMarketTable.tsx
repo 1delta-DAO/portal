@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry } from '../../../hooks/lending/useUserData'
 import type { TableHighlight, PoolRole } from './types'
-import { abbreviateUsd, formatUsd } from '../../../utils/format'
+import { abbreviateUsd, abbreviateNumber, formatUsd, formatTokenAmount } from '../../../utils/format'
 import { AssetPopover } from '../AssetPopover'
 import { sortPools, type SortKey, LtvBadge } from '../Dashboard'
 
@@ -221,19 +221,34 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                     <LtvBadge config={pool.config} variant="cell" />
                   </td>
                   <td>
-                    <span className="text-xs" title={`$${formatUsd(pool.totalDepositsUSD)}`}>
-                      {abbreviateUsd(pool.totalDepositsUSD)}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-xs" title={`$${formatUsd(pool.totalDepositsUSD)}`}>
+                        {abbreviateUsd(pool.totalDepositsUSD)}
+                      </span>
+                      <span className="text-[10px] text-base-content/50" title={formatTokenAmount(pool.totalDeposits)}>
+                        {abbreviateNumber(pool.totalDeposits)} {pool.asset.symbol}
+                      </span>
+                    </div>
                   </td>
                   <td>
-                    <span className="text-xs" title={`$${formatUsd(pool.totalDebtUSD)}`}>
-                      {abbreviateUsd(pool.totalDebtUSD)}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-xs" title={`$${formatUsd(pool.totalDebtUSD)}`}>
+                        {abbreviateUsd(pool.totalDebtUSD)}
+                      </span>
+                      <span className="text-[10px] text-base-content/50" title={formatTokenAmount(pool.totalDebt)}>
+                        {abbreviateNumber(pool.totalDebt)} {pool.asset.symbol}
+                      </span>
+                    </div>
                   </td>
                   <td>
-                    <span className="text-xs" title={`$${formatUsd(pool.totalLiquidityUSD)}`}>
-                      {abbreviateUsd(pool.totalLiquidityUSD)}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-xs" title={`$${formatUsd(pool.totalLiquidityUSD)}`}>
+                        {abbreviateUsd(pool.totalLiquidityUSD)}
+                      </span>
+                      <span className="text-[10px] text-base-content/50" title={formatTokenAmount(pool.totalLiquidity)}>
+                        {abbreviateNumber(pool.totalLiquidity)} {pool.asset.symbol}
+                      </span>
+                    </div>
                   </td>
                 </tr>
               )
@@ -349,8 +364,8 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                   )}
                 </span>
                 <LtvBadge config={pool.config} variant="inline" />
-                <span>Dep: {abbreviateUsd(pool.totalDepositsUSD)}</span>
-                <span>Liq: {abbreviateUsd(pool.totalLiquidityUSD)}</span>
+                <span title={`${formatTokenAmount(pool.totalDeposits)} ${pool.asset.symbol}`}>Dep: {abbreviateUsd(pool.totalDepositsUSD)} <span className="text-base-content/40">({abbreviateNumber(pool.totalDeposits)})</span></span>
+                <span title={`${formatTokenAmount(pool.totalLiquidity)} ${pool.asset.symbol}`}>Liq: {abbreviateUsd(pool.totalLiquidityUSD)} <span className="text-base-content/40">({abbreviateNumber(pool.totalLiquidity)})</span></span>
               </div>
             </div>
           )

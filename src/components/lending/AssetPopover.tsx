@@ -106,18 +106,28 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
   const triggerRef = useRef<HTMLDivElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
 
+  const reposition = useCallback(() => {
+    if (!triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    const popH = popoverRef.current?.offsetHeight ?? 280
+    const popW = 240 // w-60 = 15rem = 240px
+    const gap = 6
+    const top = rect.bottom + gap + popH > window.innerHeight
+      ? rect.top - gap - popH
+      : rect.bottom + gap
+    const left = Math.min(rect.left, window.innerWidth - popW - 8)
+    setCoords({ top, left })
+  }, [])
+
   const toggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     if (visible) {
       setVisible(false)
       return
     }
-    if (triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect()
-      setCoords({ top: rect.bottom + 6, left: rect.left })
-    }
+    reposition()
     setVisible(true)
-  }, [visible])
+  }, [visible, reposition])
 
   // Close on outside click
   useEffect(() => {
@@ -135,19 +145,18 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
   // Reposition on scroll / resize while visible
   useEffect(() => {
     if (!visible) return
-    const reposition = () => {
-      if (triggerRef.current) {
-        const rect = triggerRef.current.getBoundingClientRect()
-        setCoords({ top: rect.bottom + 6, left: rect.left })
-      }
-    }
     window.addEventListener('scroll', reposition, true)
     window.addEventListener('resize', reposition)
     return () => {
       window.removeEventListener('scroll', reposition, true)
       window.removeEventListener('resize', reposition)
     }
-  }, [visible])
+  }, [visible, reposition])
+
+  // Re-measure once the popover mounts so flip logic uses actual height
+  useEffect(() => {
+    if (visible && popoverRef.current) reposition()
+  }, [visible, reposition])
 
   return (
     <>

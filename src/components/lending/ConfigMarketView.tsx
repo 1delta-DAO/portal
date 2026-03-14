@@ -6,7 +6,7 @@ import type {
 } from '../../hooks/lending/usePoolData'
 import type { UserPositionEntry } from '../../hooks/lending/useUserData'
 import type { TableHighlight, PoolRole } from './TradingDashboard/types'
-import { abbreviateUsd, formatUsd } from '../../utils/format'
+import { abbreviateUsd, abbreviateNumber, formatUsd, formatTokenAmount } from '../../utils/format'
 import { riskDotColor } from './MarketsView/helpers'
 import { AssetPopover } from './AssetPopover'
 
@@ -322,6 +322,7 @@ export const ConfigMarketView: React.FC<Props> = ({
                 userPositions={userPositions}
                 highlightMap={highlightMap}
                 onRowClick={handleRowClick}
+                poolMap={poolMap}
               />
             </div>
 
@@ -339,6 +340,7 @@ export const ConfigMarketView: React.FC<Props> = ({
                 userPositions={userPositions}
                 highlightMap={highlightMap}
                 onRowClick={handleRowClick}
+                poolMap={poolMap}
               />
             </div>
           </div>
@@ -396,6 +398,7 @@ interface ConfigTableProps {
   userPositions: Map<string, UserPositionEntry>
   highlightMap: Map<string, PoolRole>
   onRowClick: (marketUid: string) => void
+  poolMap: Map<string, PoolDataItem>
 }
 
 const ConfigTable: React.FC<ConfigTableProps> = ({
@@ -405,6 +408,7 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
   userPositions,
   highlightMap,
   onRowClick,
+  poolMap,
 }) => {
   if (!items || items.length === 0) {
     return (
@@ -461,42 +465,67 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
                   <td className="max-w-36">
                     <AssetCell item={item} hasPosition={!!hasPosition} />
                   </td>
-                  {type === 'collateral' ? (
-                    <>
-                      <td>
-                        <span className="text-xs font-medium">
-                          {(item.borrowCollateralFactor * 100).toFixed(0)}%
-                        </span>
-                      </td>
-                      <td>
-                        <AprCell rate={item.depositRate} iy={iy} color="success" />
-                      </td>
-                      <td>
-                        <span className="text-xs" title={`$${formatUsd(item.totalDepositsUsd)}`}>
-                          {abbreviateUsd(item.totalDepositsUsd)}
-                        </span>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td>
-                        <AprCell rate={item.variableBorrowRate} iy={iy} color="warning" />
-                      </td>
-                      <td>
-                        <span
-                          className="text-xs"
-                          title={`$${formatUsd(item.totalDepositsUsd - item.totalDebtUsd)}`}
-                        >
-                          {abbreviateUsd(item.totalDepositsUsd - item.totalDebtUsd)}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="text-xs" title={`$${formatUsd(item.totalDebtUsd)}`}>
-                          {abbreviateUsd(item.totalDebtUsd)}
-                        </span>
-                      </td>
-                    </>
-                  )}
+                  {(() => {
+                    const pool = poolMap.get(item.marketUid)
+                    const sym = item.underlyingInfo.asset.symbol
+                    if (type === 'collateral') {
+                      return (
+                        <>
+                          <td>
+                            <span className="text-xs font-medium">
+                              {(item.borrowCollateralFactor * 100).toFixed(0)}%
+                            </span>
+                          </td>
+                          <td>
+                            <AprCell rate={item.depositRate} iy={iy} color="success" />
+                          </td>
+                          <td>
+                            <div className="flex flex-col">
+                              <span className="text-xs" title={`$${formatUsd(item.totalDepositsUsd)}`}>
+                                {abbreviateUsd(item.totalDepositsUsd)}
+                              </span>
+                              {pool && (
+                                <span className="text-[10px] text-base-content/50" title={formatTokenAmount(pool.totalDeposits)}>
+                                  {abbreviateNumber(pool.totalDeposits)} {sym}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </>
+                      )
+                    }
+                    return (
+                      <>
+                        <td>
+                          <AprCell rate={item.variableBorrowRate} iy={iy} color="warning" />
+                        </td>
+                        <td>
+                          <div className="flex flex-col">
+                            <span className="text-xs" title={`$${formatUsd(item.totalDepositsUsd - item.totalDebtUsd)}`}>
+                              {abbreviateUsd(item.totalDepositsUsd - item.totalDebtUsd)}
+                            </span>
+                            {pool && (
+                              <span className="text-[10px] text-base-content/50" title={formatTokenAmount(pool.totalLiquidity)}>
+                                {abbreviateNumber(pool.totalLiquidity)} {sym}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="flex flex-col">
+                            <span className="text-xs" title={`$${formatUsd(item.totalDebtUsd)}`}>
+                              {abbreviateUsd(item.totalDebtUsd)}
+                            </span>
+                            {pool && (
+                              <span className="text-[10px] text-base-content/50" title={formatTokenAmount(pool.totalDebt)}>
+                                {abbreviateNumber(pool.totalDebt)} {sym}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    )
+                  })()}
                 </tr>
               )
             })}
@@ -543,19 +572,34 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
                 </div>
               </div>
               <div className="flex items-center justify-between mt-2 text-xs text-base-content/70">
-                {type === 'collateral' ? (
-                  <>
-                    <span>
-                      LTV: <span className="font-medium">{(item.borrowCollateralFactor * 100).toFixed(0)}%</span>
-                    </span>
-                    <span>Dep: {abbreviateUsd(item.totalDepositsUsd)}</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Liq: {abbreviateUsd(item.totalDepositsUsd - item.totalDebtUsd)}</span>
-                    <span>Debt: {abbreviateUsd(item.totalDebtUsd)}</span>
-                  </>
-                )}
+                {(() => {
+                  const pool = poolMap.get(item.marketUid)
+                  if (type === 'collateral') {
+                    return (
+                      <>
+                        <span>
+                          LTV: <span className="font-medium">{(item.borrowCollateralFactor * 100).toFixed(0)}%</span>
+                        </span>
+                        <span title={pool ? `${formatTokenAmount(pool.totalDeposits)} ${item.underlyingInfo.asset.symbol}` : undefined}>
+                          Dep: {abbreviateUsd(item.totalDepositsUsd)}
+                          {pool && <span className="text-base-content/40"> ({abbreviateNumber(pool.totalDeposits)})</span>}
+                        </span>
+                      </>
+                    )
+                  }
+                  return (
+                    <>
+                      <span title={pool ? `${formatTokenAmount(pool.totalLiquidity)} ${item.underlyingInfo.asset.symbol}` : undefined}>
+                        Liq: {abbreviateUsd(item.totalDepositsUsd - item.totalDebtUsd)}
+                        {pool && <span className="text-base-content/40"> ({abbreviateNumber(pool.totalLiquidity)})</span>}
+                      </span>
+                      <span title={pool ? `${formatTokenAmount(pool.totalDebt)} ${item.underlyingInfo.asset.symbol}` : undefined}>
+                        Debt: {abbreviateUsd(item.totalDebtUsd)}
+                        {pool && <span className="text-base-content/40"> ({abbreviateNumber(pool.totalDebt)})</span>}
+                      </span>
+                    </>
+                  )
+                })()}
               </div>
             </div>
           )

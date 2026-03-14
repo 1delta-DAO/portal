@@ -30,10 +30,24 @@ export function abbreviateUsd(v: number): string {
   if (!Number.isFinite(v) || v === 0) return '$0'
   const abs = Math.abs(v)
   const sign = v < 0 ? '-' : ''
+  if (abs >= 1_000_000_000_000) return `${sign}$${(abs / 1_000_000_000_000).toFixed(2)}T`
   if (abs >= 1_000_000_000) return `${sign}$${(abs / 1_000_000_000).toFixed(2)}B`
   if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`
   if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`
   return `${sign}$${abs.toFixed(2)}`
+}
+
+export function abbreviateNumber(v: number): string {
+  if (!Number.isFinite(v) || v === 0) return '0'
+  const abs = Math.abs(v)
+  const sign = v < 0 ? '-' : ''
+  if (abs >= 1_000_000_000_000) return `${sign}${(abs / 1_000_000_000_000).toFixed(2)}T`
+  if (abs >= 1_000_000_000) return `${sign}${(abs / 1_000_000_000).toFixed(2)}B`
+  if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(2)}M`
+  if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(1)}K`
+  if (abs < 0.0001) return `${sign}<0.0001`
+  if (abs < 1) return `${sign}${abs.toFixed(4)}`
+  return `${sign}${abs.toFixed(2)}`
 }
 
 export function formatTokenAmount(v: number | string): string {
