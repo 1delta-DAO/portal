@@ -220,7 +220,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                       <div
                         className="tooltip tooltip-left"
                         data-tip={p.risk.breakdown
-                          .map((b) => `${b.category}: ${b.label}`)
+                          .map((b) => `${b.category}: ${b.label}${b.curatorValidated ? ' ✓' : ''}`)
                           .join(' · ')}
                       >
                         <span className="inline-flex items-center gap-1.5 text-xs text-base-content/70 cursor-help">
@@ -371,7 +371,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                 {p.risk && (
                   <div
                     className="tooltip tooltip-left"
-                    data-tip={p.risk.breakdown.map((b) => `${b.category}: ${b.label}`).join(' · ')}
+                    data-tip={p.risk.breakdown.map((b) => `${b.category}: ${b.label}${b.curatorValidated ? ' ✓' : ''}`).join(' · ')}
                   >
                     <span className="inline-flex items-center gap-1 text-[10px] text-base-content/60 cursor-help">
                       <span

@@ -206,10 +206,17 @@ export const ConfigMarketView: React.FC<Props> = ({
                     </td>
                     <td>
                       {g.configRiskLabel ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs text-base-content/70">
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${riskDotColor(g.configRiskLabel)}`} />
-                          {g.configRiskLabel}
-                        </span>
+                        <div
+                          className={g.configRiskBreakdown?.length ? 'tooltip tooltip-left' : ''}
+                          data-tip={g.configRiskBreakdown
+                            ?.map((b) => `${b.category}: ${b.label}${b.curatorValidated ? ' ✓' : ''}`)
+                            .join(' · ')}
+                        >
+                          <span className="inline-flex items-center gap-1.5 text-xs text-base-content/70 cursor-help">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${riskDotColor(g.configRiskLabel)}`} />
+                            {g.configRiskLabel}
+                          </span>
+                        </div>
                       ) : (
                         <span className="text-xs text-base-content/40">—</span>
                       )}
@@ -246,10 +253,17 @@ export const ConfigMarketView: React.FC<Props> = ({
                   </span>
                   <div className="flex items-center gap-2">
                     {g.configRiskLabel && (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-base-content/60">
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskDotColor(g.configRiskLabel)}`} />
-                        {g.configRiskLabel}
-                      </span>
+                      <div
+                        className={g.configRiskBreakdown?.length ? 'tooltip tooltip-left' : ''}
+                        data-tip={g.configRiskBreakdown
+                          ?.map((b) => `${b.category}: ${b.label}${b.curatorValidated ? ' ✓' : ''}`)
+                          .join(' · ')}
+                      >
+                        <span className="inline-flex items-center gap-1 text-[10px] text-base-content/60 cursor-help">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskDotColor(g.configRiskLabel)}`} />
+                          {g.configRiskLabel}
+                        </span>
+                      </div>
                     )}
                     <span className="text-xs text-base-content/70" title={`$${formatUsd(liquidity)}`}>
                       {abbreviateUsd(liquidity)}

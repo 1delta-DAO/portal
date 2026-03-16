@@ -74,6 +74,8 @@ export interface PoolRiskBreakdown {
   category: string
   score: number | null
   label: string
+  curatorValidated?: boolean
+  curatorIds?: string[]
 }
 
 export interface PoolRisk {

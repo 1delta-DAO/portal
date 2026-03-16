@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import type { PoolRiskBreakdown } from './useFlattenedPools'
 import { BACKEND_BASE_URL } from '../../config/backend'
 
 const endpointLendingLatest = `${BACKEND_BASE_URL}/v1/data/lending/latest?chains=`
@@ -205,6 +206,7 @@ export interface PoolConfigGroup {
   borrowables: ConfigMarketItem[] | null
   configRiskScore: number | null
   configRiskLabel: string | null
+  configRiskBreakdown?: PoolRiskBreakdown[]
 }
 
 export interface ConfigMarketItem {
