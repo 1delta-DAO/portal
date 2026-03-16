@@ -31,6 +31,7 @@ export function TokenSelectorModal({
   showChainSelector = false,
   initialChainId,
 }: TokenSelectorModalProps) {
+  const { chains } = useChains()
   const [chainId, setChainId] = useState<string | undefined>(
     initialChainId ?? currency?.chainId ?? '137'
   )
@@ -94,7 +95,7 @@ export function TokenSelectorModal({
             />
             {showChainSelector && (
               <div className="min-w-40">
-                <ChainFilterSelect chains={useChains()} value={chainId ?? ''} onChange={handleChainChange} />
+                <ChainFilterSelect chains={chains} value={chainId ?? ''} onChange={handleChainChange} />
               </div>
             )}
           </div>

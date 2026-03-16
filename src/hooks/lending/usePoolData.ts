@@ -261,7 +261,7 @@ export interface ConfigMarketItem {
  * Fetches public lending data for a specific chain.
  * Returns pools grouped by lender key.
  */
-export function useMarginPublicData(chainId: string) {
+export function useMarginPublicData(chainId: string, enabled = true) {
   const {
     data: lenderData,
     isLoading,
@@ -269,6 +269,7 @@ export function useMarginPublicData(chainId: string) {
     error,
   } = useQuery<LenderData>({
     queryKey: ['lendingPublic', chainId],
+    enabled,
     queryFn: async () => {
       const r = await fetch(endpointLendingLatest + chainId)
       if (!r.ok) {

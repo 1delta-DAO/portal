@@ -20,7 +20,7 @@ export type SubTab = 'earn' | 'lending' | 'trading' | 'swap'
 
 export function LenderTab() {
   const { address: account } = useAccount()
-  const chains = useChains()
+  const { chains, isLoading: isChainsLoading } = useChains()
   const navigate = useNavigate()
   const { tab: tabSlug, chainId: chainIdParam, lender: lenderParam } = useParams()
 
@@ -62,17 +62,19 @@ export function LenderTab() {
   // Single-asset filter (click a row in UserAssetsTable)
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
 
-  const { lenderData, isPublicDataLoading } = useMarginPublicData(effectiveChainId)
+  const chainsReady = !isChainsLoading
+  const { lenderData, isPublicDataLoading } = useMarginPublicData(effectiveChainId, chainsReady)
   const { userData, isUserDataLoading, error, refetch } = useUserData({
     chainId: effectiveChainId,
     account,
+    enabled: chainsReady,
   })
-  const { data: tokens } = useTokenLists(effectiveChainId)
+  const { data: tokens } = useTokenLists(chainsReady ? effectiveChainId : undefined)
   const {
     balances: lendingBalances,
     isLoading: isLendingBalancesLoading,
     error: lendingBalancesError,
-  } = useLendingBalances({ chainId: effectiveChainId, account })
+  } = useLendingBalances({ chainId: effectiveChainId, account, enabled: chainsReady })
 
   const isLoading = isPublicDataLoading || isUserDataLoading
 
@@ -82,6 +84,15 @@ export function LenderTab() {
     if (!filterOwned || lendingBalances.length === 0) return ''
     return lendingBalances.map((b) => b.address.toLowerCase()).join(',')
   }, [selectedAsset, filterOwned, lendingBalances])
+
+  if (isChainsLoading) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-12 text-base-content/50">
+        <span className="loading loading-spinner loading-md" />
+        <span className="text-sm">Loading chains...</span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">

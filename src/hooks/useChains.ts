@@ -8,8 +8,8 @@ interface ChainsApiResponse {
 
 const DEFAULT_CHAINS = ['1']
 
-export function useChains(): string[] {
-  const { data } = useQuery<string[]>({
+export function useChains(): { chains: string[]; isLoading: boolean } {
+  const { data, isLoading } = useQuery<string[]>({
     queryKey: ['chains'],
     queryFn: async () => {
       const res = await fetch(`${BACKEND_BASE_URL}/v1/data/chains`)
@@ -18,8 +18,7 @@ export function useChains(): string[] {
       return json.data.items
     },
     staleTime: 5 * 60_000,
-    placeholderData: DEFAULT_CHAINS,
   })
 
-  return data ?? DEFAULT_CHAINS
+  return { chains: data ?? DEFAULT_CHAINS, isLoading }
 }

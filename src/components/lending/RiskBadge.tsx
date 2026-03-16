@@ -26,6 +26,7 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ label, breakdown, size = '
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const triggerRef = useRef<HTMLSpanElement | null>(null)
+  const popoverRef = useRef<HTMLDivElement | null>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const show = () => {
@@ -35,6 +36,27 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ label, breakdown, size = '
     setPos({ top: rect.bottom + 4, left: rect.left })
     setOpen(true)
   }
+
+  // Reposition after the popover renders so we can measure it
+  React.useLayoutEffect(() => {
+    if (!open || !popoverRef.current || !triggerRef.current) return
+    const popRect = popoverRef.current.getBoundingClientRect()
+    const trigRect = triggerRef.current.getBoundingClientRect()
+    const gap = 4
+    let top = trigRect.bottom + gap
+    let left = trigRect.left
+
+    // Flip above if it would clip the bottom
+    if (top + popRect.height > window.innerHeight) {
+      top = trigRect.top - popRect.height - gap
+    }
+    // Nudge left if it would clip the right edge
+    if (left + popRect.width > window.innerWidth) {
+      left = window.innerWidth - popRect.width - 8
+    }
+
+    setPos({ top, left })
+  }, [open])
 
   const hide = () => {
     closeTimer.current = setTimeout(() => setOpen(false), 150)
@@ -76,6 +98,7 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ label, breakdown, size = '
         hasBreakdown &&
         createPortal(
           <div
+            ref={popoverRef}
             className="fixed z-9999 bg-base-100 border border-base-300 rounded-lg shadow-lg p-3 min-w-45"
             style={{ top: pos.top, left: pos.left }}
             onMouseEnter={keepOpen}
@@ -102,9 +125,9 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ label, breakdown, size = '
                 const curators = [...new Set(breakdown.flatMap((b) => b.curatorIds ?? []))]
                 if (curators.length === 0) return null
                 return (
-                  <div className="flex items-center justify-between gap-4 pt-1 mt-0.5 border-t border-base-300">
-                    <span className="text-xs text-base-content/70">Curators</span>
-                    <span className="text-xs text-base-content/60">{curators.join(', ')}</span>
+                  <div className="flex items-start justify-between gap-4 pt-1 mt-0.5 border-t border-base-300">
+                    <span className="text-xs text-base-content/70 shrink-0">Curators</span>
+                    <span className="text-xs text-base-content/60 text-right wrap-break-word min-w-0">{curators.join(', ')}</span>
                   </div>
                 )
               })()}
