@@ -53,7 +53,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
       marketUidIn: debtInPool.marketUid,
       marketUidOut: debtOutPool.marketUid,
       amount: parseUnits(amount || '0', debtOutPool.asset.decimals).toString(),
-      slippage: parseFloat(slippage) || 0.3,
+      slippage: (parseFloat(slippage) || 0.3) * 100,
       irModeIn: LendingMode.VARIABLE,
       irModeOut: LendingMode.VARIABLE,
       tradeType,

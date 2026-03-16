@@ -139,7 +139,7 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
   const [activeField, setActiveField] = useState<'input' | 'output'>('input')
 
   // Slippage
-  const [slippage, setSlippage] = useState('50') // basis points
+  const [slippage, setSlippage] = useState('0.5')
 
   // Swap hook
   const {
@@ -292,7 +292,7 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
       tokenIn: resolvedTokenInAddress,
       tokenOut: resolvedTokenOutAddress,
       amount: amountWei,
-      slippage: parseFloat(slippage) || 50,
+      slippage: (parseFloat(slippage) || 0.5) * 100,
       tradeType: tradeType as 0 | 1,
       account,
     })

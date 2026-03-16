@@ -55,7 +55,7 @@ export const CloseAction: React.FC<TradingActionProps> = ({
       marketUidIn: collateralPool.marketUid,
       marketUidOut: debtPool.marketUid,
       amount: parseUnits(amount || '0', collateralPool.asset.decimals).toString(),
-      slippage: parseFloat(slippage) || 0.3,
+      slippage: (parseFloat(slippage) || 0.3) * 100,
       irModeOut: LendingMode.VARIABLE,
       tradeType,
       isMaxOut,

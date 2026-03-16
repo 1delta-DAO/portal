@@ -120,7 +120,8 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
   }, [])
 
   const toggle = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation()
+    // Don't stop propagation — let the click bubble up so parent row
+    // handlers (e.g. market selection) still fire.
     if (visible) {
       setVisible(false)
       return

@@ -2,9 +2,10 @@ import React from 'react'
 import type { PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import { abbreviateUsd, formatUsd } from '../../../utils/format'
 import { getFormattedPrice } from '../../../utils/price'
-import { computePoolMetrics, riskDotColor, type SortKey } from './helpers'
+import { computePoolMetrics, type SortKey } from './helpers'
 import { ExposureCell } from './ExposureCell'
 import { AssetPopover } from '../AssetPopover'
+import { RiskBadge } from '../RiskBadge'
 import { lenderDisplayName } from '@1delta/lib-utils'
 
 interface MarketsTableProps {
@@ -132,7 +133,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
               return (
                 <tr
                   key={p.marketUid}
-                  className={`h-[75px] cursor-pointer transition-colors ${
+                  className={`h-18.75 cursor-pointer transition-colors ${
                     selected ? 'bg-primary/10' : 'hover:bg-base-content/5'
                   }`}
                   onClick={() => onRowClick(p)}
@@ -217,19 +218,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                   </td>
                   <td>
                     {p.risk ? (
-                      <div
-                        className="tooltip tooltip-left"
-                        data-tip={p.risk.breakdown
-                          .map((b) => `${b.category}: ${b.label}${b.curatorValidated ? ' ✓' : ''}`)
-                          .join(' · ')}
-                      >
-                        <span className="inline-flex items-center gap-1.5 text-xs text-base-content/70 cursor-help">
-                          <span
-                            className={`w-2 h-2 rounded-full shrink-0 ${riskDotColor(p.risk.label)}`}
-                          />
-                          {p.risk.label}
-                        </span>
-                      </div>
+                      <RiskBadge label={p.risk.label} breakdown={p.risk.breakdown} />
                     ) : (
                       <span className="text-xs text-base-content/40">—</span>
                     )}
@@ -369,17 +358,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                 <span>Dep: {abbreviateUsd(totalDepositsUSD)}</span>
                 <span>Liq: {abbreviateUsd(totalLiquidityUSD)}</span>
                 {p.risk && (
-                  <div
-                    className="tooltip tooltip-left"
-                    data-tip={p.risk.breakdown.map((b) => `${b.category}: ${b.label}${b.curatorValidated ? ' ✓' : ''}`).join(' · ')}
-                  >
-                    <span className="inline-flex items-center gap-1 text-[10px] text-base-content/60 cursor-help">
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskDotColor(p.risk.label)}`}
-                      />
-                      {p.risk.label}
-                    </span>
-                  </div>
+                  <RiskBadge label={p.risk.label} breakdown={p.risk.breakdown} size="sm" />
                 )}
               </div>
             </div>

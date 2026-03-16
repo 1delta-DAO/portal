@@ -5,6 +5,7 @@ import type { TableHighlight, PoolRole } from './types'
 import { abbreviateUsd, abbreviateNumber, formatUsd, formatTokenAmount } from '../../../utils/format'
 import { AssetPopover } from '../AssetPopover'
 import { sortPools, type SortKey, LtvBadge } from '../Dashboard'
+import { RiskBadge } from '../RiskBadge'
 
 const PAGE_SIZE = 25
 
@@ -133,6 +134,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
               >
                 Liquidity{sortArrow('totalLiquidityUSD')}
               </th>
+              <th>Risk</th>
             </tr>
           </thead>
           <tbody>
@@ -250,12 +252,19 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                       </span>
                     </div>
                   </td>
+                  <td>
+                    {pool.risk ? (
+                      <RiskBadge label={pool.risk.label} breakdown={pool.risk.breakdown} />
+                    ) : (
+                      <span className="text-xs text-base-content/40">—</span>
+                    )}
+                  </td>
                 </tr>
               )
             })}
             {pagedPools.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-6 text-sm text-base-content/60">
+                <td colSpan={8} className="text-center py-6 text-sm text-base-content/60">
                   No pools match your search.
                 </td>
               </tr>
@@ -366,6 +375,9 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                 <LtvBadge config={pool.config} variant="inline" />
                 <span title={`${formatTokenAmount(pool.totalDeposits)} ${pool.asset.symbol}`}>Dep: {abbreviateUsd(pool.totalDepositsUSD)} <span className="text-base-content/40">({abbreviateNumber(pool.totalDeposits)})</span></span>
                 <span title={`${formatTokenAmount(pool.totalLiquidity)} ${pool.asset.symbol}`}>Liq: {abbreviateUsd(pool.totalLiquidityUSD)} <span className="text-base-content/40">({abbreviateNumber(pool.totalLiquidity)})</span></span>
+                {pool.risk && (
+                  <RiskBadge label={pool.risk.label} breakdown={pool.risk.breakdown} size="sm" />
+                )}
               </div>
             </div>
           )

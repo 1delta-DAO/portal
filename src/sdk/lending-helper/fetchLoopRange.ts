@@ -119,6 +119,8 @@ export async function fetchLoopRange(params: {
   account: string
   marketUidIn?: string
   marketUidOut?: string
+  payAsset?: string
+  payAmount?: string
 }): Promise<LoopRangeResult> {
   try {
     const qs = new URLSearchParams()
@@ -127,6 +129,8 @@ export async function fetchLoopRange(params: {
     qs.set('account', params.account)
     if (params.marketUidIn) qs.set('marketUidIn', params.marketUidIn)
     if (params.marketUidOut) qs.set('marketUidOut', params.marketUidOut)
+    if (params.payAsset) qs.set('payAsset', params.payAsset)
+    if (params.payAmount) qs.set('payAmount', params.payAmount)
 
     const res = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/range?${qs}`)
 
@@ -158,6 +162,8 @@ export async function fetchLoopRangeWithSimulation(params: {
   body: LoopRangeSimulationBody
   marketUidIn?: string
   marketUidOut?: string
+  payAsset?: string
+  payAmount?: string
 }): Promise<LoopRangeResult> {
   try {
     const qs = new URLSearchParams()
@@ -165,6 +171,8 @@ export async function fetchLoopRangeWithSimulation(params: {
     qs.set('chainId', params.chainId)
     if (params.marketUidIn) qs.set('marketUidIn', params.marketUidIn)
     if (params.marketUidOut) qs.set('marketUidOut', params.marketUidOut)
+    if (params.payAsset) qs.set('payAsset', params.payAsset)
+    if (params.payAmount) qs.set('payAmount', params.payAmount)
 
     const res = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/range?${qs}`, {
       method: 'POST',

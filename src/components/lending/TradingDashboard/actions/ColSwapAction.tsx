@@ -53,7 +53,7 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
       marketUidIn: colInPool.marketUid,
       marketUidOut: colOutPool.marketUid,
       amount: parseUnits(amount || '0', colInPool.asset.decimals).toString(),
-      slippage: parseFloat(slippage) || 0.3,
+      slippage: (parseFloat(slippage) || 0.3) * 100,
       irModeIn: LendingMode.NONE,
       irModeOut: LendingMode.NONE,
       tradeType,

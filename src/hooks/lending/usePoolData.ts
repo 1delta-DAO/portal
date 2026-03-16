@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { PoolRiskBreakdown } from './useFlattenedPools'
+import type { PoolRiskBreakdown, PoolRisk } from './useFlattenedPools'
 import { BACKEND_BASE_URL } from '../../config/backend'
 
 const endpointLendingLatest = `${BACKEND_BASE_URL}/v1/data/lending/latest?chains=`
@@ -62,6 +62,7 @@ interface RawMarket {
     oraclePrice: { oraclePrice: number | null; oraclePriceUsd: number | null } | null
     prices: Record<string, unknown> | null
   }
+  risk?: PoolRisk | null
   params?: any
 }
 
@@ -103,6 +104,7 @@ export interface PoolDataItem {
   isFrozen: boolean
   oraclePrice?: number
   oraclePriceUSD?: number
+  risk?: PoolRisk | null
   params?: any
 }
 
@@ -182,6 +184,7 @@ function rawMarketToPoolDataItem(raw: RawMarket): PoolDataItem {
     isFrozen: raw.flags?.isFrozen ?? false,
     oraclePrice: info.oraclePrice?.oraclePrice ?? undefined,
     oraclePriceUSD: info.oraclePrice?.oraclePriceUsd ?? undefined,
+    risk: raw.risk ?? null,
     params: raw.params,
   }
 }

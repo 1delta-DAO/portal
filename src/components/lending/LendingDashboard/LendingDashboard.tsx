@@ -59,7 +59,7 @@ export function LendingDashboard({
   const [actionTab, setActionTab] = useState<ActionType>('Deposit')
 
   // View mode: default flat list vs config-grouped view
-  const [viewMode, setViewMode] = useState<'default' | 'config'>('default')
+  const [viewMode, setViewMode] = useState<'default' | 'config'>('config')
 
   // Search & sort state
   const [assetSearch, setAssetSearch] = useState('')
@@ -287,17 +287,6 @@ export function LendingDashboard({
               <button
                 type="button"
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                  viewMode === 'default'
-                    ? 'bg-base-100 shadow-sm text-base-content'
-                    : 'text-base-content/60 hover:text-base-content'
-                }`}
-                onClick={() => setViewMode('default')}
-              >
-                Default
-              </button>
-              <button
-                type="button"
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                   viewMode === 'config'
                     ? 'bg-base-100 shadow-sm text-base-content'
                     : 'text-base-content/60 hover:text-base-content'
@@ -305,6 +294,17 @@ export function LendingDashboard({
                 onClick={() => setViewMode('config')}
               >
                 By Config
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'default'
+                    ? 'bg-base-100 shadow-sm text-base-content'
+                    : 'text-base-content/60 hover:text-base-content'
+                }`}
+                onClick={() => setViewMode('default')}
+              >
+                Default
               </button>
             </div>
           </div>
@@ -342,10 +342,7 @@ export function LendingDashboard({
 
       {/* Mobile action panel modal */}
       {isMobile && showMobileAction && (
-        <MobileActionModal
-          {...actionPanelProps}
-          onClose={() => setShowMobileAction(false)}
-        />
+        <MobileActionModal {...actionPanelProps} onClose={() => setShowMobileAction(false)} />
       )}
     </div>
   )

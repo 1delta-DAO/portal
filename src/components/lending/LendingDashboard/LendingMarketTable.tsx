@@ -1,9 +1,15 @@
 import React, { useMemo, useState } from 'react'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry } from '../../../hooks/lending/useUserData'
-import { abbreviateUsd, abbreviateNumber, formatUsd, formatTokenAmount } from '../../../utils/format'
-import { sortPools, type SortKey, LtvBadge } from '../Dashboard'
+import {
+  abbreviateUsd,
+  abbreviateNumber,
+  formatUsd,
+  formatTokenAmount,
+} from '../../../utils/format'
+import { type SortKey, LtvBadge } from '../Dashboard'
 import { AssetPopover } from '../AssetPopover'
+import { RiskBadge } from '../RiskBadge'
 
 const PAGE_SIZE = 25
 
@@ -43,7 +49,9 @@ export const LendingMarketTable: React.FC<Props> = ({
   )
 
   const sortArrow = (key: SortKey) =>
-    sortKey === key ? <span className="ml-1 text-xs">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span> : null
+    sortKey === key ? (
+      <span className="ml-1 text-xs">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>
+    ) : null
 
   return (
     <div className="rounded-box border border-base-300 overflow-hidden">
@@ -97,6 +105,7 @@ export const LendingMarketTable: React.FC<Props> = ({
               >
                 Liquidity{sortArrow('totalLiquidityUSD')}
               </th>
+              <th>Risk</th>
             </tr>
           </thead>
           <tbody>
@@ -127,9 +136,7 @@ export const LendingMarketTable: React.FC<Props> = ({
                       marketUid={pool.marketUid}
                       marketName={pool.name}
                       currentUtilization={
-                        pool.totalDeposits > 0
-                          ? pool.totalDebt / pool.totalDeposits
-                          : undefined
+                        pool.totalDeposits > 0 ? pool.totalDebt / pool.totalDeposits : undefined
                       }
                       currentDepositRate={depositTotal}
                       currentBorrowRate={borrowTotal}
@@ -137,10 +144,7 @@ export const LendingMarketTable: React.FC<Props> = ({
                       chainId={pool.asset.chainId}
                     >
                       <div className="flex flex-col min-w-0">
-                        <span
-                          className="font-medium text-sm truncate"
-                          title={pool.asset.symbol}
-                        >
+                        <span className="font-medium text-sm truncate" title={pool.asset.symbol}>
                           {pool.asset.symbol}
                           {pool.isFrozen && (
                             <span
@@ -198,7 +202,10 @@ export const LendingMarketTable: React.FC<Props> = ({
                       <span className="text-xs" title={`$${formatUsd(pool.totalDepositsUSD)}`}>
                         {abbreviateUsd(pool.totalDepositsUSD)}
                       </span>
-                      <span className="text-[10px] text-base-content/50" title={formatTokenAmount(pool.totalDeposits)}>
+                      <span
+                        className="text-[10px] text-base-content/50"
+                        title={formatTokenAmount(pool.totalDeposits)}
+                      >
                         {abbreviateNumber(pool.totalDeposits)} {pool.asset.symbol}
                       </span>
                     </div>
@@ -208,7 +215,10 @@ export const LendingMarketTable: React.FC<Props> = ({
                       <span className="text-xs" title={`$${formatUsd(pool.totalDebtUSD)}`}>
                         {abbreviateUsd(pool.totalDebtUSD)}
                       </span>
-                      <span className="text-[10px] text-base-content/50" title={formatTokenAmount(pool.totalDebt)}>
+                      <span
+                        className="text-[10px] text-base-content/50"
+                        title={formatTokenAmount(pool.totalDebt)}
+                      >
                         {abbreviateNumber(pool.totalDebt)} {pool.asset.symbol}
                       </span>
                     </div>
@@ -218,17 +228,27 @@ export const LendingMarketTable: React.FC<Props> = ({
                       <span className="text-xs" title={`$${formatUsd(pool.totalLiquidityUSD)}`}>
                         {abbreviateUsd(pool.totalLiquidityUSD)}
                       </span>
-                      <span className="text-[10px] text-base-content/50" title={formatTokenAmount(pool.totalLiquidity)}>
+                      <span
+                        className="text-[10px] text-base-content/50"
+                        title={formatTokenAmount(pool.totalLiquidity)}
+                      >
                         {abbreviateNumber(pool.totalLiquidity)} {pool.asset.symbol}
                       </span>
                     </div>
+                  </td>
+                  <td>
+                    {pool.risk ? (
+                      <RiskBadge label={pool.risk.label} breakdown={pool.risk.breakdown} />
+                    ) : (
+                      <span className="text-xs text-base-content/40">—</span>
+                    )}
                   </td>
                 </tr>
               )
             })}
             {pagedPools.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-6 text-sm text-base-content/60">
+                <td colSpan={8} className="text-center py-6 text-sm text-base-content/60">
                   No pools match your search.
                 </td>
               </tr>
@@ -292,7 +312,15 @@ const MobilePoolCards: React.FC<{
   sortKey: SortKey
   sortDir: 'asc' | 'desc'
   onToggleSort: (key: SortKey) => void
-}> = ({ pools, userPositions, selectedMarketUid, onPoolSelect, sortKey, sortDir, onToggleSort }) => {
+}> = ({
+  pools,
+  userPositions,
+  selectedMarketUid,
+  onPoolSelect,
+  sortKey,
+  sortDir,
+  onToggleSort,
+}) => {
   const sortLabels: Record<string, string> = {
     depositApr: 'Dep APR',
     borrowApr: 'Bor APR',
@@ -323,8 +351,7 @@ const MobilePoolCards: React.FC<{
       {pools.map((pool) => {
         const isSelected = selectedMarketUid === pool.marketUid
         const userPos = userPositions.get(pool.marketUid)
-        const hasPosition =
-          userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
+        const hasPosition = userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
         const mIy = pool.intrinsicYield ?? 0
         const mDepTotal = pool.depositRate + mIy
         const mBorTotal = pool.variableBorrowRate + mIy
@@ -355,23 +382,16 @@ const MobilePoolCards: React.FC<{
                 <div className="flex flex-col min-w-0">
                   <span className="font-semibold text-sm truncate" title={pool.asset.symbol}>
                     {pool.asset.symbol}
-                    {pool.isFrozen && (
-                      <span className="ml-1 text-warning text-xs">&#x2744;</span>
-                    )}
+                    {pool.isFrozen && <span className="ml-1 text-warning text-xs">&#x2744;</span>}
                   </span>
-                  <span
-                    className="text-[11px] text-base-content/60 truncate"
-                    title={pool.name}
-                  >
+                  <span className="text-[11px] text-base-content/60 truncate" title={pool.name}>
                     {pool.name}
                   </span>
                 </div>
               </AssetPopover>
               <div className="text-right shrink-0">
                 <div className="flex items-center justify-end gap-1">
-                  <span className="font-bold text-sm text-success">
-                    {mDepTotal.toFixed(2)}%
-                  </span>
+                  <span className="font-bold text-sm text-success">{mDepTotal.toFixed(2)}%</span>
                   {mIy > 0 && (
                     <span
                       className="badge badge-xs bg-success/15 text-success border-0"
@@ -386,8 +406,7 @@ const MobilePoolCards: React.FC<{
             </div>
             <div className="flex items-center justify-between mt-2 text-xs text-base-content/70">
               <span>
-                Borrow:{' '}
-                <span className="text-warning font-medium">{mBorTotal.toFixed(2)}%</span>
+                Borrow: <span className="text-warning font-medium">{mBorTotal.toFixed(2)}%</span>
                 {mIy > 0 && (
                   <span
                     className="badge badge-xs bg-warning/15 text-warning border-0 ml-1"
@@ -398,8 +417,21 @@ const MobilePoolCards: React.FC<{
                 )}
               </span>
               <LtvBadge config={pool.config} variant="inline" />
-              <span title={`${formatTokenAmount(pool.totalDeposits)} ${pool.asset.symbol}`}>Dep: {abbreviateUsd(pool.totalDepositsUSD)} <span className="text-base-content/40">({abbreviateNumber(pool.totalDeposits)})</span></span>
-              <span title={`${formatTokenAmount(pool.totalLiquidity)} ${pool.asset.symbol}`}>Liq: {abbreviateUsd(pool.totalLiquidityUSD)} <span className="text-base-content/40">({abbreviateNumber(pool.totalLiquidity)})</span></span>
+              <span title={`${formatTokenAmount(pool.totalDeposits)} ${pool.asset.symbol}`}>
+                Dep: {abbreviateUsd(pool.totalDepositsUSD)}{' '}
+                <span className="text-base-content/40">
+                  ({abbreviateNumber(pool.totalDeposits)})
+                </span>
+              </span>
+              <span title={`${formatTokenAmount(pool.totalLiquidity)} ${pool.asset.symbol}`}>
+                Liq: {abbreviateUsd(pool.totalLiquidityUSD)}{' '}
+                <span className="text-base-content/40">
+                  ({abbreviateNumber(pool.totalLiquidity)})
+                </span>
+              </span>
+              {pool.risk && (
+                <RiskBadge label={pool.risk.label} breakdown={pool.risk.breakdown} size="sm" />
+              )}
             </div>
           </div>
         )

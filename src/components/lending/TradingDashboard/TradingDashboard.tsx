@@ -66,7 +66,7 @@ export function TradingDashboard({
   const [activeOperation, setActiveOperation] = useState<TradingOperation>('Loop')
   const [selectedPools, setSelectedPools] = useState<SelectedPool[]>([])
   const [showMobileAction, setShowMobileAction] = useState(false)
-  const [viewMode, setViewMode] = useState<'default' | 'config'>('default')
+  const [viewMode, setViewMode] = useState<'default' | 'config'>('config')
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
 
   // Sub-accounts
@@ -292,17 +292,6 @@ export function TradingDashboard({
               <button
                 type="button"
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                  viewMode === 'default'
-                    ? 'bg-base-100 shadow-sm text-base-content'
-                    : 'text-base-content/60 hover:text-base-content'
-                }`}
-                onClick={() => setViewMode('default')}
-              >
-                Default
-              </button>
-              <button
-                type="button"
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                   viewMode === 'config'
                     ? 'bg-base-100 shadow-sm text-base-content'
                     : 'text-base-content/60 hover:text-base-content'
@@ -310,6 +299,17 @@ export function TradingDashboard({
                 onClick={() => setViewMode('config')}
               >
                 By Config
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'default'
+                    ? 'bg-base-100 shadow-sm text-base-content'
+                    : 'text-base-content/60 hover:text-base-content'
+                }`}
+                onClick={() => setViewMode('default')}
+              >
+                Default
               </button>
             </div>
           </div>
@@ -338,7 +338,7 @@ export function TradingDashboard({
         </div>
 
         {/* Right: Action panel — desktop only */}
-        <div className="hidden md:block w-96 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
+        <div className="hidden md:block w-72 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
           {/* Config selector */}
           {sortedConfigGroups.length > 0 && (
             <div>

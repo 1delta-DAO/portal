@@ -7,8 +7,8 @@ import type {
 import type { UserPositionEntry } from '../../hooks/lending/useUserData'
 import type { TableHighlight, PoolRole } from './TradingDashboard/types'
 import { abbreviateUsd, abbreviateNumber, formatUsd, formatTokenAmount } from '../../utils/format'
-import { riskDotColor } from './MarketsView/helpers'
 import { AssetPopover } from './AssetPopover'
+import { RiskBadge } from './RiskBadge'
 
 interface Props {
   configGroups: PoolConfigGroup[]
@@ -33,20 +33,14 @@ const ROLE_STYLES: Record<PoolRole, string> = {
   pay: 'bg-warning/10 border-l-2 border-l-warning',
 }
 
-/** Total deposits USD across all collaterals + borrowables (deduplicated by marketUid). */
-function configTotalLiquidity(g: PoolConfigGroup): number {
+/** Total borrow liquidity USD across borrowables (deduplicated by marketUid). */
+function configBorrowLiquidity(g: PoolConfigGroup): number {
   const seen = new Set<string>()
   let total = 0
-  for (const item of g.collaterals ?? []) {
-    if (!seen.has(item.marketUid)) {
-      seen.add(item.marketUid)
-      total += item.totalDepositsUsd
-    }
-  }
   for (const item of g.borrowables ?? []) {
     if (!seen.has(item.marketUid)) {
       seen.add(item.marketUid)
-      total += item.totalDepositsUsd
+      total += item.totalDepositsUsd - item.totalDebtUsd
     }
   }
   return total
@@ -66,6 +60,7 @@ export const ConfigMarketView: React.FC<Props> = ({
 }) => {
   const [internalConfigId, setInternalConfigId] = useState<string | null>(null)
   const [page, setPage] = useState(0)
+  const [configFilter, setConfigFilter] = useState('')
 
   // Use controlled or internal state
   const isControlled = controlledConfigId !== undefined
@@ -79,19 +74,30 @@ export const ConfigMarketView: React.FC<Props> = ({
   }
 
   // Sort config groups: user's active e-mode first, then by total liquidity descending
-  const sortedGroups = useMemo(
-    () =>
-      [...configGroups].sort((a, b) => {
-        if (userActiveCategory != null) {
-          const aIsActive = a.category === userActiveCategory
-          const bIsActive = b.category === userActiveCategory
-          if (aIsActive && !bIsActive) return -1
-          if (bIsActive && !aIsActive) return 1
-        }
-        return configTotalLiquidity(b) - configTotalLiquidity(a)
-      }),
-    [configGroups, userActiveCategory]
-  )
+  const sortedGroups = useMemo(() => {
+    const q = configFilter.trim().toLowerCase()
+    const filtered = q
+      ? configGroups.filter((g) => {
+          if ((g.label || g.configId).toLowerCase().includes(q)) return true
+          const matchAssets = (items: ConfigMarketItem[] | null) =>
+            items?.some(
+              (i) =>
+                i.underlyingInfo.asset.symbol.toLowerCase().includes(q) ||
+                i.underlyingInfo.asset.name.toLowerCase().includes(q)
+            )
+          return matchAssets(g.collaterals) || matchAssets(g.borrowables)
+        })
+      : configGroups
+    return [...filtered].sort((a, b) => {
+      if (userActiveCategory != null) {
+        const aIsActive = a.category === userActiveCategory
+        const bIsActive = b.category === userActiveCategory
+        if (aIsActive && !bIsActive) return -1
+        if (bIsActive && !aIsActive) return 1
+      }
+      return configBorrowLiquidity(b) - configBorrowLiquidity(a)
+    })
+  }, [configGroups, userActiveCategory, configFilter])
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(sortedGroups.length / PAGE_SIZE))
@@ -100,10 +106,10 @@ export const ConfigMarketView: React.FC<Props> = ({
     [sortedGroups, page]
   )
 
-  // Reset page when groups change
+  // Reset page when groups or filter change
   React.useEffect(() => {
     setPage(0)
-  }, [configGroups.length])
+  }, [configGroups.length, configFilter])
 
   // Auto-select first config
   React.useEffect(() => {
@@ -158,32 +164,97 @@ export const ConfigMarketView: React.FC<Props> = ({
     <div className="space-y-3">
       {/* Config list — paginated, sorted by liquidity */}
       <div className="rounded-box border border-base-300 overflow-hidden">
-        {/* Desktop table */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="table table-sm w-full">
-            <thead>
-              <tr>
-                <th>Config</th>
-                <th>Collaterals</th>
-                <th>Borrowables</th>
-                <th>Total Deposits</th>
-                <th>Risk</th>
-              </tr>
-            </thead>
-            <tbody>
+        {/* Config filter */}
+        {configGroups.length > 3 && (
+          <div className="px-3 py-1.5 border-b border-base-300">
+            <input
+              type="text"
+              placeholder="Filter configs by name or asset…"
+              value={configFilter}
+              onChange={(e) => setConfigFilter(e.target.value)}
+              className="input input-xs input-bordered w-full max-w-xs bg-base-100"
+            />
+          </div>
+        )}
+        {sortedGroups.length === 0 ? (
+          <div className="p-4 text-center text-xs text-base-content/40">No matching configs</div>
+        ) : (
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="table table-sm w-full">
+                <thead>
+                  <tr>
+                    <th>Config</th>
+                    <th>Collaterals</th>
+                    <th>Borrowables</th>
+                    <th>Borrow Liquidity</th>
+                    <th>Risk</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedGroups.map((g) => {
+                    const isActive = g.configId === selectedConfigId
+                    const isUserMode = userActiveCategory != null && g.category === userActiveCategory
+                    const liquidity = configBorrowLiquidity(g)
+                    return (
+                      <tr
+                        key={g.configId}
+                        className={`cursor-pointer transition-colors ${
+                          isActive ? 'bg-primary/10' : isUserMode ? 'bg-success/5' : 'hover:bg-base-200'
+                        }`}
+                        onClick={() => setSelectedConfigId(g.configId)}
+                      >
+                        <td>
+                          <span className="font-medium text-sm">
+                            {g.label || `Config ${g.configId}`}
+                            {isUserMode && (
+                              <span className="ml-1.5 text-[9px] font-medium text-success/80 bg-success/10 px-1 py-0.5 rounded align-middle">
+                                active
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                        <td>
+                          <IconStack items={g.collaterals} />
+                        </td>
+                        <td>
+                          <IconStack items={g.borrowables} />
+                        </td>
+                        <td>
+                          <span className="text-xs" title={`$${formatUsd(liquidity)}`}>
+                            {abbreviateUsd(liquidity)}
+                          </span>
+                        </td>
+                        <td>
+                          {g.configRiskLabel ? (
+                            <RiskBadge label={g.configRiskLabel} breakdown={g.configRiskBreakdown ?? []} />
+                          ) : (
+                            <span className="text-xs text-base-content/40">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile card list */}
+            <div className="md:hidden divide-y divide-base-300">
               {pagedGroups.map((g) => {
                 const isActive = g.configId === selectedConfigId
                 const isUserMode = userActiveCategory != null && g.category === userActiveCategory
-                const liquidity = configTotalLiquidity(g)
+                const liquidity = configBorrowLiquidity(g)
                 return (
-                  <tr
-                    key={g.configId}
-                    className={`cursor-pointer transition-colors ${
-                      isActive ? 'bg-primary/10' : isUserMode ? 'bg-success/5' : 'hover:bg-base-200'
+                  <div
+                    key={`m-${g.configId}`}
+                    className={`p-3 cursor-pointer transition-colors ${
+                      isActive ? 'bg-primary/10' : isUserMode ? 'bg-success/5' : 'active:bg-base-200'
                     }`}
                     onClick={() => setSelectedConfigId(g.configId)}
                   >
-                    <td>
+                    <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-sm">
                         {g.label || `Config ${g.configId}`}
                         {isUserMode && (
@@ -192,124 +263,57 @@ export const ConfigMarketView: React.FC<Props> = ({
                           </span>
                         )}
                       </span>
-                    </td>
-                    <td>
-                      <IconStack items={g.collaterals} />
-                    </td>
-                    <td>
-                      <IconStack items={g.borrowables} />
-                    </td>
-                    <td>
-                      <span className="text-xs" title={`$${formatUsd(liquidity)}`}>
-                        {abbreviateUsd(liquidity)}
-                      </span>
-                    </td>
-                    <td>
-                      {g.configRiskLabel ? (
-                        <div
-                          className={g.configRiskBreakdown?.length ? 'tooltip tooltip-left' : ''}
-                          data-tip={g.configRiskBreakdown
-                            ?.map((b) => `${b.category}: ${b.label}${b.curatorValidated ? ' ✓' : ''}`)
-                            .join(' · ')}
-                        >
-                          <span className="inline-flex items-center gap-1.5 text-xs text-base-content/70 cursor-help">
-                            <span className={`w-2 h-2 rounded-full shrink-0 ${riskDotColor(g.configRiskLabel)}`} />
-                            {g.configRiskLabel}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-base-content/40">—</span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile card list */}
-        <div className="md:hidden divide-y divide-base-300">
-          {pagedGroups.map((g) => {
-            const isActive = g.configId === selectedConfigId
-            const isUserMode = userActiveCategory != null && g.category === userActiveCategory
-            const liquidity = configTotalLiquidity(g)
-            return (
-              <div
-                key={`m-${g.configId}`}
-                className={`p-3 cursor-pointer transition-colors ${
-                  isActive ? 'bg-primary/10' : isUserMode ? 'bg-success/5' : 'active:bg-base-200'
-                }`}
-                onClick={() => setSelectedConfigId(g.configId)}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-sm">
-                    {g.label || `Config ${g.configId}`}
-                    {isUserMode && (
-                      <span className="ml-1.5 text-[9px] font-medium text-success/80 bg-success/10 px-1 py-0.5 rounded align-middle">
-                        active
-                      </span>
-                    )}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {g.configRiskLabel && (
-                      <div
-                        className={g.configRiskBreakdown?.length ? 'tooltip tooltip-left' : ''}
-                        data-tip={g.configRiskBreakdown
-                          ?.map((b) => `${b.category}: ${b.label}${b.curatorValidated ? ' ✓' : ''}`)
-                          .join(' · ')}
-                      >
-                        <span className="inline-flex items-center gap-1 text-[10px] text-base-content/60 cursor-help">
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskDotColor(g.configRiskLabel)}`} />
-                          {g.configRiskLabel}
+                      <div className="flex items-center gap-2">
+                        {g.configRiskLabel && (
+                          <RiskBadge label={g.configRiskLabel} breakdown={g.configRiskBreakdown ?? []} size="sm" />
+                        )}
+                        <span className="text-xs text-base-content/70" title={`$${formatUsd(liquidity)}`}>
+                          {abbreviateUsd(liquidity)}
                         </span>
                       </div>
-                    )}
-                    <span className="text-xs text-base-content/70" title={`$${formatUsd(liquidity)}`}>
-                      {abbreviateUsd(liquidity)}
-                    </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-[10px] text-base-content/60">
+                      <div className="flex items-center gap-1">
+                        <span>Col:</span>
+                        <IconStack items={g.collaterals} max={4} />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span>Debt:</span>
+                        <IconStack items={g.borrowables} max={4} />
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-4 text-[10px] text-base-content/60">
-                  <div className="flex items-center gap-1">
-                    <span>Col:</span>
-                    <IconStack items={g.collaterals} max={4} />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span>Debt:</span>
-                    <IconStack items={g.borrowables} max={4} />
-                  </div>
+                )
+              })}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-3 py-2 border-t border-base-300 bg-base-200/30">
+                <span className="text-xs text-base-content/50">
+                  {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, sortedGroups.length)} of {sortedGroups.length}
+                </span>
+                <div className="join">
+                  <button
+                    type="button"
+                    className="join-item btn btn-xs btn-ghost"
+                    disabled={page === 0}
+                    onClick={() => setPage((p) => p - 1)}
+                  >
+                    «
+                  </button>
+                  <button
+                    type="button"
+                    className="join-item btn btn-xs btn-ghost"
+                    disabled={page >= totalPages - 1}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    »
+                  </button>
                 </div>
               </div>
-            )
-          })}
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-3 py-2 border-t border-base-300 bg-base-200/30">
-            <span className="text-xs text-base-content/50">
-              {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, sortedGroups.length)} of {sortedGroups.length}
-            </span>
-            <div className="join">
-              <button
-                type="button"
-                className="join-item btn btn-xs btn-ghost"
-                disabled={page === 0}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                «
-              </button>
-              <button
-                type="button"
-                className="join-item btn btn-xs btn-ghost"
-                disabled={page >= totalPages - 1}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                »
-              </button>
-            </div>
-          </div>
+            )}
+          </>
         )}
       </div>
 
@@ -424,6 +428,25 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
   onRowClick,
   poolMap,
 }) => {
+  const [filter, setFilter] = useState('')
+
+  const sorted = useMemo(() => {
+    if (!items) return []
+    let filtered = items
+    const q = filter.trim().toLowerCase()
+    if (q) {
+      filtered = items.filter((item) => {
+        const { name, symbol } = item.underlyingInfo.asset
+        return name.toLowerCase().includes(q) || symbol.toLowerCase().includes(q)
+      })
+    }
+    return [...filtered].sort((a, b) => {
+      const aLiq = a.totalDepositsUsd - (type === 'borrowable' ? a.totalDebtUsd : 0)
+      const bLiq = b.totalDepositsUsd - (type === 'borrowable' ? b.totalDebtUsd : 0)
+      return bLiq - aLiq
+    })
+  }, [items, type, filter])
+
   if (!items || items.length === 0) {
     return (
       <div className="p-4 text-center text-xs text-base-content/40">
@@ -434,6 +457,25 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
 
   return (
     <>
+      {/* Filter input */}
+      {items.length > 3 && (
+        <div className="px-3 py-1.5 border-b border-base-300">
+          <input
+            type="text"
+            placeholder="Filter by name or symbol…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="input input-xs input-bordered w-full max-w-xs bg-base-100"
+          />
+        </div>
+      )}
+
+      {sorted.length === 0 ? (
+        <div className="p-4 text-center text-xs text-base-content/40">
+          No matches
+        </div>
+      ) : (
+      <>
       {/* Desktop table */}
       <div className="hidden md:block overflow-x-auto">
         <table className="table table-sm w-full">
@@ -456,7 +498,7 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => {
+            {sorted.map((item) => {
               const isSelected = selectedMarketUid === item.marketUid
               const role = highlightMap.get(item.marketUid)
               const userPos = userPositions.get(item.marketUid)
@@ -549,7 +591,7 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
 
       {/* Mobile card list */}
       <div className="md:hidden divide-y divide-base-300">
-        {items.map((item) => {
+        {sorted.map((item) => {
           const isSelected = selectedMarketUid === item.marketUid
           const role = highlightMap.get(item.marketUid)
           const userPos = userPositions.get(item.marketUid)
@@ -619,6 +661,8 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
           )
         })}
       </div>
+      </>
+      )}
     </>
   )
 }

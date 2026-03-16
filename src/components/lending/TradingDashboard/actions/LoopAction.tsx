@@ -43,6 +43,10 @@ function LoopRangeInfo({
   const { modeAnalysis } = loopRange
   const inUserMode = modeAnalysis.userModeRange
   const needsModeSwitch = modeAnalysis.userMode !== modeAnalysis.targetMode
+  const formatMode = (mode: string | number) => {
+    const s = String(mode)
+    return s.startsWith('0x') && s.length > 10 ? `${s.slice(0, 5)}....${s.slice(-3)}` : s
+  }
 
   return (
     <div className="rounded-lg border border-base-300 bg-base-200/40 px-2.5 py-2 space-y-1.5 text-xs">
@@ -59,9 +63,7 @@ function LoopRangeInfo({
 
       {/* Best-case (target e-mode) */}
       <div className="flex items-center justify-between">
-        <span className="text-base-content/70">
-          {needsModeSwitch ? 'Target e-mode' : 'Max'}
-        </span>
+        <span className="text-base-content/70">{needsModeSwitch ? 'Target e-mode' : 'Max'}</span>
         <span className="font-medium">
           {loopRange.amount.toFixed(4)} {debtSymbol}{' '}
           <span className="text-base-content/50">(${formatUsd(loopRange.amountUSD)})</span>
@@ -71,7 +73,7 @@ function LoopRangeInfo({
       {/* Current e-mode range (shown only if different from target) */}
       {needsModeSwitch && inUserMode && (
         <div className="flex items-center justify-between">
-          <span className="text-base-content/70">Current e-mode</span>
+          <span className="text-base-content/70">Current mode</span>
           <span className="font-medium">
             {inUserMode.amountIn.toFixed(4)} {debtSymbol}{' '}
             <span className="text-base-content/50">(${formatUsd(inUserMode.amountUSD)})</span>
@@ -80,21 +82,21 @@ function LoopRangeInfo({
       )}
 
       {needsModeSwitch && !inUserMode && (
-        <div className="text-warning/80">
-          Pair not available in your current e-mode
-        </div>
+        <div className="text-warning/80">Pair not available in your current mode</div>
       )}
 
       {/* Mode switch indicator */}
       {needsModeSwitch && (
-        <div className={`flex items-center gap-1 text-[11px] ${
-          modeAnalysis.canSwitchToTargetMode ? 'text-success/80' : 'text-warning/80'
-        }`}>
+        <div
+          className={`flex items-center gap-1 text-[11px] ${
+            modeAnalysis.canSwitchToTargetMode ? 'text-success/80' : 'text-warning/80'
+          }`}
+        >
           <span>{modeAnalysis.canSwitchToTargetMode ? '\u2713' : '\u26A0'}</span>
           <span>
             {modeAnalysis.canSwitchToTargetMode
-              ? `Can switch to e-mode ${modeAnalysis.targetMode} for better range`
-              : `Cannot switch to e-mode ${modeAnalysis.targetMode} (conflicts with existing positions)`}
+              ? `Can switch to borrow mode ${formatMode(modeAnalysis.targetMode)} for better range`
+              : `Cannot switch to borrow mode ${formatMode(modeAnalysis.targetMode)} (conflicts with existing positions)`}
           </span>
         </div>
       )}
@@ -195,6 +197,13 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     [subAccounts, accountId]
   )
 
+  // Debounce payAmount to avoid excessive range refetches on every keystroke
+  const [debouncedPayAmount, setDebouncedPayAmount] = useState('')
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedPayAmount(payAmount), 400)
+    return () => clearTimeout(timer)
+  }, [payAmount])
+
   useEffect(() => {
     if (!collateralPool || !debtPool || !selectedLender || !chainId) {
       setLoopRange(null)
@@ -205,11 +214,26 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     setLoopRangeLoading(true)
 
     const run = async () => {
+      const payParams = selectedPayCurrency
+        ? {
+            payAsset: selectedPayCurrency.address,
+            ...(debouncedPayAmount
+              ? {
+                  payAmount: parseUnits(
+                    debouncedPayAmount,
+                    selectedPayCurrency.decimals
+                  ).toString(),
+                }
+              : {}),
+          }
+        : {}
+
       const filterParams = {
         lender: selectedLender,
         chainId,
         marketUidIn: debtPool.marketUid,
         marketUidOut: collateralPool.marketUid,
+        ...payParams,
       }
 
       const result = activeSubAccount
@@ -217,7 +241,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
             ...filterParams,
             body: {
               balanceData: {
-                borrowDiscountedCollateral: activeSubAccount.balanceData.borrowDiscountedCollateral ?? 0,
+                borrowDiscountedCollateral:
+                  activeSubAccount.balanceData.borrowDiscountedCollateral ?? 0,
                 collateral: activeSubAccount.balanceData.collateral,
                 debt: activeSubAccount.balanceData.debt,
                 adjustedDebt: activeSubAccount.balanceData.adjustedDebt ?? 0,
@@ -248,7 +273,9 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     }
 
     run()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [
     collateralPool?.marketUid,
     debtPool?.marketUid,
@@ -256,6 +283,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     chainId,
     account,
     activeSubAccount,
+    selectedPayCurrency?.address,
+    debouncedPayAmount,
   ])
 
   // Max amounts
@@ -264,7 +293,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
   // Pay wallet balance + overMax
   const payWalletBalance = selectedPayCurrency
-    ? walletBalances.get(selectedPayCurrency.address.toLowerCase()) ?? null
+    ? (walletBalances.get(selectedPayCurrency.address.toLowerCase()) ?? null)
     : null
   const payWalletAmount = payWalletBalance ? parseFloat(payWalletBalance.balance) : 0
   const payOverMax = payWalletAmount > 0 && parseAmount(payAmount) > payWalletAmount + 1e-9
@@ -277,7 +306,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
         marketUidIn: debtPool.marketUid,
         marketUidOut: collateralPool.marketUid,
         debtAmount: parseUnits(debtAmount || '0', debtPool.asset.decimals).toString(),
-        slippage: parseFloat(slippage) || 0.3,
+        slippage: (parseFloat(slippage) || 0.3) * 100,
         borrowMode: LendingMode.VARIABLE,
         usePendleMintRedeem: false,
         ...(selectedPayCurrency ? { payAsset: selectedPayCurrency.address } : {}),
@@ -412,7 +441,9 @@ export const LoopAction: React.FC<TradingActionProps> = ({
           {payWalletBalance && (
             <div className="text-xs flex justify-between px-1 mb-1">
               <span className="text-base-content/60">Wallet balance:</span>
-              <span className={`font-medium ${payWalletAmount === 0 ? 'text-base-content/40' : ''}`}>
+              <span
+                className={`font-medium ${payWalletAmount === 0 ? 'text-base-content/40' : ''}`}
+              >
                 {formatTokenAmount(payWalletBalance.balance)} {selectedPayCurrency.symbol} ($
                 {formatUsd(payWalletBalance.balanceUSD)})
               </span>
