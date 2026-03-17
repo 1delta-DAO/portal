@@ -11,6 +11,7 @@ import { AmountQuickButtons } from '../../DashboardActions/AmountQuickButtons'
 import { formatTokenAmount, formatUsd, parseAmount } from '../../DashboardActions/format'
 import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes } from '../useTradingQuotes'
+import { RateImpactIndicator } from '../../DashboardActions/RateImpactIndicator'
 import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
 import {
   fetchLoopRangeWithSimulation,
@@ -140,6 +141,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     quotes,
     permissions,
     transactions,
+    rateImpact,
     selectedIndex,
     loading,
     executing,
@@ -508,6 +510,15 @@ export const LoopAction: React.FC<TradingActionProps> = ({
           ))}
         </div>
       )}
+
+      {/* Rate impact */}
+      <RateImpactIndicator
+        rateImpact={rateImpact}
+        marketLabels={{
+          ...(collateralPool ? { [collateralPool.marketUid]: `${collateralPool.asset.symbol} (Collateral)` } : {}),
+          ...(debtPool ? { [debtPool.marketUid]: `${debtPool.asset.symbol} (Debt)` } : {}),
+        }}
+      />
 
       {/* Permissions, transactions, and execute — grouped together */}
       {selectedIndex !== null && !payOverMax && (

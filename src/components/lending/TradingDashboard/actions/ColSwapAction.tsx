@@ -9,6 +9,7 @@ import { QuoteCard } from '../QuoteCard'
 import { AmountQuickButtons } from '../../DashboardActions/AmountQuickButtons'
 import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes } from '../useTradingQuotes'
+import { RateImpactIndicator } from '../../DashboardActions/RateImpactIndicator'
 import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
 
 export const ColSwapAction: React.FC<TradingActionProps> = ({
@@ -31,7 +32,7 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
   const [isMaxIn, setIsMaxIn] = useState(false)
 
   const {
-    quotes, permissions, transactions, selectedIndex, loading, executing, error,
+    quotes, permissions, transactions, rateImpact, selectedIndex, loading, executing, error,
     fetchQuotes, selectQuote, executePermission, executeTransaction, executeQuote, reset,
   } = useTradingQuotes({ chainId, account })
 
@@ -159,6 +160,15 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
           ))}
         </div>
       )}
+
+      {/* Rate impact */}
+      <RateImpactIndicator
+        rateImpact={rateImpact}
+        marketLabels={{
+          ...(colInPool ? { [colInPool.marketUid]: `${colInPool.asset.symbol} (Swap From)` } : {}),
+          ...(colOutPool ? { [colOutPool.marketUid]: `${colOutPool.asset.symbol} (Swap Into)` } : {}),
+        }}
+      />
 
       {selectedIndex !== null && (
         <div className="space-y-1.5">

@@ -396,10 +396,10 @@ export function TradingDashboard({
             </button>
           ) : (
             <>
-              {activeOperation === 'Loop' && <LoopAction {...actionProps} />}
-              {activeOperation === 'ColSwap' && <ColSwapAction {...actionProps} />}
-              {activeOperation === 'DebtSwap' && <DebtSwapAction {...actionProps} />}
-              {activeOperation === 'Close' && <CloseAction {...actionProps} />}
+              {activeOperation === 'Loop' && <LoopAction key={selectedLender} {...actionProps} />}
+              {activeOperation === 'ColSwap' && <ColSwapAction key={selectedLender} {...actionProps} />}
+              {activeOperation === 'DebtSwap' && <DebtSwapAction key={selectedLender} {...actionProps} />}
+              {activeOperation === 'Close' && <CloseAction key={selectedLender} {...actionProps} />}
             </>
           )}
         </div>

@@ -78,8 +78,16 @@ export interface LendingActionSimulation {
   post: SimulationState
 }
 
+export interface RateImpactEntry {
+  marketUid: string
+  utilization: { current: number; projected: number }
+  borrowRate: { current: number; projected: number }
+  depositRate: { current: number; projected: number }
+}
+
 export interface LendingActionResponseWithSimulation extends LendingActionResponse {
   simulation?: LendingActionSimulation
+  rateImpact?: RateImpactEntry[]
 }
 
 export interface LendingActionResultWithSimulation {
@@ -136,6 +144,7 @@ export async function fetchLendingAction(
         transactions: json.actions?.transactions ?? [],
         permissions: json.actions?.permissions ?? [],
         simulation: json.data?.simulation,
+        rateImpact: json.data?.rateImpact,
       },
     }
   } catch (err: any) {

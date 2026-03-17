@@ -1,4 +1,5 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import { abbreviateUsd, formatUsd } from '../../../utils/format'
 import { getFormattedPrice } from '../../../utils/price'
@@ -7,6 +8,36 @@ import { ExposureCell } from './ExposureCell'
 import { AssetPopover } from '../AssetPopover'
 import { RiskBadge } from '../RiskBadge'
 import { lenderDisplayName } from '@1delta/lib-utils'
+import { buildPath } from '../../../utils/routes'
+
+/** Compact radial utilization indicator */
+const UtilCircle: React.FC<{ pct: number }> = ({ pct }) => {
+  const r = 16
+  const stroke = 3
+  const size = (r + stroke) * 2
+  const circ = 2 * Math.PI * r
+  const offset = circ * (1 - Math.min(pct, 100) / 100)
+  const color = pct >= 90 ? 'stroke-error' : pct >= 70 ? 'stroke-warning' : 'stroke-success'
+  const cx = r + stroke
+  const cy = r + stroke
+  return (
+    <svg width={size} height={size} className="shrink-0 -rotate-90">
+      <circle cx={cx} cy={cy} r={r} fill="none" strokeWidth={stroke} className="stroke-base-300" />
+      <circle
+        cx={cx} cy={cy} r={r} fill="none" strokeWidth={stroke}
+        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+        className={color}
+      />
+      <text
+        x={cx} y={cy}
+        textAnchor="middle" dominantBaseline="central"
+        className="fill-base-content rotate-90 origin-center text-[9px] font-semibold"
+      >
+        {pct.toFixed(0)}%
+      </text>
+    </svg>
+  )
+}
 
 interface MarketsTableProps {
   pools: PoolEntry[]
@@ -41,6 +72,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
   onGoToPage,
   isFetchingMore,
 }) => {
+  const navigate = useNavigate()
   const getAsset = (p: PoolEntry) => p.underlyingInfo?.asset
 
   const isRowSelected = (entry: PoolEntry) =>
@@ -98,21 +130,21 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
     <div className="flex-1 min-w-0 rounded-box border border-base-300 overflow-hidden">
       {/* ── Desktop table ── */}
       <div className="hidden md:block overflow-x-auto">
-        <table className="table table-sm table-fixed w-full">
+        <table className="table table-sm w-full">
           <thead>
             <tr>
-              <th>Market</th>
+              <th className="w-1/4">Market</th>
               <th className="cursor-pointer" onClick={() => onToggleSort('apr')}>
                 APR{sortIndicator('apr')}
               </th>
-              <th className="cursor-pointer" onClick={() => onToggleSort('utilization')}>
-                Utilization{sortIndicator('utilization')}
+              <th className="cursor-pointer" onClick={() => onToggleSort('utilization')} title="Utilization">
+                Util.{sortIndicator('utilization')}
               </th>
               <th className="cursor-pointer" onClick={() => onToggleSort('totalDepositsUSD')}>
                 Deposits{sortIndicator('totalDepositsUSD')}
               </th>
-              <th className="cursor-pointer" onClick={() => onToggleSort('totalLiquidityUSD')}>
-                Liquidity{sortIndicator('totalLiquidityUSD')}
+              <th className="cursor-pointer" onClick={() => onToggleSort('totalLiquidityUSD')} title="Liquidity">
+                Liq.{sortIndicator('totalLiquidityUSD')}
               </th>
               <th>Price</th>
               <th className="cursor-pointer" onClick={() => onToggleSort('riskScore')}>
@@ -139,32 +171,46 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                   onClick={() => onRowClick(p)}
                 >
                   <td>
-                    <AssetPopover
-                      address={p.underlyingAddress || p.underlyingInfo?.asset?.address}
-                      name={getAsset(p)?.name ?? p.name}
-                      symbol={getAsset(p)?.symbol ?? ''}
-                      logoURI={getAsset(p)?.logoURI}
-                      marketUid={p.marketUid}
-                      marketName={p.name}
-                      currentUtilization={utilization}
-                      currentDepositRate={apr + intrinsicYield}
-                      currentBorrowRate={borrowApr + intrinsicYield}
-                      priceUsd={p.underlyingInfo?.prices?.priceUsd}
-                      oraclePriceUsd={p.underlyingInfo?.oraclePrice?.oraclePriceUsd ?? undefined}
-                      chainId={p.chainId}
-                    >
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-medium truncate" title={p.name}>
-                          {p.name}
-                        </span>
-                        <span
-                          className="text-[11px] text-base-content/60 truncate"
-                          title={p.lenderKey}
-                        >
-                          {lenderDisplayName(p.lenderKey)}
-                        </span>
-                      </div>
-                    </AssetPopover>
+                    <div className="flex items-center gap-1.5">
+                      <AssetPopover
+                        address={p.underlyingAddress || p.underlyingInfo?.asset?.address}
+                        name={getAsset(p)?.name ?? p.name}
+                        symbol={getAsset(p)?.symbol ?? ''}
+                        logoURI={getAsset(p)?.logoURI}
+                        marketUid={p.marketUid}
+                        marketName={p.name}
+                        currentUtilization={utilization}
+                        currentDepositRate={apr + intrinsicYield}
+                        currentBorrowRate={borrowApr + intrinsicYield}
+                        priceUsd={p.underlyingInfo?.prices?.priceUsd}
+                        oraclePriceUsd={p.underlyingInfo?.oraclePrice?.oraclePriceUsd ?? undefined}
+                        chainId={p.chainId}
+                      >
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-medium truncate" title={p.name}>
+                            {p.name}
+                          </span>
+                          <span
+                            className="text-[11px] text-base-content/60 truncate"
+                            title={p.lenderKey}
+                          >
+                            {lenderDisplayName(p.lenderKey)}
+                          </span>
+                        </div>
+                      </AssetPopover>
+                      <a
+                        className="shrink-0 text-base-content/30 hover:text-primary transition-colors"
+                        title={`Open ${lenderDisplayName(p.lenderKey)} lending`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(buildPath('lending', p.chainId, p.lenderKey))
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M7 17L17 7" /><path d="M7 7h10v10" />
+                        </svg>
+                      </a>
+                    </div>
                   </td>
                   <td>
                     <div className="flex items-center gap-1 text-xs">
@@ -182,14 +228,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                     </div>
                   </td>
                   <td>
-                    <div className="flex items-center gap-2">
-                      <progress
-                        className="progress progress-primary w-24"
-                        value={utilPct}
-                        max={100}
-                      />
-                      <span className="text-xs font-medium">{utilPct.toFixed(1)}%</span>
-                    </div>
+                    <UtilCircle pct={utilPct} />
                   </td>
                   <td>
                     <div className="flex flex-col text-xs">
@@ -325,6 +364,17 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                       </span>
                     </div>
                   </AssetPopover>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle opacity-40 hover:opacity-100"
+                    title={`Open ${lenderDisplayName(p.lenderKey)} lending`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      navigate(buildPath('lending', p.chainId, p.lenderKey))
+                    }}
+                  >
+                    →
+                  </button>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="flex items-center justify-end gap-1">

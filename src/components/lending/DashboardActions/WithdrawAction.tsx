@@ -9,6 +9,7 @@ import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
 import { lenderSupportsSubAccounts } from './helpers'
 import { HealthFactorProjection } from './HealthFactorProjection'
+import { RateImpactIndicator } from './RateImpactIndicator'
 import { TransactionSuccess } from './TransactionSuccess'
 
 export const WithdrawAction: React.FC<ActionPanelProps> = ({
@@ -38,6 +39,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
   const {
     result,
     simulation,
+    rateImpact,
     loading,
     executingPermission,
     executingMain,
@@ -179,6 +181,9 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
       {/* Projected health factor */}
       <HealthFactorProjection simulation={simulation} />
 
+      {/* Rate impact */}
+      <RateImpactIndicator rateImpact={rateImpact} />
+
       {result && !overMax && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">
           <span className="text-xs text-base-content/60">
@@ -194,14 +199,17 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
                 className={`btn btn-sm w-full ${done ? 'btn-disabled btn-outline btn-success' : isCurrent ? 'btn-warning' : 'btn-outline btn-ghost'}`}
                 disabled={!isCurrent || executingPermission}
                 onClick={isCurrent ? executeNextPermission : undefined}
+                title={perm.description || `Approval ${i + 1}`}
               >
-                {done ? (
-                  `\u2713 ${perm.description || `Approval ${i + 1}`}`
-                ) : isCurrent && executingPermission ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  perm.description || `Approval ${i + 1}`
-                )}
+                <span className="truncate max-w-full">
+                  {done ? (
+                    `\u2713 ${perm.description || `Approval ${i + 1}`}`
+                  ) : isCurrent && executingPermission ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    perm.description || `Approval ${i + 1}`
+                  )}
+                </span>
               </button>
             )
           })}

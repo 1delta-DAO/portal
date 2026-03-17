@@ -6,6 +6,7 @@ import {
   fetchLendingAction,
   type LendingActionResponseWithSimulation,
   type LendingActionSimulation,
+  type RateImpactEntry,
 } from '../../../sdk/lending-helper/fetchLendingAction'
 import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
 import { useDebounce } from '../../../hooks/useDebounce'
@@ -55,6 +56,7 @@ export function useActionExecution(params: {
   const allPermissionsDone = hasPermissions && permissionsCompleted >= permissions.length
   const executing = executingPermission || executingMain
   const simulation: LendingActionSimulation | undefined = result?.simulation
+  const rateImpact: RateImpactEntry[] | undefined = result?.rateImpact
 
   const resetState = () => {
     setResult(null)
@@ -167,6 +169,7 @@ export function useActionExecution(params: {
   return {
     result,
     simulation,
+    rateImpact,
     loading,
     executing,
     executingPermission,

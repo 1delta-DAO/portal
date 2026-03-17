@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
 import type { TradingOperation, TradingQuote, Tx } from './types'
+import type { RateImpactEntry } from '../../../sdk/lending-helper/fetchLendingAction'
 import { BACKEND_BASE_URL } from '../../../config/backend'
 
 const ENDPOINTS: Record<TradingOperation, string> = {
@@ -62,6 +63,7 @@ interface QuoteState {
   quotes: TradingQuote[]
   permissions: Tx[]
   transactions: Tx[]
+  rateImpact: RateImpactEntry[] | null
   selectedIndex: number | null
   loading: boolean
   executing: boolean
@@ -75,6 +77,7 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
     quotes: [],
     permissions: [],
     transactions: [],
+    rateImpact: null,
     selectedIndex: null,
     loading: false,
     executing: false,
@@ -94,6 +97,7 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
         quotes: [],
         permissions: [],
         transactions: [],
+        rateImpact: null,
         selectedIndex: null,
       }))
 
@@ -118,11 +122,14 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
         // Transactions: collateral enable/disable (e.g. Compound V2 / Venus)
         const transactions: Tx[] = envelope.actions?.transactions ?? envelope.data?.transactions ?? []
 
+        const rateImpact: RateImpactEntry[] | null = envelope.data?.rateImpact ?? null
+
         setState((s) => ({
           ...s,
           quotes,
           permissions,
           transactions,
+          rateImpact,
           selectedIndex: quotes.length > 0 ? 0 : null,
           loading: false,
         }))
@@ -175,6 +182,7 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
       quotes: [],
       permissions: [],
       transactions: [],
+      rateImpact: null,
       selectedIndex: null,
       loading: false,
       executing: false,
