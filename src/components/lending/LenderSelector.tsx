@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { lenderDisplayNameFull } from '@1delta/lib-utils'
-import type { LenderData } from '../../hooks/lending/usePoolData'
+import type { LenderData, LenderInfoMap } from '../../hooks/lending/usePoolData'
 import type { UserDataResult } from '../../hooks/lending/useUserData'
 import { computeLenderTvl } from '../../utils/format'
 import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'
@@ -9,6 +8,7 @@ import { SearchableSelect, type SearchableSelectOption } from './SearchableSelec
 
 interface UseLenderSelectorParams {
   lenderData: LenderData | undefined
+  lenderInfoMap?: LenderInfoMap
   userData: UserDataResult
   chainId: string
   initialLender?: string
@@ -17,6 +17,7 @@ interface UseLenderSelectorParams {
 
 export function useLenderSelector({
   lenderData,
+  lenderInfoMap,
   userData,
   chainId,
   initialLender,
@@ -58,12 +59,15 @@ export function useLenderSelector({
   }, [allLenderKeys, lenderBalances, lenderData])
 
   // Lender options for searchable dropdown (with icons)
-  const lenderOptions: SearchableSelectOption[] = lenders.map((l) => ({
-    value: l,
-    label: lenderDisplayNameFull(l),
-    icon: `https://raw.githubusercontent.com/1delta-DAO/protocol-icons/main/lender/${l.toLowerCase()}.webp`,
-    indicator: lenderBalances.has(l) ? '\u25CF ' : undefined,
-  }))
+  const lenderOptions: SearchableSelectOption[] = lenders.map((l) => {
+    const info = lenderInfoMap?.[l]
+    return {
+      value: l,
+      label: info?.name ?? l,
+      icon: info?.logoURI ?? `https://raw.githubusercontent.com/1delta-DAO/protocol-icons/main/lender/${l.toLowerCase()}.webp`,
+      indicator: lenderBalances.has(l) ? '\u25CF ' : undefined,
+    }
+  })
 
   // Stable key for lender list to avoid useEffect dependency array issues
   const lendersKey = lenders.join(',')

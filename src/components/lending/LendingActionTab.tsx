@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
-import { lenderDisplayNameFull, RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '@1delta/lib-utils'
 import { LenderData, PoolDataItem } from '../../hooks/lending/usePoolData'
 import { sortLenderKeysByTvl } from '../../utils/format'
 import {
@@ -62,7 +62,7 @@ export const LendingActionTab = ({ lenderData, actionType, chainId }: Props) => 
     const q = lenderSearch.trim().toLowerCase()
     if (!q) return lenders
     return lenders.filter((lender) => {
-      const label = lenderDisplayNameFull(lender).toLowerCase()
+      const label = String(lender).toLowerCase()
       return lender.toLowerCase().includes(q) || label.includes(q)
     })
   }, [lenders, lenderSearch])
@@ -71,7 +71,7 @@ export const LendingActionTab = ({ lenderData, actionType, chainId }: Props) => 
     setSelectedLender(lender)
     setSelectedPool(null)
     setAmount('')
-    setLenderSearch(lenderDisplayNameFull(lender))
+    setLenderSearch(String(lender))
     setIsLenderOpen(false)
   }
 
@@ -155,7 +155,7 @@ export const LendingActionTab = ({ lenderData, actionType, chainId }: Props) => 
             isLenderOpen
               ? lenderSearch
               : selectedLender
-                ? lenderDisplayNameFull(selectedLender)
+                ? String(selectedLender)
                 : ''
           }
           onFocus={() => {
@@ -177,7 +177,7 @@ export const LendingActionTab = ({ lenderData, actionType, chainId }: Props) => 
               <div className="px-3 py-2 text-sm text-base-content/60">No lenders found</div>
             )}
             {filteredLenders.map((lender) => {
-              const label = lenderDisplayNameFull(lender)
+              const label = String(lender)
               const selected = lender === selectedLender
               return (
                 <button

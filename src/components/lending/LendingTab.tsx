@@ -63,7 +63,7 @@ export function LenderTab() {
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
 
   const chainsReady = !isChainsLoading
-  const { lenderData, isPublicDataLoading } = useMarginPublicData(effectiveChainId, chainsReady)
+  const { lenderData, lenderInfoMap, isPublicDataLoading } = useMarginPublicData(effectiveChainId, chainsReady)
   const { userData, isUserDataLoading, error, refetch } = useUserData({
     chainId: effectiveChainId,
     account,
@@ -192,6 +192,7 @@ export function LenderTab() {
                   account={account}
                   chainId={effectiveChainId}
                   userData={userData}
+                  lenderInfoMap={lenderInfoMap}
                   isLoading={isLoading}
                   error={error}
                   refetch={refetch}
@@ -211,6 +212,7 @@ export function LenderTab() {
       {activeTab === 'lending' && (
         <LendingDashboard
           lenderData={lenderData}
+          lenderInfoMap={lenderInfoMap}
           userData={userData}
           chainId={effectiveChainId}
           account={account}
@@ -224,6 +226,7 @@ export function LenderTab() {
       {activeTab === 'trading' && (
         <TradingDashboard
           lenderData={lenderData}
+          lenderInfoMap={lenderInfoMap}
           userData={userData}
           chainId={effectiveChainId}
           account={account}

@@ -519,7 +519,7 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
                   onClick={() => onRowClick(item.marketUid)}
                 >
                   <td className="max-w-36">
-                    <AssetCell item={item} hasPosition={!!hasPosition} />
+                    <AssetCell item={item} hasPosition={!!hasPosition} entityName={poolMap.get(item.marketUid)?.name} />
                   </td>
                   {(() => {
                     const pool = poolMap.get(item.marketUid)
@@ -612,7 +612,7 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
               onClick={() => onRowClick(item.marketUid)}
             >
               <div className="flex items-center justify-between">
-                <AssetCell item={item} hasPosition={!!hasPosition} />
+                <AssetCell item={item} hasPosition={!!hasPosition} entityName={poolMap.get(item.marketUid)?.name} />
                 <div className="text-right shrink-0">
                   {type === 'collateral' ? (
                     <>
@@ -671,9 +671,10 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
 // Shared cell components
 // ---------------------------------------------------------------------------
 
-const AssetCell: React.FC<{ item: ConfigMarketItem; hasPosition: boolean }> = ({
+const AssetCell: React.FC<{ item: ConfigMarketItem; hasPosition: boolean; entityName?: string }> = ({
   item,
   hasPosition,
+  entityName,
 }) => {
   const asset = item.underlyingInfo.asset
   const iy = item.intrinsicYield ?? 0
@@ -686,7 +687,7 @@ const AssetCell: React.FC<{ item: ConfigMarketItem; hasPosition: boolean }> = ({
       logoURI={asset.logoURI}
       positionDot={hasPosition}
       marketUid={item.marketUid}
-      marketName={`${asset.symbol} (${asset.name})`}
+      marketName={entityName ?? `${asset.symbol} (${asset.name})`}
       currentUtilization={utilization}
       currentDepositRate={item.depositRate + iy}
       currentBorrowRate={item.variableBorrowRate + iy}

@@ -1,7 +1,7 @@
 // src/components/UserLenderPositionsTable.tsx
 import React, { useState } from 'react'
-import { lenderDisplayName } from '@1delta/lib-utils'
 import type { RawCurrency } from '@1delta/lib-utils'
+import type { LenderInfoMap } from '../../hooks/lending/usePoolData'
 import { useSendLendingTransaction } from '../../hooks/useSendLendingTransaction'
 import type {
   UserDataResult,
@@ -18,6 +18,7 @@ interface UserLenderPositionsTableProps {
   account?: string
   chainId: string
   userData?: UserDataResult
+  lenderInfoMap?: LenderInfoMap
   isLoading: boolean
   error: any
   refetch: () => void
@@ -319,7 +320,8 @@ const MobileLenderCard: React.FC<{
   tokens: Record<string, RawCurrency>
   account?: string
   chainId: string
-}> = ({ entry, tokens, account, chainId }) => {
+  lenderInfoMap?: LenderInfoMap
+}> = ({ entry, tokens, account, chainId, lenderInfoMap }) => {
   const subs = entry.data.filter(
     (sub) => extractPositions(sub.positions).length > 0 || sub.balanceData.nav !== 0
   )
@@ -331,7 +333,7 @@ const MobileLenderCard: React.FC<{
         {/* Lender header */}
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-base">{lenderDisplayName(entry.lender)}</h3>
+            <h3 className="font-semibold text-base">{lenderInfoMap?.[entry.lender]?.name ?? entry.lender}</h3>
             {!hasSingleSub && (
               <span className="text-xs text-base-content/50">{subs.length} accounts</span>
             )}
@@ -406,6 +408,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
   account,
   chainId,
   userData,
+  lenderInfoMap,
   isLoading,
   error,
   refetch,
@@ -480,6 +483,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
               tokens={tokens}
               account={account}
               chainId={chainId}
+              lenderInfoMap={lenderInfoMap}
             />
           ))}
         </div>
@@ -593,7 +597,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                       <td colSpan={hasSingleSub ? 1 : 7}>
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-sm">
-                            {lenderDisplayName(entry.lender)}
+                            {lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
                           </span>
                           {!hasSingleSub && (
                             <span className="text-xs text-base-content/50">

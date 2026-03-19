@@ -43,11 +43,18 @@ export interface PoolUnderlyingInfo {
   oraclePrice: PoolOraclePrice
 }
 
+export interface LenderInfo {
+  key: string
+  name: string
+  logoURI: string
+}
+
 export interface PoolEntry {
   chainId: string
   marketUid: string
   name: string
   lenderKey: string
+  lenderInfo?: LenderInfo
   underlyingAddress: string
   depositRate: string
   variableBorrowRate: string

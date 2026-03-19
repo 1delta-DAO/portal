@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react'
-import type { LenderData, PoolDataItem } from '../../../hooks/lending/usePoolData'
+import type { LenderData, LenderInfoMap, PoolDataItem } from '../../../hooks/lending/usePoolData'
 import { usePoolConfigData } from '../../../hooks/lending/usePoolData'
 import { ConfigMarketView } from '../ConfigMarketView'
 import { RiskSelect } from '../RiskSelect'
@@ -23,6 +23,7 @@ import { useIsMobile } from '../../../hooks/useIsMobile'
 
 interface Props {
   lenderData: LenderData | undefined
+  lenderInfoMap?: LenderInfoMap
   userData: UserDataResult
   chainId: string
   account?: string
@@ -42,6 +43,7 @@ const OP_LABELS: Record<TradingOperation, string> = {
 
 export function TradingDashboard({
   lenderData,
+  lenderInfoMap,
   userData,
   chainId,
   account,
@@ -56,6 +58,7 @@ export function TradingDashboard({
 
   // Lender selection (shared hook)
   const { selectedLender, setSelectedLender, lenderOptions, lenderBalances } = useLenderSelector({
+    lenderInfoMap,
     lenderData,
     userData,
     chainId,

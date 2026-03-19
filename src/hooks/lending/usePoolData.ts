@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { PoolRiskBreakdown, PoolRisk } from './useFlattenedPools'
+import type { PoolRiskBreakdown, PoolRisk, LenderInfo } from './useFlattenedPools'
 import { BACKEND_BASE_URL } from '../../config/backend'
 
 const endpointLendingLatest = `${BACKEND_BASE_URL}/v1/data/lending/latest?chains=`
@@ -17,6 +17,7 @@ interface LendingLatestApiResponse {
 interface LenderEntryRaw {
   chainId: string
   lenderKey: string
+  lenderInfo?: LenderInfo
   lastFetched: number
   markets: RawMarket[]
 }
@@ -73,6 +74,11 @@ interface RawMarket {
 /** Pools grouped by lender key. One level — no chainId wrapping. */
 export type LenderData = {
   [lender: string]: PoolDataItem[]
+}
+
+/** Lender info map keyed by lender key. */
+export type LenderInfoMap = {
+  [lender: string]: LenderInfo
 }
 
 export interface PoolDataItem {
@@ -263,11 +269,11 @@ export interface ConfigMarketItem {
  */
 export function useMarginPublicData(chainId: string, enabled = true) {
   const {
-    data: lenderData,
+    data,
     isLoading,
     isFetching,
     error,
-  } = useQuery<LenderData>({
+  } = useQuery<{ lenderData: LenderData; lenderInfoMap: LenderInfoMap }>({
     queryKey: ['lendingPublic', chainId],
     enabled,
     queryFn: async () => {
@@ -281,11 +287,15 @@ export function useMarginPublicData(chainId: string, enabled = true) {
         throw new Error(json.error?.message ?? 'API returned success: false')
       }
 
-      const transformed: LenderData = {}
+      const lenderData: LenderData = {}
+      const lenderInfoMap: LenderInfoMap = {}
       for (const entry of json.data.items) {
-        transformed[entry.lenderKey] = entry.markets.map(rawMarketToPoolDataItem)
+        lenderData[entry.lenderKey] = entry.markets.map(rawMarketToPoolDataItem)
+        if (entry.lenderInfo) {
+          lenderInfoMap[entry.lenderKey] = entry.lenderInfo
+        }
       }
-      return transformed
+      return { lenderData, lenderInfoMap }
     },
     refetchInterval: 5 * 60 * 1000,
     staleTime: 5_000,
@@ -293,7 +303,8 @@ export function useMarginPublicData(chainId: string, enabled = true) {
   })
 
   return {
-    lenderData,
+    lenderData: data?.lenderData,
+    lenderInfoMap: data?.lenderInfoMap,
     isPublicDataLoading: isLoading,
     isPublicDataFetching: isFetching,
     error,

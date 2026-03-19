@@ -7,7 +7,6 @@ import { computePoolMetrics, type SortKey } from './helpers'
 import { ExposureCell } from './ExposureCell'
 import { AssetPopover } from '../AssetPopover'
 import { RiskBadge } from '../RiskBadge'
-import { lenderDisplayName } from '@1delta/lib-utils'
 import { buildPath } from '../../../utils/routes'
 
 /** Compact radial utilization indicator */
@@ -187,20 +186,20 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                         chainId={p.chainId}
                       >
                         <div className="flex flex-col min-w-0">
-                          <span className="font-medium truncate" title={p.name}>
-                            {p.name}
+                          <span className="font-medium truncate" title={getAsset(p)?.name ?? p.name}>
+                            {getAsset(p)?.symbol ?? p.name}
                           </span>
                           <span
                             className="text-[11px] text-base-content/60 truncate"
                             title={p.lenderKey}
                           >
-                            {lenderDisplayName(p.lenderKey)}
+                            {p.lenderInfo?.name ?? p.lenderKey}
                           </span>
                         </div>
                       </AssetPopover>
                       <a
                         className="shrink-0 text-base-content/30 hover:text-primary transition-colors"
-                        title={`Open ${lenderDisplayName(p.lenderKey)} lending`}
+                        title={`Open ${p.lenderInfo?.name ?? p.lenderKey} lending`}
                         onClick={(e) => {
                           e.stopPropagation()
                           navigate(buildPath('lending', p.chainId, p.lenderKey))
@@ -359,21 +358,21 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                     chainId={p.chainId}
                   >
                     <div className="flex flex-col min-w-0">
-                      <span className="font-semibold text-sm truncate" title={p.name}>
-                        {p.name}
+                      <span className="font-semibold text-sm truncate" title={getAsset(p)?.name ?? p.name}>
+                        {getAsset(p)?.symbol ?? p.name}
                       </span>
                       <span
                         className="text-[11px] text-base-content/60 truncate"
                         title={p.lenderKey}
                       >
-                        {p.lenderKey}
+                        {p.lenderInfo?.name ?? p.lenderKey}
                       </span>
                     </div>
                   </AssetPopover>
                   <button
                     type="button"
                     className="btn btn-ghost btn-xs btn-circle opacity-40 hover:opacity-100"
-                    title={`Open ${lenderDisplayName(p.lenderKey)} lending`}
+                    title={`Open ${p.lenderInfo?.name ?? p.lenderKey} lending`}
                     onClick={(e) => {
                       e.stopPropagation()
                       navigate(buildPath('lending', p.chainId, p.lenderKey))

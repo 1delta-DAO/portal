@@ -229,6 +229,12 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
 
             {/* Labeled fields */}
             <div className="px-3 py-2 space-y-1.5 text-xs">
+              {marketName && (
+                <div className="flex items-start gap-2">
+                  <span className="text-base-content/50 shrink-0 w-14">Market</span>
+                  <span className="font-medium truncate">{marketName}</span>
+                </div>
+              )}
               <div className="flex items-start gap-2">
                 <span className="text-base-content/50 shrink-0 w-14">Symbol</span>
                 <span className="font-medium">{symbol}</span>
@@ -269,7 +275,7 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
               )}
               {marketUid && (
                 <>
-                  <CopyRow label="Market" value={marketUid} />
+                  <CopyRow label="Mkt ID" value={marketUid} />
                   <div className="flex items-start gap-2 pt-1">
                     <span className="text-base-content/50 shrink-0 w-14">Details</span>
                     <IrmDetailsButton

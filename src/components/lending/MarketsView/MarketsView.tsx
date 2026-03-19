@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { getChainName, isWNative, lenderDisplayNameFull, SupportedChainId } from '@1delta/lib-utils'
+import { getChainName, isWNative, SupportedChainId } from '@1delta/lib-utils'
 import { zeroAddress } from 'viem'
 import { useFlattenedPools, type PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import type { UserDataResult } from '../../../hooks/lending/useUserData'
@@ -173,6 +173,17 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     return keys.sort(
       (a, b) => computeLenderTvlFromPools(pools, b) - computeLenderTvlFromPools(pools, a)
     )
+  }, [pools])
+
+  // Build lender name lookup from pool lenderInfo
+  const lenderNameMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const p of pools) {
+      if (p.lenderInfo?.name && !map[p.lenderKey]) {
+        map[p.lenderKey] = p.lenderInfo.name
+      }
+    }
+    return map
   }, [pools])
 
   // Filtering + sorting
@@ -454,7 +465,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
             <option value="all">All lenders</option>
             {lenders.map((l) => (
               <option key={l} value={l}>
-                {lenderDisplayNameFull(l)}
+                {lenderNameMap[l] ?? l}
               </option>
             ))}
           </select>

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { isWNative } from '@1delta/lib-utils'
 import { zeroAddress } from 'viem'
-import type { LenderData, PoolDataItem } from '../../../hooks/lending/usePoolData'
+import type { LenderData, LenderInfoMap, PoolDataItem } from '../../../hooks/lending/usePoolData'
 import { usePoolConfigData } from '../../../hooks/lending/usePoolData'
 import { ConfigMarketView } from '../ConfigMarketView'
 import { RiskSelect } from '../RiskSelect'
@@ -23,6 +23,7 @@ import { ActionPanel, MobileActionModal } from './ActionPanel'
 
 interface Props {
   lenderData: LenderData | undefined
+  lenderInfoMap?: LenderInfoMap
   userData: UserDataResult
   chainId: string
   account?: string
@@ -34,6 +35,7 @@ interface Props {
 
 export function LendingDashboard({
   lenderData,
+  lenderInfoMap,
   userData,
   chainId,
   account,
@@ -48,6 +50,7 @@ export function LendingDashboard({
 
   // Lender selection (shared hook)
   const { selectedLender, setSelectedLender, lenderOptions, lenderBalances } = useLenderSelector({
+    lenderInfoMap,
     lenderData,
     userData,
     chainId,
