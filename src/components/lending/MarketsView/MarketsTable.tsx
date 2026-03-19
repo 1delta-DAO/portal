@@ -190,13 +190,13 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                             {getAsset(p)?.symbol ?? p.name}
                           </span>
                           <span
-                            className="text-[11px] text-base-content/60 truncate flex items-center gap-1"
+                            className="text-[11px] text-base-content/60 flex items-center gap-1 min-w-0"
                             title={p.lenderKey}
                           >
                             {p.lenderInfo?.logoURI && (
                               <img src={p.lenderInfo.logoURI} width={12} height={12} alt="" className="rounded-full object-contain w-3 h-3 shrink-0" />
                             )}
-                            {p.lenderInfo?.name ?? p.lenderKey}
+                            <span className="truncate">{p.lenderInfo?.name ?? p.lenderKey}</span>
                           </span>
                         </div>
                       </AssetPopover>
@@ -365,13 +365,13 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                         {getAsset(p)?.symbol ?? p.name}
                       </span>
                       <span
-                        className="text-[11px] text-base-content/60 truncate flex items-center gap-1"
+                        className="text-[11px] text-base-content/60 flex items-center gap-1 min-w-0"
                         title={p.lenderKey}
                       >
                         {p.lenderInfo?.logoURI && (
                           <img src={p.lenderInfo.logoURI} width={12} height={12} alt="" className="rounded-full object-contain w-3 h-3 shrink-0" />
                         )}
-                        {p.lenderInfo?.name ?? p.lenderKey}
+                        <span className="truncate">{p.lenderInfo?.name ?? p.lenderKey}</span>
                       </span>
                     </div>
                   </AssetPopover>

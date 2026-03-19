@@ -99,7 +99,7 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ label, breakdown, size = '
         createPortal(
           <div
             ref={popoverRef}
-            className="fixed z-9999 bg-base-100 border border-base-300 rounded-lg shadow-lg p-3 min-w-45"
+            className="fixed z-9999 bg-base-100 border border-base-300 rounded-lg shadow-lg p-3 min-w-45 max-w-72"
             style={{ top: pos.top, left: pos.left }}
             onMouseEnter={keepOpen}
             onMouseLeave={hide}
