@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { PoolRiskBreakdown, PoolRisk, LenderInfo } from './useFlattenedPools'
 import { BACKEND_BASE_URL } from '../../config/backend'
 
-const endpointLendingLatest = `${BACKEND_BASE_URL}/v1/data/lending/latest?chains=`
+const endpointLendingLatest = `${BACKEND_BASE_URL}/v1/data/lending/latest?maxRiskScore=5&chains=`
 
 // ============================================================================
 // Types for the /lending/latest API response (new format)
@@ -268,12 +268,10 @@ export interface ConfigMarketItem {
  * Returns pools grouped by lender key.
  */
 export function useMarginPublicData(chainId: string, enabled = true) {
-  const {
-    data,
-    isLoading,
-    isFetching,
-    error,
-  } = useQuery<{ lenderData: LenderData; lenderInfoMap: LenderInfoMap }>({
+  const { data, isLoading, isFetching, error } = useQuery<{
+    lenderData: LenderData
+    lenderInfoMap: LenderInfoMap
+  }>({
     queryKey: ['lendingPublic', chainId],
     enabled,
     queryFn: async () => {
