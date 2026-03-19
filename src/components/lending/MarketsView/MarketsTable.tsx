@@ -295,9 +295,15 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
               (key) => {
                 const labels: Record<SortKey, string> = {
                   apr: 'APR',
+                  borrowRate: 'Borrow',
+                  intrinsicYield: 'Yield',
                   utilization: 'Util',
                   totalDepositsUSD: 'Deposits',
+                  totalDebtUSD: 'Debt $',
                   totalLiquidityUSD: 'Liquidity',
+                  totalDeposits: 'Deposits (n)',
+                  totalDebt: 'Debt (n)',
+                  totalLiquidity: 'Liq (n)',
                   riskScore: 'Risk',
                 }
                 return (

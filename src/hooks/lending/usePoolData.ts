@@ -303,11 +303,11 @@ export function useMarginPublicData(chainId: string, enabled = true) {
 /**
  * Fetches pool data grouped by e-mode / pool configuration for a specific chain + lender.
  */
-export function usePoolConfigData(chainId: string, lenderKey: string) {
+export function usePoolConfigData(chainId: string, lenderKey: string, maxRiskScore = 4) {
   return useQuery<PoolConfigGroup[]>({
-    queryKey: ['poolsByConfig', chainId, lenderKey],
+    queryKey: ['poolsByConfig', chainId, lenderKey, maxRiskScore],
     queryFn: async () => {
-      const url = `${BACKEND_BASE_URL}/v1/data/lending/pools/by-config?chains=${chainId}&lenders=${lenderKey}`
+      const url = `${BACKEND_BASE_URL}/v1/data/lending/pools/by-config?chains=${chainId}&lenders=${lenderKey}&maxRiskScore=${maxRiskScore}`
       const r = await fetch(url)
       if (!r.ok) {
         const text = await r.text().catch(() => '')

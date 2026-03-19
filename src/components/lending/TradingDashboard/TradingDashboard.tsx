@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react'
 import type { LenderData, PoolDataItem } from '../../../hooks/lending/usePoolData'
 import { usePoolConfigData } from '../../../hooks/lending/usePoolData'
 import { ConfigMarketView } from '../ConfigMarketView'
+import { RiskSelect } from '../RiskSelect'
 import type {
   UserDataResult,
   UserPositionEntry,
@@ -67,6 +68,7 @@ export function TradingDashboard({
   const [selectedPools, setSelectedPools] = useState<SelectedPool[]>([])
   const [showMobileAction, setShowMobileAction] = useState(false)
   const [viewMode, setViewMode] = useState<'default' | 'config'>('config')
+  const [maxRiskScore, setMaxRiskScore] = useState<number>(4)
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
 
   // Sub-accounts
@@ -98,7 +100,8 @@ export function TradingDashboard({
   // Config-grouped pool data
   const { data: configGroups, isLoading: isConfigLoading } = usePoolConfigData(
     chainId,
-    selectedLender
+    selectedLender,
+    maxRiskScore
   )
 
   // Auto-select first config when config groups load
@@ -312,6 +315,8 @@ export function TradingDashboard({
                 Default
               </button>
             </div>
+
+            <RiskSelect value={maxRiskScore} onChange={setMaxRiskScore} />
           </div>
 
           {viewMode === 'config' ? (

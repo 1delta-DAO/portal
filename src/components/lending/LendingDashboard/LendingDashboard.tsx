@@ -4,6 +4,7 @@ import { zeroAddress } from 'viem'
 import type { LenderData, PoolDataItem } from '../../../hooks/lending/usePoolData'
 import { usePoolConfigData } from '../../../hooks/lending/usePoolData'
 import { ConfigMarketView } from '../ConfigMarketView'
+import { RiskSelect } from '../RiskSelect'
 import type {
   UserDataResult,
   UserPositionEntry,
@@ -60,6 +61,7 @@ export function LendingDashboard({
 
   // View mode: default flat list vs config-grouped view
   const [viewMode, setViewMode] = useState<'default' | 'config'>('config')
+  const [maxRiskScore, setMaxRiskScore] = useState<number>(4)
 
   // Search & sort state
   const [assetSearch, setAssetSearch] = useState('')
@@ -98,7 +100,8 @@ export function LendingDashboard({
   // Config-grouped pool data (fetched when config view is active)
   const { data: configGroups, isLoading: isConfigLoading } = usePoolConfigData(
     chainId,
-    selectedLender
+    selectedLender,
+    maxRiskScore
   )
 
   // Token lists for native token lookup
@@ -307,6 +310,8 @@ export function LendingDashboard({
                 Default
               </button>
             </div>
+
+            <RiskSelect value={maxRiskScore} onChange={setMaxRiskScore} />
           </div>
 
           {viewMode === 'config' ? (

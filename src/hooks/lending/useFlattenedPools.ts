@@ -110,7 +110,8 @@ function buildPoolsUrl(
   chainIds?: (number | string)[],
   lenders?: string[],
   start?: number,
-  count?: number
+  count?: number,
+  maxRiskScore?: number
 ) {
   const url = new URL(base)
 
@@ -122,6 +123,7 @@ function buildPoolsUrl(
   }
   if (start !== undefined) url.searchParams.set('start', String(start))
   if (count !== undefined) url.searchParams.set('count', String(count))
+  if (maxRiskScore !== undefined) url.searchParams.set('maxRiskScore', String(maxRiskScore))
 
   url.searchParams.set('includeExposures', 'true')
 
@@ -140,15 +142,17 @@ function buildPoolsUrl(
 export function useFlattenedPools(params: {
   chainId?: string
   lender?: string
+  maxRiskScore?: number
   enabled?: boolean
 }) {
   const chainId = params?.chainId
   const lender = params?.lender
+  const maxRiskScore = params?.maxRiskScore ?? 4
   const enabled = params?.enabled ?? true
 
   const { data, isLoading, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage, error } =
     useInfiniteQuery<PoolsApiResponse>({
-      queryKey: ['flattenedPools', chainId ?? '', lender ?? ''],
+      queryKey: ['flattenedPools', chainId ?? '', lender ?? '', maxRiskScore],
       enabled,
       initialPageParam: 0 as number,
       queryFn: async ({ pageParam }) => {
@@ -157,7 +161,8 @@ export function useFlattenedPools(params: {
           chainId ? [chainId] : [],
           lender ? [lender] : [],
           pageParam as number,
-          API_PAGE_SIZE
+          API_PAGE_SIZE,
+          maxRiskScore
         )
         const r = await fetch(url)
         if (!r.ok) {

@@ -1,7 +1,18 @@
 import type { PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 
-export type SortKey = 'apr' | 'utilization' | 'totalLiquidityUSD' | 'totalDepositsUSD' | 'riskScore'
+export type SortKey =
+  | 'apr'
+  | 'utilization'
+  | 'totalDepositsUSD'
+  | 'totalDebtUSD'
+  | 'totalLiquidityUSD'
+  | 'totalDeposits'
+  | 'totalDebt'
+  | 'totalLiquidity'
+  | 'borrowRate'
+  | 'intrinsicYield'
+  | 'riskScore'
 
 /** Derive a risk label from a numeric score (1–5) */
 export function scoreToRiskLabel(score: number | null | undefined): string {
