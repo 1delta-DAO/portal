@@ -169,8 +169,8 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                   }`}
                   onClick={() => onRowClick(p)}
                 >
-                  <td>
-                    <div className="flex items-center gap-1.5">
+                  <td className="w-1/4 max-w-48">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       <AssetPopover
                         address={p.underlyingAddress || p.underlyingInfo?.asset?.address}
                         name={getAsset(p)?.name ?? p.name}
