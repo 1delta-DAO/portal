@@ -1,4 +1,4 @@
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../lib-utils'
 import { getTokenFromCache } from '../data/tokenListsCache'
 import { zeroAddress } from 'viem'
 

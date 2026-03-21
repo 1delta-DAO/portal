@@ -5,7 +5,7 @@ import { useTokenLists } from '../../hooks/useTokenLists'
 import { useBalanceQuery } from '../../hooks/balances/useBalanceQuery'
 import { usePriceQuery } from '../../hooks/prices/usePriceQuery'
 import { useChainsRegistry } from '../../sdk/hooks/useChainsRegistry'
-import { CurrencyHandler, SupportedChainId } from '../../sdk/types'
+import { getWNativeAddress, SupportedChainId } from '../../sdk/types'
 import { getCurrency } from '../../lib/trade-helpers/utils'
 import type { RawCurrency } from '../../types/currency'
 import { TokenSelectorDropdownMode } from './Dropdown'
@@ -155,7 +155,7 @@ export function TokenSelector({
     // Native
     relevantTokens.push(zeroAddress as Address)
 
-    const wrappedNative = CurrencyHandler.wrappedAddressFromAddress(chainId, zeroAddress)
+    const wrappedNative = getWNativeAddress(chainId)
     if (wrappedNative) {
       const wrappedAddr = wrappedNative.toLowerCase()
       const wrappedLower = Object.keys(tokensMap).find((addr) => addr.toLowerCase() === wrappedAddr)

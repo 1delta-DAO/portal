@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useAccount } from 'wagmi'
 import { parseUnits, zeroAddress, type Address } from 'viem'
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../../types/currency'
 import { useSpotSwapQuote, type SpotSwapQuote } from '../../hooks/useSpotSwapQuote'
 import { useTokenLists } from '../../hooks/useTokenLists'
 import { useBalanceQuery, type BalanceEntry } from '../../hooks/balances/useBalanceQuery'

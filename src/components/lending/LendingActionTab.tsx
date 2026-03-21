@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { parseUnits } from 'viem'
 import { useAccount } from 'wagmi'
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../../types/currency'
 import { LenderData, PoolDataItem } from '../../hooks/lending/usePoolData'
 import { sortLenderKeysByTvl } from '../../utils/format'
 import {

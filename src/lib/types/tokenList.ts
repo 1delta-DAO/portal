@@ -1,4 +1,4 @@
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../lib-utils'
 
 /**
  * Token list entry structure matching frontend pattern

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../../types/currency'
 import type { TokenBalance } from '../../hooks/lending/useTokenBalances'
 import { AssetPopover } from './AssetPopover'
 

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../../types/currency'
 import { BACKEND_BASE_URL } from '../../config/backend'
 
 interface PriceEntry {

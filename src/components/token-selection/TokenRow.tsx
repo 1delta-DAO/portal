@@ -1,5 +1,5 @@
 import React from 'react'
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../../types/currency'
 
 interface TokenRowProps {
   token: RawCurrency

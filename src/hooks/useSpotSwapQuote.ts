@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { BACKEND_BASE_URL } from '../config/backend'
 import { useSendLendingTransaction, type LendingTx } from './useSendLendingTransaction'
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../types/currency'
 
 export interface SpotSwapQuote {
   aggregator: string

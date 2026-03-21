@@ -1,4 +1,4 @@
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../../../types/currency'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry, UserSubAccount } from '../../../hooks/lending/useUserData'
 import type { TokenBalance } from '../../../hooks/lending/useTokenBalances'

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { getChainName, isWNative, SupportedChainId } from '@1delta/lib-utils'
+import { getChainName, isWNative, SupportedChainId } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import { useFlattenedPools, type PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import type { UserDataResult } from '../../../hooks/lending/useUserData'

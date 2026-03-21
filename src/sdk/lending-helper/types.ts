@@ -1,4 +1,4 @@
-import { LendingMode, MorphoParams, SweepType, TransferToLenderType } from '@1delta/calldata-sdk';
+import { LendingMode, SweepType, type MorphoParams, TransferToLenderType } from '../../lib/lib-utils';
 
 interface CreateDepositBaseParams {
 	receiver?: string;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { isWNative } from '@1delta/lib-utils'
+import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'

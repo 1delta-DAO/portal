@@ -1,4 +1,4 @@
-import { getChainShortName } from '@1delta/lib-utils'
+import { getChainShortName } from '../../lib/lib-utils'
 import React from 'react'
 import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'
 

@@ -1,4 +1,4 @@
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../../types/currency'
 
 export interface TokenRowData {
   addr: string

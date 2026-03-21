@@ -10,7 +10,7 @@ import {
 } from '../DashboardActions'
 import { WalletConnect } from '../../connect'
 import type { TokenBalance } from '../../../hooks/lending/useTokenBalances'
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../../../types/currency'
 
 interface ActionContentProps {
   actionTab: ActionType

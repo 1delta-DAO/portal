@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { isWNative } from '@1delta/lib-utils'
+import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { LenderData, LenderInfoMap, PoolDataItem } from '../../../hooks/lending/usePoolData'
 import { usePoolConfigData } from '../../../hooks/lending/usePoolData'

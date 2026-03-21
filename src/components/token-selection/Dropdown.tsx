@@ -1,6 +1,6 @@
 import React from 'react'
 import type { Address } from 'viem'
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../../types/currency'
 import type { TokenRowData } from './types'
 import { TokenRow } from './TokenRow'
 

@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../types/currency'
 import {
   loadTokenListForChain,
   getChainTokensCache,

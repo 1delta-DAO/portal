@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import { isWNative, LendingMode, type RawCurrency } from '@1delta/lib-utils'
+import { isWNative, LendingMode, type RawCurrency } from '../../../../lib/lib-utils'
 import { parseUnits, zeroAddress } from 'viem'
 import { useTokenLists } from '../../../../hooks/useTokenLists'
 import type { PoolDataItem } from '../../../../hooks/lending/usePoolData'

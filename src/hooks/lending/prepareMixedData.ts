@@ -1,6 +1,6 @@
 // src/utils/flattenLenderDataWithUser.ts
-import type { RawCurrency } from '@1delta/lib-utils'
-import type { BalanceData, AprData, UserConfig } from '@1delta/margin-fetcher'
+import type { RawCurrency } from '../../types/currency'
+import type { BalanceData, AprData, UserConfig } from '../../lib/lib-utils'
 import type {
   UserDataResult,
   LenderUserDataEntry,

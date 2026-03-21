@@ -1,24 +1,92 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { http } from 'wagmi'
-import { getAvailableChainIds, SupportedChainId } from '@1delta/lib-utils'
-import { getEvmChain } from '@1delta/providers'
+import type { Chain } from 'viem'
+import {
+  mainnet,
+  optimism,
+  cronos,
+  telos,
+  xdc,
+  bsc,
+  gnosis,
+  unichain,
+  polygon,
+  monad,
+  sonic,
+  manta,
+  fantom,
+  hyperEvm,
+  metis,
+  coreDao,
+  moonbeam,
+  sei,
+  soneium,
+  morph,
+  mantle,
+  kaia,
+  base,
+  plasma,
+  mode,
+  arbitrum,
+  celo,
+  avalanche,
+  hemi,
+  linea,
+  berachain,
+  blast,
+  taiko,
+  scroll,
+  katana,
+} from 'viem/chains'
 
-// auto-inititalize chains based on state
-export const evmChainWagmi: any[] = getAvailableChainIds()
-  .filter((a) => a !== SupportedChainId.FUEL)
-  .map((chainId) => getEvmChain(chainId))
+export const evmChainWagmi: [Chain, ...Chain[]] = [
+  mainnet,       // 1
+  optimism,      // 10
+  cronos,        // 25
+  telos,         // 40
+  xdc,           // 50
+  bsc,           // 56
+  gnosis,        // 100
+  unichain,      // 130
+  polygon,       // 137
+  monad,         // 143
+  sonic,         // 146
+  manta,         // 169
+  fantom,        // 250
+  hyperEvm,      // 999
+  metis,         // 1088
+  coreDao,       // 1116
+  moonbeam,      // 1284
+  sei,           // 1329
+  soneium,       // 1868
+  morph,         // 2818
+  mantle,        // 5000
+  kaia,          // 8217
+  base,          // 8453
+  plasma,        // 9745
+  mode,          // 34443
+  arbitrum,      // 42161
+  celo,          // 42220
+  avalanche,     // 43114
+  hemi,          // 43111
+  linea,         // 59144
+  berachain,     // 80094
+  blast,         // 81457
+  taiko,         // 167000
+  scroll,        // 534352
+  katana,        // 747474
+]
 
-const RPC_OVERRIDES = {
-  [SupportedChainId.BNB_SMART_CHAIN_MAINNET]: 'https://bsc-dataseed1.bnbchain.org',
-  [SupportedChainId.METIS_ANDROMEDA_MAINNET]: 'https://metis-andromeda.rpc.thirdweb.com',
+const RPC_OVERRIDES: Record<number, string> = {
+  [bsc.id]: 'https://bsc-dataseed1.bnbchain.org',
+  [metis.id]: 'https://metis-andromeda.rpc.thirdweb.com',
 }
 
 export const evmTransportsWagmi = Object.assign(
   {},
   ...evmChainWagmi.map(({ id }) => {
     return {
-      // @ts-ignore
-      [id]: http(RPC_OVERRIDES[String(id)], { batch: true }),
+      [id]: http(RPC_OVERRIDES[id], { batch: true }),
     }
   })
 )
@@ -26,7 +94,7 @@ export const evmTransportsWagmi = Object.assign(
 export const config = getDefaultConfig({
   appName: 'Portal',
   projectId: 'id',
-  chains: evmChainWagmi as any,
+  chains: evmChainWagmi,
   transports: evmTransportsWagmi,
   ssr: false,
   pollingInterval: 30_000,

@@ -1,4 +1,4 @@
-import { getRpcUrlByIndex } from "@1delta/lib-utils"
+import { getRpcUrlByIndex } from "../../lib/lib-utils"
 
 export interface RawRpcResponse {
   jsonrpc: '2.0'

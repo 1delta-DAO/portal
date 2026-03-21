@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { LendingMode } from '@1delta/lib-utils'
+import { LendingMode } from '../../../../lib/lib-utils'
 import { parseUnits } from 'viem'
 import type { PoolDataItem } from '../../../../hooks/lending/usePoolData'
 import type { TradingActionProps, SelectedPool } from '../types'

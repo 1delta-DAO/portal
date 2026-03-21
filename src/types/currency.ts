@@ -1,1 +1,1 @@
-export type { RawCurrency } from '@1delta/lib-utils'
+export type { RawCurrency } from '../lib/lib-utils'

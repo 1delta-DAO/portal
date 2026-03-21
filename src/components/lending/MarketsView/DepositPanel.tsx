@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../../../types/currency'
 import type { PoolEntry } from '../../../hooks/lending/useFlattenedPools'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry, UserSubAccount } from '../../../hooks/lending/useUserData'

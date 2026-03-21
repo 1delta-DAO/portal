@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Address } from 'viem'
 import { ChainFilterSelect } from '../lending/ChainFilter'
 import { TokenSelector } from './index'
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../../types/currency'
 import { getCurrency } from '../../lib/trade-helpers/utils'
 import { useChains } from '../../hooks/useChains'
 

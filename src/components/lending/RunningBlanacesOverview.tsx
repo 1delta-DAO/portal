@@ -1,6 +1,6 @@
 // src/components/lending/RunningBalancesOverview.tsx
 import React from 'react'
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../../types/currency'
 
 export interface RunningBalanceItem {
   asset: RawCurrency

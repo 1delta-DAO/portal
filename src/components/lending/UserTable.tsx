@@ -1,6 +1,6 @@
 // src/components/UserLenderPositionsTable.tsx
 import React, { useState } from 'react'
-import type { RawCurrency } from '@1delta/lib-utils'
+import type { RawCurrency } from '../../types/currency'
 import type { LenderInfoMap } from '../../hooks/lending/usePoolData'
 import { useSendLendingTransaction } from '../../hooks/useSendLendingTransaction'
 import type {

@@ -1,4 +1,4 @@
-import { RawCurrency } from '@1delta/lib-utils'
+import { RawCurrency } from '../lib-utils'
 
 export type TokenListsRecord = Record<string, Record<string, RawCurrency>>
 export interface DeltaTokenList {
