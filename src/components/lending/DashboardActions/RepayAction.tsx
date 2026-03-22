@@ -84,8 +84,8 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   const repayMax = debtToken > 0 ? Math.min(debtToken, activeBalToken) : 0
 
   const currentAmount = parseAmount(amount)
-  const overWallet = activeBalToken > 0 && currentAmount > activeBalToken + 1e-9
-  const overDebt = debtToken > 0 && currentAmount > debtToken + 1e-9
+  const overWallet = !isAll && activeBalToken > 0 && currentAmount > activeBalToken + 1e-9
+  const overDebt = !isAll && debtToken > 0 && currentAmount > debtToken + 1e-9
   const overMax = overWallet || overDebt
 
   const handleQuickSelect = (val: string) => {

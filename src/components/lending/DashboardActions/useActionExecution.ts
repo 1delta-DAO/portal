@@ -94,7 +94,6 @@ export function useActionExecution(params: {
     const doFetch = async () => {
       setLoading(true)
       setError(null)
-      setResult(null)
       setPermissionsCompleted(0)
 
       const parsedAmount = parseUnits(debouncedAmount || '0', decimals)

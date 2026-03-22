@@ -76,7 +76,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
   const withdrawableToken = userPosition ? parseAmount(userPosition.withdrawable) : 0
   const depositsToken = userPosition ? parseAmount(userPosition.deposits) : 0
   const currentAmount = parseAmount(amount)
-  const overMax = withdrawableToken > 0 && currentAmount > withdrawableToken + 1e-9
+  const overMax = !isAll && withdrawableToken > 0 && currentAmount > withdrawableToken + 1e-9
 
   const handleQuickSelect = (val: string) => {
     setIsAll(false)
@@ -163,7 +163,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
         />
       </div>
 
-      {overMax && !isAll && (
+      {overMax && (
         <div className="text-[10px] text-error">
           Exceeds withdrawable balance ({formatTokenAmount(withdrawableToken)}).
         </div>
