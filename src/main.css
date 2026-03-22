@@ -29,18 +29,35 @@
   border-radius: var(--radius-box);
 }
 
-/* Buttons inside RainbowKit modal */
-[data-rk] button {
+/* Buttons inside RainbowKit modal – scope to the connect-button only;
+   wallet-option buttons inside the dialog must keep RainbowKit's own
+   styles so they remain tappable on mobile. */
+[data-rk] [role="dialog"] button {
   border-radius: var(--radius-box);
   background-color: hsl(var(--color-base-200));
   color: hsl(var(--color-base-content));
-  border: 1px solid hsl(var(--color-base-300)) !important;
+  border: 1px solid hsl(var(--color-base-300));
 }
 
-[data-rk] button:hover {
+[data-rk] [role="dialog"] button:hover {
   background-color: hsl(var(--color-primary));
   color: hsl(var(--color-primary-content));
   border-color: hsl(var(--color-primary));
+}
+
+/* Wallet-option buttons (icon grid on mobile) – keep them tappable
+   by restoring pointer-events and adding touch-action so mobile
+   browsers don't swallow the tap as a scroll gesture. */
+[data-rk] [data-testid^="wallet-option-"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure RainbowKit dialog portal sits above every app layer (navbar z-50,
+   IRM dock z-9990, popovers z-9999) on all mobile browsers. */
+[data-rk] [role="dialog"] {
+  z-index: 2147483646 !important;
+  touch-action: manipulation;
 }
 
 /* Sections inside modal */
