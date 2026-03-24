@@ -1,9 +1,10 @@
 import { BACKEND_BASE_URL } from '../../config/backend'
 
 // ============================================================================
-// Types
+// Types — aligned with range endpoint docs
 // ============================================================================
 
+/** Parsed range amounts for a single mode range (numeric for comparisons) */
 export interface LoopRangeModeRange {
   amountIn: number
   amountOut: number
@@ -21,8 +22,17 @@ export interface LoopRangeModeAnalysis {
 export interface LoopRangeEntry {
   assetLong: string
   assetShort: string
-  amount: number
+  /** Numeric amountIn — use for comparisons / quick button visibility */
+  amountIn: number
+  /** Raw amountIn string from API — use for input fields to avoid float precision loss */
+  amountInStr: string
+  /** Numeric amountOut */
+  amountOut: number
+  /** Raw amountOut string from API */
+  amountOutStr: string
+  /** USD value of the binding constraint */
   amountUSD: number
+  /** Mode analysis (leverage/loop only, null-ish for flat endpoints) */
   modeAnalysis: LoopRangeModeAnalysis
 }
 
@@ -38,28 +48,61 @@ export interface LoopRangeResult {
 
 const ZERO_RANGE: LoopRangeModeRange = { amountIn: 0, amountOut: 0, amountUSD: 0 }
 
+function parseModeRange(raw: any): LoopRangeModeRange | null {
+  if (!raw) return null
+  return {
+    amountIn: Number(raw.amountIn) || 0,
+    amountOut: Number(raw.amountOut) || 0,
+    amountUSD: Number(raw.amountUSD) || 0,
+  }
+}
+
 /**
- * Resolve the effective range from a raw API entry:
- * - If canSwitchToTargetMode && targetModeRange exists → use target
- * - Otherwise use userModeRange, defaulting to zeros if null
+ * Resolve the effective range from a raw API entry.
+ *
+ * Two response formats:
+ * 1. Leverage/loop (has modeAnalysis with userModeRange/targetModeRange)
+ * 2. Flat (colswap/debtswap/close — amountIn/amountOut/amountUSD at top level)
  */
 function resolveLoopRangeEntry(raw: any): LoopRangeEntry {
-  const ma = raw.modeAnalysis ?? {}
-  const canSwitch = !!ma.canSwitchToTargetMode
-  const targetRange: LoopRangeModeRange | null = ma.targetModeRange
-    ? { amountIn: ma.targetModeRange.amountIn ?? 0, amountOut: ma.targetModeRange.amountOut ?? 0, amountUSD: ma.targetModeRange.amountUSD ?? 0 }
-    : null
-  const userRange: LoopRangeModeRange | null = ma.userModeRange
-    ? { amountIn: ma.userModeRange.amountIn ?? 0, amountOut: ma.userModeRange.amountOut ?? 0, amountUSD: ma.userModeRange.amountUSD ?? 0 }
-    : null
+  // Flat format: amountIn/amountOut/amountUSD directly on entry, no modeAnalysis
+  if (!raw.modeAnalysis) {
+    return {
+      assetLong: '',
+      assetShort: '',
+      amountIn: Number(raw.amountIn) || 0,
+      amountInStr: String(raw.amountIn ?? '0'),
+      amountOut: Number(raw.amountOut) || 0,
+      amountOutStr: String(raw.amountOut ?? '0'),
+      amountUSD: Number(raw.amountUSD) || 0,
+      modeAnalysis: {
+        userMode: '0',
+        targetMode: '0',
+        canSwitchToTargetMode: false,
+        userModeRange: null,
+        targetModeRange: null,
+      },
+    }
+  }
 
-  const effective =
-    canSwitch && targetRange ? targetRange : userRange ?? ZERO_RANGE
+  // Leverage format: resolve from modeAnalysis
+  const ma = raw.modeAnalysis
+  const canSwitch = !!ma.canSwitchToTargetMode
+  const targetRange = parseModeRange(ma.targetModeRange)
+  const userRange = parseModeRange(ma.userModeRange)
+
+  const effective = canSwitch && targetRange ? targetRange : userRange ?? ZERO_RANGE
+
+  // Preserve raw strings from the API for input fields
+  const rawEffective = canSwitch && ma.targetModeRange ? ma.targetModeRange : ma.userModeRange
 
   return {
     assetLong: raw.underlyingInfoLong?.asset?.address ?? '',
     assetShort: raw.underlyingInfoShort?.asset?.address ?? '',
-    amount: effective.amountIn,
+    amountIn: effective.amountIn,
+    amountInStr: String(rawEffective?.amountIn ?? effective.amountIn),
+    amountOut: effective.amountOut,
+    amountOutStr: String(rawEffective?.amountOut ?? effective.amountOut),
     amountUSD: effective.amountUSD,
     modeAnalysis: {
       userMode: ma.userMode ?? '0',
@@ -110,6 +153,19 @@ export interface LoopRangeSimulationBody {
 }
 
 // ============================================================================
+// Range endpoint paths per operation
+// ============================================================================
+
+export type RangeOperation = 'leverage' | 'collateral-swap' | 'debt-swap' | 'close'
+
+const RANGE_ENDPOINTS: Record<RangeOperation, string> = {
+  'leverage': `${BACKEND_BASE_URL}/v1/data/loop/range/leverage`,
+  'collateral-swap': `${BACKEND_BASE_URL}/v1/data/loop/range/collateral-swap`,
+  'debt-swap': `${BACKEND_BASE_URL}/v1/data/loop/range/debt-swap`,
+  'close': `${BACKEND_BASE_URL}/v1/data/loop/range/close`,
+}
+
+// ============================================================================
 // Fetch (GET — uses account for on-chain data)
 // ============================================================================
 
@@ -121,6 +177,7 @@ export async function fetchLoopRange(params: {
   marketUidOut?: string
   payAsset?: string
   payAmount?: string
+  operation?: RangeOperation
 }): Promise<LoopRangeResult> {
   try {
     const qs = new URLSearchParams()
@@ -132,7 +189,8 @@ export async function fetchLoopRange(params: {
     if (params.payAsset) qs.set('payAsset', params.payAsset)
     if (params.payAmount) qs.set('payAmount', params.payAmount)
 
-    const res = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/range?${qs}`)
+    const endpoint = RANGE_ENDPOINTS[params.operation ?? 'leverage']
+    const res = await fetch(`${endpoint}?${qs}`)
 
     if (!res.ok) {
       const text = await res.text().catch(() => '')
@@ -164,6 +222,7 @@ export async function fetchLoopRangeWithSimulation(params: {
   marketUidOut?: string
   payAsset?: string
   payAmount?: string
+  operation?: RangeOperation
 }): Promise<LoopRangeResult> {
   try {
     const qs = new URLSearchParams()
@@ -174,7 +233,8 @@ export async function fetchLoopRangeWithSimulation(params: {
     if (params.payAsset) qs.set('payAsset', params.payAsset)
     if (params.payAmount) qs.set('payAmount', params.payAmount)
 
-    const res = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/range?${qs}`, {
+    const endpoint = RANGE_ENDPOINTS[params.operation ?? 'leverage']
+    const res = await fetch(`${endpoint}?${qs}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params.body),

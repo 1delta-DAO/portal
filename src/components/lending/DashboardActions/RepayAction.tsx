@@ -3,7 +3,7 @@ import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
-import { formatTokenAmount, formatUsd, parseAmount, formatTokenForInput } from './format'
+import { formatTokenAmount, formatUsd, parseAmount, formatTokenForInput, sanitizeAmountInput } from './format'
 import { AmountQuickButtons } from './AmountQuickButtons'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
@@ -75,17 +75,19 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
     resetState()
   }, [pool?.marketUid])
 
-  const debtToken = userPosition
+  const debtTotal = userPosition
     ? parseAmount(userPosition.debt) + parseAmount(userPosition.debtStable)
     : 0
 
   const activeBal = canUseNative && useNative ? nativeBalance : walletBalance
-  const activeBalToken = parseAmount(activeBal?.balance ?? 0)
-  const repayMax = debtToken > 0 ? Math.min(debtToken, activeBalToken) : 0
+  const activeBalStr = activeBal?.balance ?? '0'
+  const activeBalNum = parseAmount(activeBalStr)
+  const repayMaxNum = debtTotal > 0 ? Math.min(debtTotal, activeBalNum) : 0
+  const repayMaxStr = formatTokenForInput(repayMaxNum)
 
   const currentAmount = parseAmount(amount)
-  const overWallet = !isAll && activeBalToken > 0 && currentAmount > activeBalToken + 1e-9
-  const overDebt = !isAll && debtToken > 0 && currentAmount > debtToken + 1e-9
+  const overWallet = !isAll && activeBalNum > 0 && currentAmount > activeBalNum + 1e-9
+  const overDebt = !isAll && debtTotal > 0 && currentAmount > debtTotal + 1e-9
   const overMax = overWallet || overDebt
 
   const handleQuickSelect = (val: string) => {
@@ -95,8 +97,8 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
 
   const handleIsAllChange = (checked: boolean) => {
     setIsAll(checked)
-    if (checked && repayMax > 0) {
-      setAmount(formatTokenForInput(repayMax))
+    if (checked && repayMaxNum > 0) {
+      setAmount(repayMaxStr)
     }
   }
 
@@ -143,18 +145,18 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
       {activeBal && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Wallet balance:</span>
-          <span className={`font-medium ${activeBalToken === 0 ? 'text-base-content/40' : ''}`}>
+          <span className={`font-medium ${activeBalNum === 0 ? 'text-base-content/40' : ''}`}>
             {formatTokenAmount(activeBal.balance)} (${formatUsd(activeBal.balanceUSD)})
           </span>
         </div>
       )}
 
       {/* Outstanding debt */}
-      {userPosition && debtToken > 0 && (
+      {userPosition && debtTotal > 0 && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Outstanding debt:</span>
           <span className="text-error font-medium">
-            {formatTokenAmount(debtToken)} ($
+            {formatTokenAmount(debtTotal)} ($
             {formatUsd(userPosition.debtUSD + userPosition.debtStableUSD)})
           </span>
         </div>
@@ -165,7 +167,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
         <div className="flex justify-between items-center mb-1">
           <span className="label-text text-xs">Amount</span>
           <AmountQuickButtons
-            maxAmount={repayMax}
+            maxAmount={repayMaxStr}
             onSelect={handleQuickSelect}
             onMax={() => handleIsAllChange(true)}
           />
@@ -177,8 +179,10 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
           placeholder="0.0"
           value={amount}
           onChange={(e) => {
+            const v = sanitizeAmountInput(e.target.value)
+            if (v === null) return
             setIsAll(false)
-            setAmount(e.target.value)
+            setAmount(v)
           }}
           disabled={!pool}
         />
@@ -186,12 +190,12 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
 
       {overWallet && !isAll && (
         <div className="text-[10px] text-error">
-          Exceeds wallet balance ({formatTokenAmount(activeBalToken)}).
+          Exceeds wallet balance ({formatTokenAmount(activeBalNum)}).
         </div>
       )}
       {overDebt && !overWallet && !isAll && (
         <div className="text-[10px] text-error">
-          Exceeds outstanding debt ({formatTokenAmount(debtToken)}).
+          Exceeds outstanding debt ({formatTokenAmount(debtTotal)}).
         </div>
       )}
 

@@ -3,7 +3,7 @@ import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
-import { formatTokenAmount, formatUsd, parseAmount, formatTokenForInput } from './format'
+import { formatTokenAmount, formatUsd, parseAmount, sanitizeAmountInput } from './format'
 import { AmountQuickButtons } from './AmountQuickButtons'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
@@ -73,10 +73,9 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
     resetState()
   }, [pool?.marketUid])
 
-  const withdrawableToken = userPosition ? parseAmount(userPosition.withdrawable) : 0
-  const depositsToken = userPosition ? parseAmount(userPosition.deposits) : 0
-  const currentAmount = parseAmount(amount)
-  const overMax = !isAll && withdrawableToken > 0 && currentAmount > withdrawableToken + 1e-9
+  const withdrawableStr = String(userPosition?.withdrawable ?? '0')
+  const depositsStr = String(userPosition?.deposits ?? '0')
+  const overMax = !isAll && parseAmount(withdrawableStr) > 0 && parseAmount(amount) > parseAmount(withdrawableStr) + 1e-9
 
   const handleQuickSelect = (val: string) => {
     setIsAll(false)
@@ -85,8 +84,8 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
 
   const handleIsAllChange = (checked: boolean) => {
     setIsAll(checked)
-    if (checked && withdrawableToken > 0) {
-      setAmount(formatTokenForInput(withdrawableToken))
+    if (checked && parseAmount(withdrawableStr) > 0) {
+      setAmount(withdrawableStr)
     }
   }
 
@@ -130,7 +129,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
       )}
 
       {/* Available balance */}
-      {userPosition && depositsToken > 0 && (
+      {userPosition && parseAmount(depositsStr) > 0 && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Available to withdraw:</span>
           <span className="text-success font-medium">
@@ -144,7 +143,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
         <div className="flex justify-between items-center mb-1">
           <span className="label-text text-xs">Amount</span>
           <AmountQuickButtons
-            maxAmount={withdrawableToken}
+            maxAmount={withdrawableStr}
             onSelect={handleQuickSelect}
             onMax={() => handleIsAllChange(true)}
           />
@@ -156,8 +155,10 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
           placeholder="0.0"
           value={amount}
           onChange={(e) => {
+            const v = sanitizeAmountInput(e.target.value)
+            if (v === null) return
             setIsAll(false)
-            setAmount(e.target.value)
+            setAmount(v)
           }}
           disabled={!pool}
         />
@@ -165,7 +166,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
 
       {overMax && (
         <div className="text-[10px] text-error">
-          Exceeds withdrawable balance ({formatTokenAmount(withdrawableToken)}).
+          Exceeds withdrawable balance ({formatTokenAmount(withdrawableStr)}).
         </div>
       )}
 

@@ -1,8 +1,8 @@
 import React from 'react'
-import { formatTokenForInput } from './format'
+import { multiplyAmountString } from './format'
 
 interface AmountQuickButtonsProps {
-  maxAmount: number
+  maxAmount: string
   onSelect: (amountStr: string) => void
   /** Called when "Max" is clicked instead of onSelect, e.g. to toggle isAll */
   onMax?: () => void
@@ -20,7 +20,8 @@ export const AmountQuickButtons: React.FC<AmountQuickButtonsProps> = ({
   onSelect,
   onMax,
 }) => {
-  if (!maxAmount || !Number.isFinite(maxAmount) || maxAmount <= 0) {
+  const n = parseFloat(maxAmount)
+  if (!maxAmount || !Number.isFinite(n) || n <= 0) {
     return null
   }
 
@@ -35,7 +36,7 @@ export const AmountQuickButtons: React.FC<AmountQuickButtonsProps> = ({
             if (e.fraction === 1 && onMax) {
               onMax()
             } else {
-              onSelect(formatTokenForInput(maxAmount * e.fraction))
+              onSelect(multiplyAmountString(maxAmount, e.fraction))
             }
           }}
         >

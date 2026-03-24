@@ -8,7 +8,7 @@ import { PoolSelectorDropdown } from '../PoolSelectorDropdown'
 import { SlippageInput } from '../SlippageInput'
 import { QuoteCard } from '../QuoteCard'
 import { AmountQuickButtons } from '../../DashboardActions/AmountQuickButtons'
-import { formatTokenAmount, formatUsd, parseAmount } from '../../DashboardActions/format'
+import { formatTokenAmount, formatUsd, parseAmount, sanitizeAmountInput } from '../../DashboardActions/format'
 import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes } from '../useTradingQuotes'
 import { RateImpactIndicator } from '../../DashboardActions/RateImpactIndicator'
@@ -56,7 +56,7 @@ function LoopRangeInfo({
         <button
           type="button"
           className="text-primary hover:underline cursor-pointer text-[11px] font-medium"
-          onClick={() => onSetMax(loopRange.amount)}
+          onClick={() => onSetMax(loopRange.amountIn)}
         >
           Use max
         </button>
@@ -66,7 +66,7 @@ function LoopRangeInfo({
       <div className="flex items-center justify-between">
         <span className="text-base-content/70">{needsModeSwitch ? 'Target e-mode' : 'Max'}</span>
         <span className="font-medium">
-          {loopRange.amount.toFixed(4)} {debtSymbol}{' '}
+          {formatTokenAmount(loopRange.amountInStr)} {debtSymbol}{' '}
           <span className="text-base-content/50">(${formatUsd(loopRange.amountUSD)})</span>
         </span>
       </div>
@@ -76,7 +76,7 @@ function LoopRangeInfo({
         <div className="flex items-center justify-between">
           <span className="text-base-content/70">Current mode</span>
           <span className="font-medium">
-            {inUserMode.amountIn.toFixed(4)} {debtSymbol}{' '}
+            {formatTokenAmount(inUserMode.amountIn)} {debtSymbol}{' '}
             <span className="text-base-content/50">(${formatUsd(inUserMode.amountUSD)})</span>
           </span>
         </div>
@@ -291,14 +291,14 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
   // Max amounts
   const debtPos = debtPool ? userPositions.get(debtPool.marketUid) : null
-  const maxBorrowable = debtPos ? Number(debtPos.borrowable) : 0
+  const maxBorrowableStr = debtPos ? String(debtPos.borrowable) : '0'
 
   // Pay wallet balance + overMax
   const payWalletBalance = selectedPayCurrency
     ? (walletBalances.get(selectedPayCurrency.address.toLowerCase()) ?? null)
     : null
-  const payWalletAmount = payWalletBalance ? parseFloat(payWalletBalance.balance) : 0
-  const payOverMax = payWalletAmount > 0 && parseAmount(payAmount) > payWalletAmount + 1e-9
+  const payWalletStr = payWalletBalance?.balance ?? '0'
+  const payOverMax = parseAmount(payWalletStr) > 0 && parseAmount(payAmount) > parseAmount(payWalletStr) + 1e-9
 
   const handleFetchQuotes = () => {
     if (!collateralPool || !debtPool) return
@@ -340,141 +340,151 @@ export const LoopAction: React.FC<TradingActionProps> = ({
         />
       )}
 
-      {/* Collateral pool */}
-      <PoolSelectorDropdown
-        pools={collateralPools}
-        value={collateralPool}
-        onChange={setCollateralPool}
-        userPositions={userPositions}
-        label="Collateral (Deposit Into)"
-        positionType="deposits"
-        preferredUids={preferredCollateralUids}
-      />
-
-      {/* Debt pool */}
-      <PoolSelectorDropdown
-        pools={borrowablePools}
-        value={debtPool}
-        onChange={setDebtPool}
-        userPositions={userPositions}
-        label="Debt (Borrow From)"
-        positionType="debt"
-        preferredUids={preferredBorrowableUids}
-      />
-
-      {/* Debt amount */}
-      <div className="form-control">
-        <div className="flex items-center justify-between mb-0.5">
-          <label className="label-text text-xs">Debt Amount</label>
-          <AmountQuickButtons maxAmount={maxBorrowable} onSelect={setDebtAmount} />
-        </div>
-        <input
-          type="text"
-          inputMode="decimal"
-          className="input input-bordered input-sm w-full"
-          placeholder="0.0"
-          value={debtAmount}
-          onChange={(e) => {
-            setDebtAmount(e.target.value)
-            reset()
-          }}
+      {/* Collateral pool (output — no amount, determined by quote) */}
+      <div className="rounded-lg p-2 bg-base-200/30">
+        <PoolSelectorDropdown
+          pools={collateralPools}
+          value={collateralPool}
+          onChange={setCollateralPool}
+          userPositions={userPositions}
+          label="Collateral (Deposit Into)"
+          positionType="deposits"
+          preferredUids={preferredCollateralUids}
         />
-        {debtPos && Number(debtPos.borrowable) > 0 && (
-          <span className="text-[10px] text-base-content/50 mt-0.5">
-            Borrowable: {Number(debtPos.borrowable).toFixed(4)}
-          </span>
-        )}
       </div>
 
-      {/* Loop range info */}
-      {collateralPool && debtPool && (
-        <LoopRangeInfo
-          loopRange={loopRange}
-          loading={loopRangeLoading}
-          debtSymbol={debtPool.asset.symbol}
-          onSetMax={(amount) => {
-            setDebtAmount(String(amount))
-            reset()
-          }}
+      {/* Debt pool + Debt amount + Loop range */}
+      <div className="rounded-lg p-2 ring-1 ring-primary bg-primary/5">
+        <PoolSelectorDropdown
+          pools={borrowablePools}
+          value={debtPool}
+          onChange={setDebtPool}
+          userPositions={userPositions}
+          label="Debt (Borrow From)"
+          positionType="debt"
+          preferredUids={preferredBorrowableUids}
         />
-      )}
-
-      {/* Pay currency */}
-      <div className="form-control">
-        <label className="label-text text-xs mb-1">Pay With (Margin)</label>
-        {payCurrencies.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {payCurrencies.map((c) => {
-              const isActive = payCurrencyAddress === c.address
-              return (
-                <button
-                  key={c.address}
-                  type="button"
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors border cursor-pointer ${
-                    isActive
-                      ? 'border-primary bg-primary/10 ring-1 ring-primary'
-                      : 'border-base-300 bg-base-200/50 hover:bg-base-200'
-                  }`}
-                  onClick={() => {
-                    setPayCurrencyAddress(c.address)
-                    setPayAmount('')
-                  }}
-                >
-                  <img
-                    src={c.logoURI}
-                    width={16}
-                    height={16}
-                    alt={c.symbol}
-                    className="rounded-full object-contain w-4 h-4"
-                  />
-                  <span className="font-medium">{c.symbol}</span>
-                </button>
-              )
-            })}
-          </div>
-        ) : (
-          <span className="text-xs text-base-content/50">Select collateral & debt pools first</span>
-        )}
-      </div>
-
-      {/* Pay amount + wallet balance */}
-      {selectedPayCurrency && (
-        <div className="form-control">
-          {payWalletBalance && (
-            <div className="text-xs flex justify-between px-1 mb-1">
-              <span className="text-base-content/60">Wallet balance:</span>
-              <span
-                className={`font-medium ${payWalletAmount === 0 ? 'text-base-content/40' : ''}`}
-              >
-                {formatTokenAmount(payWalletBalance.balance)} {selectedPayCurrency.symbol} ($
-                {formatUsd(payWalletBalance.balanceUSD)})
-              </span>
-            </div>
-          )}
+        <div className="form-control mt-1.5">
           <div className="flex items-center justify-between mb-0.5">
-            <label className="label-text text-xs">Pay Amount</label>
-            {payWalletBalance ? (
-              <AmountQuickButtons maxAmount={payWalletAmount} onSelect={setPayAmount} />
-            ) : null}
+            <label className="label-text text-xs">Debt Amount</label>
+            <AmountQuickButtons maxAmount={maxBorrowableStr} onSelect={setDebtAmount} />
           </div>
           <input
             type="text"
             inputMode="decimal"
             className="input input-bordered input-sm w-full"
             placeholder="0.0"
-            value={payAmount}
+            value={debtAmount}
             onChange={(e) => {
-              setPayAmount(e.target.value)
+              const v = sanitizeAmountInput(e.target.value)
+              if (v === null) return
+              setDebtAmount(v)
               reset()
             }}
           />
-          {payOverMax && (
-            <div className="text-[10px] text-error mt-0.5">
-              Exceeds wallet balance ({formatTokenAmount(payWalletAmount)}).
-            </div>
+          {debtPos && Number(debtPos.borrowable) > 0 && (
+            <span className="text-[10px] text-base-content/50 mt-0.5">
+              Borrowable: {Number(debtPos.borrowable).toFixed(4)}
+            </span>
           )}
         </div>
-      )}
+
+        {/* Loop range info */}
+        {collateralPool && debtPool && (
+          <div className="mt-1.5">
+            <LoopRangeInfo
+              loopRange={loopRange}
+              loading={loopRangeLoading}
+              debtSymbol={debtPool.asset.symbol}
+              onSetMax={(amount) => {
+                setDebtAmount(String(amount))
+                reset()
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Pay currency + Pay amount */}
+      <div className="rounded-lg p-2 bg-base-200/30">
+        <div className="form-control">
+          <label className="label-text text-xs mb-1">Pay With (Margin)</label>
+          {payCurrencies.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {payCurrencies.map((c) => {
+                const isActive = payCurrencyAddress === c.address
+                return (
+                  <button
+                    key={c.address}
+                    type="button"
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors border cursor-pointer ${
+                      isActive
+                        ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                        : 'border-base-300 bg-base-200/50 hover:bg-base-200'
+                    }`}
+                    onClick={() => {
+                      setPayCurrencyAddress(c.address)
+                      setPayAmount('')
+                    }}
+                  >
+                    <img
+                      src={c.logoURI}
+                      width={16}
+                      height={16}
+                      alt={c.symbol}
+                      className="rounded-full object-contain w-4 h-4"
+                    />
+                    <span className="font-medium">{c.symbol}</span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <span className="text-xs text-base-content/50">Select collateral & debt pools first</span>
+          )}
+        </div>
+
+        {/* Pay amount + wallet balance */}
+        {selectedPayCurrency && (
+          <div className="form-control mt-1.5">
+            {payWalletBalance && (
+              <div className="text-xs flex justify-between px-1 mb-1">
+                <span className="text-base-content/60">Wallet balance:</span>
+                <span
+                  className={`font-medium ${parseAmount(payWalletStr) === 0 ? 'text-base-content/40' : ''}`}
+                >
+                  {formatTokenAmount(payWalletBalance.balance)} {selectedPayCurrency.symbol} ($
+                  {formatUsd(payWalletBalance.balanceUSD)})
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between mb-0.5">
+              <label className="label-text text-xs">Pay Amount</label>
+              {payWalletBalance ? (
+                <AmountQuickButtons maxAmount={payWalletStr} onSelect={setPayAmount} />
+              ) : null}
+            </div>
+            <input
+              type="text"
+              inputMode="decimal"
+              className="input input-bordered input-sm w-full"
+              placeholder="0.0"
+              value={payAmount}
+              onChange={(e) => {
+                const v = sanitizeAmountInput(e.target.value)
+                if (v === null) return
+                setPayAmount(v)
+                reset()
+              }}
+            />
+            {payOverMax && (
+              <div className="text-[10px] text-error mt-0.5">
+                Exceeds wallet balance ({formatTokenAmount(payWalletStr)}).
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Slippage */}
       <SlippageInput value={slippage} onChange={setSlippage} />
@@ -527,7 +537,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
             <button
               key={`perm-${i}`}
               type="button"
-              className="btn btn-outline btn-sm w-full"
+              className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 whitespace-normal text-xs"
+              title={tx.description || 'Approve'}
               onClick={() => executePermission(tx)}
             >
               {tx.description || 'Approve'}
@@ -537,7 +548,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
             <button
               key={`tx-${i}`}
               type="button"
-              className="btn btn-outline btn-sm w-full"
+              className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 whitespace-normal text-xs"
+              title={tx.description || 'Execute Setup Transaction'}
               onClick={() => executeTransaction(tx)}
             >
               {tx.description || 'Execute Setup Transaction'}

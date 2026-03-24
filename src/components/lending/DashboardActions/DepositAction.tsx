@@ -3,7 +3,7 @@ import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
-import { formatTokenAmount, formatUsd, parseAmount } from './format'
+import { formatTokenAmount, formatUsd, parseAmount, sanitizeAmountInput } from './format'
 import { AmountQuickButtons } from './AmountQuickButtons'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
@@ -59,9 +59,8 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   }, [pool?.marketUid])
 
   const activeBal = canUseNative && useNative ? nativeBalance : walletBalance
-  const walletAmount = activeBal ? parseFloat(activeBal.balance) : 0
-  const currentAmount = parseAmount(amount)
-  const overMax = walletAmount > 0 && currentAmount > walletAmount + 1e-9
+  const walletAmountStr = activeBal?.balance ?? '0'
+  const overMax = parseAmount(walletAmountStr) > 0 && parseAmount(amount) > parseAmount(walletAmountStr) + 1e-9
 
   if (txSuccess) {
     return (
@@ -105,7 +104,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       {activeBal && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Wallet balance:</span>
-          <span className={`font-medium ${walletAmount === 0 ? 'text-base-content/40' : ''}`}>
+          <span className={`font-medium ${parseAmount(walletAmountStr) === 0 ? 'text-base-content/40' : ''}`}>
             {formatTokenAmount(activeBal.balance)} (${formatUsd(activeBal.balanceUSD)})
           </span>
         </div>
@@ -125,7 +124,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       <div className="form-control">
         <div className="flex justify-between items-center mb-1">
           <span className="label-text text-xs">Amount</span>
-          <AmountQuickButtons maxAmount={walletAmount} onSelect={(val) => setAmount(val)} />
+          <AmountQuickButtons maxAmount={walletAmountStr} onSelect={(val) => setAmount(val)} />
         </div>
         <input
           type="text"
@@ -133,14 +132,14 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
           className="input input-bordered input-sm w-full"
           placeholder="0.0"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => { const v = sanitizeAmountInput(e.target.value); if (v !== null) setAmount(v) }}
           disabled={!pool}
         />
       </div>
 
       {overMax && (
         <div className="text-[10px] text-error">
-          Exceeds wallet balance ({formatTokenAmount(walletAmount)}).
+          Exceeds wallet balance ({formatTokenAmount(walletAmountStr)}).
         </div>
       )}
 

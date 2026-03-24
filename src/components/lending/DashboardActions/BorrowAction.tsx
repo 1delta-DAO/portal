@@ -3,7 +3,7 @@ import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
-import { formatTokenAmount, formatUsd, parseAmount } from './format'
+import { formatTokenAmount, formatUsd, parseAmount, sanitizeAmountInput } from './format'
 import { AmountQuickButtons } from './AmountQuickButtons'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
@@ -56,13 +56,12 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
     resetState()
   }, [pool?.marketUid])
 
-  const depositsToken = userPosition ? parseAmount(userPosition.deposits) : 0
-  const debtToken = userPosition
-    ? parseAmount(userPosition.debt) + parseAmount(userPosition.debtStable)
-    : 0
-  const borrowableToken = userPosition ? parseAmount(userPosition.borrowable) : 0
-  const currentAmount = parseAmount(amount)
-  const overMax = borrowableToken > 0 && currentAmount > borrowableToken + 1e-9
+  const depositsStr = String(userPosition?.deposits ?? '0')
+  const debtStr = String(userPosition?.debt ?? '0')
+  const debtStableStr = String(userPosition?.debtStable ?? '0')
+  const borrowableStr = String(userPosition?.borrowable ?? '0')
+  const debtTotal = parseAmount(debtStr) + parseAmount(debtStableStr)
+  const overMax = parseAmount(borrowableStr) > 0 && parseAmount(amount) > parseAmount(borrowableStr) + 1e-9
 
   if (txSuccess) {
     return (
@@ -110,7 +109,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
       )}
 
       {/* User position context */}
-      {userPosition && depositsToken > 0 && (
+      {userPosition && parseAmount(depositsStr) > 0 && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Your deposits:</span>
           <span className="text-success font-medium">
@@ -118,19 +117,19 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
           </span>
         </div>
       )}
-      {userPosition && debtToken > 0 && (
+      {userPosition && debtTotal > 0 && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Current debt:</span>
           <span className="text-error font-medium">
-            {formatTokenAmount(debtToken)} (${formatUsd(userPosition.debtUSD + userPosition.debtStableUSD)})
+            {formatTokenAmount(debtTotal)} (${formatUsd(userPosition.debtUSD + userPosition.debtStableUSD)})
           </span>
         </div>
       )}
-      {borrowableToken > 0 && (
+      {parseAmount(borrowableStr) > 0 && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Available to borrow:</span>
           <span className="text-warning font-medium">
-            {formatTokenAmount(borrowableToken)}
+            {formatTokenAmount(borrowableStr)}
           </span>
         </div>
       )}
@@ -147,7 +146,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
       <div className="form-control">
         <div className="flex justify-between items-center mb-1">
           <span className="label-text text-xs">Amount</span>
-          <AmountQuickButtons maxAmount={borrowableToken} onSelect={(val) => setAmount(val)} />
+          <AmountQuickButtons maxAmount={borrowableStr} onSelect={(val) => setAmount(val)} />
         </div>
         <input
           type="text"
@@ -155,14 +154,14 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
           className="input input-bordered input-sm w-full"
           placeholder="0.0"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => { const v = sanitizeAmountInput(e.target.value); if (v !== null) setAmount(v) }}
           disabled={!pool}
         />
       </div>
 
       {overMax && (
         <div className="text-[10px] text-error">
-          Exceeds borrowable amount ({formatTokenAmount(borrowableToken)}).
+          Exceeds borrowable amount ({formatTokenAmount(borrowableStr)}).
         </div>
       )}
 
