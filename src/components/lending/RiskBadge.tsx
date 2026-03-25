@@ -17,6 +17,8 @@ function riskTextColor(label: string): string {
       return 'text-warning'
     case 'high':
       return 'text-error'
+    case 'unknown':
+      return 'text-base-content/40'
     default:
       return 'text-base-content/50'
   }
@@ -109,16 +111,24 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ label, breakdown, size = '
             </div>
             <div className="flex flex-col gap-1.5">
               {breakdown.map((b) => (
-                <div key={b.category} className="flex items-center justify-between gap-4">
-                  <span className="text-xs text-base-content/70 capitalize">{b.category}</span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskDotColor(b.label)}`}
-                    />
-                    <span className={`text-xs font-medium ${riskTextColor(b.label)}`}>
-                      {b.label}
+                <div key={b.category}>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-xs text-base-content/70 capitalize">{b.category}</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskDotColor(b.label)}`}
+                      />
+                      <span className={`text-xs font-medium ${riskTextColor(b.label)}`}>
+                        {b.label}
+                      </span>
                     </span>
-                  </span>
+                  </div>
+                  {b.category === 'oracle' && b.description && (
+                    <div className="text-[10px] text-base-content/50 mt-0.5 ml-0.5">
+                      {b.description}
+                      {b.baseAsset && <span> (base: {b.baseAsset})</span>}
+                    </div>
+                  )}
                 </div>
               ))}
               {(() => {

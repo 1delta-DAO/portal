@@ -82,7 +82,13 @@ export interface PoolRiskBreakdown {
   score: number | null
   label: string
   curatorValidated?: boolean
-  curatorIds?: string[]
+  curatorIds?: string[] | null
+  /** Oracle risk: human-readable description */
+  description?: string | null
+  /** Oracle risk: whether the oracle has a static base price */
+  staticBase?: boolean | null
+  /** Oracle risk: base asset symbol or address */
+  baseAsset?: string | null
 }
 
 export interface PoolRisk {

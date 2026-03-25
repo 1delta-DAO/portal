@@ -20,6 +20,7 @@ import { useIsMobile } from '../../../hooks/useIsMobile'
 import { useLenderSelector, LenderSelector } from '../LenderSelector'
 import { LendingMarketTable } from './LendingMarketTable'
 import { ActionPanel, MobileActionModal } from './ActionPanel'
+import { usePersistedFilters } from '../../../hooks/usePersistedFilters'
 
 interface Props {
   lenderData: LenderData | undefined
@@ -62,14 +63,23 @@ export function LendingDashboard({
   const [selectedPool, setSelectedPool] = useState<PoolDataItem | null>(null)
   const [actionTab, setActionTab] = useState<ActionType>('Deposit')
 
-  // View mode: default flat list vs config-grouped view
-  const [viewMode, setViewMode] = useState<'default' | 'config'>('config')
-  const [maxRiskScore, setMaxRiskScore] = useState<number>(4)
+  // Persisted filters
+  const { filters: lf, setFilter: setLF, resetToDefaults: resetLendingFilters } = usePersistedFilters(
+    'lending-dashboard',
+    { viewMode: 'config', maxRiskScore: 4, sortKey: 'totalDepositsUSD' as string, sortDir: 'desc' as string },
+    { chainId }
+  )
+  const viewMode = lf.viewMode as 'default' | 'config'
+  const maxRiskScore = lf.maxRiskScore
+  const sortKey = lf.sortKey as SortKey
+  const sortDir = lf.sortDir as 'asc' | 'desc'
+  const setViewMode = (v: 'default' | 'config') => setLF('viewMode', v)
+  const setMaxRiskScore = (v: number) => setLF('maxRiskScore', v)
+  const setSortKey = (v: SortKey) => setLF('sortKey', v)
+  const setSortDir = (v: 'asc' | 'desc') => setLF('sortDir', v)
 
-  // Search & sort state
+  // Transient UI state
   const [assetSearch, setAssetSearch] = useState('')
-  const [sortKey, setSortKey] = useState<SortKey>('totalDepositsUSD')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [showMobileAction, setShowMobileAction] = useState(false)
 
   // Sub-accounts for the selected lender
@@ -135,7 +145,7 @@ export function LendingDashboard({
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
-      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
     } else {
       setSortKey(key)
       setSortDir('desc')
@@ -315,6 +325,7 @@ export function LendingDashboard({
             </div>
 
             <RiskSelect value={maxRiskScore} onChange={setMaxRiskScore} />
+            <button type="button" className="btn btn-xs btn-ghost text-base-content/50" onClick={resetLendingFilters} title="Reset filters to defaults">Reset</button>
           </div>
 
           {viewMode === 'config' ? (

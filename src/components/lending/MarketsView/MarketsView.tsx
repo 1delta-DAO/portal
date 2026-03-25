@@ -9,6 +9,7 @@ import { computePoolMetrics, poolEntryToPoolDataItem, type SortKey } from './hel
 import { MarketsTable } from './MarketsTable'
 import { DepositPanel } from './DepositPanel'
 import { useIsMobile } from '../../../hooks/useIsMobile'
+import { usePersistedFilters } from '../../../hooks/usePersistedFilters'
 
 const HIGH_LIQUIDITY_CHAINS: ReadonlySet<string> = new Set([
   SupportedChainId.PLASMA_MAINNET,
@@ -43,40 +44,90 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
 }) => {
   const isMobile = useIsMobile()
 
-  // Filters
+  // Persisted filters (survive tab switches and sessions)
+  const marketsDefaults = useMemo(() => ({
+    selectedLender: 'all',
+    sortKey: 'apr' as string,
+    sortDir: 'desc' as string,
+    pageSize: 10,
+    minUtilPct: '10',
+    maxUtilPct: '90',
+    minDepositsUsd: getDefaultMinDepositsUsd(chainId),
+    minAprPct: '1',
+    assetFilter: '',
+    maxAprPct: '',
+    maxDepositsUsd: '',
+    minDepositsNative: '',
+    maxDepositsNative: '',
+    minDebtNative: '',
+    maxDebtNative: '',
+    minLiquidityNative: '',
+    maxLiquidityNative: '',
+    minDebtUsd: '',
+    maxDebtUsd: '',
+    minLiquidityUsd: '',
+    maxLiquidityUsd: '',
+    maxRiskScore: '4',
+  }), [chainId])
+
+  const { filters: f, setFilter, resetToDefaults: resetFilters } = usePersistedFilters(
+    'markets-view', marketsDefaults, { chainId }
+  )
+
+  // Destructure for convenience
+  const selectedLender = f.selectedLender
+  const sortKey = f.sortKey as SortKey
+  const sortDir = f.sortDir as 'asc' | 'desc'
+  const pageSize = f.pageSize
+  const minUtilPct = f.minUtilPct
+  const maxUtilPct = f.maxUtilPct
+  const minDepositsUsd = f.minDepositsUsd
+  const minAprPct = f.minAprPct
+  const assetFilter = f.assetFilter
+  const maxAprPct = f.maxAprPct
+  const maxDepositsUsd = f.maxDepositsUsd
+  const minDepositsNative = f.minDepositsNative
+  const maxDepositsNative = f.maxDepositsNative
+  const minDebtNative = f.minDebtNative
+  const maxDebtNative = f.maxDebtNative
+  const minLiquidityNative = f.minLiquidityNative
+  const maxLiquidityNative = f.maxLiquidityNative
+  const minDebtUsd = f.minDebtUsd
+  const maxDebtUsd = f.maxDebtUsd
+  const minLiquidityUsd = f.minLiquidityUsd
+  const maxLiquidityUsd = f.maxLiquidityUsd
+  const maxRiskScore = f.maxRiskScore
+
+  // Setters (wrap setFilter for each)
+  const setSelectedLender = (v: string) => setFilter('selectedLender', v)
+  const setSortKey = (v: SortKey) => setFilter('sortKey', v)
+  const setSortDir = (v: 'asc' | 'desc') => setFilter('sortDir', v)
+  const setPageSize = (v: number) => setFilter('pageSize', v)
+  const setMinUtilPct = (v: string) => setFilter('minUtilPct', v)
+  const setMaxUtilPct = (v: string) => setFilter('maxUtilPct', v)
+  const setMinDepositsUsd = (v: string) => setFilter('minDepositsUsd', v)
+  const setMinAprPct = (v: string) => setFilter('minAprPct', v)
+  const setAssetFilter = (v: string) => setFilter('assetFilter', v)
+  const setMaxAprPct = (v: string) => setFilter('maxAprPct', v)
+  const setMaxDepositsUsd = (v: string) => setFilter('maxDepositsUsd', v)
+  const setMinDepositsNative = (v: string) => setFilter('minDepositsNative', v)
+  const setMaxDepositsNative = (v: string) => setFilter('maxDepositsNative', v)
+  const setMinDebtNative = (v: string) => setFilter('minDebtNative', v)
+  const setMaxDebtNative = (v: string) => setFilter('maxDebtNative', v)
+  const setMinLiquidityNative = (v: string) => setFilter('minLiquidityNative', v)
+  const setMaxLiquidityNative = (v: string) => setFilter('maxLiquidityNative', v)
+  const setMinDebtUsd = (v: string) => setFilter('minDebtUsd', v)
+  const setMaxDebtUsd = (v: string) => setFilter('maxDebtUsd', v)
+  const setMinLiquidityUsd = (v: string) => setFilter('minLiquidityUsd', v)
+  const setMaxLiquidityUsd = (v: string) => setFilter('maxLiquidityUsd', v)
+  const setMaxRiskScore = (v: string) => setFilter('maxRiskScore', v)
+
+  // Transient UI state (not persisted)
   const [search, setSearch] = useState('')
-  const [selectedLender, setSelectedLender] = useState<string>('all')
-  const [sortKey, setSortKey] = useState<SortKey>('apr')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-
-  // Pagination
-  const [pageSize, setPageSize] = useState<number>(10)
   const [page, setPage] = useState<number>(1)
-
-  // Priority filters
-  const [minUtilPct, setMinUtilPct] = useState<string>('10')
-  const [maxUtilPct, setMaxUtilPct] = useState<string>('90')
-  const [minDepositsUsd, setMinDepositsUsd] = useState<string>(() => getDefaultMinDepositsUsd(chainId))
-  const [minAprPct, setMinAprPct] = useState<string>('1')
-  const [assetFilter, setAssetFilter] = useState<string>('')
-  const userOverrodeMinDeposits = useRef(false)
-
-  // Extended filters (popover)
-  const [maxAprPct, setMaxAprPct] = useState<string>('')
-  const [maxDepositsUsd, setMaxDepositsUsd] = useState<string>('')
-  const [minDepositsNative, setMinDepositsNative] = useState<string>('')
-  const [maxDepositsNative, setMaxDepositsNative] = useState<string>('')
-  const [minDebtNative, setMinDebtNative] = useState<string>('')
-  const [maxDebtNative, setMaxDebtNative] = useState<string>('')
-  const [minLiquidityNative, setMinLiquidityNative] = useState<string>('')
-  const [maxLiquidityNative, setMaxLiquidityNative] = useState<string>('')
-  const [minDebtUsd, setMinDebtUsd] = useState<string>('')
-  const [maxDebtUsd, setMaxDebtUsd] = useState<string>('')
-  const [minLiquidityUsd, setMinLiquidityUsd] = useState<string>('')
-  const [maxLiquidityUsd, setMaxLiquidityUsd] = useState<string>('')
-  const [maxRiskScore, setMaxRiskScore] = useState<string>('4')
   const [showExtendedFilters, setShowExtendedFilters] = useState(false)
   const extendedRef = useRef<HTMLDivElement>(null)
+  const userOverrodeMinDeposits = useRef(false)
 
   // Pool selection for deposit
   const [selectedEntry, setSelectedEntry] = useState<PoolEntry | null>(null)
@@ -406,7 +457,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
-      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
     } else {
       setSortKey(key)
       setSortDir('desc')
@@ -546,8 +597,16 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
           />
         </div>
 
-        {/* Extended filters toggle */}
-        <div className="relative flex items-end" ref={extendedRef}>
+        {/* Reset + Extended filters toggle */}
+        <div className="relative flex items-end gap-1" ref={extendedRef}>
+          <button
+            type="button"
+            className="btn btn-xs btn-ghost text-base-content/50"
+            onClick={resetFilters}
+            title="Reset all filters to defaults"
+          >
+            Reset
+          </button>
           <button
             type="button"
             className={`btn btn-xs ${showExtendedFilters ? 'btn-primary' : 'btn-outline'}`}

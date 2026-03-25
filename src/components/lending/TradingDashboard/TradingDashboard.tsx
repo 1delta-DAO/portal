@@ -18,6 +18,7 @@ import { ColSwapAction } from './actions/ColSwapAction'
 import { DebtSwapAction } from './actions/DebtSwapAction'
 import { CloseAction } from './actions/CloseAction'
 import type { TradingOperation, SelectedPool, TableHighlight } from './types'
+import { usePersistedFilters } from '../../../hooks/usePersistedFilters'
 import { YourPositions, type PositionSummary } from '../YourPositions'
 import { useIsMobile } from '../../../hooks/useIsMobile'
 
@@ -67,11 +68,22 @@ export function TradingDashboard({
   })
 
   const [selectedSubAccountId, setSelectedSubAccountId] = useState<string | null>(null)
-  const [activeOperation, setActiveOperation] = useState<TradingOperation>('Loop')
+  // Persisted filters
+  const { filters: tf, setFilter: setTF, resetToDefaults: resetTradingFilters } = usePersistedFilters(
+    'trading-dashboard',
+    { activeOperation: 'Loop' as string, viewMode: 'config', maxRiskScore: 4 },
+    { chainId }
+  )
+  const activeOperation = tf.activeOperation as TradingOperation
+  const viewMode = tf.viewMode as 'default' | 'config'
+  const maxRiskScore = tf.maxRiskScore
+  const setActiveOperation = (v: TradingOperation) => setTF('activeOperation', v)
+  const setViewMode = (v: 'default' | 'config') => setTF('viewMode', v)
+  const setMaxRiskScore = (v: number) => setTF('maxRiskScore', v)
+
+  // Transient UI state
   const [selectedPools, setSelectedPools] = useState<SelectedPool[]>([])
   const [showMobileAction, setShowMobileAction] = useState(false)
-  const [viewMode, setViewMode] = useState<'default' | 'config'>('config')
-  const [maxRiskScore, setMaxRiskScore] = useState<number>(4)
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
 
   // Sub-accounts
@@ -320,6 +332,7 @@ export function TradingDashboard({
             </div>
 
             <RiskSelect value={maxRiskScore} onChange={setMaxRiskScore} />
+            <button type="button" className="btn btn-xs btn-ghost text-base-content/50" onClick={resetTradingFilters} title="Reset filters to defaults">Reset</button>
           </div>
 
           {viewMode === 'config' ? (
