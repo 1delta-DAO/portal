@@ -25,7 +25,7 @@ const renderCurrency = (asset: RawCurrency) => {
   return (
     <div className="flex items-center gap-2 min-w-0">
       <div className="bg-base-300 rounded-full w-7 h-7 flex items-center justify-center overflow-hidden">
-        {asset.logoURI && <img src={asset.logoURI} width={20} height={20} alt={symbol} />}
+        {asset.logoURI && <img src={asset.logoURI} width={20} height={20} alt={symbol} className="token-logo" />}
       </div>
       <div className="flex flex-col truncate">
         <span className="font-medium leading-tight truncate">{symbol || name}</span>

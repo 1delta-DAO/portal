@@ -160,7 +160,7 @@ const PositionsList: React.FC<{
               <img
                 src={token.logoURI}
                 alt={symbol}
-                className="w-3.5 h-3.5 rounded-full object-contain"
+                className="w-3.5 h-3.5 rounded-full object-contain token-logo"
               />
             ) : null}
             <span className="text-[10px]">

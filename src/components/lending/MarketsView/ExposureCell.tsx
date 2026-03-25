@@ -62,7 +62,7 @@ export const ExposureCell: React.FC<ExposureCellProps> = ({ exposures, chainToke
             width={ICON_SIZE}
             height={ICON_SIZE}
             alt={symbol}
-            className="rounded-full object-contain"
+            className="rounded-full object-contain token-logo"
             style={{ width: ICON_SIZE, height: ICON_SIZE }}
           />
         ) : (

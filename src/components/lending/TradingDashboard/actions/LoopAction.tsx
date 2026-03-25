@@ -258,7 +258,9 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               modeId: String(activeSubAccount.userConfig.selectedMode),
               positions: activeSubAccount.positions.map((p) => ({
                 marketUid: p.marketUid,
+                deposits: String(p.deposits),
                 depositsUSD: p.depositsUSD,
+                debt: String(p.debt),
                 debtUSD: p.debtUSD,
                 debtStableUSD: p.debtStableUSD,
                 collateralEnabled: p.collateralEnabled,
@@ -432,7 +434,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
                       width={16}
                       height={16}
                       alt={c.symbol}
-                      className="rounded-full object-contain w-4 h-4"
+                      className="rounded-full object-contain w-4 h-4 token-logo"
                     />
                     <span className="font-medium">{c.symbol}</span>
                   </button>

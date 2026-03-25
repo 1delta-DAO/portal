@@ -100,7 +100,9 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
               modeId: String(activeSubAccount.userConfig.selectedMode),
               positions: activeSubAccount.positions.map((p) => ({
                 marketUid: p.marketUid,
+                deposits: String(p.deposits),
                 depositsUSD: p.depositsUSD,
+                debt: String(p.debt),
                 debtUSD: p.debtUSD,
                 debtStableUSD: p.debtStableUSD,
                 collateralEnabled: p.collateralEnabled,
@@ -190,7 +192,7 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
               <AmountQuickButtons
                 maxAmount={maxSwapStr}
                 onSelect={(v) => { setInputAmount(v); setIsMaxIn(false); reset() }}
-                onMax={() => { setInputAmount(formatTokenForInput(maxSwapStr)); setIsMaxIn(true); reset() }}
+                onMax={() => { setInputAmount(maxSwapStr); setIsMaxIn(true); reset() }}
               />
             )}
           </div>

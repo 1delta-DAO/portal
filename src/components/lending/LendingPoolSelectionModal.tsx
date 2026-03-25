@@ -19,7 +19,7 @@ const renderAsset = (asset: RawCurrency) => {
     <div className="flex items-center gap-2 min-w-0">
       <div className="avatar placeholder">
         <div className="bg-base-300 text-base-content rounded-full w-8 h-8 flex items-center justify-center overflow-hidden">
-          {asset.logoURI && <img src={asset.logoURI} alt={symbol} width={24} height={24} />}
+          {asset.logoURI && <img src={asset.logoURI} alt={symbol} width={24} height={24} className="token-logo" />}
         </div>
       </div>
       <div className="flex flex-col min-w-0">

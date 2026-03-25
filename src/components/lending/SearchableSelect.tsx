@@ -76,7 +76,7 @@ export function SearchableSelect({
             {selectedOption ? (
               <>
                 {selectedOption.icon && (
-                  <img src={selectedOption.icon} alt="" className="w-4 h-4 rounded-full" />
+                  <img src={selectedOption.icon} alt="" className="w-4 h-4 rounded-full token-logo" />
                 )}
                 {selectedOption.indicator && (
                   <span className="opacity-60">{selectedOption.indicator}</span>
@@ -118,7 +118,7 @@ export function SearchableSelect({
                     onClick={() => handleSelect(opt.value)}
                   >
                     {opt.icon && (
-                      <img src={opt.icon} alt="" className="w-4 h-4 rounded-full inline-block mr-1.5 align-middle" />
+                      <img src={opt.icon} alt="" className="w-4 h-4 rounded-full inline-block mr-1.5 align-middle token-logo" />
                     )}
                     {opt.indicator && (
                       <span className="opacity-60 text-xs mr-1">{opt.indicator}</span>
@@ -162,7 +162,7 @@ export function SearchableSelect({
           {selectedOption ? (
             <>
               {selectedOption.icon && (
-                <img src={selectedOption.icon} alt="" className="w-4 h-4 rounded-full" />
+                <img src={selectedOption.icon} alt="" className="w-4 h-4 rounded-full token-logo" />
               )}
               {selectedOption.indicator && (
                 <span className="opacity-60">{selectedOption.indicator}</span>
@@ -210,7 +210,7 @@ export function SearchableSelect({
                   onClick={() => handleSelect(opt.value)}
                 >
                   {opt.icon && (
-                    <img src={opt.icon} alt="" className="w-4 h-4 rounded-full shrink-0" />
+                    <img src={opt.icon} alt="" className="w-4 h-4 rounded-full shrink-0 token-logo" />
                   )}
                   {opt.indicator && (
                     <span className="opacity-60 text-xs shrink-0">{opt.indicator}</span>

@@ -26,10 +26,14 @@ export interface LoopRangeEntry {
   amountIn: number
   /** Raw amountIn string from API — use for input fields to avoid float precision loss */
   amountInStr: string
+  /** Exact raw wei string for amountIn — prefer when passing to action endpoints */
+  amountInRaw?: string
   /** Numeric amountOut */
   amountOut: number
   /** Raw amountOut string from API */
   amountOutStr: string
+  /** Exact raw wei string for amountOut — prefer when passing to action endpoints */
+  amountOutRaw?: string
   /** USD value of the binding constraint */
   amountUSD: number
   /** Mode analysis (leverage/loop only, null-ish for flat endpoints) */
@@ -72,8 +76,10 @@ function resolveLoopRangeEntry(raw: any): LoopRangeEntry {
       assetShort: '',
       amountIn: Number(raw.amountIn) || 0,
       amountInStr: String(raw.amountIn ?? '0'),
+      amountInRaw: raw.amountInRaw ?? undefined,
       amountOut: Number(raw.amountOut) || 0,
       amountOutStr: String(raw.amountOut ?? '0'),
+      amountOutRaw: raw.amountOutRaw ?? undefined,
       amountUSD: Number(raw.amountUSD) || 0,
       modeAnalysis: {
         userMode: '0',
@@ -101,8 +107,10 @@ function resolveLoopRangeEntry(raw: any): LoopRangeEntry {
     assetShort: raw.underlyingInfoShort?.asset?.address ?? '',
     amountIn: effective.amountIn,
     amountInStr: String(rawEffective?.amountIn ?? effective.amountIn),
+    amountInRaw: raw.amountInRaw ?? rawEffective?.amountInRaw ?? undefined,
     amountOut: effective.amountOut,
     amountOutStr: String(rawEffective?.amountOut ?? effective.amountOut),
+    amountOutRaw: raw.amountOutRaw ?? rawEffective?.amountOutRaw ?? undefined,
     amountUSD: effective.amountUSD,
     modeAnalysis: {
       userMode: ma.userMode ?? '0',
@@ -145,7 +153,11 @@ export interface LoopRangeSimulationBody {
   modeId?: string
   positions?: Array<{
     marketUid: string
+    /** Exact token-amount string for deposits — avoids USD÷price rounding */
+    deposits?: string
     depositsUSD: number
+    /** Exact token-amount string for debt — avoids USD÷price rounding */
+    debt?: string
     debtUSD: number
     debtStableUSD: number
     collateralEnabled: boolean

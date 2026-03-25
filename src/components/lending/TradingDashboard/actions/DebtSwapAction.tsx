@@ -98,7 +98,9 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
               modeId: String(activeSubAccount.userConfig.selectedMode),
               positions: activeSubAccount.positions.map((p) => ({
                 marketUid: p.marketUid,
+                deposits: String(p.deposits),
                 depositsUSD: p.depositsUSD,
+                debt: String(p.debt),
                 debtUSD: p.debtUSD,
                 debtStableUSD: p.debtStableUSD,
                 collateralEnabled: p.collateralEnabled,

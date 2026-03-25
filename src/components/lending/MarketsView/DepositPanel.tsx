@@ -64,7 +64,7 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
             width={32}
             height={32}
             alt={resolvedPool.asset.symbol}
-            className="rounded-full object-contain w-8 h-8 shrink-0"
+            className="rounded-full object-contain w-8 h-8 shrink-0 token-logo"
           />
           <div className="flex flex-col min-w-0">
             <span className="font-medium text-sm truncate" title={selectedEntry!.name}>

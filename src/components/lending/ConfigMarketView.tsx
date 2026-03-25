@@ -394,7 +394,7 @@ const IconStack: React.FC<{ items: ConfigMarketItem[] | null; max?: number }> = 
             height={22}
             alt={item.underlyingInfo.asset.symbol}
             title={item.underlyingInfo.asset.symbol}
-            className="rounded-full object-contain w-5.5 h-5.5 border-2 border-base-100 bg-base-100"
+            className="rounded-full object-contain w-5.5 h-5.5 border-2 border-base-100 bg-base-100 token-logo"
           />
         ))}
       </div>

@@ -54,13 +54,24 @@ export function sanitizeAmountInput(v: string): string | null {
 }
 
 /**
- * Multiply a decimal string amount by a fraction without intermediate float rounding.
- * For simple fractions (0.25, 0.5, 0.75) this shifts decimals to avoid precision loss.
+ * Multiply a decimal string amount by a fraction.
+ * Truncates (rounds down) to the input's decimal precision so the result
+ * never exceeds the original balance due to floating-point rounding.
  */
 export function multiplyAmountString(amount: string, fraction: number): string {
   const n = parseFloat(amount)
   if (!Number.isFinite(n) || n <= 0) return ''
-  // Use the string representation to preserve precision through the multiply
+
+  if (fraction === 1) return amount
+
   const result = n * fraction
-  return formatTokenForInput(result)
+
+  // Determine the input's decimal places to truncate to
+  const dotIdx = amount.indexOf('.')
+  const inputDecimals = dotIdx >= 0 ? amount.length - dotIdx - 1 : 0
+  // Truncate (floor) rather than round to ensure result <= fraction * balance
+  const factor = 10 ** inputDecimals
+  const truncated = Math.floor(result * factor) / factor
+
+  return formatTokenForInput(truncated)
 }

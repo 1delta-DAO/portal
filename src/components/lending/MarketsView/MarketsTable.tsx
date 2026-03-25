@@ -194,7 +194,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                             title={p.lenderKey}
                           >
                             {p.lenderInfo?.logoURI && (
-                              <img src={p.lenderInfo.logoURI} width={12} height={12} alt="" className="rounded-full object-contain w-3 h-3 shrink-0" />
+                              <img src={p.lenderInfo.logoURI} width={12} height={12} alt="" className="rounded-full object-contain w-3 h-3 shrink-0 token-logo" />
                             )}
                             <span className="truncate">{p.lenderInfo?.name ?? p.lenderKey}</span>
                           </span>
@@ -369,7 +369,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                         title={p.lenderKey}
                       >
                         {p.lenderInfo?.logoURI && (
-                          <img src={p.lenderInfo.logoURI} width={12} height={12} alt="" className="rounded-full object-contain w-3 h-3 shrink-0" />
+                          <img src={p.lenderInfo.logoURI} width={12} height={12} alt="" className="rounded-full object-contain w-3 h-3 shrink-0 token-logo" />
                         )}
                         <span className="truncate">{p.lenderInfo?.name ?? p.lenderKey}</span>
                       </span>

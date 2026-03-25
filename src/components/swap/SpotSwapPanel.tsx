@@ -395,7 +395,7 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
                   <img
                     src={tokenIn.logoURI}
                     alt={tokenIn.symbol}
-                    className="w-5 h-5 rounded-full object-contain"
+                    className="w-5 h-5 rounded-full object-contain token-logo"
                   />
                   <div className="flex flex-col items-start">
                     <span className="font-medium text-sm">{tokenIn.symbol}</span>
@@ -490,7 +490,7 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
                   <img
                     src={tokenOut.logoURI}
                     alt={tokenOut.symbol}
-                    className="w-5 h-5 rounded-full object-contain"
+                    className="w-5 h-5 rounded-full object-contain token-logo"
                   />
                   <div className="flex flex-col items-start">
                     <span className="font-medium text-sm">{tokenOut.symbol}</span>

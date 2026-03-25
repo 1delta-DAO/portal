@@ -119,7 +119,7 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
               width={20}
               height={20}
               alt={value.asset.symbol}
-              className="rounded-full object-contain w-5 h-5"
+              className="rounded-full object-contain w-5 h-5 token-logo"
             />
             <span className="truncate">
               {value.asset.symbol}
@@ -187,7 +187,7 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
                     width={20}
                     height={20}
                     alt={pool.asset.symbol}
-                    className="rounded-full object-contain w-5 h-5 shrink-0"
+                    className="rounded-full object-contain w-5 h-5 shrink-0 token-logo"
                   />
                   <div className="flex flex-col min-w-0 flex-1">
                     <span className="flex items-center gap-1.5 font-medium">

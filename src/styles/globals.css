@@ -12,6 +12,14 @@
   }
 }
 
+@layer utilities {
+  .token-logo {
+    background-color: white;
+    border-radius: 9999px;
+    object-fit: contain;
+  }
+}
+
 @plugin "daisyui" {
   themes:
     terminal,

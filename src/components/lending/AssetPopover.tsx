@@ -175,7 +175,7 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
               width={24}
               height={24}
               alt={symbol}
-              className="rounded-full object-contain w-6 h-6"
+              className="rounded-full object-contain w-6 h-6 token-logo"
             />
           ) : (
             <div className="bg-base-300 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
@@ -209,7 +209,7 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
                     width={20}
                     height={20}
                     alt={symbol}
-                    className="rounded-full w-5 h-5 shrink-0"
+                    className="rounded-full w-5 h-5 shrink-0 token-logo"
                   />
                 )}
                 <span className="font-semibold text-sm">{symbol}</span>

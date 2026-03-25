@@ -47,7 +47,7 @@ export const NativeCurrencySelector: React.FC<NativeCurrencySelectorProps> = ({
               width={14}
               height={14}
               alt={nativeToken.symbol}
-              className="rounded-full object-contain w-3.5 h-3.5"
+              className="rounded-full object-contain w-3.5 h-3.5 token-logo"
             />
           )}
           <span className="font-medium">{nativeToken.symbol}</span>

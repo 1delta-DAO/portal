@@ -33,8 +33,8 @@ export const AmountQuickButtons: React.FC<AmountQuickButtonsProps> = ({
           type="button"
           className="btn btn-ghost btn-xs px-1.5 py-0 h-5 min-h-0 text-[10px]"
           onClick={() => {
-            if (e.fraction === 1 && onMax) {
-              onMax()
+            if (e.fraction === 1) {
+              onMax ? onMax() : onSelect(maxAmount)
             } else {
               onSelect(multiplyAmountString(maxAmount, e.fraction))
             }
