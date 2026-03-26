@@ -38,6 +38,10 @@ export function useSendLendingTransaction(params: {
       exact: false,
     })
     queryClient.invalidateQueries({ queryKey: ['lendingBalances', chainId, account] })
+    queryClient.invalidateQueries({
+      queryKey: ['balanceQuery', account],
+      exact: false,
+    })
   }, [queryClient, chainId, account])
 
   const send = useCallback(
@@ -66,7 +70,7 @@ export function useSendLendingTransaction(params: {
         })
 
         if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash, pollingInterval: 12_000 })
+          await publicClient.waitForTransactionReceipt({ hash, confirmations: 2, pollingInterval: 4_000 })
         }
 
         invalidateQueries()

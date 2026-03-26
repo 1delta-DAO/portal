@@ -107,27 +107,27 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
   const [tokenOutModalOpen, setTokenOutModalOpen] = useState(false)
   const [tokenQuery, setTokenQuery] = useState('')
 
-  // Fetch balances for selected tokens
-  const balanceCurrencies = useMemo(() => {
-    const currencies: RawCurrency[] = []
-    if (tokenIn) currencies.push(tokenIn)
-    if (tokenOut) currencies.push(tokenOut)
-    return currencies
-  }, [tokenIn, tokenOut])
+  // Fetch balances separately per token so switching one doesn't discard the other's cache
+  const tokenInCurrencies = useMemo(() => (tokenIn ? [tokenIn] : []), [tokenIn])
+  const tokenOutCurrencies = useMemo(() => (tokenOut ? [tokenOut] : []), [tokenOut])
 
-  const { data: balances } = useBalanceQuery({
-    currencies: balanceCurrencies,
-    enabled: balanceCurrencies.length > 0 && !!account,
+  const { data: tokenInBalances } = useBalanceQuery({
+    currencies: tokenInCurrencies,
+    enabled: !!tokenIn && !!account,
+  })
+  const { data: tokenOutBalances } = useBalanceQuery({
+    currencies: tokenOutCurrencies,
+    enabled: !!tokenOut && !!account,
   })
 
   const tokenInBalance: BalanceEntry | undefined = useMemo(
-    () => tokenIn ? balances?.[chainId]?.[tokenIn.address.toLowerCase()] : undefined,
-    [balances, chainId, tokenIn]
+    () => tokenIn ? tokenInBalances?.[chainId]?.[tokenIn.address.toLowerCase()] : undefined,
+    [tokenInBalances, chainId, tokenIn]
   )
 
   const tokenOutBalance: BalanceEntry | undefined = useMemo(
-    () => tokenOut ? balances?.[chainId]?.[tokenOut.address.toLowerCase()] : undefined,
-    [balances, chainId, tokenOut]
+    () => tokenOut ? tokenOutBalances?.[chainId]?.[tokenOut.address.toLowerCase()] : undefined,
+    [tokenOutBalances, chainId, tokenOut]
   )
 
   const tokenInPriceRaw = tokenInBalance?.priceUSD ?? 0
