@@ -10,8 +10,9 @@ import { QuoteCard } from '../QuoteCard'
 import { AmountQuickButtons } from '../../DashboardActions/AmountQuickButtons'
 import { formatTokenAmount, formatUsd, parseAmount, sanitizeAmountInput } from '../../DashboardActions/format'
 import { ErrorDisplay } from '../ErrorDisplay'
-import { useTradingQuotes } from '../useTradingQuotes'
+import { useTradingQuotes, buildSimulationBody } from '../useTradingQuotes'
 import { RateImpactIndicator } from '../../DashboardActions/RateImpactIndicator'
+import { SimulationIndicator } from '../../DashboardActions/SimulationIndicator'
 import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
 import {
   fetchLoopRangeWithSimulation,
@@ -142,6 +143,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     permissions,
     transactions,
     rateImpact,
+    simulation,
     selectedIndex,
     loading,
     executing,
@@ -319,7 +321,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
           : {}),
         ...(accountId ? { accountId } : {}),
       },
-      account
+      account,
+      activeSubAccount ? buildSimulationBody(activeSubAccount) : undefined
     )
   }
 
@@ -531,6 +534,9 @@ export const LoopAction: React.FC<TradingActionProps> = ({
           ...(debtPool ? { [debtPool.marketUid]: `${debtPool.asset.symbol} (Debt)` } : {}),
         }}
       />
+
+      {/* Position impact (health factor / borrow capacity) */}
+      <SimulationIndicator simulation={simulation} />
 
       {/* Permissions, transactions, and execute — grouped together */}
       {selectedIndex !== null && !payOverMax && (

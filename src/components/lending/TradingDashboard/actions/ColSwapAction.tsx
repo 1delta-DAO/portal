@@ -10,8 +10,9 @@ import { QuoteCard } from '../QuoteCard'
 import { AmountQuickButtons } from '../../DashboardActions/AmountQuickButtons'
 import { formatTokenForInput, formatUsd, sanitizeAmountInput } from '../../DashboardActions/format'
 import { ErrorDisplay } from '../ErrorDisplay'
-import { useTradingQuotes } from '../useTradingQuotes'
+import { useTradingQuotes, buildSimulationBody } from '../useTradingQuotes'
 import { RateImpactIndicator } from '../../DashboardActions/RateImpactIndicator'
+import { SimulationIndicator } from '../../DashboardActions/SimulationIndicator'
 import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
 import {
   fetchLoopRangeWithSimulation,
@@ -41,7 +42,7 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
   const [slippage, setSlippage] = useState('0.3')
 
   const {
-    quotes, permissions, transactions, rateImpact, selectedIndex, loading, executing, error,
+    quotes, permissions, transactions, rateImpact, simulation, selectedIndex, loading, executing, error,
     fetchQuotes, selectQuote, executePermission, executeTransaction, executeQuote, reset,
   } = useTradingQuotes({ chainId, account })
 
@@ -155,7 +156,7 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
       ...(activeField === 'input' && isAll ? { isAll: true } : {}),
       usePendleMintRedeem: false,
       ...(accountId ? { accountId } : {}),
-    }, account)
+    }, account, activeSubAccount ? buildSimulationBody(activeSubAccount) : undefined)
   }
 
   const canFetch = !!colInPool && !!colOutPool && !!exactAmount
@@ -306,6 +307,9 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
           ...(colOutPool ? { [colOutPool.marketUid]: `${colOutPool.asset.symbol} (Swap Into)` } : {}),
         }}
       />
+
+      {/* Position impact (health factor / borrow capacity) */}
+      <SimulationIndicator simulation={simulation} />
 
       {selectedIndex !== null && (
         <div className="space-y-1.5">

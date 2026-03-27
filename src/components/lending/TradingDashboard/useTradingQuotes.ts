@@ -3,6 +3,35 @@ import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransact
 import type { TradingOperation, TradingQuote, Tx } from './types'
 import type { RateImpactEntry } from '../../../sdk/lending-helper/fetchLendingAction'
 import { BACKEND_BASE_URL } from '../../../config/backend'
+import type { LoopRangeSimulationBody } from '../../../sdk/lending-helper/fetchLoopRange'
+import type { UserSubAccount } from '../../../hooks/lending/useUserData'
+
+export function buildSimulationBody(sub: UserSubAccount): LoopRangeSimulationBody {
+  return {
+    balanceData: {
+      borrowDiscountedCollateral: sub.balanceData.borrowDiscountedCollateral ?? 0,
+      collateral: sub.balanceData.collateral,
+      debt: sub.balanceData.debt,
+      adjustedDebt: sub.balanceData.adjustedDebt ?? 0,
+      deposits: sub.balanceData.deposits,
+      nav: sub.balanceData.nav,
+      deposits24h: sub.balanceData.deposits24h,
+      debt24h: sub.balanceData.debt24h,
+      nav24h: sub.balanceData.nav24h,
+    },
+    aprData: sub.aprData,
+    modeId: String(sub.userConfig.selectedMode),
+    positions: sub.positions.map((p) => ({
+      marketUid: p.marketUid,
+      deposits: String(p.deposits),
+      depositsUSD: p.depositsUSD,
+      debt: String(p.debt),
+      debtUSD: p.debtUSD,
+      debtStableUSD: p.debtStableUSD,
+      collateralEnabled: p.collateralEnabled,
+    })),
+  }
+}
 
 const ENDPOINTS: Record<TradingOperation, string> = {
   Loop: `${BACKEND_BASE_URL}/v1/actions/loop/leverage`,
@@ -59,11 +88,23 @@ function normalizeQuotes(
   })
 }
 
+export interface SimulationResult {
+  pre: {
+    healthFactor: number
+    borrowCapacity: number
+  }
+  post: {
+    healthFactor: number
+    borrowCapacity: number
+  }
+}
+
 interface QuoteState {
   quotes: TradingQuote[]
   permissions: Tx[]
   transactions: Tx[]
   rateImpact: RateImpactEntry[] | null
+  simulation: SimulationResult | null
   selectedIndex: number | null
   loading: boolean
   executing: boolean
@@ -78,6 +119,7 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
     permissions: [],
     transactions: [],
     rateImpact: null,
+    simulation: null,
     selectedIndex: null,
     loading: false,
     executing: false,
@@ -88,7 +130,8 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
     async (
       operation: TradingOperation,
       params: Record<string, string | number | boolean | bigint>,
-      account?: string
+      account?: string,
+      body?: LoopRangeSimulationBody
     ) => {
       setState((s) => ({
         ...s,
@@ -98,6 +141,7 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
         permissions: [],
         transactions: [],
         rateImpact: null,
+        simulation: null,
         selectedIndex: null,
       }))
 
@@ -105,7 +149,13 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
         const allParams = account ? { ...params, account } : params
         const qs = new URLSearchParams(Object.entries(allParams).map(([k, v]) => [k, String(v)]))
 
-        const res = await fetch(`${ENDPOINTS[operation]}?${qs}`)
+        const res = body
+          ? await fetch(`${ENDPOINTS[operation]}?${qs}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            })
+          : await fetch(`${ENDPOINTS[operation]}?${qs}`)
         if (!res.ok) {
           const text = await res.text().catch(() => '')
           throw new Error(`HTTP ${res.status}: ${text || res.statusText}`)
@@ -124,12 +174,28 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
 
         const rateImpact: RateImpactEntry[] | null = envelope.data?.rateImpact ?? null
 
+        const rawSim = envelope.data?.simulation
+        const simulation: SimulationResult | null =
+          rawSim?.pre && rawSim?.post
+            ? {
+                pre: {
+                  healthFactor: rawSim.pre.healthFactor ?? 0,
+                  borrowCapacity: rawSim.pre.borrowCapacity ?? 0,
+                },
+                post: {
+                  healthFactor: rawSim.post.healthFactor ?? 0,
+                  borrowCapacity: rawSim.post.borrowCapacity ?? 0,
+                },
+              }
+            : null
+
         setState((s) => ({
           ...s,
           quotes,
           permissions,
           transactions,
           rateImpact,
+          simulation,
           selectedIndex: quotes.length > 0 ? 0 : null,
           loading: false,
         }))
@@ -183,6 +249,7 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
       permissions: [],
       transactions: [],
       rateImpact: null,
+      simulation: null,
       selectedIndex: null,
       loading: false,
       executing: false,
