@@ -31,9 +31,9 @@ export function LenderTab() {
 
   const setActiveTab = useCallback(
     (tab: SubTab) => {
-      navigate(buildPath(tab, selectedChain), { replace: true })
+      navigate(buildPath(tab, selectedChain, initialLender || undefined), { replace: true })
     },
-    [navigate, selectedChain]
+    [navigate, selectedChain, initialLender]
   )
 
   const setSelectedChain = useCallback(

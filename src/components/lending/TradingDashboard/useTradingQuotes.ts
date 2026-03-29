@@ -99,6 +99,11 @@ export interface SimulationResult {
   }
 }
 
+interface TxSuccessState {
+  operation: TradingOperation
+  hash?: string
+}
+
 interface QuoteState {
   quotes: TradingQuote[]
   permissions: Tx[]
@@ -107,14 +112,19 @@ interface QuoteState {
   simulation: SimulationResult | null
   selectedIndex: number | null
   loading: boolean
-  executing: boolean
+  executingPermission: boolean
+  executingTransaction: boolean
+  executingQuote: boolean
+  permissionsCompleted: number
+  transactionsCompleted: number
+  txSuccess: TxSuccessState | null
   error: string | null
 }
 
 export function useTradingQuotes(params: { chainId: string; account?: string }) {
   const { send } = useSendLendingTransaction({ chainId: params.chainId, account: params.account })
 
-  const [state, setState] = useState<QuoteState>({
+  const initialState: QuoteState = {
     quotes: [],
     permissions: [],
     transactions: [],
@@ -122,9 +132,16 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
     simulation: null,
     selectedIndex: null,
     loading: false,
-    executing: false,
+    executingPermission: false,
+    executingTransaction: false,
+    executingQuote: false,
+    permissionsCompleted: 0,
+    transactionsCompleted: 0,
+    txSuccess: null,
     error: null,
-  })
+  }
+
+  const [state, setState] = useState<QuoteState>(initialState)
 
   const fetchQuotes = useCallback(
     async (
@@ -143,6 +160,9 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
         rateImpact: null,
         simulation: null,
         selectedIndex: null,
+        permissionsCompleted: 0,
+        transactionsCompleted: 0,
+        txSuccess: null,
       }))
 
       try {
@@ -210,60 +230,63 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
     setState((s) => ({ ...s, selectedIndex: index }))
   }, [])
 
-  const executePermission = useCallback(
-    async (tx: Tx) => {
-      const { ok, error: txError } = await send(tx)
-      if (!ok) {
-        setState((s) => ({ ...s, error: txError ?? 'Permission failed' }))
-      }
-    },
-    [send]
-  )
+  const executeNextPermission = useCallback(async () => {
+    const idx = state.permissionsCompleted
+    if (idx >= state.permissions.length) return
+    setState((s) => ({ ...s, executingPermission: true, error: null }))
+    const { ok, error: txError } = await send(state.permissions[idx])
+    if (ok) {
+      setState((s) => ({ ...s, executingPermission: false, permissionsCompleted: s.permissionsCompleted + 1 }))
+    } else {
+      setState((s) => ({ ...s, executingPermission: false, error: txError ?? 'Permission failed' }))
+    }
+  }, [state.permissionsCompleted, state.permissions, send])
 
-  const executeTransaction = useCallback(
-    async (tx: Tx) => {
-      const { ok, error: txError } = await send(tx)
-      if (!ok) {
-        setState((s) => ({ ...s, error: txError ?? 'Transaction failed' }))
-      }
-    },
-    [send]
-  )
+  const executeNextTransaction = useCallback(async () => {
+    const idx = state.transactionsCompleted
+    if (idx >= state.transactions.length) return
+    setState((s) => ({ ...s, executingTransaction: true, error: null }))
+    const { ok, error: txError } = await send(state.transactions[idx])
+    if (ok) {
+      setState((s) => ({ ...s, executingTransaction: false, transactionsCompleted: s.transactionsCompleted + 1 }))
+    } else {
+      setState((s) => ({ ...s, executingTransaction: false, error: txError ?? 'Transaction failed' }))
+    }
+  }, [state.transactionsCompleted, state.transactions, send])
 
-  const executeQuote = useCallback(async () => {
+  const executeQuote = useCallback(async (operation: TradingOperation) => {
     if (state.selectedIndex === null) return
-
-    setState((s) => ({ ...s, executing: true, error: null }))
+    setState((s) => ({ ...s, executingQuote: true, error: null }))
     const quote = state.quotes[state.selectedIndex]
-    const { ok, error: txError } = await send(quote.tx)
-    setState((s) => ({
-      ...s,
-      executing: false,
-      error: ok ? null : (txError ?? 'Execution failed'),
-    }))
+    const { ok, error: txError, hash } = await send(quote.tx)
+    if (ok) {
+      setState((s) => ({ ...s, executingQuote: false, txSuccess: { operation, hash } }))
+    } else {
+      setState((s) => ({ ...s, executingQuote: false, error: txError ?? 'Execution failed' }))
+    }
   }, [state.selectedIndex, state.quotes, send])
 
-  const reset = useCallback(() => {
-    setState({
-      quotes: [],
-      permissions: [],
-      transactions: [],
-      rateImpact: null,
-      simulation: null,
-      selectedIndex: null,
-      loading: false,
-      executing: false,
-      error: null,
-    })
+  const dismissSuccess = useCallback(() => {
+    setState((s) => ({ ...s, txSuccess: null, quotes: [], permissions: [], transactions: [], permissionsCompleted: 0, transactionsCompleted: 0, selectedIndex: null }))
   }, [])
+
+  const reset = useCallback(() => {
+    setState(initialState)
+  }, [])
+
+  const allPermissionsDone = state.permissions.length === 0 || state.permissionsCompleted >= state.permissions.length
+  const allTransactionsDone = state.transactions.length === 0 || state.transactionsCompleted >= state.transactions.length
 
   return {
     ...state,
+    allPermissionsDone,
+    allTransactionsDone,
     fetchQuotes,
     selectQuote,
-    executePermission,
-    executeTransaction,
+    executeNextPermission,
+    executeNextTransaction,
     executeQuote,
+    dismissSuccess,
     reset,
   }
 }

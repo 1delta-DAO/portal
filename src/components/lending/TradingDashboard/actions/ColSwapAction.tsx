@@ -11,6 +11,7 @@ import { AmountQuickButtons } from '../../DashboardActions/AmountQuickButtons'
 import { formatTokenForInput, formatUsd, sanitizeAmountInput } from '../../DashboardActions/format'
 import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes, buildSimulationBody } from '../useTradingQuotes'
+import { TradingTransactionSuccess } from '../TradingTransactionSuccess'
 import { RateImpactIndicator } from '../../DashboardActions/RateImpactIndicator'
 import { SimulationIndicator } from '../../DashboardActions/SimulationIndicator'
 import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
@@ -42,8 +43,9 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
   const [slippage, setSlippage] = useState('0.3')
 
   const {
-    quotes, permissions, transactions, rateImpact, simulation, selectedIndex, loading, executing, error,
-    fetchQuotes, selectQuote, executePermission, executeTransaction, executeQuote, reset,
+    quotes, permissions, transactions, rateImpact, simulation, selectedIndex, loading,
+    executingQuote, txSuccess, error,
+    fetchQuotes, selectQuote, executeNextPermission, executeNextTransaction, executeQuote, dismissSuccess, reset,
   } = useTradingQuotes({ chainId, account })
 
   // Notify parent
@@ -160,6 +162,10 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
   }
 
   const canFetch = !!colInPool && !!colOutPool && !!exactAmount
+
+  if (txSuccess) {
+    return <TradingTransactionSuccess operation={txSuccess.operation} hash={txSuccess.hash} onDismiss={dismissSuccess} />
+  }
 
   return (
     <div className="space-y-3">
@@ -314,17 +320,17 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
       {selectedIndex !== null && (
         <div className="space-y-1.5">
           {permissions.map((tx, i) => (
-            <button key={`perm-${i}`} type="button" className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 whitespace-normal text-xs" title={tx.description || 'Approve'} onClick={() => executePermission(tx)}>
+            <button key={`perm-${i}`} type="button" className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 whitespace-normal text-xs" title={tx.description || 'Approve'} onClick={() => executeNextPermission()}>
               {tx.description || 'Approve'}
             </button>
           ))}
           {transactions.map((tx, i) => (
-            <button key={`tx-${i}`} type="button" className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 whitespace-normal text-xs" title={tx.description || 'Execute Setup Transaction'} onClick={() => executeTransaction(tx)}>
+            <button key={`tx-${i}`} type="button" className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 whitespace-normal text-xs" title={tx.description || 'Execute Setup Transaction'} onClick={() => executeNextTransaction()}>
               {tx.description || 'Execute Setup Transaction'}
             </button>
           ))}
-          <button type="button" className="btn btn-success btn-sm w-full" disabled={executing} onClick={executeQuote}>
-            {executing ? 'Executing...' : 'Execute Collateral Swap'}
+          <button type="button" className="btn btn-success btn-sm w-full" disabled={executingQuote} onClick={() => executeQuote('ColSwap')}>
+            {executingQuote ? <span className="loading loading-spinner loading-xs" /> : 'Execute Collateral Swap'}
           </button>
         </div>
       )}

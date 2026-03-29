@@ -11,6 +11,7 @@ import { AmountQuickButtons } from '../../DashboardActions/AmountQuickButtons'
 import { formatTokenAmount, formatUsd, parseAmount, sanitizeAmountInput } from '../../DashboardActions/format'
 import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes, buildSimulationBody } from '../useTradingQuotes'
+import { TradingTransactionSuccess } from '../TradingTransactionSuccess'
 import { RateImpactIndicator } from '../../DashboardActions/RateImpactIndicator'
 import { SimulationIndicator } from '../../DashboardActions/SimulationIndicator'
 import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
@@ -146,13 +147,15 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     simulation,
     selectedIndex,
     loading,
-    executing,
+    executingQuote,
+    txSuccess,
     error,
     fetchQuotes,
     selectQuote,
-    executePermission,
-    executeTransaction,
+    executeNextPermission,
+    executeNextTransaction,
     executeQuote,
+    dismissSuccess,
     reset,
   } = useTradingQuotes({ chainId, account })
 
@@ -329,6 +332,10 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   const allowCreateAccount = !!selectedPayCurrency && !!payAmount
 
   const canFetch = !!collateralPool && !!debtPool && !!debtAmount
+
+  if (txSuccess) {
+    return <TradingTransactionSuccess operation={txSuccess.operation} hash={txSuccess.hash} onDismiss={dismissSuccess} />
+  }
 
   return (
     <div className="space-y-3">
@@ -538,7 +545,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
       {/* Position impact (health factor / borrow capacity) */}
       <SimulationIndicator simulation={simulation} />
 
-      {/* Permissions, transactions, and execute — grouped together */}
+      {/* Permissions, transactions, and execute */}
       {selectedIndex !== null && !payOverMax && (
         <div className="space-y-1.5">
           {permissions.map((tx, i) => (
@@ -547,7 +554,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               type="button"
               className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 whitespace-normal text-xs"
               title={tx.description || 'Approve'}
-              onClick={() => executePermission(tx)}
+              onClick={() => executeNextPermission()}
             >
               {tx.description || 'Approve'}
             </button>
@@ -558,7 +565,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               type="button"
               className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 whitespace-normal text-xs"
               title={tx.description || 'Execute Setup Transaction'}
-              onClick={() => executeTransaction(tx)}
+              onClick={() => executeNextTransaction()}
             >
               {tx.description || 'Execute Setup Transaction'}
             </button>
@@ -566,10 +573,10 @@ export const LoopAction: React.FC<TradingActionProps> = ({
           <button
             type="button"
             className="btn btn-success btn-sm w-full"
-            disabled={executing}
-            onClick={executeQuote}
+            disabled={executingQuote}
+            onClick={() => executeQuote('Loop')}
           >
-            {executing ? 'Executing...' : 'Execute Loop'}
+            {executingQuote ? <span className="loading loading-spinner loading-xs" /> : 'Execute Loop'}
           </button>
         </div>
       )}
