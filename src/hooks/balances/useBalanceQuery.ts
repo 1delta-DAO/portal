@@ -78,7 +78,7 @@ export function useBalanceQuery({ currencies, enabled = true }: UseBalanceQueryP
 
       return result
     },
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
   })
 }

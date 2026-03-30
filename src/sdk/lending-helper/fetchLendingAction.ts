@@ -1,3 +1,5 @@
+import type { LoopRangeSimulationBody } from './fetchLoopRange'
+
 export interface LendingActionParams {
   marketUid: string
   operator: string
@@ -11,6 +13,8 @@ export interface LendingActionParams {
   accountId?: string
   /** When true, the server runs an e2e simulation and returns projected health factor / balances */
   simulate?: boolean
+  /** When provided, sent as POST body for simulation (same shape as loop simulation body) */
+  simulationBody?: LoopRangeSimulationBody
 }
 
 export interface LendingTransaction {
@@ -119,7 +123,14 @@ export async function fetchLendingAction(
     if (params.accountId) qs.set('accountId', params.accountId)
     if (params.simulate) qs.set('simulate', 'true')
 
-    const res = await fetch(`${LENDING_ACTIONS_BASE}/${action}?${qs}`)
+    const url = `${LENDING_ACTIONS_BASE}/${action}?${qs}`
+    const res = params.simulationBody
+      ? await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params.simulationBody),
+        })
+      : await fetch(url)
 
     if (!res.ok) {
       const text = await res.text().catch(() => '')

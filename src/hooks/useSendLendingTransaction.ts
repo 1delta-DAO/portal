@@ -44,6 +44,20 @@ export function useSendLendingTransaction(params: {
     })
   }, [queryClient, chainId, account])
 
+  /** Force refetch (bypasses staleTime, always hits network) */
+  const refetchQueries = useCallback(() => {
+    queryClient.refetchQueries({ queryKey: ['userData', chainId, account] })
+    queryClient.refetchQueries({
+      queryKey: ['tokenBalances', chainId, account],
+      exact: false,
+    })
+    queryClient.refetchQueries({ queryKey: ['lendingBalances', chainId, account] })
+    queryClient.refetchQueries({
+      queryKey: ['balanceQuery', account],
+      exact: false,
+    })
+  }, [queryClient, chainId, account])
+
   const send = useCallback(
     async (tx: LendingTx): Promise<SendResult> => {
       if (!walletClient) {
@@ -78,10 +92,10 @@ export function useSendLendingTransaction(params: {
           console.warn('Receipt polling failed:', receiptErr)
         }
 
-        // Invalidate immediately, then again after delays to catch backend indexing lag
+        // Invalidate immediately, then force refetch after delays to catch backend indexing lag
         invalidateQueries()
-        setTimeout(invalidateQueries, 4_000)
-        setTimeout(invalidateQueries, 10_000)
+        setTimeout(refetchQueries, 4_000)
+        setTimeout(refetchQueries, 10_000)
         return { ok: true, hash }
       } catch (e: any) {
         const msg = e.shortMessage ?? e.message ?? 'Transaction failed'

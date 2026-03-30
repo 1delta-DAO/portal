@@ -8,6 +8,7 @@ import {
   type LendingActionSimulation,
   type RateImpactEntry,
 } from '../../../sdk/lending-helper/fetchLendingAction'
+import type { LoopRangeSimulationBody } from '../../../sdk/lending-helper/fetchLoopRange'
 import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
 import { useDebounce } from '../../../hooks/useDebounce'
 import type { ActionType } from './types'
@@ -50,6 +51,33 @@ export function useActionExecution(params: {
   const debouncedAmount = useDebounce(amount, 500)
   const fetchIdRef = useRef(0)
   const shouldSimulate = !!subAccount
+
+  const simulationBody: LoopRangeSimulationBody | undefined = subAccount
+    ? {
+        balanceData: {
+          borrowDiscountedCollateral: subAccount.balanceData.borrowDiscountedCollateral ?? 0,
+          collateral: subAccount.balanceData.collateral,
+          debt: subAccount.balanceData.debt,
+          adjustedDebt: subAccount.balanceData.adjustedDebt ?? 0,
+          deposits: subAccount.balanceData.deposits,
+          nav: subAccount.balanceData.nav,
+          deposits24h: subAccount.balanceData.deposits24h,
+          debt24h: subAccount.balanceData.debt24h,
+          nav24h: subAccount.balanceData.nav24h,
+        },
+        aprData: subAccount.aprData,
+        modeId: String(subAccount.userConfig.selectedMode),
+        positions: subAccount.positions.map((p) => ({
+          marketUid: p.marketUid,
+          deposits: String(p.deposits),
+          depositsUSD: p.depositsUSD,
+          debt: String(p.debt),
+          debtUSD: p.debtUSD,
+          debtStableUSD: p.debtStableUSD,
+          collateralEnabled: p.collateralEnabled,
+        })),
+      }
+    : undefined
 
   const permissions = result?.permissions ?? []
   const hasPermissions = permissions.length > 0
@@ -109,6 +137,7 @@ export function useActionExecution(params: {
         receiveAsset,
         accountId,
         simulate: shouldSimulate,
+        simulationBody,
       })
 
       if (fetchIdRef.current !== fetchId) return
