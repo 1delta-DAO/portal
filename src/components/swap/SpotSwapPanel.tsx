@@ -25,7 +25,8 @@ function formatAmount(v: number): string {
   if (v < 0.000001) return '<0.000001'
   if (v < 1) return v.toFixed(8)
   if (v < 1000) return v.toFixed(6)
-  return v.toLocaleString(undefined, { maximumFractionDigits: 4 })
+  // No grouping separators — the string must remain parseFloat-safe
+  return v.toLocaleString('en-US', { maximumFractionDigits: 4, useGrouping: false })
 }
 
 function fmtBalance(v: number): string {
@@ -187,19 +188,17 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
 
   const selectedQuote = selectedIndex !== null ? quotes[selectedIndex] : null
 
-  // USD value impact: difference between input and output value based on prices
+  // USD value impact: use quote numbers directly (no string round-trip)
   const swapUsdImpact = useMemo(() => {
     if (!selectedQuote || tokenInPrice <= 0 || tokenOutPrice <= 0) return null
-    const inAmt = parseFloat(inputAmount)
-    const outAmt = parseFloat(outputAmount)
-    if (!Number.isFinite(inAmt) || inAmt <= 0 || !Number.isFinite(outAmt) || outAmt <= 0) return null
-    const inputUsd = inAmt * tokenInPrice
-    const outputUsd = outAmt * tokenOutPrice
-    if (inputUsd <= 0) return null
+    const { tradeInput, tradeOutput } = selectedQuote
+    if (tradeInput <= 0 || tradeOutput <= 0) return null
+    const inputUsd = tradeInput * tokenInPrice
+    const outputUsd = tradeOutput * tokenOutPrice
     const diff = outputUsd - inputUsd
     const pct = (diff / inputUsd) * 100
     return { inputUsd, outputUsd, diff, pct }
-  }, [selectedQuote, inputAmount, outputAmount, tokenInPrice, tokenOutPrice])
+  }, [selectedQuote, tokenInPrice, tokenOutPrice])
 
   // Reset everything when chain changes
   useEffect(() => {
