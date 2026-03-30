@@ -113,14 +113,20 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
   const tokenInCurrencies = useMemo(() => (tokenIn ? [tokenIn] : []), [tokenIn])
   const tokenOutCurrencies = useMemo(() => (tokenOut ? [tokenOut] : []), [tokenOut])
 
-  const { data: tokenInBalances } = useBalanceQuery({
+  const { data: tokenInBalances, isFetching: tokenInFetching, refetch: refetchTokenIn } = useBalanceQuery({
     currencies: tokenInCurrencies,
     enabled: !!tokenIn && !!account,
   })
-  const { data: tokenOutBalances } = useBalanceQuery({
+  const { data: tokenOutBalances, isFetching: tokenOutFetching, refetch: refetchTokenOut } = useBalanceQuery({
     currencies: tokenOutCurrencies,
     enabled: !!tokenOut && !!account,
   })
+
+  const refetchBalances = useCallback(() => {
+    refetchTokenIn()
+    refetchTokenOut()
+  }, [refetchTokenIn, refetchTokenOut])
+  const isBalancesFetching = tokenInFetching || tokenOutFetching
 
   const tokenInBalance: BalanceEntry | undefined = useMemo(
     () => tokenIn ? tokenInBalances?.[chainId]?.[tokenIn.address.toLowerCase()] : undefined,
@@ -416,12 +422,21 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
                 </div>
               )}
             </div>
-            {tokenIn && tokenInBalance && tokenInBalance.value > 0 && (
-              <span className="text-xs text-base-content/50">
-                {fmtBalance(tokenInBalance.value)}
-                {tokenInBalance.balanceUSD > 0 && (
-                  <span className="ml-1">{fmtUsd(tokenInBalance.balanceUSD)}</span>
+            {tokenIn && account && (
+              <span className="text-xs text-base-content/50 flex items-center gap-1">
+                {tokenInBalance && tokenInBalance.value > 0 && (
+                  <>
+                    {fmtBalance(tokenInBalance.value)}
+                    {tokenInBalance.balanceUSD > 0 && (
+                      <span>{fmtUsd(tokenInBalance.balanceUSD)}</span>
+                    )}
+                  </>
                 )}
+                <button type="button" className="text-base-content/30 hover:text-base-content/60 transition-colors" onClick={() => refetchBalances()} title="Refresh balances">
+                  {isBalancesFetching ? <span className="loading loading-spinner w-2.5 h-2.5" /> : (
+                    <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>
+                  )}
+                </button>
               </span>
             )}
           </div>
@@ -511,12 +526,21 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
         <div className="rounded-lg bg-base-200/60 p-3">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-base-content/50">You receive</span>
-            {tokenOut && tokenOutBalance && tokenOutBalance.value > 0 && (
-              <span className="text-xs text-base-content/50">
-                {fmtBalance(tokenOutBalance.value)}
-                {tokenOutBalance.balanceUSD > 0 && (
-                  <span className="ml-1">{fmtUsd(tokenOutBalance.balanceUSD)}</span>
+            {tokenOut && account && (
+              <span className="text-xs text-base-content/50 flex items-center gap-1">
+                {tokenOutBalance && tokenOutBalance.value > 0 && (
+                  <>
+                    {fmtBalance(tokenOutBalance.value)}
+                    {tokenOutBalance.balanceUSD > 0 && (
+                      <span>{fmtUsd(tokenOutBalance.balanceUSD)}</span>
+                    )}
+                  </>
                 )}
+                <button type="button" className="text-base-content/30 hover:text-base-content/60 transition-colors" onClick={() => refetchBalances()} title="Refresh balances">
+                  {isBalancesFetching ? <span className="loading loading-spinner w-2.5 h-2.5" /> : (
+                    <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>
+                  )}
+                </button>
               </span>
             )}
           </div>
