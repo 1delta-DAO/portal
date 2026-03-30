@@ -24,6 +24,10 @@ export interface ActionPanelProps {
   nativeBalance?: TokenBalance | null
   /** Active sub-account — used to send balance/apr data for simulation */
   subAccount?: UserSubAccount
+  /** Whether wallet balances are currently being fetched */
+  isBalancesFetching?: boolean
+  /** Manually trigger a wallet balance refresh */
+  refetchBalances?: () => void
 }
 
 export interface ActionState {

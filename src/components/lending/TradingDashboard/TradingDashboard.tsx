@@ -175,7 +175,7 @@ export function TradingDashboard({
     [allPools]
   )
 
-  const { balances: walletBalances } = useTokenBalances({
+  const { balances: walletBalances, isBalancesFetching, refetchBalances } = useTokenBalances({
     chainId,
     account,
     assets: poolAssetAddresses,
@@ -266,6 +266,8 @@ export function TradingDashboard({
     chainId,
     account,
     accountId: selectedSubAccountId ?? undefined,
+    isBalancesFetching,
+    refetchBalances,
     onAccountIdChange: handleAccountIdChange,
     onPoolSelectionChange: handlePoolSelectionChange,
   }

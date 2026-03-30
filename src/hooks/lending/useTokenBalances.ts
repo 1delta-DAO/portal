@@ -39,7 +39,7 @@ export function useTokenBalances(params: {
   // Stable key from sorted assets to avoid refetches on reorder
   const assetsKey = [...assets].sort().join(',')
 
-  const { data, isLoading, error } = useQuery<Map<string, TokenBalance>>({
+  const { data, isLoading, isFetching, error, refetch } = useQuery<Map<string, TokenBalance>>({
     queryKey: ['tokenBalances', chainId, account, assetsKey],
     enabled,
     queryFn: async () => {
@@ -74,6 +74,8 @@ export function useTokenBalances(params: {
   return {
     balances: data ?? new Map<string, TokenBalance>(),
     isBalancesLoading: isLoading,
+    isBalancesFetching: isFetching,
     balancesError: error,
+    refetchBalances: refetch,
   }
 }

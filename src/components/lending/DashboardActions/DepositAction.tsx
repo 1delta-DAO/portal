@@ -24,6 +24,8 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   nativeToken,
   nativeBalance,
   subAccount,
+  isBalancesFetching,
+  refetchBalances,
 }) => {
   const [amount, setAmount] = useState('')
   const [useNative, setUseNative] = useState(false)
@@ -103,7 +105,25 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       {/* Wallet balance */}
       {activeBal && (
         <div className="text-xs flex justify-between px-1">
-          <span className="text-base-content/60">Wallet balance:</span>
+          <span className="text-base-content/60 flex items-center gap-1">
+            Wallet balance:
+            {refetchBalances && (
+              <button
+                type="button"
+                className="text-base-content/30 hover:text-base-content/60 transition-colors"
+                onClick={refetchBalances}
+                title="Refresh balance"
+              >
+                {isBalancesFetching ? (
+                  <span className="loading loading-spinner w-2.5 h-2.5" />
+                ) : (
+                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                  </svg>
+                )}
+              </button>
+            )}
+          </span>
           <span className={`font-medium ${parseAmount(walletAmountStr) === 0 ? 'text-base-content/40' : ''}`}>
             {formatTokenAmount(activeBal.balance)} (${formatUsd(activeBal.balanceUSD)})
           </span>

@@ -69,11 +69,19 @@ export function useSendLendingTransaction(params: {
           value: BigInt(tx.value ?? 0),
         })
 
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash, confirmations: 2, pollingInterval: 4_000 })
+        try {
+          if (publicClient) {
+            await publicClient.waitForTransactionReceipt({ hash, confirmations: 2, pollingInterval: 4_000 })
+          }
+        } catch (receiptErr) {
+          // Receipt polling can fail on some RPCs; continue to invalidate anyway
+          console.warn('Receipt polling failed:', receiptErr)
         }
 
+        // Invalidate immediately, then again after delays to catch backend indexing lag
         invalidateQueries()
+        setTimeout(invalidateQueries, 4_000)
+        setTimeout(invalidateQueries, 10_000)
         return { ok: true, hash }
       } catch (e: any) {
         const msg = e.shortMessage ?? e.message ?? 'Transaction failed'

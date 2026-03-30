@@ -3,7 +3,7 @@ import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
-import { formatTokenAmount, formatUsd, parseAmount, formatTokenForInput, sanitizeAmountInput } from './format'
+import { formatTokenAmount, formatUsd, parseAmount, sanitizeAmountInput, addAmountStrings, minAmountString, compareAmountStrings } from './format'
 import { AmountQuickButtons } from './AmountQuickButtons'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
@@ -24,6 +24,8 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   nativeToken,
   nativeBalance,
   subAccount,
+  isBalancesFetching,
+  refetchBalances,
 }) => {
   const [amount, setAmount] = useState('')
   const [isAll, setIsAll] = useState(false)
@@ -75,19 +77,19 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
     resetState()
   }, [pool?.marketUid])
 
-  const debtTotal = userPosition
-    ? parseAmount(userPosition.debt) + parseAmount(userPosition.debtStable)
-    : 0
+  const debtStr = userPosition
+    ? addAmountStrings(String(userPosition.debt ?? '0'), String(userPosition.debtStable ?? '0'))
+    : '0'
+  const debtTotal = parseAmount(debtStr) // only for display
 
   const activeBal = canUseNative && useNative ? nativeBalance : walletBalance
   const activeBalStr = activeBal?.balance ?? '0'
-  const activeBalNum = parseAmount(activeBalStr)
-  const repayMaxNum = debtTotal > 0 ? Math.min(debtTotal, activeBalNum) : 0
-  const repayMaxStr = formatTokenForInput(repayMaxNum)
+  const hasDebt = compareAmountStrings(debtStr, '0') > 0
+  const hasBal = compareAmountStrings(activeBalStr, '0') > 0
+  const repayMaxStr = hasDebt && hasBal ? minAmountString(debtStr, activeBalStr) : '0'
 
-  const currentAmount = parseAmount(amount)
-  const overWallet = !isAll && activeBalNum > 0 && currentAmount > activeBalNum + 1e-9
-  const overDebt = !isAll && debtTotal > 0 && currentAmount > debtTotal + 1e-9
+  const overWallet = !isAll && hasBal && compareAmountStrings(amount || '0', activeBalStr) > 0
+  const overDebt = !isAll && hasDebt && compareAmountStrings(amount || '0', debtStr) > 0
   const overMax = overWallet || overDebt
 
   const handleQuickSelect = (val: string) => {
@@ -97,7 +99,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
 
   const handleIsAllChange = (checked: boolean) => {
     setIsAll(checked)
-    if (checked && repayMaxNum > 0) {
+    if (checked && compareAmountStrings(repayMaxStr, '0') > 0) {
       setAmount(repayMaxStr)
     }
   }
@@ -144,8 +146,17 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
       {/* Wallet balance */}
       {activeBal && (
         <div className="text-xs flex justify-between px-1">
-          <span className="text-base-content/60">Wallet balance:</span>
-          <span className={`font-medium ${activeBalNum === 0 ? 'text-base-content/40' : ''}`}>
+          <span className="text-base-content/60 flex items-center gap-1">
+            Wallet balance:
+            {refetchBalances && (
+              <button type="button" className="text-base-content/30 hover:text-base-content/60 transition-colors" onClick={refetchBalances} title="Refresh balance">
+                {isBalancesFetching ? <span className="loading loading-spinner w-2.5 h-2.5" /> : (
+                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>
+                )}
+              </button>
+            )}
+          </span>
+          <span className={`font-medium ${!hasBal ? 'text-base-content/40' : ''}`}>
             {formatTokenAmount(activeBal.balance)} (${formatUsd(activeBal.balanceUSD)})
           </span>
         </div>
@@ -190,7 +201,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
 
       {overWallet && !isAll && (
         <div className="text-[10px] text-error">
-          Exceeds wallet balance ({formatTokenAmount(activeBalNum)}).
+          Exceeds wallet balance ({formatTokenAmount(activeBalStr)}).
         </div>
       )}
       {overDebt && !overWallet && !isAll && (

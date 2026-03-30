@@ -5,6 +5,8 @@ import { BACKEND_BASE_URL } from '../../config/backend'
 
 export interface BalanceEntry {
   value: number
+  /** Human-readable balance string (e.g. "1.5") — preserves full precision */
+  balance: string
   raw?: string
   balanceUSD: number
   priceUSD: number
@@ -59,10 +61,12 @@ export function useBalanceQuery({ currencies, enabled = true }: UseBalanceQueryP
 
           const chainBalances: Record<string, BalanceEntry> = {}
           for (const item of json.data?.items ?? []) {
-            const balVal = parseFloat(item.balance || '0')
+            const balStr: string = item.balance || '0'
+            const balVal = parseFloat(balStr)
             const balUSD = item.balanceUSD ?? 0
             chainBalances[item.address.toLowerCase()] = {
               value: balVal,
+              balance: balStr,
               raw: item.balanceRaw,
               balanceUSD: balUSD,
               priceUSD: item.priceUSD ?? (balVal > 0 ? balUSD / balVal : 0),

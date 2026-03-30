@@ -25,6 +25,8 @@ interface ActionContentProps {
   nativeToken: RawCurrency | null
   nativeBalance: TokenBalance | null
   activeSubAccount: UserSubAccount | null
+  isBalancesFetching?: boolean
+  refetchBalances?: () => void
 }
 
 /** Renders the action form (Deposit/Withdraw/Borrow/Repay) for a connected wallet */
@@ -41,6 +43,8 @@ const ActionContent: React.FC<ActionContentProps> = ({
   nativeToken,
   nativeBalance,
   activeSubAccount,
+  isBalancesFetching,
+  refetchBalances,
 }) => {
   const common = {
     pool: selectedPool,
@@ -54,6 +58,8 @@ const ActionContent: React.FC<ActionContentProps> = ({
     nativeToken,
     nativeBalance,
     subAccount: activeSubAccount ?? undefined,
+    isBalancesFetching,
+    refetchBalances,
   }
 
   return (
@@ -89,7 +95,10 @@ export const ActionTabs: React.FC<{
 
 /* ── Selected asset badge ── */
 
-const SelectedAssetBadge: React.FC<{ pool: PoolDataItem | null }> = ({ pool }) =>
+const SelectedAssetBadge: React.FC<{
+  pool: PoolDataItem | null
+  lenderInfo?: { name: string; logoURI: string }
+}> = ({ pool, lenderInfo }) =>
   pool ? (
     <div className="flex items-center gap-2 p-2 rounded-lg bg-base-200">
       <img
@@ -101,11 +110,18 @@ const SelectedAssetBadge: React.FC<{ pool: PoolDataItem | null }> = ({ pool }) =
       />
       <div className="flex flex-col min-w-0">
         <span className="font-medium text-sm truncate" title={pool.name}>
-          {pool.name}
-        </span>
-        <span className="text-xs text-base-content/60 truncate" title={pool.asset.symbol}>
           {pool.asset.symbol}
         </span>
+        {lenderInfo ? (
+          <span className="text-xs text-base-content/60 truncate flex items-center gap-1">
+            <img src={lenderInfo.logoURI} width={14} height={14} alt={lenderInfo.name} className="rounded-full object-contain w-3.5 h-3.5" />
+            {lenderInfo.name}
+          </span>
+        ) : (
+          <span className="text-xs text-base-content/60 truncate" title={pool.asset.symbol}>
+            {pool.asset.symbol}
+          </span>
+        )}
       </div>
     </div>
   ) : (
@@ -167,17 +183,21 @@ export interface ActionPanelProps {
   nativeToken: RawCurrency | null
   nativeBalance: TokenBalance | null
   activeSubAccount: UserSubAccount | null
+  lenderInfo?: { name: string; logoURI: string }
+  isBalancesFetching?: boolean
+  refetchBalances?: () => void
 }
 
 export const ActionPanel: React.FC<ActionPanelProps> = ({
   actionTab,
   onTabChange,
   selectedPool,
+  lenderInfo,
   ...rest
 }) => (
   <div className="hidden md:block w-72 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
     <ActionTabs actionTab={actionTab} onTabChange={onTabChange} />
-    <SelectedAssetBadge pool={selectedPool} />
+    <SelectedAssetBadge pool={selectedPool} lenderInfo={lenderInfo} />
     <WalletGate actionTab={actionTab} selectedPool={selectedPool} {...rest} />
   </div>
 )
@@ -186,7 +206,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
 
 export const MobileActionModal: React.FC<
   ActionPanelProps & { onClose: () => void }
-> = ({ onClose, actionTab, onTabChange, selectedPool, ...rest }) => {
+> = ({ onClose, actionTab, onTabChange, selectedPool, lenderInfo, ...rest }) => {
   if (!selectedPool) return null
 
   return (
@@ -201,7 +221,7 @@ export const MobileActionModal: React.FC<
         </button>
         <div className="space-y-3">
           <ActionTabs actionTab={actionTab} onTabChange={onTabChange} />
-          <SelectedAssetBadge pool={selectedPool} />
+          <SelectedAssetBadge pool={selectedPool} lenderInfo={lenderInfo} />
           <WalletGate actionTab={actionTab} selectedPool={selectedPool} {...rest} />
         </div>
       </div>

@@ -14,6 +14,7 @@ import { TradingTransactionSuccess } from '../TradingTransactionSuccess'
 import { RateImpactIndicator } from '../../DashboardActions/RateImpactIndicator'
 import { SimulationIndicator } from '../../DashboardActions/SimulationIndicator'
 import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
+import { lenderSupportsSubAccounts } from '../../DashboardActions/helpers'
 import {
   fetchLoopRangeWithSimulation,
   fetchLoopRange,
@@ -167,12 +168,15 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
 
   return (
     <div className="space-y-3">
-      {subAccounts.length > 0 && (
+      {(subAccounts.length > 0 || lenderSupportsSubAccounts(selectedLender)) && (
         <SubAccountSelector
           subAccounts={subAccounts}
           selectedAccountId={accountId ?? null}
           onChange={onAccountIdChange}
-          allowCreate={false}
+          allowCreate={subAccounts.length === 0}
+          chainId={chainId}
+          lender={selectedLender}
+          account={account}
         />
       )}
 

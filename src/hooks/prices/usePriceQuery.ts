@@ -50,8 +50,18 @@ export function usePriceQuery({ currencies, enabled = true }: UsePriceQueryParam
           if (!json.success) return
 
           const chainPrices: Record<string, PriceEntry> = {}
-          for (const item of json.data?.items ?? []) {
-            chainPrices[item.address.toLowerCase()] = { usd: item.priceUSD ?? item.price ?? 0 }
+          const items = json.data?.items
+          if (items && typeof items === 'object') {
+            if (Array.isArray(items)) {
+              for (const item of items) {
+                chainPrices[item.address.toLowerCase()] = { usd: item.priceUSD ?? item.price ?? 0 }
+              }
+            } else {
+              // items is a Record<address, price>
+              for (const [addr, price] of Object.entries(items)) {
+                chainPrices[addr.toLowerCase()] = { usd: price as number }
+              }
+            }
           }
           result[chainId] = chainPrices
         })

@@ -17,6 +17,10 @@ export interface SpotSwapTx {
   description?: string
 }
 
+interface SwapSuccess {
+  hash?: string
+}
+
 interface SpotSwapState {
   quotes: SpotSwapQuote[]
   currencyIn: RawCurrency | null
@@ -26,6 +30,7 @@ interface SpotSwapState {
   loading: boolean
   executing: boolean
   error: string | null
+  txSuccess: SwapSuccess | null
 }
 
 export interface SpotSwapParams {
@@ -52,6 +57,7 @@ export function useSpotSwapQuote(params: { chainId: string; account?: string }) 
     loading: false,
     executing: false,
     error: null,
+    txSuccess: null,
   })
 
   const fetchQuote = useCallback(
@@ -143,13 +149,17 @@ export function useSpotSwapQuote(params: { chainId: string; account?: string }) 
 
     setState((s) => ({ ...s, executing: true, error: null }))
     const quote = state.quotes[state.selectedIndex]
-    const { ok, error: txError } = await send(quote.tx as LendingTx)
-    setState((s) => ({
-      ...s,
-      executing: false,
-      error: ok ? null : (txError ?? 'Swap execution failed'),
-    }))
+    const { ok, error: txError, hash } = await send(quote.tx as LendingTx)
+    if (ok) {
+      setState((s) => ({ ...s, executing: false, txSuccess: { hash } }))
+    } else {
+      setState((s) => ({ ...s, executing: false, error: txError ?? 'Swap execution failed' }))
+    }
   }, [state.selectedIndex, state.quotes, send])
+
+  const dismissSuccess = useCallback(() => {
+    setState((s) => ({ ...s, txSuccess: null, quotes: [], permissions: [], selectedIndex: null }))
+  }, [])
 
   const reset = useCallback(() => {
     setState({
@@ -161,6 +171,7 @@ export function useSpotSwapQuote(params: { chainId: string; account?: string }) 
       loading: false,
       executing: false,
       error: null,
+      txSuccess: null,
     })
   }, [])
 
@@ -170,6 +181,7 @@ export function useSpotSwapQuote(params: { chainId: string; account?: string }) 
     selectQuote,
     executePermission,
     executeSwap,
+    dismissSuccess,
     reset,
   }
 }

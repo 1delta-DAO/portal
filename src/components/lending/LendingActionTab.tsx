@@ -9,6 +9,7 @@ import {
   type LendingActionResponse,
 } from '../../sdk/lending-helper/fetchLendingAction'
 import { useSendLendingTransaction } from '../../hooks/useSendLendingTransaction'
+import { sanitizeAmountInput } from './DashboardActions/format'
 
 type ActionType = 'Deposit' | 'Withdraw' | 'Borrow' | 'Repay'
 
@@ -222,7 +223,7 @@ export const LendingActionTab = ({ lenderData, actionType, chainId }: Props) => 
             className="input input-bordered text-right w-32"
             placeholder="0.0"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => { const v = sanitizeAmountInput(e.target.value); if (v !== null) setAmount(v) }}
           />
         </div>
       </div>

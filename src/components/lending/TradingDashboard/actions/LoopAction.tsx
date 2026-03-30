@@ -15,6 +15,7 @@ import { TradingTransactionSuccess } from '../TradingTransactionSuccess'
 import { RateImpactIndicator } from '../../DashboardActions/RateImpactIndicator'
 import { SimulationIndicator } from '../../DashboardActions/SimulationIndicator'
 import { SubAccountSelector } from '../../DashboardActions/SubAccountSelector'
+import { lenderSupportsSubAccounts } from '../../DashboardActions/helpers'
 import {
   fetchLoopRangeWithSimulation,
   fetchLoopRange,
@@ -119,6 +120,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   chainId,
   account,
   accountId,
+  isBalancesFetching,
+  refetchBalances,
   onAccountIdChange,
   onPoolSelectionChange,
 }) => {
@@ -340,12 +343,12 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   return (
     <div className="space-y-3">
       {/* Sub-account */}
-      {(subAccounts.length > 0 || allowCreateAccount) && (
+      {(subAccounts.length > 0 || allowCreateAccount || lenderSupportsSubAccounts(selectedLender)) && (
         <SubAccountSelector
           subAccounts={subAccounts}
           selectedAccountId={accountId ?? null}
           onChange={onAccountIdChange}
-          allowCreate={allowCreateAccount}
+          allowCreate={allowCreateAccount || (subAccounts.length === 0 && lenderSupportsSubAccounts(selectedLender))}
           chainId={chainId}
           lender={selectedLender}
           account={account}
@@ -461,7 +464,16 @@ export const LoopAction: React.FC<TradingActionProps> = ({
           <div className="form-control mt-1.5">
             {payWalletBalance && (
               <div className="text-xs flex justify-between px-1 mb-1">
-                <span className="text-base-content/60">Wallet balance:</span>
+                <span className="text-base-content/60 flex items-center gap-1">
+                  Wallet balance:
+                  {refetchBalances && (
+                    <button type="button" className="text-base-content/30 hover:text-base-content/60 transition-colors" onClick={refetchBalances} title="Refresh balance">
+                      {isBalancesFetching ? <span className="loading loading-spinner w-2.5 h-2.5" /> : (
+                        <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>
+                      )}
+                    </button>
+                  )}
+                </span>
                 <span
                   className={`font-medium ${parseAmount(payWalletStr) === 0 ? 'text-base-content/40' : ''}`}
                 >

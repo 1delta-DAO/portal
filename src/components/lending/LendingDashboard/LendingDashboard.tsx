@@ -131,7 +131,7 @@ export function LendingDashboard({
   }, [allPools, hasWrappedNative])
 
   // Wallet token balances for these assets
-  const { balances: walletBalances } = useTokenBalances({
+  const { balances: walletBalances, isBalancesFetching, refetchBalances } = useTokenBalances({
     chainId,
     account,
     assets: poolAssetAddresses,
@@ -234,6 +234,9 @@ export function LendingDashboard({
     return walletBalances.get(zeroAddress) ?? null
   }, [nativeToken, walletBalances])
 
+  // Lender info for the selected lender
+  const activeLenderInfo = selectedLender && lenderInfoMap ? lenderInfoMap[selectedLender] : undefined
+
   // Shared action panel props
   const actionPanelProps = {
     actionTab,
@@ -251,6 +254,9 @@ export function LendingDashboard({
     nativeToken,
     nativeBalance,
     activeSubAccount,
+    lenderInfo: activeLenderInfo,
+    isBalancesFetching,
+    refetchBalances,
   }
 
   if (isPublicDataLoading) {

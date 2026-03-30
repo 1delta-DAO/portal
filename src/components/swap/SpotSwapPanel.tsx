@@ -3,12 +3,14 @@ import { useAccount } from 'wagmi'
 import { parseUnits, zeroAddress, type Address } from 'viem'
 import type { RawCurrency } from '../../types/currency'
 import { useSpotSwapQuote, type SpotSwapQuote } from '../../hooks/useSpotSwapQuote'
+import { compareAmountStrings } from '../lending/DashboardActions/format'
 import { useTokenLists } from '../../hooks/useTokenLists'
 import { useBalanceQuery, type BalanceEntry } from '../../hooks/balances/useBalanceQuery'
 import { TokenSelectorModal } from '../token-selection/TokenSelectorModal'
-import { formatTokenForInput } from '../lending/DashboardActions/format'
+import { multiplyAmountString, sanitizeAmountInput } from '../lending/DashboardActions/format'
 import { SlippageInput } from '../lending/TradingDashboard/SlippageInput'
 import { ErrorDisplay } from '../lending/TradingDashboard/ErrorDisplay'
+import { usePriceQuery } from '../../hooks/prices/usePriceQuery'
 import { useSyncChain } from '../../hooks/useSyncChain'
 import { WalletConnect } from '../connect'
 import { getCurrency } from '../../lib/trade-helpers/utils'
@@ -130,8 +132,27 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
     [tokenOutBalances, chainId, tokenOut]
   )
 
-  const tokenInPriceRaw = tokenInBalance?.priceUSD ?? 0
-  const tokenOutPriceRaw = tokenOutBalance?.priceUSD ?? 0
+  // Prices via dedicated endpoint
+  const priceCurrencies = useMemo(() => {
+    const list: RawCurrency[] = []
+    if (tokenIn) list.push(tokenIn)
+    if (tokenOut) list.push(tokenOut)
+    return list
+  }, [tokenIn, tokenOut])
+
+  const { data: priceData } = usePriceQuery({
+    currencies: priceCurrencies,
+    enabled: priceCurrencies.length > 0,
+  })
+
+  const tokenInPrice = useMemo(
+    () => (tokenIn ? priceData?.[chainId]?.[tokenIn.address.toLowerCase()]?.usd ?? 0 : 0),
+    [priceData, chainId, tokenIn]
+  )
+  const tokenOutPrice = useMemo(
+    () => (tokenOut ? priceData?.[chainId]?.[tokenOut.address.toLowerCase()]?.usd ?? 0 : 0),
+    [priceData, chainId, tokenOut]
+  )
 
   // Amount state
   const [inputAmount, setInputAmount] = useState('')
@@ -149,31 +170,30 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
     loading,
     executing,
     error,
+    txSuccess,
     fetchQuote,
     selectQuote,
     executePermission,
     executeSwap,
+    dismissSuccess,
     reset,
   } = useSpotSwapQuote({ chainId, account })
 
   const selectedQuote = selectedIndex !== null ? quotes[selectedIndex] : null
 
-  // Token prices: use balance-derived price, or cross-derive from quote + other token's price
-  const tokenInPrice = useMemo(() => {
-    if (tokenInPriceRaw > 0) return tokenInPriceRaw
-    if (selectedQuote && tokenOutPriceRaw > 0 && selectedQuote.tradeInput > 0) {
-      return (selectedQuote.tradeOutput * tokenOutPriceRaw) / selectedQuote.tradeInput
-    }
-    return 0
-  }, [tokenInPriceRaw, tokenOutPriceRaw, selectedQuote])
-
-  const tokenOutPrice = useMemo(() => {
-    if (tokenOutPriceRaw > 0) return tokenOutPriceRaw
-    if (selectedQuote && tokenInPriceRaw > 0 && selectedQuote.tradeOutput > 0) {
-      return (selectedQuote.tradeInput * tokenInPriceRaw) / selectedQuote.tradeOutput
-    }
-    return 0
-  }, [tokenOutPriceRaw, tokenInPriceRaw, selectedQuote])
+  // USD value impact: difference between input and output value based on prices
+  const swapUsdImpact = useMemo(() => {
+    if (!selectedQuote || tokenInPrice <= 0 || tokenOutPrice <= 0) return null
+    const inAmt = parseFloat(inputAmount)
+    const outAmt = parseFloat(outputAmount)
+    if (!Number.isFinite(inAmt) || inAmt <= 0 || !Number.isFinite(outAmt) || outAmt <= 0) return null
+    const inputUsd = inAmt * tokenInPrice
+    const outputUsd = outAmt * tokenOutPrice
+    if (inputUsd <= 0) return null
+    const diff = outputUsd - inputUsd
+    const pct = (diff / inputUsd) * 100
+    return { inputUsd, outputUsd, diff, pct }
+  }, [selectedQuote, inputAmount, outputAmount, tokenInPrice, tokenOutPrice])
 
   // Reset everything when chain changes
   useEffect(() => {
@@ -339,6 +359,38 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
       <div className="rounded-box border border-base-300 bg-base-100 p-4 space-y-1">
         <h3 className="text-sm font-semibold mb-3">Spot Swap</h3>
 
+        {txSuccess ? (
+          <div className="flex flex-col items-center gap-3 py-4 animate-in fade-in">
+            <div className="w-14 h-14 rounded-full bg-success/15 flex items-center justify-center">
+              <svg className="w-8 h-8 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-sm font-semibold">Swap Confirmed</p>
+              <p className="text-xs text-base-content/70">
+                {tokenIn?.symbol} → {tokenOut?.symbol}
+              </p>
+            </div>
+            {txSuccess.hash && (
+              <p className="text-[10px] text-base-content/40 font-mono truncate max-w-full px-2">
+                {txSuccess.hash}
+              </p>
+            )}
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost w-full mt-1"
+              onClick={() => {
+                dismissSuccess()
+                setInputAmount('')
+                setOutputAmount('')
+              }}
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+        <>
         {/* Input token panel (exact input / tradeType=0) */}
         <div className="rounded-lg bg-base-200/60 p-3">
           <div className="flex items-center justify-between mb-1">
@@ -356,7 +408,7 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
                       key={e.label}
                       type="button"
                       className="btn btn-ghost btn-xs px-1.5 py-0 h-5 min-h-0 text-[10px]"
-                      onClick={() => handleInputChange(formatTokenForInput(tokenInBalance.value * e.fraction))}
+                      onClick={() => handleInputChange(e.fraction === 1 ? tokenInBalance.balance : multiplyAmountString(tokenInBalance.balance, e.fraction))}
                     >
                       {e.label}
                     </button>
@@ -380,7 +432,7 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
               className="input input-ghost text-2xl font-medium flex-1 p-0 h-auto focus:outline-none bg-transparent"
               placeholder="0"
               value={inputAmount}
-              onChange={(e) => handleInputChange(e.target.value)}
+              onChange={(e) => { const v = sanitizeAmountInput(e.target.value); if (v !== null) handleInputChange(v) }}
             />
             <button
               type="button"
@@ -475,7 +527,7 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
               className="input input-ghost text-2xl font-medium flex-1 p-0 h-auto focus:outline-none bg-transparent"
               placeholder="0"
               value={outputAmount}
-              onChange={(e) => handleOutputChange(e.target.value)}
+              onChange={(e) => { const v = sanitizeAmountInput(e.target.value); if (v !== null) handleOutputChange(v) }}
             />
             <button
               type="button"
@@ -529,7 +581,7 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
 
         {/* Insufficient balance warning */}
         {tokenIn && inputAmount && parseFloat(inputAmount) > 0 && account && (
-          tokenInBalance ? parseFloat(inputAmount) > tokenInBalance.value : false
+          tokenInBalance ? compareAmountStrings(inputAmount, tokenInBalance.balance) > 0 : false
         ) && (
           <div className="text-xs text-warning flex items-center gap-1.5 px-1">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 shrink-0">
@@ -576,6 +628,26 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
                 outSymbol={tokenOut?.symbol}
               />
             ))}
+          </div>
+        )}
+
+        {/* USD value impact */}
+        {swapUsdImpact && (
+          <div className="rounded-lg border border-base-300 bg-base-200/40 px-2.5 py-2 text-xs space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-base-content/60">You pay</span>
+              <span className="font-medium">{fmtUsd(swapUsdImpact.inputUsd)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-base-content/60">You receive</span>
+              <span className="font-medium">{fmtUsd(swapUsdImpact.outputUsd)}</span>
+            </div>
+            <div className="flex items-center justify-between border-t border-base-300 pt-1">
+              <span className="text-base-content/60">Price impact</span>
+              <span className={`font-semibold ${swapUsdImpact.pct >= -0.1 ? 'text-success' : swapUsdImpact.pct >= -1 ? 'text-warning' : 'text-error'}`}>
+                {swapUsdImpact.diff >= 0 ? '+' : ''}{fmtUsd(swapUsdImpact.diff)} ({swapUsdImpact.pct >= 0 ? '+' : ''}{swapUsdImpact.pct.toFixed(2)}%)
+              </span>
+            </div>
           </div>
         )}
 
@@ -632,6 +704,8 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
               </>
             )}
           </div>
+        )}
+        </>
         )}
       </div>
 

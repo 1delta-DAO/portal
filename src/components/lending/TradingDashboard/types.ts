@@ -54,6 +54,8 @@ export interface TradingActionProps {
   chainId: string
   account?: string
   accountId?: string
+  isBalancesFetching?: boolean
+  refetchBalances?: () => void
   onAccountIdChange: (accountId: string | null) => void
   onPoolSelectionChange: (selections: SelectedPool[]) => void
 }

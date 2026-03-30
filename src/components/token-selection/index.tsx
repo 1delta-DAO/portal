@@ -231,45 +231,6 @@ export function TokenSelector({
     return relevantTokens
   }, [tokensMap, chainId, nativeCurrencySymbol])
 
-  const priceCurrencies = useMemo(() => {
-    const currencies: RawCurrency[] = []
-    const seenAddresses = new Set<string>()
-
-    if (balances?.[chainId] && userAddress) {
-      for (const addr of allAddrs) {
-        const bal = balances[chainId][addr.toLowerCase()]
-        if (bal && Number(bal.value || 0) > 0) {
-          const currency = getCurrency(chainId, addr)
-          if (currency) {
-            const key = currency.address.toLowerCase()
-            if (!seenAddresses.has(key)) {
-              seenAddresses.add(key)
-              currencies.push(currency)
-            }
-          }
-        }
-      }
-    }
-
-    for (const addr of relevant) {
-      const currency = getCurrency(chainId, addr)
-      if (currency) {
-        const key = currency.address.toLowerCase()
-        if (!seenAddresses.has(key)) {
-          seenAddresses.add(key)
-          currencies.push(currency)
-        }
-      }
-    }
-
-    return currencies
-  }, [balances, chainId, allAddrs, userAddress, relevant])
-
-  const { data: prices, isLoading: pricesLoading } = usePriceQuery({
-    currencies: priceCurrencies,
-    enabled: priceCurrencies.length > 0,
-  })
-
   const getTokenCategory = useCallback(
     (token: { symbol?: string }): number => {
       const symbolUpper = (token.symbol ?? '').toUpperCase()
@@ -289,109 +250,119 @@ export function TokenSelector({
   // Debounce search query to avoid blocking the UI on large token lists
   const debouncedQuery = useDebounce(searchQuery, 200)
 
-  const rows: TokenRowData[] = useMemo(() => {
+  // Compute visible addresses (filtered by search + main/user set)
+  const visibleAddresses: Address[] = useMemo(() => {
     const q = debouncedQuery.trim().toLowerCase()
-    const relevantSet = new Set(relevant.map((addr) => addr.toLowerCase()))
     const excludeSet = excludeAddresses
       ? new Set(excludeAddresses.map((a) => a.toLowerCase()))
       : null
 
-    let addressesToShow: Address[]
-
     if (!q) {
-      addressesToShow = allAddrs.filter((addr) => {
+      return allAddrs.filter((addr) => {
         const addrLower = addr.toLowerCase()
-        return mainAndUserTokensSet.has(addrLower)
+        return mainAndUserTokensSet.has(addrLower) && (!excludeSet || !excludeSet.has(addrLower))
       })
-    } else {
-      const mainAndUserMatches: Address[] = []
-      const otherMatches: Address[] = []
-      const seen = new Set<string>()
-
-      for (const addr of allAddrs) {
-        // Stop early if we already have enough results
-        if (mainAndUserMatches.length + otherMatches.length >= MAX_SEARCH_RESULTS) break
-
-        const addrLower = addr.toLowerCase()
-        if (seen.has(addrLower)) continue
-        if (excludeSet?.has(addrLower)) continue
-
-        const token = tokensMap[addr]
-        if (!token) continue
-
-        const symbolLower = (token.symbol ?? '').toLowerCase()
-        const nameLower = (token.name ?? '').toLowerCase()
-        const matches = symbolLower.includes(q) || nameLower.includes(q) || addrLower.includes(q)
-
-        if (matches) {
-          seen.add(addrLower)
-          if (mainAndUserTokensSet.has(addrLower)) {
-            mainAndUserMatches.push(addr)
-          } else {
-            otherMatches.push(addr)
-          }
-        }
-      }
-
-      addressesToShow = [...mainAndUserMatches, ...otherMatches]
     }
 
-    const filtered = addressesToShow
-      .map((addr) => {
-        const token = tokensMap[addr]
-        const addrLower = addr.toLowerCase()
-        const bal = balances?.[chainId]?.[addrLower]
-        const priceData = prices?.[chainId]?.[addrLower]
-        const price = priceData?.usd || 0
+    const mainAndUserMatches: Address[] = []
+    const otherMatches: Address[] = []
+    const seen = new Set<string>()
 
-        const balanceAmount = bal ? Number(bal.value || 0) : 0
-        // Prefer balanceUSD from the API; fall back to balance * price
-        const usdValue = bal?.balanceUSD ? bal.balanceUSD : balanceAmount * price
+    for (const addr of allAddrs) {
+      if (mainAndUserMatches.length + otherMatches.length >= MAX_SEARCH_RESULTS) break
+      const addrLower = addr.toLowerCase()
+      if (seen.has(addrLower)) continue
+      if (excludeSet?.has(addrLower)) continue
 
-        const isRelevant = relevantSet.has(addrLower)
-        return {
-          addr,
-          token,
-          usdValue,
-          price,
-          balanceAmount,
-          category: getTokenCategory(token),
-          isRelevant,
+      const token = tokensMap[addr]
+      if (!token) continue
+
+      const symbolLower = (token.symbol ?? '').toLowerCase()
+      const nameLower = (token.name ?? '').toLowerCase()
+      if (symbolLower.includes(q) || nameLower.includes(q) || addrLower.includes(q)) {
+        seen.add(addrLower)
+        if (mainAndUserTokensSet.has(addrLower)) {
+          mainAndUserMatches.push(addr)
+        } else {
+          otherMatches.push(addr)
         }
-      })
-      .filter(({ addr }) => !excludeSet || !excludeSet.has(addr.toLowerCase()))
+      }
+    }
 
-    return filtered.sort((a, b) => {
+    return [...mainAndUserMatches, ...otherMatches]
+  }, [allAddrs, tokensMap, debouncedQuery, excludeAddresses, mainAndUserTokensSet])
+
+  // Build price query currencies from visible addresses (debounced to avoid rapid refetches)
+  const priceCurrencies = useMemo(() => {
+    const currencies: RawCurrency[] = []
+    const seen = new Set<string>()
+    for (const addr of visibleAddresses) {
+      const currency = getCurrency(chainId, addr)
+      if (currency) {
+        const key = currency.address.toLowerCase()
+        if (!seen.has(key)) {
+          seen.add(key)
+          currencies.push(currency)
+        }
+      }
+    }
+    return currencies
+  }, [visibleAddresses, chainId])
+
+  const debouncedPriceCurrencies = useDebounce(priceCurrencies, 300)
+
+  const { data: prices, isLoading: pricesLoading } = usePriceQuery({
+    currencies: debouncedPriceCurrencies,
+    enabled: debouncedPriceCurrencies.length > 0,
+  })
+
+  const rows: TokenRowData[] = useMemo(() => {
+    const relevantSet = new Set(relevant.map((addr) => addr.toLowerCase()))
+
+    const mapped = visibleAddresses.map((addr) => {
+      const token = tokensMap[addr]
+      const addrLower = addr.toLowerCase()
+      const bal = balances?.[chainId]?.[addrLower]
+      const priceData = prices?.[chainId]?.[addrLower]
+      const price = priceData?.usd || 0
+
+      const balanceAmount = bal ? Number(bal.value || 0) : 0
+      const usdValue = bal?.balanceUSD ? bal.balanceUSD : balanceAmount * price
+
+      const isRelevant = relevantSet.has(addrLower)
+      return {
+        addr,
+        token,
+        usdValue,
+        price,
+        balanceAmount,
+        category: getTokenCategory(token),
+        isRelevant,
+      }
+    })
+
+    return mapped.sort((a, b) => {
       // Primary: USD balance value (highest first)
       const usdValueDiff = b.usdValue - a.usdValue
-      if (Math.abs(usdValueDiff) > 0.01) {
-        return usdValueDiff
-      }
+      if (Math.abs(usdValueDiff) > 0.01) return usdValueDiff
 
       // Secondary: token balance amount (holders first)
       const balDiff = b.balanceAmount - a.balanceAmount
-      if (Math.abs(balDiff) > 0.000001) {
-        return balDiff
-      }
+      if (Math.abs(balDiff) > 0.000001) return balDiff
 
       // Tertiary: category (native/wrapped first)
-      if (a.category !== b.category) {
-        return a.category - b.category
-      }
+      if (a.category !== b.category) return a.category - b.category
 
       return (a.token.symbol ?? '').localeCompare(b.token.symbol ?? '')
     })
   }, [
-    allAddrs,
+    visibleAddresses,
     tokensMap,
-    debouncedQuery,
     balances,
     prices,
     chainId,
-    excludeAddresses,
     getTokenCategory,
     relevant,
-    mainAndUserTokensSet,
   ])
 
   const selected = value ? tokensMap[value.toLowerCase()] : undefined

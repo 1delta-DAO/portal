@@ -1,4 +1,5 @@
 import React from 'react'
+import { sanitizeAmountInput } from '../DashboardActions/format'
 
 const presets = [0.1, 0.3, 0.5, 1.0]
 
@@ -31,7 +32,7 @@ export const SlippageInput: React.FC<SlippageInputProps> = ({ value, onChange })
       inputMode="decimal"
       className="input input-bordered input-xs w-full"
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => { const v = sanitizeAmountInput(e.target.value); if (v !== null) onChange(v) }}
     />
   </div>
 )
