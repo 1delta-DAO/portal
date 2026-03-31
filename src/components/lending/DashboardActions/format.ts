@@ -149,15 +149,20 @@ export function multiplyAmountString(amount: string, fraction: number): string {
   }
   if (scaledBigInt <= 0n) return ''
 
-  // Multiply and divide using BigInt (floor division = truncation)
-  const result = (scaledBigInt * fractionNumerator) / fractionDenominator
+  // Scale up so the BigInt multiplication preserves enough decimal places.
+  // The input contributes `inputDecimals` and the fraction contributes
+  // `fractionDecimals`, so the product needs their sum.
+  const extraDecimals = fractionDecimals
+  const extraScale = BigInt(10 ** extraDecimals)
+  const result = (scaledBigInt * extraScale * fractionNumerator) / fractionDenominator
 
   // Convert back to decimal string
+  const totalDecimals = inputDecimals + extraDecimals
   const resultStr = result.toString()
-  if (inputDecimals === 0) return resultStr
+  if (totalDecimals === 0) return resultStr
 
-  const padded = resultStr.padStart(inputDecimals + 1, '0')
-  const intPart = padded.slice(0, padded.length - inputDecimals)
-  const decPart = padded.slice(padded.length - inputDecimals).replace(/0+$/, '')
+  const padded = resultStr.padStart(totalDecimals + 1, '0')
+  const intPart = padded.slice(0, padded.length - totalDecimals)
+  const decPart = padded.slice(padded.length - totalDecimals).replace(/0+$/, '')
   return decPart ? `${intPart}.${decPart}` : intPart
 }
