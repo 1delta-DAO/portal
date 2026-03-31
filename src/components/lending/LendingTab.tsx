@@ -26,7 +26,7 @@ export function LenderTab() {
 
   // Derive state from URL params
   const activeTab = tabFromSlug(tabSlug)
-  const selectedChain = chainIdParam || '1'
+  const selectedChain = chainIdParam || localStorage.getItem('selectedChainId') || '1'
   const initialLender = lenderParam ? slugToLender(lenderParam) : ''
 
   const setActiveTab = useCallback(
@@ -38,6 +38,7 @@ export function LenderTab() {
 
   const setSelectedChain = useCallback(
     (chain: string) => {
+      localStorage.setItem('selectedChainId', chain)
       // Reset lender when changing chain since lenders differ per chain
       navigate(buildPath(activeTab, chain), { replace: true })
     },
