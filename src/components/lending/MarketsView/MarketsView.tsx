@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getChainName, isWNative, SupportedChainId } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import { useFlattenedPools, type PoolEntry } from '../../../hooks/lending/useFlattenedPools'
@@ -126,7 +126,14 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   const [search, setSearch] = useState('')
   const [page, setPage] = useState<number>(1)
   const [showExtendedFilters, setShowExtendedFilters] = useState(false)
+  const [popoverAbove, setPopoverAbove] = useState(false)
   const extendedRef = useRef<HTMLDivElement>(null)
+  const popoverRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return
+    const rect = node.getBoundingClientRect()
+    const overflowing = rect.bottom > window.innerHeight
+    if (overflowing) setPopoverAbove(true)
+  }, [])
   const userOverrodeMinDeposits = useRef(false)
 
   // Pool selection for deposit
@@ -490,7 +497,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-4 space-y-4 overflow-hidden">
+    <div className="w-full max-w-6xl mx-auto p-4 space-y-4">
       {/* Top row: title + main controls */}
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
@@ -610,14 +617,21 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
           <button
             type="button"
             className={`btn btn-xs ${showExtendedFilters ? 'btn-primary' : 'btn-outline'}`}
-            onClick={() => setShowExtendedFilters((v) => !v)}
+            onClick={() => {
+              setShowExtendedFilters((v) => {
+                if (v) setPopoverAbove(false)
+                return !v
+              })
+            }}
           >
             {showExtendedFilters ? 'Close' : 'Advanced'}
           </button>
 
           {/* Extended filters popover */}
           {showExtendedFilters && (
-            <div className="absolute top-full right-0 mt-1 z-50 bg-base-200 border border-base-300 rounded-lg shadow-xl p-4 w-85 space-y-3">
+            <div
+              ref={popoverRef}
+              className={`absolute right-0 z-50 bg-base-200 border border-base-300 rounded-lg shadow-xl p-4 w-85 space-y-3 max-h-[80vh] overflow-y-auto ${popoverAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
               {/* Asset filter */}
               <div className="form-control">
                 <label className="label py-0">

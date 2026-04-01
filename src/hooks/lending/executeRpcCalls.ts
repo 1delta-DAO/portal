@@ -1,37 +1,66 @@
-import { getRpcUrlByIndex } from "../../lib/lib-utils"
+import { getRpcUrlByIndex } from '../../lib/lib-utils'
 
-export interface RawRpcResponse {
-  jsonrpc: '2.0'
-  id: number
-  result?: string
-  error?: {
-    code: number
-    message: string
-  }
+// New format: { chainId, call: { to, data } }
+interface RpcCallDescriptor {
+  chainId: string
+  call: { to: string; data: string }
 }
 
-// Helper to execute raw RPC calls with retry logic (now expects single multicall per batch)
-async function executeRpcCalls(
+// Old format: full JSON-RPC object
+interface JsonRpcCall {
+  jsonrpc: '2.0'
+  id: number
+  method: 'eth_call'
+  params: unknown[]
+}
+
+export type RpcCall = RpcCallDescriptor | JsonRpcCall
+
+export interface RawRpcResponse {
+  chainId: string
+  result: string
+}
+
+function isJsonRpcCall(obj: any): obj is JsonRpcCall {
+  return obj && typeof obj === 'object' && 'method' in obj && obj.method === 'eth_call'
+}
+
+/**
+ * Resolve the RPC body from whatever format the backend returns:
+ *  - Pure JSON-RPC: { jsonrpc, id, method, params }            → send as-is
+ *  - Descriptor with JSON-RPC call: { chainId, call: {jsonrpc…} } → unwrap call
+ *  - Descriptor with plain call:    { chainId, call: {to, data} } → wrap in eth_call
+ */
+function toRpcBody(call: RpcCall): object {
+  if (isJsonRpcCall(call)) return call
+  if (isJsonRpcCall(call.call)) return call.call
+  return { jsonrpc: '2.0', id: 1, method: 'eth_call', params: [call.call, 'latest'] }
+}
+
+async function executeCall(
   rpcUrl: string,
-  rpcCalls: any[],
+  call: RpcCall,
+  chainId: string,
   maxRetries = 3,
-  initialDelayMs = 1000,
-): Promise<RawRpcResponse[]> {
+  initialDelayMs = 1000
+): Promise<RawRpcResponse> {
   let lastError: Error | null = null
+
+  const body = toRpcBody(call)
+  const responseChainId = isJsonRpcCall(call) ? chainId : call.chainId
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const response = await fetch(rpcUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rpcCalls),
+        body: JSON.stringify(body),
       })
 
-      // Retry on rate limiting or server errors
       if (response.status === 429 || response.status >= 500) {
         const delayMs = initialDelayMs * Math.pow(2, attempt)
         console.log(
-          `RPC call returned ${response.status}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries + 1})`,
+          `RPC call returned ${response.status}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries + 1})`
         )
         await new Promise((resolve) => setTimeout(resolve, delayMs))
         continue
@@ -42,16 +71,17 @@ async function executeRpcCalls(
       }
 
       const result: any = await response.json()
-      // Handle case where single RPC call returns object instead of array
-      return Array.isArray(result) ? result : [result]
+      if (result.error) {
+        throw new Error(`RPC error: ${result.error.message}`)
+      }
+      return { chainId: responseChainId, result: result.result }
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error))
 
-      // Don't retry on the last attempt
       if (attempt < maxRetries) {
         const delayMs = initialDelayMs * Math.pow(2, attempt)
         console.log(
-          `RPC call error: ${lastError.message}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries + 1})`,
+          `RPC call error: ${lastError.message}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries + 1})`
         )
         await new Promise((resolve) => setTimeout(resolve, delayMs))
       }
@@ -63,25 +93,22 @@ async function executeRpcCalls(
 
 export async function executeRpcCallsWithRetry(
   chainId: string,
-  rpcCalls: any[],
+  rpcCalls: RpcCall[],
   maxRetries = 5,
-  initialDelayMs = 1000,
+  initialDelayMs = 1000
 ): Promise<RawRpcResponse[]> {
   for (let i = 0; i < maxRetries; i++) {
     try {
-      const rpc = getRpcUrlByIndex(chainId, i)
-      console.log(`Using RPC URL for chain ${chainId}, index ${i}: ${rpc}`)
+      const rpcUrl = getRpcUrlByIndex(chainId, i)
+      console.log(`Using RPC URL for chain ${chainId}, index ${i}: ${rpcUrl}`)
 
-      const result = await executeRpcCalls(rpc, rpcCalls, 1, initialDelayMs)
+      const rawResponses = await Promise.all(
+        rpcCalls.map((call) => executeCall(rpcUrl, call, chainId, 1, initialDelayMs))
+      )
 
-      if (result[0]?.error) {
-        console.error(`RPC call returned error:`, result[0].error)
-        continue
-      }
-
-      return result
+      return rawResponses
     } catch (e) {
-      console.error(`Error getting RPC URL for chain ${chainId}:`, e)
+      console.error(`Error executing RPC calls for chain ${chainId} (attempt ${i + 1}):`, e)
     }
   }
   throw new Error(`Failed to execute RPC calls after ${maxRetries} attempts`)

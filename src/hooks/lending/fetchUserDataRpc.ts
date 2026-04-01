@@ -1,22 +1,15 @@
 import type { RawLenderUserDataEntry, UserDataSummary } from './useUserData'
-import { executeRpcCallsWithRetry } from './executeRpcCalls'
+import { executeRpcCallsWithRetry, type RpcCall } from './executeRpcCalls'
 
 // ============================================================================
 // Types for the rpc-call endpoint
 // ============================================================================
 
-interface JsonRpcCall {
-  jsonrpc: '2.0'
-  id: number
-  method: 'eth_call'
-  params: unknown[]
-}
-
 interface RpcCallApiResponse {
   success: boolean
   data: {
     rpcCallId: string
-    rpcCalls: JsonRpcCall[]
+    rpcCalls: RpcCall[]
   }
   error?: { code: string; message: string }
 }
@@ -78,8 +71,8 @@ async function fetchApi<T extends { success: boolean; error?: { code: string; me
 
 /**
  * Fetches user lending data via the three-step RPC flow:
- * 1. GET /lending/user-positions/rpc-call → JSON-RPC call descriptors
- * 2. Execute calls via user's RPC provider
+ * 1. GET /lending/user-positions/rpc-call → call descriptors ({ chainId, call })
+ * 2. Execute each call as eth_call via user's RPC provider
  * 3. POST /lending/user-positions/parse → structured user data
  */
 export async function fetchUserDataViaRpc(
@@ -90,13 +83,13 @@ export async function fetchUserDataViaRpc(
   const batches = chainId === '1' ? `&batchSize=500` : ''
   const rpcCallUrl =
     `${BACKEND_BASE_URL}/v1/data/lending/user-positions/rpc-call` +
-    `?chain=${chainId}&account=${account}${batches}`
+    `?chains=${chainId}&account=${account}${batches}`
 
   const {
     data: { rpcCallId, rpcCalls },
   } = await fetchApi<RpcCallApiResponse>('rpc-call', rpcCallUrl)
 
-  // Step 2: Execute JSON-RPC calls via user's own RPC provider
+  // Step 2: Execute each call as eth_call via user's own RPC provider
   const rawResponses = await executeRpcCallsWithRetry(chainId, rpcCalls)
 
   // Step 3: Send results to parse endpoint
