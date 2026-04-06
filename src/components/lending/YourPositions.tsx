@@ -50,7 +50,7 @@ export function YourPositions({
   onPoolSelect,
 }: YourPositionsProps) {
   return (
-    <div className="rounded-box border border-base-300 p-4 space-y-3">
+    <div className="rounded-box border border-base-300 p-3 sm:p-4 space-y-3">
       <h3 className="text-sm font-semibold">Your Positions</h3>
 
       {subAccounts.length === 0 && (

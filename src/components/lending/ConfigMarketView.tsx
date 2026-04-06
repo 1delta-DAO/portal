@@ -140,7 +140,7 @@ export const ConfigMarketView: React.FC<Props> = ({
 
   if (isLoading) {
     return (
-      <div className="rounded-box border border-base-300 p-6 flex justify-center">
+      <div className="rounded-box border border-base-300 p-4 sm:p-6 flex justify-center">
         <span className="loading loading-spinner loading-md" />
       </div>
     )
@@ -148,7 +148,7 @@ export const ConfigMarketView: React.FC<Props> = ({
 
   if (configGroups.length === 0) {
     return (
-      <div className="rounded-box border border-base-300 p-6">
+      <div className="rounded-box border border-base-300 p-4 sm:p-6">
         <EmptyState title="No config data available for this lender." />
       </div>
     )

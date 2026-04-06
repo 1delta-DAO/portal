@@ -157,7 +157,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
 
   if (!chainId) {
     return (
-      <div className="w-full max-w-6xl mx-auto p-4">
+      <div className="w-full max-w-6xl mx-auto p-3 sm:p-4">
         <p className="text-sm text-base-content/70">Select a chain to view lending markets.</p>
       </div>
     )
@@ -497,7 +497,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-4 space-y-4">
+    <div className="w-full max-w-6xl mx-auto p-0 sm:p-4 space-y-3 sm:space-y-4">
       {/* Top row: title + main controls */}
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>

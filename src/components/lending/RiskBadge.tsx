@@ -145,9 +145,19 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ label, breakdown, size = '
 
       {open && hasBreakdown && isMobile &&
         createPortal(
+          // React events bubble through the React tree, not the DOM tree —
+          // so without stopPropagation here, taps on the backdrop (and any
+          // tap inside the portal that isn't caught by the sheet's own
+          // stopPropagation) would bubble back up through <RiskBadge> →
+          // <td> → <tr onClick> and end up selecting the row underneath.
           <div
             className="fixed inset-0 z-9999 flex items-center justify-center p-4"
-            onClick={closeNow}
+            onClick={(e) => {
+              e.stopPropagation()
+              closeNow()
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
           >
             {/* backdrop */}
             <div className="absolute inset-0 bg-base-300/40 backdrop-blur-sm" />

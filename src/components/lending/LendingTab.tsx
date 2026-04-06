@@ -96,9 +96,9 @@ export function LenderTab() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Top bar: chain selector + sub-tabs */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-2 sm:gap-3 md:flex-row md:items-center md:justify-between">
         <div role="tablist" className="tabs tabs-bordered">
           <button
             type="button"
@@ -144,7 +144,7 @@ export function LenderTab() {
 
       {/* Tab content */}
       {activeTab === 'earn' && (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {account && (
             <div className="space-y-3">
               <div className="flex items-center gap-1 bg-base-200 rounded-lg p-1 w-fit">

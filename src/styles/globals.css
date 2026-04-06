@@ -439,9 +439,15 @@
   padding-right: 2.5rem;
 }
 
-/* Modal boxes in terminal – a bit more inner spacing */
+/* Modal boxes in terminal – a bit more inner spacing on desktop;
+   keep mobile tight so the dialog has room to breathe on small screens. */
 [data-theme='terminal'] .modal-box {
-  padding: 1.75rem;
+  padding: 1rem;
+}
+@media (min-width: 640px) {
+  [data-theme='terminal'] .modal-box {
+    padding: 1.75rem;
+  }
 }
 
 
@@ -489,7 +495,12 @@
 }
 
 [data-theme='bloomberg'] .modal-box {
-  padding: 1.5rem;
+  padding: 1rem;
+}
+@media (min-width: 640px) {
+  [data-theme='bloomberg'] .modal-box {
+    padding: 1.5rem;
+  }
 }
 
 /* Row hover: amber-tinted near-black so it's distinct from both

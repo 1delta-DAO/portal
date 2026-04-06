@@ -273,7 +273,7 @@ export function TradingDashboard({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Lender selector */}
       <LenderSelector
         lenderOptions={lenderOptions}
@@ -284,7 +284,7 @@ export function TradingDashboard({
 
       {/* User positions + sub-account selector */}
       {account && isUserDataLoading && (
-        <div className="rounded-box border border-base-300 p-4 flex items-center gap-2">
+        <div className="rounded-box border border-base-300 p-3 sm:p-4 flex items-center gap-2">
           <span className="loading loading-spinner loading-sm" />
           <span className="text-sm text-base-content/60">Loading positions...</span>
         </div>

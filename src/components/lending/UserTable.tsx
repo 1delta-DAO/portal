@@ -317,7 +317,7 @@ const MobileLenderCard: React.FC<{
 
   return (
     <div className="card bg-base-100 shadow border border-base-300">
-      <div className="card-body p-4 space-y-3">
+      <div className="card-body p-3 space-y-3">
         {/* Lender header */}
         <div className="flex items-center justify-between">
           <div>
@@ -487,7 +487,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
 
   // Desktop layout with table
   return (
-    <div className="w-full max-w-6xl mx-auto p-4 space-y-4">
+    <div className="w-full max-w-6xl mx-auto p-0 sm:p-4 space-y-3 sm:space-y-4">
       {/* Header */}
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
