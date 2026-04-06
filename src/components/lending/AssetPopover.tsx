@@ -27,7 +27,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
       <span className="text-base-content/50 shrink-0 w-14">{label}</span>
       <button
         type="button"
-        className="inline-flex items-center gap-1 font-mono text-[11px] hover:text-primary transition-colors min-w-0"
+        className="inline-flex items-center gap-1 font-mono text-[10px] hover:text-primary transition-colors min-w-0"
         onClick={copy}
         title={`Copy ${label.toLowerCase()}: ${value}`}
       >

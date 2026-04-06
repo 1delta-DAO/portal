@@ -83,13 +83,13 @@ export const ExposureCell: React.FC<ExposureCellProps> = ({ exposures, chainToke
     const extra = addrs.length - MAX_INLINE
     return (
       <div className="flex items-center gap-1">
-        <span className="text-[9px] text-base-content/50 w-3.5 shrink-0">{label}</span>
+        <span className="text-[10px] text-base-content/50 w-3.5 shrink-0">{label}</span>
         <div className="flex items-center">
           {inline.map(renderIcon)}
           {extra > 0 && (
             <span
               ref={triggerRef}
-              className="text-[9px] text-base-content/60 cursor-pointer ml-0.5"
+              className="text-[10px] text-base-content/60 cursor-pointer ml-0.5"
               onClick={openPopover}
             >
               +{extra}

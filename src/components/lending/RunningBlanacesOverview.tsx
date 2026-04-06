@@ -26,7 +26,7 @@ const renderAssetMini = (asset: RawCurrency) => {
         </div>
       </div>
       <div className="flex flex-col min-w-0">
-        <span className="text-[11px] font-medium truncate">{symbol || name}</span>
+        <span className="text-[10px] font-medium truncate">{symbol || name}</span>
         {name && symbol && name !== symbol && (
           <span className="text-[10px] text-base-content/60 truncate">{name}</span>
         )}
@@ -45,7 +45,7 @@ export const RunningBalancesOverview: React.FC<RunningBalancesOverviewProps> = (
   return (
     <div className={`mt-3 rounded-box border border-base-300 p-3 bg-base-100 ${className}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="font-semibold uppercase text-[11px]">{title}</span>
+        <span className="font-semibold uppercase text-[10px]">{title}</span>
         {/* Legend */}
         {/* <div className="flex items-center gap-2 text-[10px] text-base-content/70">
                     <span className="inline-flex items-center gap-1">
@@ -80,7 +80,7 @@ export const RunningBalancesOverview: React.FC<RunningBalancesOverviewProps> = (
               {renderAssetMini(asset)}
 
               <div className="flex flex-col min-w-0 flex-1">
-                <span className="text-[11px] font-semibold truncate">
+                <span className="text-[10px] font-semibold truncate">
                   {absAmount.toLocaleString(undefined, {
                     maximumFractionDigits: 6,
                   })}{' '}

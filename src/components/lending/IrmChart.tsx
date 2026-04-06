@@ -2,8 +2,10 @@ import React, { useRef, useState, useCallback, useEffect } from 'react'
 
 const PAD = { top: 18, right: 14, bottom: 36, left: 46 }
 
-const DEPOSIT_COLOR = '#22c55e'
-const BORROW_COLOR  = '#f97316'
+// Resolved at render time from the active DaisyUI theme so the curves
+// re-color on theme switch instead of staying neon green/orange.
+const DEPOSIT_COLOR = 'var(--color-success)'
+const BORROW_COLOR  = 'var(--color-warning)'
 
 export interface IrmPoint {
   utilization: number
@@ -174,20 +176,20 @@ export const IrmCurveChart: React.FC<IrmCurveChartProps> = ({ points, currentUti
             transform: hovered.utilization > 0.6 ? 'translateX(-100%)' : undefined,
           }}
         >
-          <p className="text-base-content/50 mb-1.5 tabular-nums text-[11px]">
+          <p className="text-base-content/50 mb-1.5 tabular-nums text-[10px]">
             Utilization: <span className="text-base-content font-semibold">{(hovered.utilization * 100).toFixed(0)}%</span>
           </p>
           <div className="flex items-center gap-2 tabular-nums">
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: DEPOSIT_COLOR }} />
-            <span className="text-base-content/60 text-[11px]">Deposit</span>
-            <span className="font-semibold ml-auto pl-3 text-[11px]" style={{ color: DEPOSIT_COLOR }}>
+            <span className="text-base-content/60 text-[10px]">Deposit</span>
+            <span className="font-semibold ml-auto pl-3 text-[10px]" style={{ color: DEPOSIT_COLOR }}>
               {(hovered.depositRate ?? 0).toFixed(2)}%
             </span>
           </div>
           <div className="flex items-center gap-2 tabular-nums mt-0.5">
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: BORROW_COLOR }} />
-            <span className="text-base-content/60 text-[11px]">Borrow</span>
-            <span className="font-semibold ml-auto pl-3 text-[11px]" style={{ color: BORROW_COLOR }}>
+            <span className="text-base-content/60 text-[10px]">Borrow</span>
+            <span className="font-semibold ml-auto pl-3 text-[10px]" style={{ color: BORROW_COLOR }}>
               {(hovered.borrowRate ?? 0).toFixed(2)}%
             </span>
           </div>

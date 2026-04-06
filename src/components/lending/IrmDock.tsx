@@ -9,8 +9,10 @@ import { createPortal } from 'react-dom'
 import { useIrmData } from '../../hooks/lending/useIrmData'
 import { IrmCurveChart } from './IrmChart'
 
-const DEPOSIT_COLOR = '#22c55e'
-const BORROW_COLOR  = '#f97316'
+// Resolved at render time from the active DaisyUI theme so legend swatches
+// and stat numbers re-color on theme switch instead of staying neon.
+const DEPOSIT_COLOR = 'var(--color-success)'
+const BORROW_COLOR  = 'var(--color-warning)'
 
 // ---------------------------------------------------------------------------
 // Context
@@ -68,12 +70,12 @@ function IrmDockedPanel({
         <div className="flex items-start justify-between gap-2 mb-2.5">
           <div className="flex items-center gap-2 flex-wrap">
             <span
-              className="badge badge-sm font-bold tracking-wide text-[11px] bg-base-300 border-0"
+              className="badge badge-sm font-bold tracking-wide text-[10px] bg-base-300 border-0"
               title={lenderKey}
             >
               {lenderKey.length > 18 ? `${lenderKey.slice(0, 18)}…` : lenderKey}
             </span>
-            <span className="text-[11px] text-base-content/40 uppercase tracking-wider">IRM</span>
+            <span className="text-[10px] text-base-content/40 uppercase tracking-wider">IRM</span>
           </div>
           <button
             type="button"
@@ -96,19 +98,19 @@ function IrmDockedPanel({
         {/* Current rate stats */}
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl bg-base-200 px-3 py-2">
-            <p className="text-[11px] text-base-content/45 mb-1 leading-none">Deposit APR</p>
+            <p className="text-[10px] text-base-content/45 mb-1 leading-none">Deposit APR</p>
             <p className="text-lg font-bold leading-none tabular-nums" style={{ color: DEPOSIT_COLOR }}>
               {currentDepositRate !== undefined ? `${currentDepositRate.toFixed(2)}%` : '—'}
             </p>
           </div>
           <div className="rounded-xl bg-base-200 px-3 py-2">
-            <p className="text-[11px] text-base-content/45 mb-1 leading-none">Borrow APR</p>
+            <p className="text-[10px] text-base-content/45 mb-1 leading-none">Borrow APR</p>
             <p className="text-lg font-bold leading-none tabular-nums" style={{ color: BORROW_COLOR }}>
               {currentBorrowRate !== undefined ? `${currentBorrowRate.toFixed(2)}%` : '—'}
             </p>
           </div>
           <div className="rounded-xl bg-base-200 px-3 py-2">
-            <p className="text-[11px] text-base-content/45 mb-1 leading-none">Utilization</p>
+            <p className="text-[10px] text-base-content/45 mb-1 leading-none">Utilization</p>
             <p className="text-lg font-bold leading-none tabular-nums text-base-content/70">
               {currentUtilization !== undefined ? `${(currentUtilization * 100).toFixed(1)}%` : '—'}
             </p>
@@ -134,7 +136,7 @@ function IrmDockedPanel({
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
             <p className="text-sm text-base-content/40">IRM data unavailable</p>
-            <p className="text-[11px] text-base-content/25">No curve data returned for this market</p>
+            <p className="text-[10px] text-base-content/25">No curve data returned for this market</p>
           </div>
         )}
 
@@ -146,7 +148,7 @@ function IrmDockedPanel({
               <path d="M17 17H3V7a4 4 0 011.173-2.826M7 7h10v6" />
             </svg>
             <p className="text-sm text-base-content/40">No data available</p>
-            <p className="text-[11px] text-base-content/25">This market has no IRM curve</p>
+            <p className="text-[10px] text-base-content/25">This market has no IRM curve</p>
           </div>
         )}
 
@@ -163,7 +165,7 @@ function IrmDockedPanel({
                 <span className="text-base-content/55">Borrow APR</span>
               </span>
               {currentUtilization !== undefined && (
-                <span className="flex items-center gap-1.5 ml-auto text-[11px] text-base-content/35">
+                <span className="flex items-center gap-1.5 ml-auto text-[10px] text-base-content/35">
                   <svg width="12" height="8" viewBox="0 0 12 8">
                     <line x1="0" y1="4" x2="12" y2="4" stroke="currentColor" strokeDasharray="3 2" strokeWidth="1.5" />
                   </svg>
@@ -273,7 +275,7 @@ export function IrmDetailsButton({
   return (
     <button
       type="button"
-      className={`inline-flex items-center gap-0.5 text-[11px] hover:underline transition-colors ${
+      className={`inline-flex items-center gap-0.5 text-[10px] hover:underline transition-colors ${
         isOpen ? 'text-primary/50' : 'text-primary'
       }`}
       onClick={handleClick}

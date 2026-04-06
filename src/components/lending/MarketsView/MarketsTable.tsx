@@ -30,7 +30,7 @@ const UtilCircle: React.FC<{ pct: number }> = ({ pct }) => {
       <text
         x={cx} y={cy}
         textAnchor="middle" dominantBaseline="central"
-        className="fill-base-content rotate-90 origin-center text-[9px] font-semibold"
+        className="fill-base-content rotate-90 origin-center text-[10px] font-semibold"
       >
         {pct.toFixed(0)}%
       </text>
@@ -130,7 +130,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
       {/* ── Desktop table ── */}
       <div className="hidden md:block overflow-x-auto">
         <table className="table table-sm w-full">
-          <thead>
+          <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
             <tr>
               <th className="w-1/4">Market</th>
               <th className="cursor-pointer" onClick={() => onToggleSort('apr')}>
@@ -164,8 +164,8 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
               return (
                 <tr
                   key={p.marketUid}
-                  className={`h-18.75 cursor-pointer transition-colors ${
-                    selected ? 'bg-primary/10' : 'hover:bg-base-content/5'
+                  className={`h-16 cursor-pointer transition-colors ${
+                    selected ? 'bg-primary/10' : 'hover:bg-base-200'
                   }`}
                   onClick={() => onRowClick(p)}
                 >
@@ -190,7 +190,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                             {getAsset(p)?.symbol ?? p.name}
                           </span>
                           <span
-                            className="text-[11px] text-base-content/60 flex items-center gap-1 min-w-0"
+                            className="text-[10px] text-base-content/60 flex items-center gap-1 min-w-0"
                             title={p.lenderKey}
                           >
                             {p.lenderInfo?.logoURI && (
@@ -339,7 +339,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
             <div
               key={`m-${p.chainId}-${p.lenderKey}-${p.underlyingAddress}`}
               className={`p-3 cursor-pointer transition-colors ${
-                selected ? 'bg-primary/10' : 'active:bg-base-content/5'
+                selected ? 'bg-primary/10' : 'active:bg-base-200'
               }`}
               onClick={() => onRowClick(p)}
             >
@@ -365,7 +365,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                         {getAsset(p)?.symbol ?? p.name}
                       </span>
                       <span
-                        className="text-[11px] text-base-content/60 flex items-center gap-1 min-w-0"
+                        className="text-[10px] text-base-content/60 flex items-center gap-1 min-w-0"
                         title={p.lenderKey}
                       >
                         {p.lenderInfo?.logoURI && (

@@ -25,7 +25,7 @@ const renderAsset = (asset: RawCurrency) => {
       <div className="flex flex-col min-w-0">
         <span className="font-medium text-sm truncate">{symbol || name}</span>
         {name && symbol && name !== symbol && (
-          <span className="text-[11px] text-base-content/60 truncate">{name}</span>
+          <span className="text-[10px] text-base-content/60 truncate">{name}</span>
         )}
       </div>
     </div>
@@ -146,7 +146,7 @@ const LendingPoolList: React.FC<LendingPoolListProps> = ({ pools, onSelect, onCl
                   <span className="text-xs font-medium text-base-content truncate" title={p.poolData.name}>
                     {p.poolData.name}
                   </span>
-                  <span className="text-[11px] text-base-content/50 truncate" title={p.lender}>
+                  <span className="text-[10px] text-base-content/50 truncate" title={p.lender}>
                     {p.lender}
                   </span>
                 </div>
@@ -204,7 +204,7 @@ const LendingPoolList: React.FC<LendingPoolListProps> = ({ pools, onSelect, onCl
             <span className="text-xs font-medium text-base-content truncate" title={p.poolData.name}>
               {p.poolData.name}
             </span>
-            <span className="text-[11px] text-base-content/50 truncate" title={p.lender}>
+            <span className="text-[10px] text-base-content/50 truncate" title={p.lender}>
               {p.lender}
             </span>
           </div>
@@ -309,14 +309,31 @@ export const LendingPoolSelectionModal: React.FC<LendingPoolSelectionModalProps>
       <div className="relative z-50 bg-base-100 rounded-box shadow-lg w-full max-w-2xl max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-base-300">
           <h3 className="font-semibold text-sm">Select Lending Market</h3>
-          <button type="button" className="btn btn-ghost btn-xs" onClick={onClose}>
-            ✕
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs btn-circle"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-3.5 h-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
 
         {/* Search controls */}
         <div className="px-4 py-3 border-b border-base-300 space-y-2">
-          <div className="text-[11px] uppercase tracking-wide text-base-content/60">
+          <div className="text-[10px] uppercase tracking-wide text-base-content/60">
             Filter by asset, lender, or pool id
           </div>
 

@@ -107,7 +107,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
       {/* Desktop table */}
       <div className="hidden md:block overflow-x-auto">
         <table className="table table-sm w-full">
-          <thead>
+          <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
             <tr>
               <th className="cursor-pointer select-none" onClick={() => toggleSort('symbol')}>
                 Asset{sortArrow('symbol')}
@@ -181,7 +181,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                           )}
                         </span>
                         <span
-                          className="text-[11px] text-base-content/60 truncate"
+                          className="text-[10px] text-base-content/60 truncate"
                           title={pool.name}
                         >
                           {pool.name}
@@ -337,7 +337,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                         {pool.isFrozen && <span className="ml-1 text-warning text-xs">&#x2744;</span>}
                       </span>
                       <span
-                        className="text-[11px] text-base-content/60 truncate"
+                        className="text-[10px] text-base-content/60 truncate"
                         title={pool.name}
                       >
                         {pool.name}

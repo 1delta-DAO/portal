@@ -85,7 +85,7 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
       <div className="rounded-box border border-base-300 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="table table-sm w-full">
-            <thead>
+            <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
               <tr>
                 <th>Asset</th>
                 <th className="text-right">Balance</th>

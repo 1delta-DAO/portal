@@ -183,7 +183,7 @@ export const ConfigMarketView: React.FC<Props> = ({
             {/* Desktop table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="table table-sm w-full">
-                <thead>
+                <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
                   <tr>
                     <th>Config</th>
                     <th>Collaterals</th>
@@ -209,7 +209,7 @@ export const ConfigMarketView: React.FC<Props> = ({
                           <span className="font-medium text-sm">
                             {g.label || `Config ${g.configId}`}
                             {isUserMode && (
-                              <span className="ml-1.5 text-[9px] font-medium text-success/80 bg-success/10 px-1 py-0.5 rounded align-middle">
+                              <span className="ml-1.5 text-[10px] font-medium text-success/80 bg-success/10 px-1 py-0.5 rounded align-middle">
                                 active
                               </span>
                             )}
@@ -258,7 +258,7 @@ export const ConfigMarketView: React.FC<Props> = ({
                       <span className="font-medium text-sm">
                         {g.label || `Config ${g.configId}`}
                         {isUserMode && (
-                          <span className="ml-1.5 text-[9px] font-medium text-success/80 bg-success/10 px-1 py-0.5 rounded align-middle">
+                          <span className="ml-1.5 text-[10px] font-medium text-success/80 bg-success/10 px-1 py-0.5 rounded align-middle">
                             active
                           </span>
                         )}
@@ -479,7 +479,7 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
       {/* Desktop table */}
       <div className="hidden md:block overflow-x-auto">
         <table className="table table-sm w-full">
-          <thead>
+          <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
             <tr>
               <th>Asset</th>
               {type === 'collateral' ? (
@@ -699,7 +699,7 @@ const AssetCell: React.FC<{ item: ConfigMarketItem; hasPosition: boolean; entity
         <span className="font-medium text-sm truncate" title={asset.symbol}>
           {asset.symbol}
         </span>
-        <span className="text-[11px] text-base-content/60 truncate" title={asset.name}>
+        <span className="text-[10px] text-base-content/60 truncate" title={asset.name}>
           {asset.name}
         </span>
       </div>

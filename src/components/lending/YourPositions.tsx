@@ -203,7 +203,7 @@ export function YourPositions({
                       </AssetPopover>
                       {account && (
                         <div className="flex flex-col items-center shrink-0">
-                          <span className="text-[9px] text-base-content/50 leading-tight">
+                          <span className="text-[10px] text-base-content/50 leading-tight">
                             Coll.
                           </span>
                           <CollateralToggle

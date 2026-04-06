@@ -58,7 +58,7 @@ function LoopRangeInfo({
         <span className="text-base-content/60 font-medium">Max Loop Size</span>
         <button
           type="button"
-          className="text-primary hover:underline cursor-pointer text-[11px] font-medium"
+          className="text-primary hover:underline cursor-pointer text-[10px] font-medium"
           onClick={() => onSetMax(loopRange.amountIn)}
         >
           Use max
@@ -92,7 +92,7 @@ function LoopRangeInfo({
       {/* Mode switch indicator */}
       {needsModeSwitch && (
         <div
-          className={`flex items-center gap-1 text-[11px] ${
+          className={`flex items-center gap-1 text-[10px] ${
             modeAnalysis.canSwitchToTargetMode ? 'text-success/80' : 'text-warning/80'
           }`}
         >

@@ -38,7 +38,7 @@ export const AmountUsdHint: React.FC<AmountUsdHintProps> = ({ amountUsd }) => {
         pointer-events-none absolute inset-y-0 right-0
         flex items-center
         px-1.5 rounded-md
-        text-[11px] text-base-content/70
+        text-[10px] text-base-content/70
       "
     >
       ≈ ${formatUsdCompact(amountUsd)}

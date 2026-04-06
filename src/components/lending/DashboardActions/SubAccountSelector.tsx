@@ -148,7 +148,7 @@ export const SubAccountSelector: React.FC<SubAccountSelectorProps> = ({
       {/* SELECT: show ID input when creating new */}
       {creatingNew && isSelect && nextAccount && (
         <div className="mt-2 flex items-center gap-2">
-          <label className="text-[11px] text-base-content/60 shrink-0">Account ID:</label>
+          <label className="text-[10px] text-base-content/60 shrink-0">Account ID:</label>
           <input
             type="text"
             inputMode="numeric"
@@ -170,7 +170,7 @@ export const SubAccountSelector: React.FC<SubAccountSelectorProps> = ({
 
       {/* AUTOGEN: info text when creating new */}
       {creatingNew && isAutogen && (
-        <div className="mt-2 text-[11px] text-base-content/50">
+        <div className="mt-2 text-[10px] text-base-content/50">
           Account ID will be generated on-chain automatically.
         </div>
       )}

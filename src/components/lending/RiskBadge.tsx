@@ -106,7 +106,7 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ label, breakdown, size = '
             onMouseEnter={keepOpen}
             onMouseLeave={hide}
           >
-            <div className="text-[11px] font-semibold text-base-content/50 uppercase tracking-wider mb-2">
+            <div className="text-[10px] font-semibold text-base-content/50 uppercase tracking-wider mb-2">
               Risk Breakdown
             </div>
             <div className="flex flex-col gap-1.5">

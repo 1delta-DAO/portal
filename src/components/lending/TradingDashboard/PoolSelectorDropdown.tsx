@@ -123,7 +123,7 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
             />
             <span className="truncate">
               {value.asset.symbol}
-              <span className="text-base-content/50 ml-1 text-[11px]">{value.asset.name}</span>
+              <span className="text-base-content/50 ml-1 text-[10px]">{value.asset.name}</span>
             </span>
           </>
         ) : (
@@ -194,7 +194,7 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
                       {pool.asset.symbol}
                       <span className="text-base-content/50 ml-0.5 font-normal">{pool.asset.name}</span>
                       {isPreferred && (
-                        <span className="ml-auto text-[9px] font-medium text-primary/70 bg-primary/10 px-1 py-0.5 rounded">
+                        <span className="ml-auto text-[10px] font-medium text-primary/70 bg-primary/10 px-1 py-0.5 rounded">
                           config
                         </span>
                       )}

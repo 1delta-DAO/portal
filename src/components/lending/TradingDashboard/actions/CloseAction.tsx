@@ -303,7 +303,7 @@ export const CloseAction: React.FC<TradingActionProps> = ({
                 checked={isAll}
                 onChange={(e) => { setIsAll(e.target.checked); reset() }}
               />
-              <span className="text-[11px] text-base-content/70">Withdraw all collateral (repay debt, refund residual)</span>
+              <span className="text-[10px] text-base-content/70">Withdraw all collateral (repay debt, refund residual)</span>
             </label>
           )}
           {closeRangeLoading && (
