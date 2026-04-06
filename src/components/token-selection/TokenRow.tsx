@@ -57,7 +57,7 @@ export const TokenRow: React.FC<TokenRowProps> = ({
       }}
     />
     <div className="flex flex-col items-start min-w-0 flex-1">
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 min-w-0 max-w-full">
         <span className="font-medium text-sm truncate">{token.symbol}</span>
         {price > 0 && (
           <span className="text-[10px] text-base-content/40">{fmtPrice(price)}</span>

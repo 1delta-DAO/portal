@@ -31,7 +31,7 @@ export const TokenSelectorListMode: React.FC<TokenSelectorListModeProps> = ({
   }
 
   return (
-    <div className="space-y-0.5 max-h-[60vh] overflow-y-auto">
+    <div className="space-y-0.5 max-h-[60vh] overflow-y-auto overflow-x-hidden min-w-0">
       {rows.map((row) => (
         <TokenRow
           key={row.addr}

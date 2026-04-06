@@ -73,38 +73,42 @@ export function TokenSelectorModal({
   return (
     <div className="modal modal-open" onClick={onClose}>
       <div
-        className="modal-box max-w-2xl max-h-[90dvh] p-0 flex flex-col"
+        className="modal-box max-w-2xl max-h-[90dvh] p-0 flex flex-col overflow-x-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-base-300 shrink-0">
-          <h3 className="font-bold">Select a token</h3>
-          <button className="btn btn-sm btn-ghost" onClick={onClose}>
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-base-300 shrink-0">
+          <h3 className="font-bold min-w-0 truncate">Select a token</h3>
+          <button className="btn btn-sm btn-ghost shrink-0" onClick={onClose}>
             ✕
           </button>
         </div>
 
-        {/* search + chain selector */}
+        {/* search + chain selector. min-w-0 cascades so the input can shrink
+            past its placeholder width on narrow viewports; the chain selector
+            uses a basis instead of a hard min-width to avoid pushing the row
+            past the modal width on mobile. */}
         <div className="px-4 py-3 shrink-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <input
-              className="input input-bordered flex-1"
+              className="input input-bordered flex-1 min-w-0"
               placeholder="Search tokens"
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
             />
             {showChainSelector && (
-              <div className="min-w-40">
+              <div className="shrink-0 basis-28 sm:basis-40 min-w-0">
                 <ChainFilterSelect chains={chains} value={chainId ?? ''} onChange={handleChainChange} />
               </div>
             )}
           </div>
         </div>
 
-        {/* token list (scrollable area) */}
-        <div className="flex-1 px-4 pb-4 overflow-y-auto">
+        {/* Token list — explicitly vertical-only scroll. Any residual content
+            overflow gets clipped, never sideways-scrolled. */}
+        <div className="flex-1 min-w-0 px-4 pb-4 overflow-y-auto overflow-x-hidden">
           {chainId && (
-            <div className="h-full">
+            <div className="h-full min-w-0">
               <TokenSelector
                 chainId={chainId}
                 value={tokenValue}
