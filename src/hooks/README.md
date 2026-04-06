@@ -6,6 +6,30 @@ All backend calls go through `BACKEND_BASE_URL` (see `src/config/backend.ts`). R
 
 ---
 
+## Structure
+
+- [lending/](lending/) — Lending pools, IRM, user positions, lending balances and the data-flattening layer (`prepareMixedData`). See [lending/README.md](lending/README.md).
+- [prices/](prices/) — `usePriceQuery` for token USD prices.
+- [balances/](balances/) — Generic `useBalanceQuery` for wallet balances.
+
+### Top-level hooks (this directory)
+
+Data and action hooks (documented in detail below):
+
+- [useSendLendingTransaction.ts](useSendLendingTransaction.ts) — Low-level signer/broadcaster used by the action hooks.
+- [useSpotSwapQuote.ts](useSpotSwapQuote.ts) — Spot swap quote + execution.
+- [useChains.ts](useChains.ts) — Supported chain IDs.
+
+Utility hooks (not in the reference tables below):
+
+- [useTokenLists.ts](useTokenLists.ts) — Loads and caches token lists.
+- [useDebounce.ts](useDebounce.ts) — Generic debounced-value hook.
+- [useIsMobile.ts](useIsMobile.ts) — Viewport-based mobile detection.
+- [useSyncChain.ts](useSyncChain.ts) — Keeps the connected wallet chain in sync with the app's selected chain.
+- [usePersistedFilters.ts](usePersistedFilters.ts) — Persists user filter selections (chain, lender, risk, etc.) across reloads.
+
+---
+
 ## Data Hooks
 
 These hooks fetch read-only data. They are built on `@tanstack/react-query` and handle caching, polling, and pagination automatically.
