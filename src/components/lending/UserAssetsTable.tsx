@@ -2,6 +2,8 @@ import React, { useMemo } from 'react'
 import type { RawCurrency } from '../../types/currency'
 import type { TokenBalance } from '../../hooks/lending/useTokenBalances'
 import { AssetPopover } from './AssetPopover'
+import { EmptyState } from '../common/EmptyState'
+import { ErrorAlert } from '../common/ErrorAlert'
 
 function formatUsd(v: number) {
   return v.toLocaleString(undefined, {
@@ -41,19 +43,11 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
   }
 
   if (error) {
-    return (
-      <div className="alert alert-error">
-        <span>Failed to load balances: {error.message ?? String(error)}</span>
-      </div>
-    )
+    return <ErrorAlert error={error} title="Failed to load balances" />
   }
 
   if (balances.length === 0) {
-    return (
-      <div className="alert alert-info">
-        <span>No lending-compatible asset balances found.</span>
-      </div>
-    )
+    return <EmptyState title="No lending-compatible asset balances found." />
   }
 
   return (

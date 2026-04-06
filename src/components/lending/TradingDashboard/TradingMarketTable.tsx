@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry } from '../../../hooks/lending/useUserData'
 import type { TableHighlight, PoolRole } from './types'
@@ -6,6 +6,11 @@ import { abbreviateUsd, abbreviateNumber, formatUsd, formatTokenAmount } from '.
 import { AssetPopover } from '../AssetPopover'
 import { sortPools, type SortKey, LtvBadge } from '../Dashboard'
 import { RiskBadge } from '../RiskBadge'
+import { useTableSort } from '../../../hooks/useTableSort'
+import { useTablePagination } from '../../../hooks/useTablePagination'
+import { SortableHeader } from '../../common/SortableHeader'
+import { TableEmptyRow } from '../../common/TableEmptyRow'
+import { TablePagination } from '../../common/TablePagination'
 
 const PAGE_SIZE = 25
 
@@ -23,8 +28,7 @@ const ROLE_STYLES: Record<PoolRole, string> = {
 
 export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, highlights }) => {
   const [search, setSearch] = useState('')
-  const [sortKey, setSortKey] = useState<SortKey>('totalDepositsUSD')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const { sortKey, sortDir, toggleSort } = useTableSort<SortKey>('totalDepositsUSD')
 
   const highlightMap = useMemo(() => {
     const map = new Map<string, PoolRole>()
@@ -32,36 +36,13 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
     return map
   }, [highlights])
 
-  const [page, setPage] = useState(0)
-
   const sorted = useMemo(
     () => sortPools(pools, search, sortKey, sortDir),
     [pools, search, sortKey, sortDir]
   )
 
-  // Reset to first page when search/sort/pool list changes
-  const sortedCount = sorted.length
-  useEffect(() => setPage(0), [search, sortKey, sortDir, sortedCount])
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
-  const pagedPools = useMemo(
-    () => sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
-    [sorted, page]
-  )
-
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortKey(key)
-      setSortDir('desc')
-    }
-  }
-
-  const sortArrow = (key: SortKey) =>
-    sortKey === key ? (
-      <span className="ml-1 text-xs">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>
-    ) : null
+  const pagination = useTablePagination(sorted, PAGE_SIZE, [search, sortKey, sortDir])
+  const { pagedItems: pagedPools } = pagination
 
   const MOBILE_ROLE_STYLES: Record<PoolRole, string> = {
     input: 'border-l-2 border-l-error bg-error/10',
@@ -109,31 +90,25 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
         <table className="table table-sm w-full">
           <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
             <tr>
-              <th className="cursor-pointer select-none" onClick={() => toggleSort('symbol')}>
-                Asset{sortArrow('symbol')}
-              </th>
-              <th className="cursor-pointer select-none" onClick={() => toggleSort('depositApr')}>
-                Deposit APR{sortArrow('depositApr')}
-              </th>
-              <th className="cursor-pointer select-none" onClick={() => toggleSort('borrowApr')}>
-                Borrow APR{sortArrow('borrowApr')}
-              </th>
+              <SortableHeader sortKey="symbol" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort}>
+                Asset
+              </SortableHeader>
+              <SortableHeader sortKey="depositApr" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort}>
+                Deposit APR
+              </SortableHeader>
+              <SortableHeader sortKey="borrowApr" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort}>
+                Borrow APR
+              </SortableHeader>
               <th>LTV</th>
-              <th
-                className="cursor-pointer select-none"
-                onClick={() => toggleSort('totalDepositsUSD')}
-              >
-                Total Deposits{sortArrow('totalDepositsUSD')}
-              </th>
-              <th className="cursor-pointer select-none" onClick={() => toggleSort('totalDebtUSD')}>
-                Total Borrows{sortArrow('totalDebtUSD')}
-              </th>
-              <th
-                className="cursor-pointer select-none"
-                onClick={() => toggleSort('totalLiquidityUSD')}
-              >
-                Liquidity{sortArrow('totalLiquidityUSD')}
-              </th>
+              <SortableHeader sortKey="totalDepositsUSD" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort}>
+                Total Deposits
+              </SortableHeader>
+              <SortableHeader sortKey="totalDebtUSD" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort}>
+                Total Borrows
+              </SortableHeader>
+              <SortableHeader sortKey="totalLiquidityUSD" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort}>
+                Liquidity
+              </SortableHeader>
               <th>Risk</th>
             </tr>
           </thead>
@@ -263,11 +238,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
               )
             })}
             {pagedPools.length === 0 && (
-              <tr>
-                <td colSpan={8} className="text-center py-6 text-sm text-base-content/60">
-                  No pools match your search.
-                </td>
-              </tr>
+              <TableEmptyRow colSpan={8}>No pools match your search.</TableEmptyRow>
             )}
           </tbody>
         </table>
@@ -390,35 +361,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between px-3 py-2 border-t border-base-300 text-xs text-base-content/60">
-          <span>
-            {page * PAGE_SIZE + 1}&ndash;{Math.min((page + 1) * PAGE_SIZE, sorted.length)} of{' '}
-            {sorted.length}
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              className="btn btn-xs btn-ghost"
-              disabled={page === 0}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              &lsaquo;
-            </button>
-            <span>
-              {page + 1} / {totalPages}
-            </span>
-            <button
-              type="button"
-              className="btn btn-xs btn-ghost"
-              disabled={page >= totalPages - 1}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              &rsaquo;
-            </button>
-          </div>
-        </div>
-      )}
+      <TablePagination pagination={pagination} totalItems={sorted.length} itemNoun="pools" />
     </div>
   )
 }

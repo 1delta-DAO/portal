@@ -3,8 +3,8 @@ import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
-import { formatTokenAmount, formatUsd, parseAmount, sanitizeAmountInput } from './format'
-import { AmountQuickButtons } from './AmountQuickButtons'
+import { formatTokenAmount, formatUsd, parseAmount } from './format'
+import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
 import { lenderSupportsSubAccounts } from './helpers'
@@ -154,27 +154,13 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
       )}
 
       {/* Amount input */}
-      <div className="form-control">
-        <div className="flex justify-between items-center mb-1">
-          <span className="label-text text-xs">Amount</span>
-          <AmountQuickButtons maxAmount={borrowableStr} onSelect={(val) => setAmount(val)} />
-        </div>
-        <input
-          type="text"
-          inputMode="decimal"
-          className="input input-bordered input-sm w-full"
-          placeholder="0.0"
-          value={amount}
-          onChange={(e) => { const v = sanitizeAmountInput(e.target.value); if (v !== null) setAmount(v) }}
-          disabled={!pool}
-        />
-      </div>
-
-      {overMax && (
-        <div className="text-[10px] text-error">
-          Exceeds borrowable amount ({formatTokenAmount(borrowableStr)}).
-        </div>
-      )}
+      <AmountInput
+        value={amount}
+        onChange={setAmount}
+        maxAmount={borrowableStr}
+        disabled={!pool}
+        error={overMax ? `Exceeds borrowable amount (${formatTokenAmount(borrowableStr)}).` : null}
+      />
 
       {error && <div className="text-error text-xs wrap-break-word">{error}</div>}
 

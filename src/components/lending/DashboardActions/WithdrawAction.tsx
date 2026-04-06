@@ -3,8 +3,8 @@ import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
-import { formatTokenAmount, formatUsd, parseAmount, sanitizeAmountInput } from './format'
-import { AmountQuickButtons } from './AmountQuickButtons'
+import { formatTokenAmount, formatUsd, parseAmount } from './format'
+import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
 import { lenderSupportsSubAccounts } from './helpers'
@@ -77,16 +77,17 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
   const depositsStr = String(userPosition?.deposits ?? '0')
   const overMax = !isAll && parseAmount(withdrawableStr) > 0 && parseAmount(amount) > parseAmount(withdrawableStr) + 1e-9
 
-  const handleQuickSelect = (val: string) => {
+  // Any user input (typing or 25/50/75 presets) clears the isAll flag.
+  const handleAmountChange = (val: string) => {
     setIsAll(false)
     setAmount(val)
   }
 
-  const handleIsAllChange = (checked: boolean) => {
-    setIsAll(checked)
-    if (checked && parseAmount(withdrawableStr) > 0) {
-      setAmount(withdrawableStr)
-    }
+  // The "Max" preset is special: it sets isAll=true (so the backend repays
+  // the full position via the dedicated isAll flag, not a fixed amount).
+  const handleMaxClick = () => {
+    setIsAll(true)
+    if (parseAmount(withdrawableStr) > 0) setAmount(withdrawableStr)
   }
 
   if (txSuccess) {
@@ -139,36 +140,14 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
       )}
 
       {/* Amount input with quick buttons */}
-      <div className="form-control">
-        <div className="flex justify-between items-center mb-1">
-          <span className="label-text text-xs">Amount</span>
-          <AmountQuickButtons
-            maxAmount={withdrawableStr}
-            onSelect={handleQuickSelect}
-            onMax={() => handleIsAllChange(true)}
-          />
-        </div>
-        <input
-          type="text"
-          inputMode="decimal"
-          className="input input-bordered input-sm w-full"
-          placeholder="0.0"
-          value={amount}
-          onChange={(e) => {
-            const v = sanitizeAmountInput(e.target.value)
-            if (v === null) return
-            setIsAll(false)
-            setAmount(v)
-          }}
-          disabled={!pool}
-        />
-      </div>
-
-      {overMax && (
-        <div className="text-[10px] text-error">
-          Exceeds withdrawable balance ({formatTokenAmount(withdrawableStr)}).
-        </div>
-      )}
+      <AmountInput
+        value={amount}
+        onChange={handleAmountChange}
+        maxAmount={withdrawableStr}
+        onMaxClick={handleMaxClick}
+        disabled={!pool}
+        error={overMax ? `Exceeds withdrawable balance (${formatTokenAmount(withdrawableStr)}).` : null}
+      />
 
       {error && <div className="text-error text-xs wrap-break-word">{error}</div>}
 

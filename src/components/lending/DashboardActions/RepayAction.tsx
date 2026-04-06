@@ -3,8 +3,8 @@ import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
-import { formatTokenAmount, formatUsd, parseAmount, sanitizeAmountInput, addAmountStrings, minAmountString, compareAmountStrings } from './format'
-import { AmountQuickButtons } from './AmountQuickButtons'
+import { formatTokenAmount, formatUsd, parseAmount, addAmountStrings, minAmountString, compareAmountStrings } from './format'
+import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
 import { lenderSupportsSubAccounts } from './helpers'
@@ -92,17 +92,27 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   const overDebt = !isAll && hasDebt && compareAmountStrings(amount || '0', debtStr) > 0
   const overMax = overWallet || overDebt
 
-  const handleQuickSelect = (val: string) => {
+  // Any user input (typing or 25/50/75 presets) clears the isAll flag.
+  const handleAmountChange = (val: string) => {
     setIsAll(false)
     setAmount(val)
   }
 
-  const handleIsAllChange = (checked: boolean) => {
-    setIsAll(checked)
-    if (checked && compareAmountStrings(repayMaxStr, '0') > 0) {
-      setAmount(repayMaxStr)
-    }
+  // The "Max" preset flips isAll=true so the backend repays the full debt
+  // via the dedicated isAll flag instead of a snapshot amount.
+  const handleMaxClick = () => {
+    setIsAll(true)
+    if (compareAmountStrings(repayMaxStr, '0') > 0) setAmount(repayMaxStr)
   }
+
+  // Repay shows two mutually-exclusive errors: wallet-overflow takes
+  // precedence over debt-overflow. Pick whichever is active for AmountInput.
+  const amountErrorMessage = (() => {
+    if (isAll) return null
+    if (overWallet) return `Exceeds wallet balance (${formatTokenAmount(activeBalStr)}).`
+    if (overDebt) return `Exceeds outstanding debt (${formatTokenAmount(debtTotal)}).`
+    return null
+  })()
 
   if (txSuccess) {
     return (
@@ -174,41 +184,14 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
       )}
 
       {/* Amount input with quick buttons */}
-      <div className="form-control">
-        <div className="flex justify-between items-center mb-1">
-          <span className="label-text text-xs">Amount</span>
-          <AmountQuickButtons
-            maxAmount={repayMaxStr}
-            onSelect={handleQuickSelect}
-            onMax={() => handleIsAllChange(true)}
-          />
-        </div>
-        <input
-          type="text"
-          inputMode="decimal"
-          className="input input-bordered input-sm w-full"
-          placeholder="0.0"
-          value={amount}
-          onChange={(e) => {
-            const v = sanitizeAmountInput(e.target.value)
-            if (v === null) return
-            setIsAll(false)
-            setAmount(v)
-          }}
-          disabled={!pool}
-        />
-      </div>
-
-      {overWallet && !isAll && (
-        <div className="text-[10px] text-error">
-          Exceeds wallet balance ({formatTokenAmount(activeBalStr)}).
-        </div>
-      )}
-      {overDebt && !overWallet && !isAll && (
-        <div className="text-[10px] text-error">
-          Exceeds outstanding debt ({formatTokenAmount(debtTotal)}).
-        </div>
-      )}
+      <AmountInput
+        value={amount}
+        onChange={handleAmountChange}
+        maxAmount={repayMaxStr}
+        onMaxClick={handleMaxClick}
+        disabled={!pool}
+        error={amountErrorMessage}
+      />
 
       {error && <div className="text-error text-xs wrap-break-word">{error}</div>}
 

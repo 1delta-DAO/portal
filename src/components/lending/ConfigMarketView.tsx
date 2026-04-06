@@ -9,6 +9,9 @@ import type { TableHighlight, PoolRole } from './TradingDashboard/types'
 import { abbreviateUsd, abbreviateNumber, formatUsd, formatTokenAmount } from '../../utils/format'
 import { AssetPopover } from './AssetPopover'
 import { RiskBadge } from './RiskBadge'
+import { useTablePagination } from '../../hooks/useTablePagination'
+import { TablePagination } from '../common/TablePagination'
+import { EmptyState } from '../common/EmptyState'
 
 interface Props {
   configGroups: PoolConfigGroup[]
@@ -59,7 +62,6 @@ export const ConfigMarketView: React.FC<Props> = ({
   userActiveCategory,
 }) => {
   const [internalConfigId, setInternalConfigId] = useState<string | null>(null)
-  const [page, setPage] = useState(0)
   const [configFilter, setConfigFilter] = useState('')
 
   // Use controlled or internal state
@@ -99,17 +101,9 @@ export const ConfigMarketView: React.FC<Props> = ({
     })
   }, [configGroups, userActiveCategory, configFilter])
 
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(sortedGroups.length / PAGE_SIZE))
-  const pagedGroups = useMemo(
-    () => sortedGroups.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
-    [sortedGroups, page]
-  )
-
-  // Reset page when groups or filter change
-  React.useEffect(() => {
-    setPage(0)
-  }, [configGroups.length, configFilter])
+  // Pagination — auto-resets on filter / group-count change
+  const configPagination = useTablePagination(sortedGroups, PAGE_SIZE, [configFilter])
+  const { pagedItems: pagedGroups } = configPagination
 
   // Auto-select first config
   React.useEffect(() => {
@@ -154,8 +148,8 @@ export const ConfigMarketView: React.FC<Props> = ({
 
   if (configGroups.length === 0) {
     return (
-      <div className="rounded-box border border-base-300 p-6 text-center text-sm text-base-content/60">
-        No config data available for this lender.
+      <div className="rounded-box border border-base-300 p-6">
+        <EmptyState title="No config data available for this lender." />
       </div>
     )
   }
@@ -177,7 +171,7 @@ export const ConfigMarketView: React.FC<Props> = ({
           </div>
         )}
         {sortedGroups.length === 0 ? (
-          <div className="p-4 text-center text-xs text-base-content/40">No matching configs</div>
+          <EmptyState size="sm" title="No matching configs" />
         ) : (
           <>
             {/* Desktop table */}
@@ -288,31 +282,7 @@ export const ConfigMarketView: React.FC<Props> = ({
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-3 py-2 border-t border-base-300 bg-base-200/30">
-                <span className="text-xs text-base-content/50">
-                  {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, sortedGroups.length)} of {sortedGroups.length}
-                </span>
-                <div className="join">
-                  <button
-                    type="button"
-                    className="join-item btn btn-xs btn-ghost"
-                    disabled={page === 0}
-                    onClick={() => setPage((p) => p - 1)}
-                  >
-                    «
-                  </button>
-                  <button
-                    type="button"
-                    className="join-item btn btn-xs btn-ghost"
-                    disabled={page >= totalPages - 1}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    »
-                  </button>
-                </div>
-              </div>
-            )}
+            <TablePagination pagination={configPagination} totalItems={sortedGroups.length} />
           </>
         )}
       </div>
@@ -448,11 +418,7 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
   }, [items, type, filter])
 
   if (!items || items.length === 0) {
-    return (
-      <div className="p-4 text-center text-xs text-base-content/40">
-        None
-      </div>
-    )
+    return <EmptyState size="sm" title="None" />
   }
 
   return (
@@ -471,9 +437,7 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
       )}
 
       {sorted.length === 0 ? (
-        <div className="p-4 text-center text-xs text-base-content/40">
-          No matches
-        </div>
+        <EmptyState size="sm" title="No matches" />
       ) : (
       <>
       {/* Desktop table */}

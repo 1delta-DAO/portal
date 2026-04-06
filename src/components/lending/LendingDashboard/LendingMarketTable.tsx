@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React from 'react'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry } from '../../../hooks/lending/useUserData'
 import {
@@ -10,6 +10,10 @@ import {
 import { type SortKey, LtvBadge } from '../Dashboard'
 import { AssetPopover } from '../AssetPopover'
 import { RiskBadge } from '../RiskBadge'
+import { useTablePagination } from '../../../hooks/useTablePagination'
+import { SortableHeader } from '../../common/SortableHeader'
+import { TableEmptyRow } from '../../common/TableEmptyRow'
+import { TablePagination } from '../../common/TablePagination'
 
 const PAGE_SIZE = 25
 
@@ -36,22 +40,8 @@ export const LendingMarketTable: React.FC<Props> = ({
   sortDir,
   onToggleSort,
 }) => {
-  const [page, setPage] = useState(0)
-
-  // Reset to first page when search/sort changes
-  const poolCount = pools.length
-  React.useEffect(() => setPage(0), [assetSearch, sortKey, sortDir, poolCount])
-
-  const totalPages = Math.max(1, Math.ceil(pools.length / PAGE_SIZE))
-  const pagedPools = useMemo(
-    () => pools.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
-    [pools, page]
-  )
-
-  const sortArrow = (key: SortKey) =>
-    sortKey === key ? (
-      <span className="ml-1 text-xs">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>
-    ) : null
+  const pagination = useTablePagination(pools, PAGE_SIZE, [assetSearch, sortKey, sortDir])
+  const { pagedItems: pagedPools } = pagination
 
   return (
     <div className="rounded-box border border-base-300 overflow-hidden">
@@ -77,34 +67,25 @@ export const LendingMarketTable: React.FC<Props> = ({
         <table className="table table-sm w-full">
           <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
             <tr>
-              <th className="cursor-pointer select-none" onClick={() => onToggleSort('symbol')}>
-                Asset{sortArrow('symbol')}
-              </th>
-              <th className="cursor-pointer select-none" onClick={() => onToggleSort('depositApr')}>
-                Deposit APR{sortArrow('depositApr')}
-              </th>
-              <th className="cursor-pointer select-none" onClick={() => onToggleSort('borrowApr')}>
-                Borrow APR{sortArrow('borrowApr')}
-              </th>
+              <SortableHeader sortKey="symbol" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort}>
+                Asset
+              </SortableHeader>
+              <SortableHeader sortKey="depositApr" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort}>
+                Deposit APR
+              </SortableHeader>
+              <SortableHeader sortKey="borrowApr" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort}>
+                Borrow APR
+              </SortableHeader>
               <th>LTV</th>
-              <th
-                className="cursor-pointer select-none"
-                onClick={() => onToggleSort('totalDepositsUSD')}
-              >
-                Total Deposits{sortArrow('totalDepositsUSD')}
-              </th>
-              <th
-                className="cursor-pointer select-none"
-                onClick={() => onToggleSort('totalDebtUSD')}
-              >
-                Total Borrows{sortArrow('totalDebtUSD')}
-              </th>
-              <th
-                className="cursor-pointer select-none"
-                onClick={() => onToggleSort('totalLiquidityUSD')}
-              >
-                Liquidity{sortArrow('totalLiquidityUSD')}
-              </th>
+              <SortableHeader sortKey="totalDepositsUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort}>
+                Total Deposits
+              </SortableHeader>
+              <SortableHeader sortKey="totalDebtUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort}>
+                Total Borrows
+              </SortableHeader>
+              <SortableHeader sortKey="totalLiquidityUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort}>
+                Liquidity
+              </SortableHeader>
               <th>Risk</th>
             </tr>
           </thead>
@@ -247,11 +228,7 @@ export const LendingMarketTable: React.FC<Props> = ({
               )
             })}
             {pagedPools.length === 0 && (
-              <tr>
-                <td colSpan={8} className="text-center py-6 text-sm text-base-content/60">
-                  No pools match your search.
-                </td>
-              </tr>
+              <TableEmptyRow colSpan={8}>No pools match your search.</TableEmptyRow>
             )}
           </tbody>
         </table>
@@ -269,35 +246,7 @@ export const LendingMarketTable: React.FC<Props> = ({
       />
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between px-3 py-2 border-t border-base-300 text-xs text-base-content/60">
-          <span>
-            {page * PAGE_SIZE + 1}&ndash;{Math.min((page + 1) * PAGE_SIZE, pools.length)} of{' '}
-            {pools.length}
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              className="btn btn-xs btn-ghost"
-              disabled={page === 0}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              &lsaquo;
-            </button>
-            <span>
-              {page + 1} / {totalPages}
-            </span>
-            <button
-              type="button"
-              className="btn btn-xs btn-ghost"
-              disabled={page >= totalPages - 1}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              &rsaquo;
-            </button>
-          </div>
-        </div>
-      )}
+      <TablePagination pagination={pagination} totalItems={pools.length} itemNoun="pools" />
     </div>
   )
 }

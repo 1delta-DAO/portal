@@ -8,6 +8,7 @@ import { ExposureCell } from './ExposureCell'
 import { AssetPopover } from '../AssetPopover'
 import { RiskBadge } from '../RiskBadge'
 import { buildPath } from '../../../utils/routes'
+import { TableEmptyRow } from '../../common/TableEmptyRow'
 
 /** Compact radial utilization indicator */
 const UtilCircle: React.FC<{ pct: number }> = ({ pct }) => {
@@ -272,11 +273,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
             })}
 
             {totalItems === 0 && (
-              <tr>
-                <td colSpan={8} className="text-center py-6 text-sm">
-                  No pools match your filters.
-                </td>
-              </tr>
+              <TableEmptyRow colSpan={8}>No pools match your filters.</TableEmptyRow>
             )}
           </tbody>
         </table>
