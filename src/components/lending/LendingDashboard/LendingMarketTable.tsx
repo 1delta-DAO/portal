@@ -70,21 +70,21 @@ export const LendingMarketTable: React.FC<Props> = ({
               <SortableHeader sortKey="symbol" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort}>
                 Asset
               </SortableHeader>
-              <SortableHeader sortKey="depositApr" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort}>
-                Deposit APR
+              <SortableHeader sortKey="depositApr" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Deposit APR">
+                Dep APR
               </SortableHeader>
-              <SortableHeader sortKey="borrowApr" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort}>
-                Borrow APR
+              <SortableHeader sortKey="borrowApr" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Borrow APR">
+                Bor APR
               </SortableHeader>
               <th>LTV</th>
-              <SortableHeader sortKey="totalDepositsUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort}>
-                Total Deposits
+              <SortableHeader sortKey="totalDepositsUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Total Deposits">
+                Deposits
               </SortableHeader>
-              <SortableHeader sortKey="totalDebtUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort}>
-                Total Borrows
+              <SortableHeader sortKey="totalDebtUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Total Borrows">
+                Borrows
               </SortableHeader>
-              <SortableHeader sortKey="totalLiquidityUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort}>
-                Liquidity
+              <SortableHeader sortKey="totalLiquidityUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Liquidity">
+                Liq.
               </SortableHeader>
               <th>Risk</th>
             </tr>
