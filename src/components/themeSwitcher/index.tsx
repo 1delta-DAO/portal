@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useIsMobile } from '../../hooks/useIsMobile'
 
 const THEMES = [
+  'bloomberg',
+  'graphite',
   'terminal',
   'nebula',
   'mars',
@@ -32,8 +34,10 @@ const THEMES = [
   'business',
 ] as const
 
+const DEFAULT_THEME = 'bloomberg'
+
 export function ThemeSwitcher() {
-  const [theme, setTheme] = useState<string>('autumn')
+  const [theme, setTheme] = useState<string>(DEFAULT_THEME)
   const [showModal, setShowModal] = useState(false)
   const isMobile = useIsMobile()
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -44,7 +48,7 @@ export function ThemeSwitcher() {
     if (typeof window === 'undefined') return
 
     const stored = window.localStorage.getItem('theme')
-    const initial = stored && THEMES.includes(stored as any) ? stored : 'synthwave'
+    const initial = stored && THEMES.includes(stored as any) ? stored : DEFAULT_THEME
 
     setTheme(initial)
     document.documentElement.setAttribute('data-theme', initial)
