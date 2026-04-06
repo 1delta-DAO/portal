@@ -18,15 +18,24 @@ debt swap, close), see
 
 ## Action forms
 
+All four forms render the amount input via the shared
+[`AmountInput`](../../common/AmountInput.tsx) primitive (label +
+presets + decimal input + error row). Withdraw and Repay pass an
+`onMaxClick` callback so the **Max** preset flips an `isAll` flag in
+the parent instead of just filling the field; Repay also computes its
+dual-error message in the parent (wallet-overflow takes precedence
+over debt-overflow).
+
 - [DepositAction.tsx](DepositAction.tsx) — Deposit form with native
   token selector, sub-account routing, HF projection and success
   modal.
 - [WithdrawAction.tsx](WithdrawAction.tsx) — Withdraw form with
-  max-amount calculation and sub-account selector.
+  `isAll` flow and sub-account selector.
 - [BorrowAction.tsx](BorrowAction.tsx) — Borrow form with HF
   projection and rate impact display.
 - [RepayAction.tsx](RepayAction.tsx) — Repay form with
-  max-repay calculation and native token selector.
+  `isAll` flow, native token selector, and dual wallet/debt
+  overflow validation.
 
 ## Shared building blocks
 
@@ -45,7 +54,10 @@ debt swap, close), see
 - [NativeCurrencySelector.tsx](NativeCurrencySelector.tsx) — Toggle
   between native and wrapped token (e.g. ETH ↔ WETH).
 - [AmountQuickButtons.tsx](AmountQuickButtons.tsx) — 25 / 50 / 75 /
-  Max quick-fill buttons for amount inputs.
+  Max quick-fill buttons. Wrapped by
+  [`AmountInput`](../../common/AmountInput.tsx) for the four basic
+  forms; still used directly by the trading-action forms in
+  [../TradingDashboard/actions/](../TradingDashboard/actions/).
 - [TransactionSuccess.tsx](TransactionSuccess.tsx) — Success banner
   with action label, amount and tx hash.
 

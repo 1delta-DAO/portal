@@ -26,6 +26,13 @@ filters, and composes the sub-dashboards:
 - [Dashboard/](Dashboard/) — Small shared utilities (LTV badge, pool
   sorting/filtering helpers) reused across dashboards.
 
+App-wide reusable primitives (empty/error states, modal headers, badges,
+the `AmountInput` form block, the table sort/empty/pagination helpers
+used by the markets tables) live in
+[../common/](../common/) — see [../common/README.md](../common/README.md).
+The matching table hooks live in [../../hooks/](../../hooks/)
+(`useTableSort`, `useTablePagination`).
+
 ## Top-level files
 
 These are reusable widgets and view fragments shared by the

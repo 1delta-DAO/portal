@@ -27,6 +27,8 @@ Utility hooks (not in the reference tables below):
 - [useIsMobile.ts](useIsMobile.ts) — Viewport-based mobile detection.
 - [useSyncChain.ts](useSyncChain.ts) — Keeps the connected wallet chain in sync with the app's selected chain.
 - [usePersistedFilters.ts](usePersistedFilters.ts) — Persists user filter selections (chain, lender, risk, etc.) across reloads.
+- [useTableSort.ts](useTableSort.ts) — Generic, domain-agnostic sort key/dir state for tables. Standard "click same key flips direction, new key resets to defaultDir" semantics. Pairs with `<SortableHeader>` in [components/common/](../components/common/).
+- [useTablePagination.ts](useTablePagination.ts) — Generic pagination state: slices an input array, auto-resets on items.length / `resetDeps` change, clamps when items shrink. Pairs with `<TablePagination>` in [components/common/](../components/common/).
 
 ---
 
