@@ -5,6 +5,8 @@ import { formatUsd, abbreviateUsd, formatTokenAmount } from '../../utils/format'
 import { AssetPopover } from './AssetPopover'
 import { EModeBadge } from './EModeAnalysisModal'
 import { CollateralToggle } from './UserTable'
+import { HealthBadge } from '../common/HealthBadge'
+import { EmptyState } from '../common/EmptyState'
 
 export interface PositionSummary {
   deposits: number
@@ -51,18 +53,18 @@ export function YourPositions({
     <div className="rounded-box border border-base-300 p-4 space-y-3">
       <h3 className="text-sm font-semibold">Your Positions</h3>
 
+      {subAccounts.length === 0 && (
+        <EmptyState
+          size="sm"
+          title="No positions yet"
+          description="Deposit or borrow on a market to see your positions here."
+        />
+      )}
+
       {/* Sub-account chips */}
       <div className="flex flex-wrap gap-2">
         {subAccounts.map((sub, i) => {
           const isActive = sub.accountId === selectedSubAccountId
-          const healthBadge =
-            sub.health != null
-              ? sub.health < 1.1
-                ? 'badge-error'
-                : sub.health < 1.3
-                  ? 'badge-warning'
-                  : 'badge-success'
-              : null
 
           return (
             <button
@@ -79,11 +81,7 @@ export function YourPositions({
               <span className="text-base-content/70" title={`Deposits: $${formatUsd(sub.balanceData.deposits)} | Debt: $${formatUsd(sub.balanceData.debt)} | NAV: $${formatUsd(sub.balanceData.nav)}`}>
                 NAV: <span className="font-medium">{abbreviateUsd(sub.balanceData.nav)}</span>
               </span>
-              {healthBadge && (
-                <span className={`badge badge-xs font-semibold ${healthBadge}`}>
-                  {sub.health!.toFixed(2)}
-                </span>
-              )}
+              {sub.health != null && <HealthBadge health={sub.health} size="xs" />}
               {selectedLender && (
                 <EModeBadge
                   subAccount={sub}
@@ -122,17 +120,7 @@ export function YourPositions({
           {summary.health != null && (
             <div className="flex items-center gap-1">
               <span>Health:</span>
-              <span
-                className={`badge badge-sm font-semibold ${
-                  summary.health < 1.1
-                    ? 'badge-error'
-                    : summary.health < 1.3
-                      ? 'badge-warning'
-                      : 'badge-success'
-                }`}
-              >
-                {summary.health.toFixed(2)}
-              </span>
+              <HealthBadge health={summary.health} />
             </div>
           )}
         </div>

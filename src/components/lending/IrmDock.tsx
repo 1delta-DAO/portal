@@ -8,6 +8,7 @@ import React, {
 import { createPortal } from 'react-dom'
 import { useIrmData } from '../../hooks/lending/useIrmData'
 import { IrmCurveChart } from './IrmChart'
+import { EmptyState } from '../common/EmptyState'
 
 // Resolved at render time from the active DaisyUI theme so legend swatches
 // and stat numbers re-color on theme switch instead of staying neon.
@@ -128,28 +129,32 @@ function IrmDockedPanel({
         )}
 
         {error && (
-          <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-base-content/20" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <p className="text-sm text-base-content/40">IRM data unavailable</p>
-            <p className="text-[10px] text-base-content/25">No curve data returned for this market</p>
-          </div>
+          <EmptyState
+            title="IRM data unavailable"
+            description="No curve data returned for this market"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-full h-full"
+                fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            }
+          />
         )}
 
         {!isLoading && !error && data === null && (
-          <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-base-content/20" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 3l18 18M10.5 10.677A2 2 0 0113.5 12.5" />
-              <path d="M17 17H3V7a4 4 0 011.173-2.826M7 7h10v6" />
-            </svg>
-            <p className="text-sm text-base-content/40">No data available</p>
-            <p className="text-[10px] text-base-content/25">This market has no IRM curve</p>
-          </div>
+          <EmptyState
+            title="No data available"
+            description="This market has no IRM curve"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-full h-full"
+                fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3l18 18M10.5 10.677A2 2 0 0113.5 12.5" />
+                <path d="M17 17H3V7a4 4 0 011.173-2.826M7 7h10v6" />
+              </svg>
+            }
+          />
         )}
 
         {data && (

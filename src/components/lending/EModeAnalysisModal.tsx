@@ -9,6 +9,9 @@ import {
   type EModeCategory,
   type EModeAnalysisEntry,
 } from '../../sdk/lending-helper/fetchEMode'
+import { ModalHeader } from '../common/ModalHeader'
+import { ErrorAlert } from '../common/ErrorAlert'
+import { EmptyState } from '../common/EmptyState'
 
 // ============================================================================
 // Mode Button — shows current borrow mode, opens the analysis modal on click
@@ -230,34 +233,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-base-300">
-          <h3
-            className="font-semibold text-sm"
-            title="Borrow mode — defines collateral and debt parameters"
-          >
-            Mode Options
-          </h3>
-          <button
-            type="button"
-            className="btn btn-ghost btn-xs btn-circle"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-3.5 h-3.5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
+        <ModalHeader title="Mode Options" onClose={onClose} />
 
         {/* Content */}
         <div className="overflow-y-auto p-4 space-y-3">
@@ -284,11 +260,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
           )}
 
           {/* Switch error banner */}
-          {switchError && (
-            <div className="alert alert-error text-xs py-2">
-              <span>{switchError}</span>
-            </div>
-          )}
+          <ErrorAlert error={switchError} title="Switch failed" />
 
           {loading && (
             <div className="flex justify-center py-8">
@@ -296,16 +268,13 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
             </div>
           )}
 
-          {error && (
-            <div className="alert alert-error text-xs">
-              <span>{error}</span>
-            </div>
-          )}
+          <ErrorAlert error={error} />
 
           {!loading && !error && categories.length <= 1 && (
-            <div className="text-sm text-base-content/60 text-center py-4">
-              No additional borrow modes available for this lender.
-            </div>
+            <EmptyState
+              size="sm"
+              title="No additional borrow modes available for this lender."
+            />
           )}
 
           {!loading && !error && categories.length > 1 && (

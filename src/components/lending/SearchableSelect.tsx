@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useIsMobile } from '../../hooks/useIsMobile'
+import { EmptyState } from '../common/EmptyState'
 
 export interface SearchableSelectOption {
   value: string
@@ -126,11 +127,7 @@ export function SearchableSelect({
                     <span className="truncate" title={opt.label}>{opt.label}</span>
                   </button>
                 ))}
-                {filtered.length === 0 && (
-                  <div className="px-3 py-2 text-xs text-base-content/50 text-center">
-                    No matches
-                  </div>
-                )}
+                {filtered.length === 0 && <EmptyState size="sm" title="No matches" />}
               </div>
 
               <div className="modal-action">
@@ -220,8 +217,8 @@ export function SearchableSelect({
               </li>
             ))}
             {filtered.length === 0 && (
-              <li className="px-3 py-2 text-xs text-base-content/50 text-center">
-                No matches
+              <li>
+                <EmptyState size="sm" title="No matches" />
               </li>
             )}
           </ul>

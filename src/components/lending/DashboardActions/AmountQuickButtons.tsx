@@ -1,5 +1,6 @@
 import React from 'react'
 import { multiplyAmountString } from './format'
+import { PresetButton } from '../../common/PresetButton'
 
 interface AmountQuickButtonsProps {
   maxAmount: string
@@ -28,10 +29,8 @@ export const AmountQuickButtons: React.FC<AmountQuickButtonsProps> = ({
   return (
     <div className="flex items-center gap-1">
       {entries.map((e) => (
-        <button
+        <PresetButton
           key={e.label}
-          type="button"
-          className="btn btn-ghost btn-xs px-1.5 py-0 h-5 min-h-0 text-[10px]"
           onClick={() => {
             if (e.fraction === 1) {
               onMax ? onMax() : onSelect(maxAmount)
@@ -41,7 +40,7 @@ export const AmountQuickButtons: React.FC<AmountQuickButtonsProps> = ({
           }}
         >
           {e.label}
-        </button>
+        </PresetButton>
       ))}
     </div>
   )

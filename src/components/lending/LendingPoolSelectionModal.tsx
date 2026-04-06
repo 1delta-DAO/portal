@@ -4,6 +4,8 @@ import { List } from 'react-window'
 import type { RawCurrency } from '../../types/currency'
 import { FlattenedPoolWithUserData } from '../../hooks/lending/prepareMixedData'
 import { ValuePill } from './Pill'
+import { ModalHeader } from '../common/ModalHeader'
+import { EmptyState } from '../common/EmptyState'
 
 interface LendingPoolSelectionModalProps {
   open: boolean
@@ -307,29 +309,7 @@ export const LendingPoolSelectionModal: React.FC<LendingPoolSelectionModalProps>
 
       {/* modal */}
       <div className="relative z-50 bg-base-100 rounded-box shadow-lg w-full max-w-2xl max-h-[80vh] flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-base-300">
-          <h3 className="font-semibold text-sm">Select Lending Market</h3>
-          <button
-            type="button"
-            className="btn btn-ghost btn-xs btn-circle"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-3.5 h-3.5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
+        <ModalHeader title="Select Lending Market" onClose={onClose} />
 
         {/* Search controls */}
         <div className="px-4 py-3 border-b border-base-300 space-y-2">
@@ -396,9 +376,10 @@ export const LendingPoolSelectionModal: React.FC<LendingPoolSelectionModalProps>
         {/* List */}
         <div className="overflow-y-auto py-2">
           {filtered.length === 0 && (
-            <div className="px-4 py-6 text-sm text-base-content/70">
-              No pools match your filters.
-            </div>
+            <EmptyState
+              title="No pools match your filters"
+              description="Try clearing the asset, lender, or pool id search."
+            />
           )}
 
           {filtered.length > 0 && (

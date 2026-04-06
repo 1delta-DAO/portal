@@ -13,6 +13,7 @@ import { useTokenLists } from '../../hooks/useTokenLists'
 import { abbreviateUsd } from '../../utils/format'
 import { fetchCollateralToggle } from '../../sdk/lending-helper/fetchLendingAction'
 import { useIsMobile } from '../../hooks/useIsMobile'
+import { HealthBadge } from '../common/HealthBadge'
 
 interface UserLenderPositionsTableProps {
   account?: string
@@ -183,19 +184,6 @@ const PositionsList: React.FC<{
         )
       })}
     </div>
-  )
-}
-
-function HealthBadge({ health }: { health: number | null }) {
-  if (health == null) return <span className="text-xs text-base-content/50">n/a</span>
-  return (
-    <span
-      className={`badge badge-sm ${
-        health < 1.1 ? 'badge-error' : health < 1.3 ? 'badge-warning' : 'badge-success'
-      }`}
-    >
-      {health.toFixed(2)}
-    </span>
   )
 }
 
