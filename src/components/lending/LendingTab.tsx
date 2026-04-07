@@ -1,5 +1,5 @@
 // src/components/LenderTab.tsx
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { useChains } from '../../hooks/useChains'
@@ -8,7 +8,7 @@ import { UserAssetsTable } from './UserAssetsTable'
 import { LendingPoolsTable } from './MarketsView'
 import { ChainFilterSelect } from './ChainFilter'
 import { useUserData } from '../../hooks/lending/useUserData'
-import { useMarginPublicData } from '../../hooks/lending/usePoolData'
+import { useMarginPublicData, useLenders } from '../../hooks/lending/usePoolData'
 import { useLendingBalances } from '../../hooks/lending/useLendingBalances'
 import { useTokenLists } from '../../hooks/useTokenLists'
 import { LendingDashboard } from './LendingDashboard'
@@ -64,7 +64,66 @@ export function LenderTab() {
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
 
   const chainsReady = !isChainsLoading
-  const { lenderData, lenderInfoMap, isPublicDataLoading } = useMarginPublicData(effectiveChainId, chainsReady)
+
+  // Light enumeration of lenders (key + name + tvlUsd) — drives the dropdown
+  // and tells useMarginPublicData which lender to fetch full data for.
+  const { lenders: lenderSummaries, isLendersLoading } = useLenders(
+    effectiveChainId,
+    chainsReady,
+  )
+
+  // Resolve the *active* lender for the heavy per-market fetch:
+  //   1. URL value if it exists in the current chain's enumeration
+  //   2. otherwise the first summary entry (already tvl-desc sorted by the server)
+  //   3. otherwise empty string → useMarginPublicData stays idle
+  //
+  // We deliberately don't keep this in component state. The URL is the source
+  // of truth, and `setSelectedLender` (defined above) writes to the URL —
+  // which re-renders us with a fresh `initialLender`. Keeping it derived
+  // avoids the previous "selection feedback loop" between local state and the
+  // URL sync effect that the old useLenderSelector had to work around.
+  const activeLender = useMemo(() => {
+    const summaryKeys = lenderSummaries?.map((l) => l.lenderInfo.key) ?? []
+    if (initialLender && summaryKeys.includes(initialLender)) return initialLender
+    return summaryKeys[0] ?? ''
+  }, [initialLender, lenderSummaries])
+
+  // When the URL has no lender (or has a stale one) and the summaries land,
+  // push the auto-selected lender into the URL exactly once per chain so the
+  // user can deep-link back to the same view. We guard with a ref to avoid
+  // overwriting a fresh user selection that's mid-flight as React batches.
+  const autoSelectedForChain = useRef<string | null>(null)
+  useEffect(() => {
+    if (!activeLender) return
+    if (initialLender === activeLender) return
+    // Only auto-write the URL if the URL is empty or holds a now-stale key.
+    const summaryKeys = lenderSummaries?.map((l) => l.lenderInfo.key) ?? []
+    const urlIsStale = !initialLender || !summaryKeys.includes(initialLender)
+    if (!urlIsStale) return
+    if (autoSelectedForChain.current === effectiveChainId) return
+    autoSelectedForChain.current = effectiveChainId
+    setSelectedLender(activeLender)
+  }, [activeLender, initialLender, lenderSummaries, effectiveChainId, setSelectedLender])
+
+  // Reset the auto-select guard whenever the chain changes so a new chain
+  // gets its own first-load auto-selection.
+  useEffect(() => {
+    autoSelectedForChain.current = null
+  }, [effectiveChainId])
+
+  // Heavy per-market data — now scoped to the SINGLE active lender. The
+  // `useMarginPublicData` hook still chunks internally (this just becomes
+  // one chunk of one), but the network round-trip drops from O(lenders)
+  // to O(1) per chain, which is the real efficiency win.
+  const lenderKeysToFetch = useMemo(
+    () => (activeLender ? [activeLender] : []),
+    [activeLender],
+  )
+  const { lenderData, lenderInfoMap, isPublicDataLoading } = useMarginPublicData(
+    effectiveChainId,
+    lenderKeysToFetch,
+    chainsReady,
+  )
   const { userData, isUserDataLoading, error, refetch } = useUserData({
     chainId: effectiveChainId,
     account,
@@ -77,7 +136,7 @@ export function LenderTab() {
     error: lendingBalancesError,
   } = useLendingBalances({ chainId: effectiveChainId, account, enabled: chainsReady })
 
-  const isLoading = isPublicDataLoading || isUserDataLoading
+  const isLoading = isLendersLoading || isPublicDataLoading || isUserDataLoading
 
   // Build external asset filter: single clicked asset takes precedence, then owned filter
   const externalAssetFilter = useMemo(() => {
@@ -212,6 +271,7 @@ export function LenderTab() {
 
       {activeTab === 'lending' && (
         <LendingDashboard
+          lenderSummaries={lenderSummaries}
           lenderData={lenderData}
           lenderInfoMap={lenderInfoMap}
           userData={userData}
@@ -219,13 +279,14 @@ export function LenderTab() {
           account={account}
           isPublicDataLoading={isPublicDataLoading}
           isUserDataLoading={isUserDataLoading}
-          initialLender={initialLender}
+          selectedLender={activeLender}
           onLenderChange={setSelectedLender}
         />
       )}
 
       {activeTab === 'trading' && (
         <TradingDashboard
+          lenderSummaries={lenderSummaries}
           lenderData={lenderData}
           lenderInfoMap={lenderInfoMap}
           userData={userData}
@@ -233,7 +294,7 @@ export function LenderTab() {
           account={account}
           isPublicDataLoading={isPublicDataLoading}
           isUserDataLoading={isUserDataLoading}
-          initialLender={initialLender}
+          selectedLender={activeLender}
           onLenderChange={setSelectedLender}
         />
       )}

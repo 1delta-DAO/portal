@@ -9,6 +9,10 @@ export interface SearchableSelectOption {
   indicator?: string
   /** Optional icon URL displayed before the label */
   icon?: string
+  /** Optional muted text shown at the right edge of the option (e.g. abbreviated TVL) */
+  trailing?: string
+  /** Optional title attribute for the trailing text (full-precision tooltip) */
+  trailingTitle?: string
 }
 
 interface SearchableSelectProps {
@@ -111,7 +115,7 @@ export function SearchableSelect({
                   <button
                     key={opt.value}
                     type="button"
-                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-1.5 min-w-0 ${
                       opt.value === value
                         ? 'bg-primary text-primary-content font-medium'
                         : 'bg-base-200 hover:bg-base-300'
@@ -119,12 +123,20 @@ export function SearchableSelect({
                     onClick={() => handleSelect(opt.value)}
                   >
                     {opt.icon && (
-                      <img src={opt.icon} alt="" className="w-4 h-4 rounded-full inline-block mr-1.5 align-middle token-logo" />
+                      <img src={opt.icon} alt="" className="w-4 h-4 rounded-full shrink-0 token-logo" />
                     )}
                     {opt.indicator && (
-                      <span className="opacity-60 text-xs mr-1">{opt.indicator}</span>
+                      <span className="opacity-60 text-xs shrink-0">{opt.indicator}</span>
                     )}
-                    <span className="truncate" title={opt.label}>{opt.label}</span>
+                    <span className="flex-1 min-w-0 truncate" title={opt.label}>{opt.label}</span>
+                    {opt.trailing && (
+                      <span
+                        className="shrink-0 ml-2 text-[10px] opacity-60 tabular-nums"
+                        title={opt.trailingTitle}
+                      >
+                        {opt.trailing}
+                      </span>
+                    )}
                   </button>
                 ))}
                 {filtered.length === 0 && <EmptyState size="sm" title="No matches" />}
@@ -212,7 +224,15 @@ export function SearchableSelect({
                   {opt.indicator && (
                     <span className="opacity-60 text-xs shrink-0">{opt.indicator}</span>
                   )}
-                  <span className="truncate" title={opt.label}>{opt.label}</span>
+                  <span className="flex-1 min-w-0 truncate" title={opt.label}>{opt.label}</span>
+                  {opt.trailing && (
+                    <span
+                      className="shrink-0 ml-2 text-[10px] text-base-content/50 tabular-nums"
+                      title={opt.trailingTitle}
+                    >
+                      {opt.trailing}
+                    </span>
+                  )}
                 </button>
               </li>
             ))}

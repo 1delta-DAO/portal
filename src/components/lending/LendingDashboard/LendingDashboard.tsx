@@ -1,7 +1,12 @@
 import React, { useMemo, useState } from 'react'
 import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
-import type { LenderData, LenderInfoMap, PoolDataItem } from '../../../hooks/lending/usePoolData'
+import type {
+  LenderData,
+  LenderInfoMap,
+  LenderSummary,
+  PoolDataItem,
+} from '../../../hooks/lending/usePoolData'
 import { usePoolConfigData } from '../../../hooks/lending/usePoolData'
 import { ConfigMarketView } from '../ConfigMarketView'
 import { RiskSelect } from '../RiskSelect'
@@ -23,6 +28,12 @@ import { ActionPanel, MobileActionModal } from './ActionPanel'
 import { usePersistedFilters } from '../../../hooks/usePersistedFilters'
 
 interface Props {
+  /**
+   * Lightweight per-lender summaries (drives the dropdown). Optional —
+   * `lenderData` is used as a fallback for the dropdown when summaries
+   * aren't passed in.
+   */
+  lenderSummaries?: LenderSummary[]
   lenderData: LenderData | undefined
   lenderInfoMap?: LenderInfoMap
   userData: UserDataResult
@@ -30,11 +41,16 @@ interface Props {
   account?: string
   isPublicDataLoading: boolean
   isUserDataLoading: boolean
-  initialLender?: string
-  onLenderChange?: (lender: string) => void
+  /**
+   * Controlled lender selection. Owned by `LendingTab` so the heavy
+   * `useMarginPublicData` fetch can be scoped to a single lender.
+   */
+  selectedLender: string
+  onLenderChange: (lender: string) => void
 }
 
 export function LendingDashboard({
+  lenderSummaries,
   lenderData,
   lenderInfoMap,
   userData,
@@ -42,21 +58,21 @@ export function LendingDashboard({
   account,
   isPublicDataLoading,
   isUserDataLoading,
-  initialLender,
+  selectedLender,
   onLenderChange,
 }: Props) {
   const { syncChain, currentChainId } = useSyncChain()
   const isWrongChain = !!account && currentChainId !== Number(chainId)
   const isMobile = useIsMobile()
 
-  // Lender selection (shared hook)
-  const { selectedLender, setSelectedLender, lenderOptions, lenderBalances } = useLenderSelector({
-    lenderInfoMap,
+  // Dropdown options + balance markers. Selection is now controlled by the
+  // parent (LendingTab) via `selectedLender` / `onLenderChange`.
+  const { lenderOptions, lenderBalances } = useLenderSelector({
+    lenderSummaries,
     lenderData,
+    lenderInfoMap,
     userData,
     chainId,
-    initialLender,
-    onLenderChange,
   })
 
   const [selectedSubAccountId, setSelectedSubAccountId] = useState<string | null>(null)
@@ -204,9 +220,13 @@ export function LendingDashboard({
     if (!deselecting) setShowMobileAction(true)
   }
 
-  // Handle lender change
+  // Handle lender change — propagate to the parent (URL-backed) and reset
+  // local selection state so we don't carry stale pool / sub-account picks
+  // across lenders. The local-state resets fire on the same render as the
+  // upstream URL push, so the next render sees a fresh `selectedLender`
+  // alongside cleared selection state.
   const handleLenderChange = (lender: string) => {
-    setSelectedLender(lender)
+    onLenderChange(lender)
     setSelectedSubAccountId(null)
     setSelectedPool(null)
   }

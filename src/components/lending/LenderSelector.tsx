@@ -1,38 +1,75 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react'
-import type { LenderData, LenderInfoMap } from '../../hooks/lending/usePoolData'
+import React, { useMemo } from 'react'
+import type { LenderData, LenderInfoMap, LenderSummary } from '../../hooks/lending/usePoolData'
 import type { UserDataResult } from '../../hooks/lending/useUserData'
-import { computeLenderTvl } from '../../utils/format'
+import { abbreviateUsd, computeLenderTvl, formatUsd } from '../../utils/format'
 import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'
 
-/* ── Hook: shared lender selection logic ── */
+/* ── Hook: lender dropdown options + balance markers ──
+ *
+ * This hook is now **fully controlled** — the parent owns `selectedLender`
+ * (typically `LendingTab`, which keeps it in sync with the URL). The hook
+ * just builds the sorted dropdown options and computes which lenders have
+ * a non-zero user balance.
+ *
+ * The auto-selection of an initial lender (when there's no value in the
+ * URL or the URL value is invalid) lives in the parent so it can run
+ * before `useMarginPublicData` is even called — that lets the parent fetch
+ * just the selected lender's data instead of all of them.
+ */
 
 interface UseLenderSelectorParams {
-  lenderData: LenderData | undefined
+  /**
+   * Lightweight per-lender summaries from `useLenders`. Preferred source —
+   * lets the dropdown render before the heavy per-market `lenderData` lands
+   * and uses the server-computed `tvlUsd` for sorting.
+   */
+  lenderSummaries?: LenderSummary[]
+  /**
+   * Heavy per-market data — used as a fallback for callers that don't yet
+   * plumb summaries through, and for sort tiebreakers when summaries are
+   * absent.
+   */
+  lenderData?: LenderData
   lenderInfoMap?: LenderInfoMap
   userData: UserDataResult
   chainId: string
-  initialLender?: string
-  onLenderChange?: (lender: string) => void
 }
 
 export function useLenderSelector({
+  lenderSummaries,
   lenderData,
   lenderInfoMap,
   userData,
   chainId,
-  initialLender,
-  onLenderChange,
 }: UseLenderSelectorParams) {
-  const allLenderKeys = useMemo(() => Object.keys(lenderData ?? {}), [lenderData])
+  // Server-side TVL when summaries are available, falling back to client-side
+  // computation from the heavy per-market data when they aren't yet.
+  const tvlByKey = useMemo(() => {
+    const map = new Map<string, number>()
+    if (lenderSummaries && lenderSummaries.length > 0) {
+      for (const s of lenderSummaries) {
+        if (s.lenderInfo?.key) map.set(s.lenderInfo.key, s.tvlUsd ?? 0)
+      }
+      return map
+    }
+    if (lenderData) {
+      for (const [k, markets] of Object.entries(lenderData)) {
+        map.set(k, computeLenderTvl(markets))
+      }
+    }
+    return map
+  }, [lenderSummaries, lenderData])
 
-  const [selectedLender, _setSelectedLender] = useState<string>(initialLender || '')
-  const setSelectedLender = useCallback(
-    (lender: string) => {
-      _setSelectedLender(lender)
-      onLenderChange?.(lender)
-    },
-    [onLenderChange]
-  )
+  const allLenderKeys = useMemo(() => {
+    // Prefer the summary list (already in tvl-desc order from the server) so
+    // the dropdown is populated before the heavy per-market data arrives.
+    if (lenderSummaries && lenderSummaries.length > 0) {
+      return lenderSummaries
+        .map((s) => s.lenderInfo?.key)
+        .filter((k): k is string => !!k)
+    }
+    return Object.keys(lenderData ?? {})
+  }, [lenderSummaries, lenderData])
 
   // Per-lender user balance (deposits + debt) for sorting & markers
   const lenderBalances = useMemo(() => {
@@ -54,44 +91,45 @@ export function useLenderSelector({
       if (balA > 0 && balB > 0) return balB - balA
       if (balA > 0) return -1
       if (balB > 0) return 1
-      return computeLenderTvl(lenderData?.[b] ?? []) - computeLenderTvl(lenderData?.[a] ?? [])
+      return (tvlByKey.get(b) ?? 0) - (tvlByKey.get(a) ?? 0)
     })
-  }, [allLenderKeys, lenderBalances, lenderData])
+  }, [allLenderKeys, lenderBalances, tvlByKey])
 
-  // Lender options for searchable dropdown (with icons)
+  // Build a (key → LenderInfo) lookup from summaries first, then fall back
+  // to the heavy lenderInfoMap. Summaries arrive sooner so the dropdown gets
+  // proper names and logos before the per-market data lands.
+  const infoByKey = useMemo(() => {
+    const map = new Map<string, { name: string; logoURI: string }>()
+    if (lenderSummaries) {
+      for (const s of lenderSummaries) {
+        if (s.lenderInfo?.key) {
+          map.set(s.lenderInfo.key, { name: s.lenderInfo.name, logoURI: s.lenderInfo.logoURI })
+        }
+      }
+    }
+    if (lenderInfoMap) {
+      for (const [k, info] of Object.entries(lenderInfoMap)) {
+        if (!map.has(k)) map.set(k, { name: info.name, logoURI: info.logoURI })
+      }
+    }
+    return map
+  }, [lenderSummaries, lenderInfoMap])
+
+  // Lender options for searchable dropdown (with icons + TVL trailing)
   const lenderOptions: SearchableSelectOption[] = lenders.map((l) => {
-    const info = lenderInfoMap?.[l]
+    const info = infoByKey.get(l)
+    const tvl = tvlByKey.get(l) ?? 0
     return {
       value: l,
       label: info?.name ?? l,
       icon: info?.logoURI ?? `https://raw.githubusercontent.com/1delta-DAO/protocol-icons/main/lender/${l.toLowerCase()}.webp`,
       indicator: lenderBalances.has(l) ? '\u25CF ' : undefined,
+      trailing: tvl > 0 ? abbreviateUsd(tvl) : undefined,
+      trailingTitle: tvl > 0 ? `TVL: $${formatUsd(tvl)}` : undefined,
     }
   })
 
-  // Stable key for lender list to avoid useEffect dependency array issues
-  const lendersKey = lenders.join(',')
-
-  // Track latest selectedLender without it being an effect dependency
-  const selectedLenderRef = useRef(selectedLender)
-  selectedLenderRef.current = selectedLender
-
-  // Auto-select lender: prefer initialLender from URL, then first in sorted list.
-  // Only reacts to lender list or URL changes — NOT to selectedLender changes
-  // (to avoid feedback loop with URL sync).
-  React.useEffect(() => {
-    if (lenders.length === 0) return
-    if (initialLender && lenders.includes(initialLender)) {
-      _setSelectedLender(initialLender)
-    } else if (!lenders.includes(selectedLenderRef.current)) {
-      _setSelectedLender(lenders[0])
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lendersKey, initialLender])
-
   return {
-    selectedLender,
-    setSelectedLender,
     lenders,
     lenderOptions,
     lenderBalances,

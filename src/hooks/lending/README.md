@@ -10,10 +10,25 @@ the top-level [../README.md](../README.md).
 ## Files
 
 ### Pool / market data
-- [usePoolData.ts](usePoolData.ts) — `useMarginPublicData` and
-  `usePoolConfigData`. Fetches public lending market data from
-  `/v1/data/lending/latest` and `/v1/data/lending/pools/by-config`,
-  grouped by lender. Defines `LenderData`, `PoolDataItem`, etc.
+- [usePoolData.ts](usePoolData.ts) — three hooks against the lending
+  endpoints, all defined in one file:
+  - **`useLenders(chainId)`** — lightweight per-(chain, lender)
+    enumeration from `/v1/data/lending/lenders`. One entry per lender
+    with `lenderInfo`, server-computed `tvlUsd`, and `lastFetched`.
+    Drives the lender dropdown without paying for full per-market
+    data. Defines `LenderSummary`.
+  - **`useMarginPublicData(chainId, lenderKeys, enabled)`** — full
+    per-market data from `/v1/data/lending/latest`. Both `chains` and
+    `lenders` are required by the backend, and the `lenders` list is
+    capped at 20 keys per request, so the hook **chunks the input
+    array internally** into batches of 20 and merges the responses
+    into a single keyed map. Pass an empty `lenderKeys` array to skip
+    the fetch entirely (useful while `useLenders` is still loading).
+    Defines `LenderData`, `LenderInfoMap`, `PoolDataItem`.
+  - **`usePoolConfigData(chainId, lenderKey, maxRiskScore?)`** — pool
+    data grouped by e-mode / configuration from
+    `/v1/data/lending/pools/by-config`. Defines `PoolConfigGroup`,
+    `ConfigMarketItem`.
 - [useFlattenedPools.ts](useFlattenedPools.ts) — Paginated
   (`useInfiniteQuery`) fetch of all pools for a chain/lender from
   `/v1/data/lending/pools`. Defines `PoolEntry`, `PoolRisk`,
