@@ -348,7 +348,8 @@ export function useLenders(chainId: string, enabled = true, maxRiskScore = 6) {
 export function useMarginPublicData(
   chainId: string,
   lenderKeys: string[] | undefined,
-  enabled = true
+  enabled = true,
+  maxRiskScore = 5
 ) {
   // Sort the keys so the query key is stable regardless of input order.
   const sortedKeys = [...(lenderKeys ?? [])].sort()
@@ -374,7 +375,7 @@ export function useMarginPublicData(
       // and we merge the results into a single keyed map.
       const responses = await Promise.all(
         chunks.map(async (chunk) => {
-          const url = `${endpointLendingLatest}?chains=${chainId}&lenders=${chunk.join(',')}`
+          const url = `${endpointLendingLatest}?chains=${chainId}&lenders=${chunk.join(',')}&maxRiskScore=${maxRiskScore}`
           const r = await fetch(url)
           if (!r.ok) {
             const text = await r.text().catch(() => '')

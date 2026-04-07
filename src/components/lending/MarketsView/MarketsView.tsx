@@ -26,7 +26,10 @@ function getDefaultMinDepositsUsd(chainId?: string): string {
 function computeLenderTvlFromPools(pools: PoolEntry[], lender: string): number {
   return pools
     .filter((p) => p.lenderKey === lender)
-    .reduce((sum, p) => sum + (parseFloat(p.totalDepositsUsd) || 0) - (parseFloat(p.totalDebtUsd) || 0), 0)
+    .reduce(
+      (sum, p) => sum + (parseFloat(p.totalDepositsUsd) || 0) - (parseFloat(p.totalDebtUsd) || 0),
+      0
+    )
 }
 
 interface LendingPoolsTableProps {
@@ -45,34 +48,39 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   const isMobile = useIsMobile()
 
   // Persisted filters (survive tab switches and sessions)
-  const marketsDefaults = useMemo(() => ({
-    selectedLender: 'all',
-    sortKey: 'apr' as string,
-    sortDir: 'desc' as string,
-    pageSize: 10,
-    minUtilPct: '10',
-    maxUtilPct: '90',
-    minDepositsUsd: getDefaultMinDepositsUsd(chainId),
-    minAprPct: '1',
-    assetFilter: '',
-    maxAprPct: '',
-    maxDepositsUsd: '',
-    minDepositsNative: '',
-    maxDepositsNative: '',
-    minDebtNative: '',
-    maxDebtNative: '',
-    minLiquidityNative: '',
-    maxLiquidityNative: '',
-    minDebtUsd: '',
-    maxDebtUsd: '',
-    minLiquidityUsd: '',
-    maxLiquidityUsd: '',
-    maxRiskScore: '4',
-  }), [chainId])
-
-  const { filters: f, setFilter, resetToDefaults: resetFilters } = usePersistedFilters(
-    'markets-view', marketsDefaults, { chainId }
+  const marketsDefaults = useMemo(
+    () => ({
+      selectedLender: 'all',
+      sortKey: 'apr' as string,
+      sortDir: 'desc' as string,
+      pageSize: 10,
+      minUtilPct: '10',
+      maxUtilPct: '90',
+      minDepositsUsd: getDefaultMinDepositsUsd(chainId),
+      minAprPct: '1',
+      assetFilter: '',
+      maxAprPct: '',
+      maxDepositsUsd: '',
+      minDepositsNative: '',
+      maxDepositsNative: '',
+      minDebtNative: '',
+      maxDebtNative: '',
+      minLiquidityNative: '',
+      maxLiquidityNative: '',
+      minDebtUsd: '',
+      maxDebtUsd: '',
+      minLiquidityUsd: '',
+      maxLiquidityUsd: '',
+      maxRiskScore: '4',
+    }),
+    [chainId]
   )
+
+  const {
+    filters: f,
+    setFilter,
+    resetToDefaults: resetFilters,
+  } = usePersistedFilters('markets-view', marketsDefaults, { chainId })
 
   // Destructure for convenience
   const selectedLender = f.selectedLender
@@ -325,24 +333,44 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     }
 
     // TVL / Deposits USD
-    result = applyMinMax(result, minDepositsUsd, maxDepositsUsd, (p) => parseFloat(p.totalDepositsUsd) || 0)
+    result = applyMinMax(
+      result,
+      minDepositsUsd,
+      maxDepositsUsd,
+      (p) => parseFloat(p.totalDepositsUsd) || 0
+    )
 
     // Risk score
     const maxRisk = parseInt(maxRiskScore, 10)
-    if (!Number.isNaN(maxRisk) && maxRisk > 0) {
+    if (!Number.isNaN(maxRisk)) {
       result = result.filter((p) => (p.risk?.score ?? 0) <= maxRisk)
     }
 
     // Native deposits
-    result = applyMinMax(result, minDepositsNative, maxDepositsNative, (p) => parseFloat(p.totalDeposits) || 0)
+    result = applyMinMax(
+      result,
+      minDepositsNative,
+      maxDepositsNative,
+      (p) => parseFloat(p.totalDeposits) || 0
+    )
     // Native debt
     result = applyMinMax(result, minDebtNative, maxDebtNative, (p) => parseFloat(p.totalDebt) || 0)
     // Native liquidity
-    result = applyMinMax(result, minLiquidityNative, maxLiquidityNative, (p) => parseFloat(p.totalLiquidity) || 0)
+    result = applyMinMax(
+      result,
+      minLiquidityNative,
+      maxLiquidityNative,
+      (p) => parseFloat(p.totalLiquidity) || 0
+    )
     // USD debt
     result = applyMinMax(result, minDebtUsd, maxDebtUsd, (p) => parseFloat(p.totalDebtUsd) || 0)
     // USD liquidity
-    result = applyMinMax(result, minLiquidityUsd, maxLiquidityUsd, (p) => parseFloat(p.totalLiquidityUsd) || 0)
+    result = applyMinMax(
+      result,
+      minLiquidityUsd,
+      maxLiquidityUsd,
+      (p) => parseFloat(p.totalLiquidityUsd) || 0
+    )
 
     // --- sorting ---
     result = [...result].sort((a, b) => {
@@ -408,16 +436,30 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
 
     return result
   }, [
-    pools, search, selectedLender, sortKey, sortDir,
-    minUtilPct, maxUtilPct, minAprPct, maxAprPct,
-    minDepositsUsd, maxDepositsUsd,
-    minDepositsNative, maxDepositsNative,
-    minDebtNative, maxDebtNative,
-    minLiquidityNative, maxLiquidityNative,
-    minDebtUsd, maxDebtUsd,
-    minLiquidityUsd, maxLiquidityUsd,
+    pools,
+    search,
+    selectedLender,
+    sortKey,
+    sortDir,
+    minUtilPct,
+    maxUtilPct,
+    minAprPct,
+    maxAprPct,
+    minDepositsUsd,
+    maxDepositsUsd,
+    minDepositsNative,
+    maxDepositsNative,
+    minDebtNative,
+    maxDebtNative,
+    minLiquidityNative,
+    maxLiquidityNative,
+    minDebtUsd,
+    maxDebtUsd,
+    minLiquidityUsd,
+    maxLiquidityUsd,
     maxRiskScore,
-    assetFilter, externalAssetFilter,
+    assetFilter,
+    externalAssetFilter,
   ])
 
   // Close extended filters on outside click
@@ -450,16 +492,31 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   useEffect(() => {
     setPage(1)
   }, [
-    search, selectedLender, sortKey, sortDir, pageSize,
-    minUtilPct, maxUtilPct, minAprPct, maxAprPct,
-    minDepositsUsd, maxDepositsUsd,
-    minDepositsNative, maxDepositsNative,
-    minDebtNative, maxDebtNative,
-    minLiquidityNative, maxLiquidityNative,
-    minDebtUsd, maxDebtUsd,
-    minLiquidityUsd, maxLiquidityUsd,
+    search,
+    selectedLender,
+    sortKey,
+    sortDir,
+    pageSize,
+    minUtilPct,
+    maxUtilPct,
+    minAprPct,
+    maxAprPct,
+    minDepositsUsd,
+    maxDepositsUsd,
+    minDepositsNative,
+    maxDepositsNative,
+    minDebtNative,
+    maxDebtNative,
+    minLiquidityNative,
+    maxLiquidityNative,
+    minDebtUsd,
+    maxDebtUsd,
+    minLiquidityUsd,
+    maxLiquidityUsd,
     maxRiskScore,
-    assetFilter, externalAssetFilter, chainId,
+    assetFilter,
+    externalAssetFilter,
+    chainId,
   ])
 
   const toggleSort = (key: SortKey) => {
@@ -631,7 +688,8 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
           {showExtendedFilters && (
             <div
               ref={popoverRef}
-              className={`absolute right-0 z-50 bg-base-200 border border-base-300 rounded-lg shadow-xl p-4 w-85 space-y-3 max-h-[80vh] overflow-y-auto ${popoverAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
+              className={`absolute right-0 z-50 bg-base-200 border border-base-300 rounded-lg shadow-xl p-4 w-85 space-y-3 max-h-[80vh] overflow-y-auto ${popoverAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+            >
               {/* Asset filter */}
               <div className="form-control">
                 <label className="label py-0">
