@@ -303,12 +303,12 @@ export interface ConfigMarketItem {
  *
  * Endpoint: `GET /v1/data/lending/lenders?chains=<chainId>`
  */
-export function useLenders(chainId: string, enabled = true) {
+export function useLenders(chainId: string, enabled = true, maxRiskScore = 6) {
   const { data, isLoading, isFetching, error } = useQuery<LenderSummary[]>({
     queryKey: ['lendingLenders', chainId],
     enabled: enabled && !!chainId,
     queryFn: async () => {
-      const url = `${endpointLendingLenders}?chains=${chainId}`
+      const url = `${endpointLendingLenders}?chains=${chainId}&maxRiskScore=${maxRiskScore}`
       const r = await fetch(url)
       if (!r.ok) {
         const text = await r.text().catch(() => '')
@@ -348,7 +348,7 @@ export function useLenders(chainId: string, enabled = true) {
 export function useMarginPublicData(
   chainId: string,
   lenderKeys: string[] | undefined,
-  enabled = true,
+  enabled = true
 ) {
   // Sort the keys so the query key is stable regardless of input order.
   const sortedKeys = [...(lenderKeys ?? [])].sort()
@@ -385,7 +385,7 @@ export function useMarginPublicData(
             throw new Error(json.error?.message ?? 'API returned success: false')
           }
           return json
-        }),
+        })
       )
 
       // The lender key now lives on `entry.lenderInfo.key`. Skip any entry
