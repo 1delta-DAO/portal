@@ -29,17 +29,27 @@
   border-radius: var(--radius-box);
 }
 
-/* Buttons inside RainbowKit modal – scope to the connect-button only;
-   wallet-option buttons inside the dialog must keep RainbowKit's own
-   styles so they remain tappable on mobile. */
-[data-rk] [role="dialog"] button {
+/* Buttons inside RainbowKit modal – scope to chrome buttons only
+   (close, back, copy, etc.). Wallet-option buttons and rk-list-items
+   have their own rules and MUST keep RainbowKit's own layout so they
+   remain tappable on mobile — restyling them breaks the hit-target
+   geometry and the wallet icons stop responding to taps. */
+[data-rk]
+  [role='dialog']
+  button:not([data-testid^='wallet-option-']):not(.rk-list-item):not(
+    [data-testid^='rk-wallet-option']
+  ) {
   border-radius: var(--radius-box);
   background-color: hsl(var(--color-base-200));
   color: hsl(var(--color-base-content));
   border: 1px solid hsl(var(--color-base-300));
 }
 
-[data-rk] [role="dialog"] button:hover {
+[data-rk]
+  [role='dialog']
+  button:not([data-testid^='wallet-option-']):not(.rk-list-item):not(
+    [data-testid^='rk-wallet-option']
+  ):hover {
   background-color: hsl(var(--color-primary));
   color: hsl(var(--color-primary-content));
   border-color: hsl(var(--color-primary));
