@@ -115,30 +115,98 @@ import { BACKEND_BASE_URL } from '../../config/backend'
 
 const endpointPools = `${BACKEND_BASE_URL}/v1/data/lending/pools`
 
-/** Number of items to request per API page */
-const API_PAGE_SIZE = 100
+/**
+ * Default page size requested from the API. The backend caps `count` at 1000;
+ * we stay well under that to keep individual requests reasonable while still
+ * minimizing round-trips for the typical "fetch all matching pools" workload.
+ */
+const DEFAULT_PAGE_SIZE = 500
+
+/**
+ * Optional server-side filters supported by `/v1/data/lending/pools`. All
+ * fields are passed straight through to the backend; see the OpenAPI spec for
+ * semantics. Numeric rates (`minYield`, `maxYield`, `minUtil`, `maxUtil`) are
+ * decimals (0–1), not percentages.
+ */
+export interface PoolsFilters {
+  lender?: string
+  underlyings?: string[]
+  assetGroups?: string[]
+  minYield?: number
+  maxYield?: number
+  minUtil?: number
+  maxUtil?: number
+  minTvlUsd?: number
+  maxTvlUsd?: number
+  minDeposits?: number
+  maxDeposits?: number
+  minDebt?: number
+  maxDebt?: number
+  minDebtUsd?: number
+  maxDebtUsd?: number
+  minLiquidity?: number
+  maxLiquidity?: number
+  minLiquidityUsd?: number
+  maxLiquidityUsd?: number
+  sortBy?: string
+  sortDir?: 'asc' | 'desc' | 'ASC' | 'DESC'
+}
 
 function buildPoolsUrl(
   base: string,
-  chainIds?: (number | string)[],
-  lenders?: string[],
-  start?: number,
-  count?: number,
-  maxRiskScore?: number
+  chainIds: (number | string)[] | undefined,
+  lender: string | undefined,
+  start: number,
+  count: number,
+  maxRiskScore: number | undefined,
+  filters: PoolsFilters | undefined
 ) {
   const url = new URL(base)
 
   if (chainIds && chainIds.length > 0) {
     chainIds.forEach((v) => url.searchParams.append('chainId', String(v)))
   }
-  if (lenders && lenders.length > 0) {
-    lenders.forEach((v) => url.searchParams.append('lender', String(v)))
+  if (lender) {
+    url.searchParams.append('lender', lender)
   }
-  if (start !== undefined) url.searchParams.set('start', String(start))
-  if (count !== undefined) url.searchParams.set('count', String(count))
+  url.searchParams.set('start', String(start))
+  url.searchParams.set('count', String(count))
   if (maxRiskScore !== undefined) url.searchParams.set('maxRiskScore', String(maxRiskScore))
-
   url.searchParams.set('includeExposures', 'true')
+
+  if (filters) {
+    if (filters.lender && !lender) url.searchParams.append('lender', filters.lender)
+    if (filters.underlyings?.length) {
+      url.searchParams.set('underlyings', filters.underlyings.join(','))
+    }
+    if (filters.assetGroups?.length) {
+      url.searchParams.set('assetGroups', filters.assetGroups.join(','))
+    }
+    const numericKeys: (keyof PoolsFilters)[] = [
+      'minYield',
+      'maxYield',
+      'minUtil',
+      'maxUtil',
+      'minTvlUsd',
+      'maxTvlUsd',
+      'minDeposits',
+      'maxDeposits',
+      'minDebt',
+      'maxDebt',
+      'minDebtUsd',
+      'maxDebtUsd',
+      'minLiquidity',
+      'maxLiquidity',
+      'minLiquidityUsd',
+      'maxLiquidityUsd',
+    ]
+    for (const k of numericKeys) {
+      const v = filters[k] as number | undefined
+      if (v !== undefined && Number.isFinite(v)) url.searchParams.set(k, String(v))
+    }
+    if (filters.sortBy) url.searchParams.set('sortBy', filters.sortBy)
+    if (filters.sortDir) url.searchParams.set('sortDir', String(filters.sortDir).toUpperCase())
+  }
 
   return url.toString()
 }
@@ -149,33 +217,55 @@ function buildPoolsUrl(
 
 /**
  * useFlattenedPools
- * Fetches from the /lending/pools endpoint filtered by chainId and lender.
- * Uses infinite query to paginate through all results in chunks of API_PAGE_SIZE.
+ *
+ * Fetches from `/v1/data/lending/pools`, paging until the server runs out of
+ * results. Optional `filters` are passed straight through as query params so
+ * the backend can do the filtering work — see {@link PoolsFilters}.
+ *
+ * Note: the backend's response field `data.count` is the *page* item count,
+ * not a grand total, so end-of-stream is detected purely by "page returned
+ * fewer than `pageSize` rows". Client `count` returned from the hook is the
+ * cumulative number of fetched rows.
  */
 export function useFlattenedPools(params: {
   chainId?: string
   lender?: string
   maxRiskScore?: number
   enabled?: boolean
+  pageSize?: number
+  filters?: PoolsFilters
 }) {
   const chainId = params?.chainId
   const lender = params?.lender
   const maxRiskScore = params?.maxRiskScore ?? 4
   const enabled = params?.enabled ?? true
+  const pageSize = params?.pageSize ?? DEFAULT_PAGE_SIZE
+  const filters = params?.filters
+
+  // Stable serialization so the queryKey only changes when filter values change.
+  const filtersKey = useMemo(() => (filters ? JSON.stringify(filters) : ''), [filters])
 
   const { data, isLoading, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage, error } =
     useInfiniteQuery<PoolsApiResponse>({
-      queryKey: ['flattenedPools', chainId ?? '', lender ?? '', maxRiskScore],
+      queryKey: [
+        'flattenedPools',
+        chainId ?? '',
+        lender ?? '',
+        maxRiskScore,
+        pageSize,
+        filtersKey,
+      ],
       enabled,
       initialPageParam: 0 as number,
       queryFn: async ({ pageParam }) => {
         const url = buildPoolsUrl(
           endpointPools,
           chainId ? [chainId] : [],
-          lender ? [lender] : [],
+          lender,
           pageParam as number,
-          API_PAGE_SIZE,
-          maxRiskScore
+          pageSize,
+          maxRiskScore,
+          filters
         )
         const r = await fetch(url)
         if (!r.ok) {
@@ -191,12 +281,11 @@ export function useFlattenedPools(params: {
         return json
       },
       getNextPageParam: (lastPage, allPages) => {
-        const totalFetched = allPages.reduce((sum, p) => sum + p.data.items.length, 0)
-        // Reached the end: fewer items returned than requested
-        if (lastPage.data.items.length < API_PAGE_SIZE) return undefined
-        // Reached the end: fetched all available items
-        if (lastPage.data.count > 0 && totalFetched >= lastPage.data.count) return undefined
-        return totalFetched
+        // The backend returns `data.count = items.length` (page count, not
+        // total), so the only reliable end-of-stream signal is "the last page
+        // came back smaller than the requested page size".
+        if (lastPage.data.items.length < pageSize) return undefined
+        return allPages.reduce((sum, p) => sum + p.data.items.length, 0)
       },
       refetchInterval: 8 * 60 * 1000,
       staleTime: 30_000,
@@ -217,11 +306,9 @@ export function useFlattenedPools(params: {
     return data.pages.flatMap((page) => page.data.items)
   }, [data])
 
-  const totalServerCount = data?.pages?.[0]?.data?.count ?? 0
-
   return {
     pools,
-    count: totalServerCount,
+    count: pools.length,
     isPoolsLoading: isLoading,
     isPoolsFetching: isFetching,
     isFetchingMore: isFetchingNextPage,
