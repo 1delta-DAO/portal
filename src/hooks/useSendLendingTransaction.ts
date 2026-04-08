@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react'
 import { Address, Hex } from 'viem'
-import { useWalletClient, usePublicClient } from 'wagmi'
+import { useWalletClient } from 'wagmi'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSyncChain } from './useSyncChain'
+import { getIndependentPublicClient } from '../lib/lib-utils'
 
 export interface LendingTx {
   to: string
@@ -22,7 +23,6 @@ export function useSendLendingTransaction(params: {
 }) {
   const { chainId, account } = params
   const { data: walletClient } = useWalletClient()
-  const publicClient = usePublicClient()
   const queryClient = useQueryClient()
   const { syncChain } = useSyncChain()
 
@@ -84,6 +84,7 @@ export function useSendLendingTransaction(params: {
         })
 
         try {
+          const publicClient = getIndependentPublicClient(chainId)
           if (publicClient) {
             await publicClient.waitForTransactionReceipt({ hash, confirmations: 2, pollingInterval: 4_000 })
           }
@@ -106,7 +107,7 @@ export function useSendLendingTransaction(params: {
         setSending(false)
       }
     },
-    [walletClient, publicClient, chainId, syncChain, invalidateQueries]
+    [walletClient, chainId, syncChain, invalidateQueries]
   )
 
   return { send, sending, error, clearError }

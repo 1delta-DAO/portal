@@ -74,10 +74,10 @@ export function SearchableSelect({
       <>
         <button
           type="button"
-          className={`select select-bordered select-sm flex items-center text-left w-full ${className}`}
+          className={`select select-bordered select-sm flex items-center text-left w-full min-w-0 ${className}`}
           onClick={() => setIsOpen(true)}
         >
-          <span className="truncate flex items-center gap-1.5 pr-4">
+          <span className="truncate flex-1 min-w-0 flex items-center gap-1.5 pr-4">
             {selectedOption ? (
               <>
                 {selectedOption.icon && (
@@ -160,11 +160,11 @@ export function SearchableSelect({
 
   // Desktop: Dropdown
   return (
-    <div ref={containerRef} className={`relative ${className}`}>
-      {/* Trigger button */}
+    <div ref={containerRef} className={`relative inline-block max-w-full ${className}`}>
+      {/* Trigger button — width adapts to selected option label */}
       <button
         type="button"
-        className="select select-bordered select-sm flex items-center text-left w-full"
+        className="select select-bordered select-sm flex items-center text-left w-auto max-w-xs"
         onClick={() => setIsOpen((prev) => !prev)}
       >
         <span className="truncate flex items-center gap-1.5 pr-4">
@@ -186,7 +186,7 @@ export function SearchableSelect({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-full min-w-48 rounded-box border border-base-300 bg-base-100 shadow-lg">
+        <div className="absolute z-50 mt-1 min-w-full w-max max-w-xs rounded-box border border-base-300 bg-base-100 shadow-lg">
           {/* Search input */}
           <div className="p-1.5">
             <input

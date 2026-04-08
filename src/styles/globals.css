@@ -2,7 +2,7 @@
 
 @layer base {
   html {
-    overflow-x: clip;
+    overflow-x: hidden;
     overflow-y: auto;
     scroll-behavior: smooth;
   }

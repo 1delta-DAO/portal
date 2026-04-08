@@ -151,14 +151,16 @@ export const LenderSelector: React.FC<LenderSelectorProps> = ({
   onChange,
   hasBalances,
 }) => (
-  <div className="flex flex-wrap items-center gap-2">
+  <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
     <label className="text-sm font-medium shrink-0">Lender:</label>
-    <SearchableSelect
-      options={lenderOptions}
-      value={selectedLender}
-      onChange={onChange}
-      placeholder="Search lenders..."
-    />
+    <div className="flex-1 min-w-0 sm:flex-none sm:min-w-0">
+      <SearchableSelect
+        options={lenderOptions}
+        value={selectedLender}
+        onChange={onChange}
+        placeholder="Search lenders..."
+      />
+    </div>
     {hasBalances && (
       <span className="text-xs text-base-content/50 shrink-0">{'\u25CF'} = has balance</span>
     )}

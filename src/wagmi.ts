@@ -93,9 +93,13 @@ export const evmTransportsWagmi = Object.assign(
 
 export const config = getDefaultConfig({
   appName: 'Portal',
-  projectId: 'id',
+  projectId: (import.meta.env.VITE_WC_PROJECT_ID as string | undefined) ?? 'id',
   chains: evmChainWagmi,
   transports: evmTransportsWagmi,
   ssr: false,
-  pollingInterval: 30_000,
+  // Effectively disable wagmi's cyclic block-watcher polling. We drive our own
+  // refetches via react-query in the relevant hooks; wagmi shouldn't be hitting
+  // chain RPCs on a timer (especially mainnet, whose default RPC is eth.merkle.io
+  // and returns CORS errors in the browser).
+  pollingInterval: Number.MAX_SAFE_INTEGER,
 })

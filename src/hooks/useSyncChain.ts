@@ -1,9 +1,9 @@
 import { useCallback } from 'react'
-import { useSwitchChain, useConnection } from 'wagmi'
+import { useSwitchChain, useAccount } from 'wagmi'
 import { useToast } from '../components/common/ToastHost'
 
 export function useSyncChain() {
-  const { chainId: currentChainId } = useConnection()
+  const { chainId: currentChainId } = useAccount()
   const { switchChainAsync } = useSwitchChain()
   const toast = useToast()
   const syncChain = useCallback(

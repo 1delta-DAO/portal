@@ -29,7 +29,7 @@
     "tailwindcss": "^4.2.2",
     "viem": "^2.47.6",
     "vite": "^8.0.1",
-    "wagmi": "^3.5.0"
+    "wagmi": "^2.19.0"
   },
   "devDependencies": {
     "@types/async-retry": "^1.4.9",
