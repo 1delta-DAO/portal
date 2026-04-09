@@ -34,7 +34,7 @@ const THEMES = [
   'business',
 ] as const
 
-const DEFAULT_THEME = 'bloomberg'
+const DEFAULT_THEME = 'forest'
 
 export function ThemeSwitcher() {
   const [theme, setTheme] = useState<string>(DEFAULT_THEME)
