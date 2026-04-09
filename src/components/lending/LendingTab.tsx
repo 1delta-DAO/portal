@@ -8,7 +8,7 @@ import { UserAssetsTable } from './UserAssetsTable'
 import { LendingPoolsTable } from './MarketsView'
 import { ChainFilterSelect } from './ChainFilter'
 import { useUserData } from '../../hooks/lending/useUserData'
-import { useMarginPublicData, useLenders } from '../../hooks/lending/usePoolData'
+import { useLendingLatest, useLenders } from '../../hooks/lending/usePoolData'
 import { useLendingBalances } from '../../hooks/lending/useLendingBalances'
 import { useTokenLists } from '../../hooks/useTokenLists'
 import { LendingDashboard } from './LendingDashboard'
@@ -66,16 +66,13 @@ export function LenderTab() {
   const chainsReady = !isChainsLoading
 
   // Light enumeration of lenders (key + name + tvlUsd) — drives the dropdown
-  // and tells useMarginPublicData which lender to fetch full data for.
-  const { lenders: lenderSummaries, isLendersLoading } = useLenders(
-    effectiveChainId,
-    chainsReady,
-  )
+  // and tells useLendingLatest which lender to fetch full data for.
+  const { lenders: lenderSummaries, isLendersLoading } = useLenders(effectiveChainId, chainsReady)
 
   // Resolve the *active* lender for the heavy per-market fetch:
   //   1. URL value if it exists in the current chain's enumeration
   //   2. otherwise the first summary entry (already tvl-desc sorted by the server)
-  //   3. otherwise empty string → useMarginPublicData stays idle
+  //   3. otherwise empty string → useLendingLatest stays idle
   //
   // We deliberately don't keep this in component state. The URL is the source
   // of truth, and `setSelectedLender` (defined above) writes to the URL —
@@ -112,17 +109,14 @@ export function LenderTab() {
   }, [effectiveChainId])
 
   // Heavy per-market data — now scoped to the SINGLE active lender. The
-  // `useMarginPublicData` hook still chunks internally (this just becomes
+  // `useLendingLatest` hook still chunks internally (this just becomes
   // one chunk of one), but the network round-trip drops from O(lenders)
   // to O(1) per chain, which is the real efficiency win.
-  const lenderKeysToFetch = useMemo(
-    () => (activeLender ? [activeLender] : []),
-    [activeLender],
-  )
-  const { lenderData, lenderInfoMap, isPublicDataLoading } = useMarginPublicData(
+  const lenderKeysToFetch = useMemo(() => (activeLender ? [activeLender] : []), [activeLender])
+  const { lenderData, lenderInfoMap, isPublicDataLoading } = useLendingLatest(
     effectiveChainId,
     lenderKeysToFetch,
-    chainsReady,
+    chainsReady
   )
   const { userData, isUserDataLoading, error, refetch } = useUserData({
     chainId: effectiveChainId,
@@ -299,9 +293,7 @@ export function LenderTab() {
         />
       )}
 
-      {activeTab === 'swap' && (
-        <SpotSwapPanel chainId={effectiveChainId} />
-      )}
+      {activeTab === 'swap' && <SpotSwapPanel chainId={effectiveChainId} />}
     </div>
   )
 }

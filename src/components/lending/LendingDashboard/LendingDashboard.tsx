@@ -43,7 +43,7 @@ interface Props {
   isUserDataLoading: boolean
   /**
    * Controlled lender selection. Owned by `LendingTab` so the heavy
-   * `useMarginPublicData` fetch can be scoped to a single lender.
+   * `useLendingLatest` fetch can be scoped to a single lender.
    */
   selectedLender: string
   onLenderChange: (lender: string) => void
@@ -80,9 +80,18 @@ export function LendingDashboard({
   const [actionTab, setActionTab] = useState<ActionType>('Deposit')
 
   // Persisted filters
-  const { filters: lf, setFilter: setLF, resetToDefaults: resetLendingFilters } = usePersistedFilters(
+  const {
+    filters: lf,
+    setFilter: setLF,
+    resetToDefaults: resetLendingFilters,
+  } = usePersistedFilters(
     'lending-dashboard',
-    { viewMode: 'config', maxRiskScore: 4, sortKey: 'totalDepositsUSD' as string, sortDir: 'desc' as string },
+    {
+      viewMode: 'config',
+      maxRiskScore: 4,
+      sortKey: 'totalDepositsUSD' as string,
+      sortDir: 'desc' as string,
+    },
     { chainId }
   )
   const viewMode = lf.viewMode as 'default' | 'config'
@@ -147,7 +156,11 @@ export function LendingDashboard({
   }, [allPools, hasWrappedNative])
 
   // Wallet token balances for these assets
-  const { balances: walletBalances, isBalancesFetching, refetchBalances } = useTokenBalances({
+  const {
+    balances: walletBalances,
+    isBalancesFetching,
+    refetchBalances,
+  } = useTokenBalances({
     chainId,
     account,
     assets: poolAssetAddresses,
@@ -255,7 +268,8 @@ export function LendingDashboard({
   }, [nativeToken, walletBalances])
 
   // Lender info for the selected lender
-  const activeLenderInfo = selectedLender && lenderInfoMap ? lenderInfoMap[selectedLender] : undefined
+  const activeLenderInfo =
+    selectedLender && lenderInfoMap ? lenderInfoMap[selectedLender] : undefined
 
   // Shared action panel props
   const actionPanelProps = {
@@ -351,7 +365,14 @@ export function LendingDashboard({
             </div>
 
             <RiskSelect value={maxRiskScore} onChange={setMaxRiskScore} />
-            <button type="button" className="btn btn-xs btn-ghost text-base-content/50" onClick={resetLendingFilters} title="Reset filters to defaults">Reset</button>
+            <button
+              type="button"
+              className="btn btn-xs btn-ghost text-base-content/50"
+              onClick={resetLendingFilters}
+              title="Reset filters to defaults"
+            >
+              Reset
+            </button>
           </div>
 
           {viewMode === 'config' ? (

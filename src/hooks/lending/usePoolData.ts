@@ -345,7 +345,7 @@ export function useLenders(chainId: string, enabled = true, maxRiskScore = 6) {
  * Pass an empty `lenderKeys` array to skip the fetch entirely (useful while
  * the lighter `useLenders` enumeration is still loading).
  */
-export function useMarginPublicData(
+export function useLendingLatest(
   chainId: string,
   lenderKeys: string[] | undefined,
   enabled = true,

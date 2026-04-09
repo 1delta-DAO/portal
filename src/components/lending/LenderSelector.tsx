@@ -13,7 +13,7 @@ import { SearchableSelect, type SearchableSelectOption } from './SearchableSelec
  *
  * The auto-selection of an initial lender (when there's no value in the
  * URL or the URL value is invalid) lives in the parent so it can run
- * before `useMarginPublicData` is even called — that lets the parent fetch
+ * before `useLendingLatest` is even called — that lets the parent fetch
  * just the selected lender's data instead of all of them.
  */
 
@@ -64,9 +64,7 @@ export function useLenderSelector({
     // Prefer the summary list (already in tvl-desc order from the server) so
     // the dropdown is populated before the heavy per-market data arrives.
     if (lenderSummaries && lenderSummaries.length > 0) {
-      return lenderSummaries
-        .map((s) => s.lenderInfo?.key)
-        .filter((k): k is string => !!k)
+      return lenderSummaries.map((s) => s.lenderInfo?.key).filter((k): k is string => !!k)
     }
     return Object.keys(lenderData ?? {})
   }, [lenderSummaries, lenderData])
@@ -122,7 +120,9 @@ export function useLenderSelector({
     return {
       value: l,
       label: info?.name ?? l,
-      icon: info?.logoURI ?? `https://raw.githubusercontent.com/1delta-DAO/protocol-icons/main/lender/${l.toLowerCase()}.webp`,
+      icon:
+        info?.logoURI ??
+        `https://raw.githubusercontent.com/1delta-DAO/protocol-icons/main/lender/${l.toLowerCase()}.webp`,
       indicator: lenderBalances.has(l) ? '\u25CF ' : undefined,
       trailing: tvl > 0 ? abbreviateUsd(tvl) : undefined,
       trailingTitle: tvl > 0 ? `TVL: $${formatUsd(tvl)}` : undefined,

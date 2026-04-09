@@ -43,7 +43,7 @@ interface Props {
   isUserDataLoading: boolean
   /**
    * Controlled lender selection. Owned by `LendingTab` so the heavy
-   * `useMarginPublicData` fetch can be scoped to a single lender.
+   * `useLendingLatest` fetch can be scoped to a single lender.
    */
   selectedLender: string
   onLenderChange: (lender: string) => void
@@ -85,7 +85,11 @@ export function TradingDashboard({
 
   const [selectedSubAccountId, setSelectedSubAccountId] = useState<string | null>(null)
   // Persisted filters
-  const { filters: tf, setFilter: setTF, resetToDefaults: resetTradingFilters } = usePersistedFilters(
+  const {
+    filters: tf,
+    setFilter: setTF,
+    resetToDefaults: resetTradingFilters,
+  } = usePersistedFilters(
     'trading-dashboard',
     { activeOperation: 'Loop' as string, viewMode: 'config', maxRiskScore: 4 },
     { chainId }
@@ -191,7 +195,11 @@ export function TradingDashboard({
     [allPools]
   )
 
-  const { balances: walletBalances, isBalancesFetching, refetchBalances } = useTokenBalances({
+  const {
+    balances: walletBalances,
+    isBalancesFetching,
+    refetchBalances,
+  } = useTokenBalances({
     chainId,
     account,
     assets: poolAssetAddresses,
@@ -352,7 +360,14 @@ export function TradingDashboard({
             </div>
 
             <RiskSelect value={maxRiskScore} onChange={setMaxRiskScore} />
-            <button type="button" className="btn btn-xs btn-ghost text-base-content/50" onClick={resetTradingFilters} title="Reset filters to defaults">Reset</button>
+            <button
+              type="button"
+              className="btn btn-xs btn-ghost text-base-content/50"
+              onClick={resetTradingFilters}
+              title="Reset filters to defaults"
+            >
+              Reset
+            </button>
           </div>
 
           {viewMode === 'config' ? (
@@ -438,8 +453,12 @@ export function TradingDashboard({
           ) : (
             <>
               {activeOperation === 'Loop' && <LoopAction key={selectedLender} {...actionProps} />}
-              {activeOperation === 'ColSwap' && <ColSwapAction key={selectedLender} {...actionProps} />}
-              {activeOperation === 'DebtSwap' && <DebtSwapAction key={selectedLender} {...actionProps} />}
+              {activeOperation === 'ColSwap' && (
+                <ColSwapAction key={selectedLender} {...actionProps} />
+              )}
+              {activeOperation === 'DebtSwap' && (
+                <DebtSwapAction key={selectedLender} {...actionProps} />
+              )}
               {activeOperation === 'Close' && <CloseAction key={selectedLender} {...actionProps} />}
             </>
           )}

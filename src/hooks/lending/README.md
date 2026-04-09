@@ -10,6 +10,7 @@ the top-level [../README.md](../README.md).
 ## Files
 
 ### Pool / market data
+
 - [usePoolData.ts](usePoolData.ts) — three hooks against the lending
   endpoints, all defined in one file:
   - **`useLenders(chainId)`** — lightweight per-(chain, lender)
@@ -17,7 +18,7 @@ the top-level [../README.md](../README.md).
     with `lenderInfo`, server-computed `tvlUsd`, and `lastFetched`.
     Drives the lender dropdown without paying for full per-market
     data. Defines `LenderSummary`.
-  - **`useMarginPublicData(chainId, lenderKeys, enabled)`** — full
+  - **`useLendingLatest(chainId, lenderKeys, enabled)`** — full
     per-market data from `/v1/data/lending/latest`. Both `chains` and
     `lenders` are required by the backend, and the `lenders` list is
     capped at 20 keys per request, so the hook **chunks the input
@@ -37,6 +38,7 @@ the top-level [../README.md](../README.md).
   market (`/v1/data/lending/irm`).
 
 ### User positions
+
 - [useUserData.ts](useUserData.ts) — User lending positions. Supports
   both a direct API mode and an RPC-based mode (default). Defines
   `LenderUserDataEntry`, `UserPositionEntry`, `UserDataSummary`.
@@ -51,14 +53,16 @@ the top-level [../README.md](../README.md).
   with retry).
 
 ### Balances
+
 - [useTokenBalances.ts](useTokenBalances.ts) — Wallet balances for a
   caller-supplied list of asset addresses
   (`/v1/data/token/balances`). Returns a `Map<address, TokenBalance>`.
 - [useLendingBalances.ts](useLendingBalances.ts) — Wallet balances
-  for *all* lending-compatible tokens on a chain
+  for _all_ lending-compatible tokens on a chain
   (`/v1/data/token/balances/lending`). No asset list needed.
 
 ### Joining layer
+
 - [prepareMixedData.ts](prepareMixedData.ts) — Pure helpers that
   flatten `LenderData` (per-pool) and stitch in the user's positions
   to produce `FlattenedPoolWithUserData[]` plus per-lender
