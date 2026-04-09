@@ -84,6 +84,12 @@ export interface UserSubAccount {
   positions: UserPositionEntry[]
 }
 
+export interface UserLenderInfo {
+  lenderKey: string
+  name: string
+  logoUri?: string
+}
+
 export interface LenderUserDataEntry {
   account: string
   chainId: string
@@ -92,6 +98,7 @@ export interface LenderUserDataEntry {
   aprData: UserAprData
   healthFactor: number | null
   leverage: number
+  lenderInfo?: UserLenderInfo
   data: UserSubAccount[]
 }
 
@@ -139,6 +146,7 @@ export interface RawLenderUserDataEntry {
   aprData?: UserAprData
   healthFactor?: number | null
   leverage?: number
+  lenderInfo?: UserLenderInfo
   data: UserSubAccount[]
 }
 
@@ -192,6 +200,7 @@ function transformUserDataEntry(raw: RawLenderUserDataEntry): LenderUserDataEntr
     aprData,
     healthFactor,
     leverage,
+    lenderInfo: raw.lenderInfo,
     data: subs,
   }
 }

@@ -642,7 +642,6 @@ const AssetCell: React.FC<{ item: ConfigMarketItem; hasPosition: boolean; entity
 }) => {
   const asset = item.underlyingInfo.asset
   const iy = item.intrinsicYield ?? 0
-  const utilization = item.totalDepositsUsd > 0 ? item.totalDebtUsd / item.totalDepositsUsd : undefined
   return (
     <AssetPopover
       address={asset.address}
@@ -652,7 +651,6 @@ const AssetCell: React.FC<{ item: ConfigMarketItem; hasPosition: boolean; entity
       positionDot={hasPosition}
       marketUid={item.marketUid}
       marketName={entityName ?? `${asset.symbol} (${asset.name})`}
-      currentUtilization={utilization}
       currentDepositRate={item.depositRate + iy}
       currentBorrowRate={item.variableBorrowRate + iy}
       priceUsd={item.underlyingInfo.prices?.priceUsd}

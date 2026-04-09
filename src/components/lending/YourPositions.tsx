@@ -175,7 +175,6 @@ export function YourPositions({
                         logoURI={pool.asset.logoURI}
                         marketUid={pool.marketUid}
                         marketName={pool.name}
-                        currentUtilization={pool.totalDeposits > 0 ? pool.totalDebt / pool.totalDeposits : undefined}
                         currentDepositRate={pool.depositRate + (pool.intrinsicYield ?? 0)}
                         currentBorrowRate={pool.variableBorrowRate + (pool.intrinsicYield ?? 0)}
                         oraclePriceUsd={pool.oraclePriceUSD}
@@ -254,7 +253,6 @@ export function YourPositions({
                         logoURI={pool.asset.logoURI}
                         marketUid={pool.marketUid}
                         marketName={pool.name}
-                        currentUtilization={pool.totalDeposits > 0 ? pool.totalDebt / pool.totalDeposits : undefined}
                         currentDepositRate={pool.depositRate + (pool.intrinsicYield ?? 0)}
                         currentBorrowRate={pool.variableBorrowRate + (pool.intrinsicYield ?? 0)}
                         oraclePriceUsd={pool.oraclePriceUSD}

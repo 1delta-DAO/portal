@@ -320,8 +320,17 @@ const MobileLenderCard: React.FC<{
       <div className="card-body p-3 space-y-3">
         {/* Lender header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-base">{lenderInfoMap?.[entry.lender]?.name ?? entry.lender}</h3>
+          <div className="flex items-center gap-2">
+            {(entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI) && (
+              <img
+                src={entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI}
+                alt=""
+                className="w-5 h-5 rounded-full object-contain"
+              />
+            )}
+            <h3 className="font-semibold text-base">
+              {entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
+            </h3>
             {!hasSingleSub && (
               <span className="text-xs text-base-content/50">{subs.length} accounts</span>
             )}
@@ -584,8 +593,15 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                     <tr className="bg-base-200/50">
                       <td colSpan={hasSingleSub ? 1 : 7}>
                         <div className="flex items-center gap-2">
+                          {(entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI) && (
+                            <img
+                              src={entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI}
+                              alt=""
+                              className="w-4 h-4 rounded-full object-contain"
+                            />
+                          )}
                           <span className="font-semibold text-sm">
-                            {lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
+                            {entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
                           </span>
                           {!hasSingleSub && (
                             <span className="text-xs text-base-content/50">

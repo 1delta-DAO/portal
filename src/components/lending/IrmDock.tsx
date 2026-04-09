@@ -22,7 +22,6 @@ const BORROW_COLOR  = 'var(--color-warning)'
 interface IrmPanelEntry {
   marketUid: string
   marketName: string
-  currentUtilization?: number
   currentDepositRate?: number
   currentBorrowRate?: number
 }
@@ -54,11 +53,12 @@ interface IrmDockedPanelProps extends IrmPanelEntry {
 }
 
 function IrmDockedPanel({
-  marketUid, marketName, currentUtilization,
+  marketUid, marketName,
   currentDepositRate, currentBorrowRate, onClose, fullWidth,
 }: IrmDockedPanelProps) {
   const { data, isLoading, error } = useIrmData(marketUid)
   const lenderKey = data?.lenderKey ?? marketUid.split(':')[0] ?? marketUid
+  const currentUtilization = data?.currentUtilization
 
   return (
     <div
@@ -254,13 +254,12 @@ export function IrmDockProvider({ children }: { children: ReactNode }) {
 interface IrmDetailsButtonProps {
   marketUid: string
   marketName: string
-  currentUtilization?: number
   currentDepositRate?: number
   currentBorrowRate?: number
 }
 
 export function IrmDetailsButton({
-  marketUid, marketName, currentUtilization, currentDepositRate, currentBorrowRate,
+  marketUid, marketName, currentDepositRate, currentBorrowRate,
 }: IrmDetailsButtonProps) {
   const { open, close, panels } = useIrmDock()
   const isOpen = panels.some((p) => p.marketUid === marketUid)
@@ -271,10 +270,10 @@ export function IrmDetailsButton({
       if (isOpen) {
         close(marketUid)
       } else {
-        open({ marketUid, marketName, currentUtilization, currentDepositRate, currentBorrowRate })
+        open({ marketUid, marketName, currentDepositRate, currentBorrowRate })
       }
     },
-    [isOpen, open, close, marketUid, marketName, currentUtilization, currentDepositRate, currentBorrowRate],
+    [isOpen, open, close, marketUid, marketName, currentDepositRate, currentBorrowRate],
   )
 
   return (

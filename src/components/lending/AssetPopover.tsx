@@ -66,7 +66,6 @@ interface AssetPopoverProps {
   positionDot?: boolean
   marketUid?: string
   marketName?: string
-  currentUtilization?: number
   currentDepositRate?: number
   currentBorrowRate?: number
   /** Market price (from price feed) */
@@ -93,7 +92,6 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
   positionDot,
   marketUid,
   marketName,
-  currentUtilization,
   currentDepositRate,
   currentBorrowRate,
   priceUsd,
@@ -281,7 +279,6 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
                     <IrmDetailsButton
                       marketUid={marketUid}
                       marketName={marketName ?? name}
-                      currentUtilization={currentUtilization}
                       currentDepositRate={currentDepositRate}
                       currentBorrowRate={currentBorrowRate}
                     />

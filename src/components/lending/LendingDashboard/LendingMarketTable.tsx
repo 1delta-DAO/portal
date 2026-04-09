@@ -116,9 +116,6 @@ export const LendingMarketTable: React.FC<Props> = ({
                       positionDot={!!hasPosition}
                       marketUid={pool.marketUid}
                       marketName={pool.name}
-                      currentUtilization={
-                        pool.totalDeposits > 0 ? pool.totalDebt / pool.totalDeposits : undefined
-                      }
                       currentDepositRate={depositTotal}
                       currentBorrowRate={borrowTotal}
                       oraclePriceUsd={pool.oraclePriceUSD}
@@ -320,9 +317,6 @@ const MobilePoolCards: React.FC<{
                 positionDot={!!hasPosition}
                 marketUid={pool.marketUid}
                 marketName={pool.name}
-                currentUtilization={
-                  pool.totalDeposits > 0 ? pool.totalDebt / pool.totalDeposits : undefined
-                }
                 currentDepositRate={mDepTotal}
                 currentBorrowRate={mBorTotal}
                 oraclePriceUsd={pool.oraclePriceUSD}

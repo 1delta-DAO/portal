@@ -14,6 +14,7 @@ export interface IrmMarket {
   chainId: string
   underlyingAddress: string
   marketName: string
+  currentUtilization?: number
   points: IrmPoint[]
 }
 
