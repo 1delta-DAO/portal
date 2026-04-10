@@ -43,7 +43,7 @@ function configBorrowLiquidity(g: PoolConfigGroup): number {
   for (const item of g.borrowables ?? []) {
     if (!seen.has(item.marketUid)) {
       seen.add(item.marketUid)
-      total += item.totalDepositsUsd - item.totalDebtUsd
+      total += item.totalLiquidityUsd ?? (item.totalDepositsUsd - item.totalDebtUsd)
     }
   }
   return total
@@ -411,8 +411,12 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
       })
     }
     return [...filtered].sort((a, b) => {
-      const aLiq = a.totalDepositsUsd - (type === 'borrowable' ? a.totalDebtUsd : 0)
-      const bLiq = b.totalDepositsUsd - (type === 'borrowable' ? b.totalDebtUsd : 0)
+      const aLiq = type === 'borrowable'
+        ? (a.totalLiquidityUsd ?? (a.totalDepositsUsd - a.totalDebtUsd))
+        : a.totalDepositsUsd
+      const bLiq = type === 'borrowable'
+        ? (b.totalLiquidityUsd ?? (b.totalDepositsUsd - b.totalDebtUsd))
+        : b.totalDepositsUsd
       return bLiq - aLiq
     })
   }, [items, type, filter])
@@ -521,14 +525,22 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
                         </td>
                         <td>
                           <div className="flex flex-col">
-                            <span className="text-xs" title={`$${formatUsd(item.totalDepositsUsd - item.totalDebtUsd)}`}>
-                              {abbreviateUsd(item.totalDepositsUsd - item.totalDebtUsd)}
-                            </span>
-                            {pool && (
-                              <span className="text-[10px] text-base-content/50" title={formatTokenAmount(pool.totalLiquidity)}>
-                                {abbreviateNumber(pool.totalLiquidity)} {sym}
-                              </span>
-                            )}
+                            {(() => {
+                              const liqUsd = item.totalLiquidityUsd ?? (item.totalDepositsUsd - item.totalDebtUsd)
+                              const liqToken = item.totalLiquidity ?? pool?.totalLiquidity
+                              return (
+                                <>
+                                  <span className="text-xs" title={`$${formatUsd(liqUsd)}`}>
+                                    {abbreviateUsd(liqUsd)}
+                                  </span>
+                                  {liqToken != null && (
+                                    <span className="text-[10px] text-base-content/50" title={formatTokenAmount(liqToken)}>
+                                      {abbreviateNumber(liqToken)} {sym}
+                                    </span>
+                                  )}
+                                </>
+                              )
+                            })()}
                           </div>
                         </td>
                         <td>
@@ -609,10 +621,16 @@ const ConfigTable: React.FC<ConfigTableProps> = ({
                   }
                   return (
                     <>
-                      <span title={pool ? `${formatTokenAmount(pool.totalLiquidity)} ${item.underlyingInfo.asset.symbol}` : undefined}>
-                        Liq: {abbreviateUsd(item.totalDepositsUsd - item.totalDebtUsd)}
-                        {pool && <span className="text-base-content/40"> ({abbreviateNumber(pool.totalLiquidity)})</span>}
-                      </span>
+                      {(() => {
+                        const liqUsd = item.totalLiquidityUsd ?? (item.totalDepositsUsd - item.totalDebtUsd)
+                        const liqToken = item.totalLiquidity ?? pool?.totalLiquidity
+                        return (
+                          <span title={liqToken != null ? `${formatTokenAmount(liqToken)} ${item.underlyingInfo.asset.symbol}` : undefined}>
+                            Liq: {abbreviateUsd(liqUsd)}
+                            {liqToken != null && <span className="text-base-content/40"> ({abbreviateNumber(liqToken)})</span>}
+                          </span>
+                        )
+                      })()}
                       <span title={pool ? `${formatTokenAmount(pool.totalDebt)} ${item.underlyingInfo.asset.symbol}` : undefined}>
                         Debt: {abbreviateUsd(item.totalDebtUsd)}
                         {pool && <span className="text-base-content/40"> ({abbreviateNumber(pool.totalDebt)})</span>}

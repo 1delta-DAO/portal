@@ -289,6 +289,8 @@ export interface ConfigMarketItem {
   totalDepositsUsd: number
   variableBorrowRate: number
   borrowCollateralFactor: number
+  totalLiquidity?: number
+  totalLiquidityUsd?: number
 }
 
 // ============================================================================
