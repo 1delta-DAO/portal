@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
-import { useAccount } from 'wagmi'
+import { useSpyAccount } from '../../contexts/SpyMode'
 import { parseUnits, zeroAddress, type Address } from 'viem'
 import type { RawCurrency } from '../../types/currency'
 import { useSpotSwapQuote, type SpotSwapQuote } from '../../hooks/useSpotSwapQuote'
@@ -98,7 +98,7 @@ function SwapQuoteCard({
 }
 
 export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
-  const { address: account } = useAccount()
+  const { address: account } = useSpyAccount()
   const { syncChain, currentChainId } = useSyncChain()
   const { data: tokensMap } = useTokenLists(chainId)
   const isWrongChain = !!account && currentChainId !== Number(chainId)

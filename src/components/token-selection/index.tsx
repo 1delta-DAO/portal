@@ -11,7 +11,7 @@ import type { RawCurrency } from '../../types/currency'
 import { TokenSelectorDropdownMode } from './Dropdown'
 import { TokenSelectorListMode } from './ListMode'
 import type { TokenRowData } from './types'
-import { useAccount } from 'wagmi'
+import { useSpyAccount } from '../../contexts/SpyMode'
 import { getMainTokensCache, isMainToken } from '../../lib/assetLists'
 import { getUserTokensForChain, addUserToken, isUserToken } from '../../lib/userTokens'
 import { useDebounce } from '../../hooks/useDebounce'
@@ -39,7 +39,7 @@ export function TokenSelector({
   showSearch = true,
   listMode = false,
 }: TokenSelectorProps) {
-  const { address: userAddress } = useAccount()
+  const { address: userAddress } = useSpyAccount()
   const { data: lists, isLoading: listsLoading } = useTokenLists(chainId)
   const { data: chains } = useChainsRegistry()
   const [open, setOpen] = useState(false)

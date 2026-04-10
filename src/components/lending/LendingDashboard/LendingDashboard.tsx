@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
+import { OPTIMIZER_DEEPLINK_KEYS, type LendingDeepLinkAction } from '../../../utils/routes'
 import type {
   LenderData,
   LenderInfoMap,
@@ -79,6 +81,14 @@ export function LendingDashboard({
   const [selectedPool, setSelectedPool] = useState<PoolDataItem | null>(null)
   const [actionTab, setActionTab] = useState<ActionType>('Deposit')
 
+  // Optimizer → Lending deep-link consumer. The optimizer pushes
+  // ?col=&debt=&action=&config=&amt= when the user clicks Supply / Borrow on
+  // a row. We resolve the addresses against the current lender's `allPools`
+  // once they're loaded and seed the action panel exactly once, then strip
+  // the params so subsequent navigation isn't sticky.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const deepLinkConsumedRef = useRef<string | null>(null)
+
   // Persisted filters
   const {
     filters: lf,
@@ -134,6 +144,52 @@ export function LendingDashboard({
     if (!selectedLender || !lenderData) return []
     return lenderData[selectedLender] ?? []
   }, [lenderData, selectedLender])
+
+  // Hydrate the action panel from optimizer deep-link query params once the
+  // lender's pools are available. We dedupe by the param signature so that
+  // re-renders don't re-fire after we've stripped the params from the URL.
+  useEffect(() => {
+    if (allPools.length === 0) return
+    const colAddr = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.collateral)
+    const debtAddr = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.debt)
+    const actionParam = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.action) as
+      | LendingDeepLinkAction
+      | null
+    if (!colAddr && !debtAddr) return
+
+    const signature = `${selectedLender}:${colAddr ?? ''}:${debtAddr ?? ''}:${actionParam ?? ''}`
+    if (deepLinkConsumedRef.current === signature) return
+    deepLinkConsumedRef.current = signature
+
+    // For Borrow actions, the relevant pool is the *debt* pool — the user
+    // wants to borrow Y, and the receiving panel needs the collateral
+    // already in place via their existing position. For Supply / Withdraw /
+    // Repay the relevant pool is the collateral leg.
+    const targetAddress =
+      actionParam === 'borrow' || actionParam === 'repay' ? debtAddr : colAddr
+    if (targetAddress) {
+      const match = allPools.find(
+        (p) => p.underlying.toLowerCase() === targetAddress.toLowerCase()
+      )
+      if (match) setSelectedPool(match)
+    }
+
+    if (actionParam) {
+      const map: Record<LendingDeepLinkAction, ActionType> = {
+        deposit: 'Deposit',
+        withdraw: 'Withdraw',
+        borrow: 'Borrow',
+        repay: 'Repay',
+      }
+      setActionTab(map[actionParam])
+    }
+
+    // Strip the optimizer params so the next navigation starts clean. We
+    // keep any unrelated params intact.
+    const next = new URLSearchParams(searchParams)
+    for (const k of Object.values(OPTIMIZER_DEEPLINK_KEYS)) next.delete(k)
+    setSearchParams(next, { replace: true })
+  }, [allPools, searchParams, setSearchParams, selectedLender])
 
   // Config-grouped pool data (fetched when config view is active)
   const { data: configGroups, isLoading: isConfigLoading } = usePoolConfigData(

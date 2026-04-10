@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useAccount } from 'wagmi'
+import { useSpyAccount } from '../../contexts/SpyMode'
 import type { RawCurrency } from '../../types/currency'
 import { BACKEND_BASE_URL } from '../../config/backend'
 
@@ -24,7 +24,7 @@ interface UseBalanceQueryParams {
  * Returns nested record: chainId -> lowercase address -> { value, raw }.
  */
 export function useBalanceQuery({ currencies, enabled = true }: UseBalanceQueryParams) {
-  const { address: account } = useAccount()
+  const { address: account } = useSpyAccount()
 
   const assetsKey = currencies
     .map((c) => `${c.chainId}:${c.address.toLowerCase()}`)

@@ -124,16 +124,26 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   refetchBalances,
   onAccountIdChange,
   onPoolSelectionChange,
+  initialSelection,
 }) => {
   const { data: chainTokens } = useTokenLists(chainId)
 
-  // Pool selections
-  const [collateralPool, setCollateralPool] = useState<PoolDataItem | null>(null)
-  const [debtPool, setDebtPool] = useState<PoolDataItem | null>(null)
+  // Pool selections — seeded once from `initialSelection` if a deep link
+  // (e.g. the Optimizer's "Loop this" button) provided one. The parent
+  // strips the URL params after passing the resolved pools through, so this
+  // initialiser only fires on mount.
+  const [collateralPool, setCollateralPool] = useState<PoolDataItem | null>(
+    initialSelection?.collateralPool ?? null
+  )
+  const [debtPool, setDebtPool] = useState<PoolDataItem | null>(
+    initialSelection?.debtPool ?? null
+  )
 
-  // Amounts
+  // Amounts — pre-fill the pay amount when the optimizer hands one through.
   const [debtAmount, setDebtAmount] = useState('')
-  const [payAmount, setPayAmount] = useState('')
+  const [payAmount, setPayAmount] = useState(
+    initialSelection?.amount != null ? String(initialSelection.amount) : ''
+  )
 
   // Pay currency
   const [payCurrencyAddress, setPayCurrencyAddress] = useState<string | null>(null)

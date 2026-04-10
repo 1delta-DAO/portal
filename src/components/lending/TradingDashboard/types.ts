@@ -37,6 +37,18 @@ export interface QuoteResponse {
   actions: { transactions: Tx[]; permissions: Tx[] } | null
 }
 
+/**
+ * Optional pre-filled selection passed in from a deep link (e.g. the
+ * Optimizer's "Loop this" button). Each leg is matched against the lender's
+ * pools by underlying address upstream and resolved to a `PoolDataItem`.
+ */
+export interface InitialActionSelection {
+  collateralPool?: PoolDataItem
+  debtPool?: PoolDataItem
+  /** Token-unit amount the user typed in the optimizer (collateral side). */
+  amount?: number
+}
+
 export interface TradingActionProps {
   allPools: PoolDataItem[]
   /** All pools (dropdowns show all, with preferred ones bumped to top). */
@@ -58,4 +70,6 @@ export interface TradingActionProps {
   refetchBalances?: () => void
   onAccountIdChange: (accountId: string | null) => void
   onPoolSelectionChange: (selections: SelectedPool[]) => void
+  /** Deep-link seed (e.g. Optimizer → Loop). Consumed once on mount. */
+  initialSelection?: InitialActionSelection
 }

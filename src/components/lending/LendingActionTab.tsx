@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { parseUnits } from 'viem'
-import { useAccount } from 'wagmi'
+import { useSpyAccount } from '../../contexts/SpyMode'
 import type { RawCurrency } from '../../types/currency'
 import { LenderData, PoolDataItem } from '../../hooks/lending/usePoolData'
 import { sortLenderKeysByTvl } from '../../utils/format'
@@ -39,7 +39,7 @@ const renderCurrency = (asset: RawCurrency) => {
 }
 
 export const LendingActionTab = ({ lenderData, actionType, chainId }: Props) => {
-  const { address: account } = useAccount()
+  const { address: account } = useSpyAccount()
   const { send, sending: txSending } = useSendLendingTransaction({ chainId, account })
 
   const lenders = useMemo(() => sortLenderKeysByTvl(lenderData), [lenderData])

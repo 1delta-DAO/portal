@@ -9,6 +9,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { config } from './wagmi'
 import App from './App'
 import { ToastProvider } from './components/common/ToastHost'
+import { SpyModeProvider } from './contexts/SpyMode'
 import { rainbowDaisyTheme } from './rainbowkitTheme'
 
 const client = new QueryClient()
@@ -19,9 +20,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={client}>
         <RainbowKitProvider theme={rainbowDaisyTheme}>
           <BrowserRouter>
-            <ToastProvider>
-              <App />
-            </ToastProvider>
+            <SpyModeProvider>
+              <ToastProvider>
+                <App />
+              </ToastProvider>
+            </SpyModeProvider>
           </BrowserRouter>
         </RainbowKitProvider>
       </QueryClientProvider>

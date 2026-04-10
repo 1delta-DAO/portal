@@ -1,4 +1,7 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { OPTIMIZER_DEEPLINK_KEYS } from '../../../utils/routes'
+import type { InitialActionSelection } from './types'
 import type {
   LenderData,
   LenderInfoMap,
@@ -131,6 +134,53 @@ export function TradingDashboard({
     if (!selectedLender || !lenderData) return []
     return lenderData[selectedLender] ?? []
   }, [lenderData, selectedLender])
+
+  // Optimizer → Loop deep-link consumer. Once the lender's pools are
+  // loaded, resolve the `?col=&debt=` addresses to PoolDataItems and pass
+  // them down to the action panel as `initialSelection`. The matched
+  // selection is held in a ref so it survives until the action component
+  // mounts (LoopAction reads it via initialState), then we strip the URL
+  // params so subsequent navigation isn't sticky.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialSelectionRef = useRef<InitialActionSelection | null>(null)
+  const [, forceRender] = useState(0)
+  const deepLinkConsumedRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (allPools.length === 0) return
+    const colAddr = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.collateral)
+    const debtAddr = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.debt)
+    const amountStr = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.amount)
+    if (!colAddr && !debtAddr) return
+
+    const signature = `${selectedLender}:${colAddr ?? ''}:${debtAddr ?? ''}:${amountStr ?? ''}`
+    if (deepLinkConsumedRef.current === signature) return
+    deepLinkConsumedRef.current = signature
+
+    const collateralPool =
+      colAddr != null
+        ? allPools.find((p) => p.underlying.toLowerCase() === colAddr.toLowerCase())
+        : undefined
+    const debtPool =
+      debtAddr != null
+        ? allPools.find((p) => p.underlying.toLowerCase() === debtAddr.toLowerCase())
+        : undefined
+
+    if (collateralPool || debtPool) {
+      initialSelectionRef.current = {
+        collateralPool,
+        debtPool,
+        amount: amountStr ? Number(amountStr) || undefined : undefined,
+      }
+      // Force a re-render so `actionProps.initialSelection` picks up the
+      // new ref content; LoopAction will be remounted via its `key` below.
+      forceRender((n) => n + 1)
+    }
+
+    const next = new URLSearchParams(searchParams)
+    for (const k of Object.values(OPTIMIZER_DEEPLINK_KEYS)) next.delete(k)
+    setSearchParams(next, { replace: true })
+  }, [allPools, searchParams, setSearchParams, selectedLender])
 
   // Config-grouped pool data
   const { data: configGroups, isLoading: isConfigLoading } = usePoolConfigData(
@@ -279,6 +329,27 @@ export function TradingDashboard({
     )
   }
 
+  // Pull (and clear) any pending deep-link selection so we hand it to the
+  // action exactly once. The receiving action's `key` includes the
+  // selection signature, which forces a fresh mount that re-runs its
+  // initialiser with the new pools.
+  const pendingSelection = initialSelectionRef.current
+  if (pendingSelection) initialSelectionRef.current = null
+  const initialSelectionKey = pendingSelection
+    ? `${pendingSelection.collateralPool?.marketUid ?? ''}:${
+        pendingSelection.debtPool?.marketUid ?? ''
+      }:${pendingSelection.amount ?? ''}`
+    : ''
+
+  // Whenever a deep-link arrives, force the active operation to Loop —
+  // every Optimizer row maps to a leveraged loop, not a swap or close.
+  useEffect(() => {
+    if (pendingSelection && activeOperation !== 'Loop') {
+      setActiveOperation('Loop')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSelectionKey])
+
   const actionProps = {
     allPools,
     collateralPools,
@@ -296,6 +367,7 @@ export function TradingDashboard({
     refetchBalances,
     onAccountIdChange: handleAccountIdChange,
     onPoolSelectionChange: handlePoolSelectionChange,
+    initialSelection: pendingSelection ?? undefined,
   }
 
   return (
@@ -452,7 +524,9 @@ export function TradingDashboard({
             </button>
           ) : (
             <>
-              {activeOperation === 'Loop' && <LoopAction key={selectedLender} {...actionProps} />}
+              {activeOperation === 'Loop' && (
+                <LoopAction key={`${selectedLender}:${initialSelectionKey}`} {...actionProps} />
+              )}
               {activeOperation === 'ColSwap' && (
                 <ColSwapAction key={selectedLender} {...actionProps} />
               )}

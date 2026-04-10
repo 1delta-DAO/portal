@@ -1,7 +1,7 @@
 // src/components/LenderTab.tsx
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useAccount } from 'wagmi'
+import { useSpyAccount } from '../../contexts/SpyMode'
 import { useChains } from '../../hooks/useChains'
 import { UserLenderPositionsTable } from './UserTable'
 import { UserAssetsTable } from './UserAssetsTable'
@@ -14,12 +14,15 @@ import { useTokenLists } from '../../hooks/useTokenLists'
 import { LendingDashboard } from './LendingDashboard'
 import { TradingDashboard } from './TradingDashboard'
 import { SpotSwapPanel } from '../swap/SpotSwapPanel'
+import { OptimizerTab } from './Optimizer'
 import { tabFromSlug, slugToLender, buildPath } from '../../utils/routes'
 
-export type SubTab = 'earn' | 'lending' | 'trading' | 'swap'
+const OPTIMIZER_ENABLED = import.meta.env.VITE_OPTIMIZER_ENABLED === 'true'
+
+export type SubTab = 'earn' | 'lending' | 'trading' | 'swap' | 'optimize'
 
 export function LenderTab() {
-  const { address: account } = useAccount()
+  const { address: account } = useSpyAccount()
   const { chains, isLoading: isChainsLoading } = useChains()
   const navigate = useNavigate()
   const { tab: tabSlug, chainId: chainIdParam, lender: lenderParam } = useParams()
@@ -180,6 +183,17 @@ export function LenderTab() {
             Looping
           </button>
 
+          {OPTIMIZER_ENABLED && (
+            <button
+              type="button"
+              role="tab"
+              className={`tab tab-sm ${activeTab === 'optimize' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('optimize')}
+            >
+              Optimizer
+            </button>
+          )}
+
           <button
             type="button"
             role="tab"
@@ -292,6 +306,8 @@ export function LenderTab() {
           onLenderChange={setSelectedLender}
         />
       )}
+
+      {OPTIMIZER_ENABLED && activeTab === 'optimize' && <OptimizerTab chainId={effectiveChainId} />}
 
       {activeTab === 'swap' && <SpotSwapPanel chainId={effectiveChainId} />}
     </div>

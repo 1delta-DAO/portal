@@ -78,6 +78,11 @@ export const evmChainWagmi: [Chain, ...Chain[]] = [
 ]
 
 const RPC_OVERRIDES: Record<number, string> = {
+  // viem's default mainnet RPC is https://eth.merkle.io which blocks browser
+  // CORS — every connector bootstrap (MetaMask SDK, WC, Coinbase, …) probes
+  // the first chain in `chains` on mount, so without an override every page
+  // load throws a burst of CORS errors against eth.merkle.io.
+  [mainnet.id]: 'https://ethereum-rpc.publicnode.com',
   [bsc.id]: 'https://bsc-dataseed1.bnbchain.org',
   [metis.id]: 'https://metis-andromeda.rpc.thirdweb.com',
 }
