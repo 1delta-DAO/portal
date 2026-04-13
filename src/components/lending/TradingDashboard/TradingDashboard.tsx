@@ -321,14 +321,6 @@ export function TradingDashboard({
     setSelectedSubAccountId(id)
   }, [])
 
-  if (isPublicDataLoading) {
-    return (
-      <div className="flex justify-center items-center py-10">
-        <span className="loading loading-spinner loading-lg" />
-      </div>
-    )
-  }
-
   // Pull (and clear) any pending deep-link selection so we hand it to the
   // action exactly once. The receiving action's `key` includes the
   // selection signature, which forces a fresh mount that re-runs its
@@ -349,6 +341,14 @@ export function TradingDashboard({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSelectionKey])
+
+  if (isPublicDataLoading) {
+    return (
+      <div className="flex justify-center items-center py-10">
+        <span className="loading loading-spinner loading-lg" />
+      </div>
+    )
+  }
 
   const actionProps = {
     allPools,

@@ -163,14 +163,6 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
 
   const { data: chainTokens } = useTokenLists(chainId)
 
-  if (!chainId) {
-    return (
-      <div className="w-full max-w-6xl mx-auto p-3 sm:p-4">
-        <p className="text-sm text-base-content/70">Select a chain to view lending markets.</p>
-      </div>
-    )
-  }
-
   // Convert selected PoolEntry to PoolDataItem using inline asset data
   const resolvedPool = useMemo(
     () => (selectedEntry ? poolEntryToPoolDataItem(selectedEntry) : null),
@@ -192,7 +184,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   }, [selectedEntry, selectedIsWrappedNative])
 
   const { balances: walletBalances } = useTokenBalances({
-    chainId,
+    chainId: chainId ?? '',
     account,
     assets: selectedAssets,
   })
@@ -543,6 +535,14 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       setSelectedEntry(entry)
       setShowMobileDeposit(true)
     }
+  }
+
+  if (!chainId) {
+    return (
+      <div className="w-full max-w-6xl mx-auto p-3 sm:p-4">
+        <p className="text-sm text-base-content/70">Select a chain to view lending markets.</p>
+      </div>
+    )
   }
 
   if (loading) {
