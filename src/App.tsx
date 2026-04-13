@@ -4,6 +4,7 @@ import { ThemeSwitcher } from './components/themeSwitcher'
 import { WalletConnect } from './components/connect'
 import { PortalLogo } from './components/PortalLogo'
 import { IrmDockProvider } from './components/lending/IrmDock'
+import { ErrorBoundary } from './components/common/ErrorBoundary'
 
 export default function App() {
   return (
@@ -31,10 +32,12 @@ export default function App() {
                   is reclaimed for the data. Desktop keeps the framed look. */}
               <div className="card bg-base-100 sm:shadow-xl rounded-none sm:rounded-2xl">
                 <div className="card-body p-3 sm:p-6">
-                  <Routes>
-                    <Route path="/:tab?/:chainId?/:lender?" element={<LenderTab />} />
-                    <Route path="*" element={<Navigate to="/earn" replace />} />
-                  </Routes>
+                  <ErrorBoundary>
+                    <Routes>
+                      <Route path="/:tab?/:chainId?/:lender?" element={<LenderTab />} />
+                      <Route path="*" element={<Navigate to="/earn" replace />} />
+                    </Routes>
+                  </ErrorBoundary>
                 </div>
               </div>
             </div>
