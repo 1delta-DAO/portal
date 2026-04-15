@@ -206,6 +206,7 @@ export const CloseAction: React.FC<TradingActionProps> = ({
                 maxAmount={maxInputStr}
                 onSelect={(v) => { setInputAmount(v); setIsAll(false); reset() }}
                 onMax={() => { setInputAmount(maxInputStr); setIsAll(true); reset() }}
+                decimals={collateralPool?.asset?.decimals}
               />
             )}
           </div>
@@ -268,6 +269,7 @@ export const CloseAction: React.FC<TradingActionProps> = ({
                 maxAmount={maxOutputStr}
                 onSelect={(v) => { setOutputAmount(v); setIsAll(false); reset() }}
                 onMax={() => { setOutputAmount(maxOutputStr); reset() }}
+                decimals={debtPool?.asset?.decimals}
               />
             )}
           </div>

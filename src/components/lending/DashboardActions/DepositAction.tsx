@@ -145,6 +145,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
         value={amount}
         onChange={setAmount}
         maxAmount={walletAmountStr}
+        decimals={pool?.asset?.decimals}
         disabled={!pool}
         error={overMax ? `Exceeds wallet balance (${formatTokenAmount(walletAmountStr)}).` : null}
       />

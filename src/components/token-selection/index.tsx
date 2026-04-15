@@ -5,7 +5,7 @@ import { useTokenLists } from '../../hooks/useTokenLists'
 import { useBalanceQuery } from '../../hooks/balances/useBalanceQuery'
 import { usePriceQuery } from '../../hooks/prices/usePriceQuery'
 import { useChainsRegistry } from '../../sdk/hooks/useChainsRegistry'
-import { getWNativeAddress, SupportedChainId } from '../../sdk/types'
+import { SupportedChainId } from '../../sdk/types'
 import { getCurrency } from '../../lib/trade-helpers/utils'
 import type { RawCurrency } from '../../types/currency'
 import { TokenSelectorDropdownMode } from './Dropdown'
@@ -155,25 +155,11 @@ export function TokenSelector({
     // Native
     relevantTokens.push(zeroAddress as Address)
 
-    const wrappedNative = getWNativeAddress(chainId)
-    if (wrappedNative) {
-      const wrappedAddr = wrappedNative.toLowerCase()
-      const wrappedLower = Object.keys(tokensMap).find((addr) => addr.toLowerCase() === wrappedAddr)
-      if (wrappedLower && !isAlreadyIncluded(wrappedLower)) {
-        relevantTokens.push(wrappedLower as Address)
-      } else {
-        const nativeSymbol = nativeCurrencySymbol
-        const wrappedEntry = Object.entries(tokensMap).find(([addr, t]: [string, any]) => {
-          const addrLower = addr.toLowerCase()
-          const isWrapped = addrLower === wrappedAddr
-          const hasWnativeProp = t?.props?.wnative === true
-          const assetGroupMatches = t?.assetGroup?.toUpperCase() === nativeSymbol
-          return (isWrapped || hasWnativeProp || assetGroupMatches) && !isAlreadyIncluded(addr)
-        })
-        if (wrappedEntry) {
-          relevantTokens.push(wrappedEntry[0] as Address)
-        }
-      }
+    const wrappedEntry = Object.entries(tokensMap).find(
+      ([addr, t]: [string, any]) => t?.props?.wnative === true && !isAlreadyIncluded(addr)
+    )
+    if (wrappedEntry) {
+      relevantTokens.push(wrappedEntry[0] as Address)
     }
 
     // USDC selection logic

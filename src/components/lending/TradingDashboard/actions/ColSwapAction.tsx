@@ -204,6 +204,7 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
                 maxAmount={maxSwapStr}
                 onSelect={(v) => { setInputAmount(v); setIsMaxIn(false); reset() }}
                 onMax={() => { setInputAmount(maxSwapStr); setIsMaxIn(true); reset() }}
+                decimals={colInPool?.asset?.decimals}
               />
             )}
           </div>

@@ -20,7 +20,7 @@ Set `VITE_BACKEND_BASE_URL` in `.env` to override the default API endpoint. A `V
 - **TanStack Query 5** — async data fetching and caching
 - **react-router-dom 7** — URL-driven routing
 - **react-window 2** — virtualized tables
-- **1delta packages** (`@1delta/chain-registry`, `@1delta/providers`, `@1delta/wnative`) — chain metadata, RPC providers, and wrapped-native helpers
+- **1delta packages** (`@1delta/chain-registry`, `@1delta/providers`) — chain metadata and RPC providers
 
 ## Features
 

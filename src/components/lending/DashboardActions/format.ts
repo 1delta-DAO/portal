@@ -116,13 +116,21 @@ export function sanitizeAmountInput(v: string): string | null {
 
 /**
  * Multiply a decimal string amount by a fraction using BigInt arithmetic
- * to avoid floating-point precision loss. Truncates (rounds down) to the
- * input's decimal precision so the result never exceeds the original balance.
+ * to avoid floating-point precision loss. Truncates (rounds down) so the
+ * result never exceeds the original balance. When `maxDecimals` is given,
+ * the result is also truncated to that many decimal places — necessary
+ * because upstream balance strings may carry float-representation
+ * artifacts (e.g. `0.30000000000000004`) that would otherwise leak into
+ * the output and produce an 18-decimal display for a 6-decimal token.
  */
-export function multiplyAmountString(amount: string, fraction: number): string {
+export function multiplyAmountString(
+  amount: string,
+  fraction: number,
+  maxDecimals?: number
+): string {
   if (!amount || fraction <= 0) return ''
 
-  if (fraction === 1) return amount
+  if (fraction === 1) return clampDecimals(amount, maxDecimals)
 
   // Determine the input's decimal places
   const dotIdx = amount.indexOf('.')
@@ -163,6 +171,20 @@ export function multiplyAmountString(amount: string, fraction: number): string {
 
   const padded = resultStr.padStart(totalDecimals + 1, '0')
   const intPart = padded.slice(0, padded.length - totalDecimals)
-  const decPart = padded.slice(padded.length - totalDecimals).replace(/0+$/, '')
+  let decPart = padded.slice(padded.length - totalDecimals)
+  if (maxDecimals != null && decPart.length > maxDecimals) {
+    decPart = decPart.slice(0, maxDecimals)
+  }
+  decPart = decPart.replace(/0+$/, '')
+  return decPart ? `${intPart}.${decPart}` : intPart
+}
+
+function clampDecimals(amount: string, maxDecimals?: number): string {
+  if (maxDecimals == null) return amount
+  const dotIdx = amount.indexOf('.')
+  if (dotIdx < 0) return amount
+  if (maxDecimals === 0) return amount.slice(0, dotIdx)
+  const decPart = amount.slice(dotIdx + 1, dotIdx + 1 + maxDecimals).replace(/0+$/, '')
+  const intPart = amount.slice(0, dotIdx)
   return decPart ? `${intPart}.${decPart}` : intPart
 }

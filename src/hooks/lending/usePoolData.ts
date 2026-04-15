@@ -156,6 +156,7 @@ export interface PoolAsset {
   assetGroup: string
   currencyId: string
   pendle?: PendleAssetData
+  props?: { [key: string]: any }
 }
 
 export interface PendleAssetData {
@@ -197,6 +198,7 @@ function rawMarketToPoolDataItem(raw: RawMarket): PoolDataItem {
       assetGroup: asset.assetGroup,
       currencyId: asset.currencyId,
       pendle: asset.props?.pendle as PendleAssetData | undefined,
+      props: asset.props,
     },
     totalDeposits: raw.totalDeposits,
     totalDebtStable: raw.totalDebtStable,

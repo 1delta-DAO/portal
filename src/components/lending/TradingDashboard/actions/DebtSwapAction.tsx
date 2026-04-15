@@ -245,6 +245,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
                 maxAmount={maxSwapStr}
                 onSelect={(v) => { setOutputAmount(v); reset() }}
                 onMax={() => { setOutputAmount(maxSwapStr); reset() }}
+                decimals={debtOutPool?.asset?.decimals}
               />
             )}
           </div>

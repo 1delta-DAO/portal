@@ -7,6 +7,8 @@ interface AmountQuickButtonsProps {
   onSelect: (amountStr: string) => void
   /** Called when "Max" is clicked instead of onSelect, e.g. to toggle isAll */
   onMax?: () => void
+  /** Token decimals — clamps preset results to this precision. */
+  decimals?: number
 }
 
 const entries = [
@@ -20,6 +22,7 @@ export const AmountQuickButtons: React.FC<AmountQuickButtonsProps> = ({
   maxAmount,
   onSelect,
   onMax,
+  decimals,
 }) => {
   const n = parseFloat(maxAmount)
   if (!maxAmount || !Number.isFinite(n) || n <= 0) {
@@ -35,7 +38,7 @@ export const AmountQuickButtons: React.FC<AmountQuickButtonsProps> = ({
             if (e.fraction === 1) {
               onMax ? onMax() : onSelect(maxAmount)
             } else {
-              onSelect(multiplyAmountString(maxAmount, e.fraction))
+              onSelect(multiplyAmountString(maxAmount, e.fraction, decimals))
             }
           }}
         >

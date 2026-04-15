@@ -392,7 +392,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
         <div className="form-control mt-1.5">
           <div className="flex items-center justify-between mb-0.5">
             <label className="label-text text-xs">Debt Amount</label>
-            <AmountQuickButtons maxAmount={maxBorrowableStr} onSelect={setDebtAmount} />
+            <AmountQuickButtons maxAmount={maxBorrowableStr} onSelect={setDebtAmount} decimals={debtPool?.asset?.decimals} />
           </div>
           <input
             type="text"
@@ -495,7 +495,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
             <div className="flex items-center justify-between mb-0.5">
               <label className="label-text text-xs">Pay Amount</label>
               {payWalletBalance ? (
-                <AmountQuickButtons maxAmount={payWalletStr} onSelect={setPayAmount} />
+                <AmountQuickButtons maxAmount={payWalletStr} onSelect={setPayAmount} decimals={selectedPayCurrency.decimals} />
               ) : null}
             </div>
             <input

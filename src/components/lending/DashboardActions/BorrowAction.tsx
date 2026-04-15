@@ -158,6 +158,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
         value={amount}
         onChange={setAmount}
         maxAmount={borrowableStr}
+        decimals={pool?.asset?.decimals}
         disabled={!pool}
         error={overMax ? `Exceeds borrowable amount (${formatTokenAmount(borrowableStr)}).` : null}
       />

@@ -144,6 +144,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
         value={amount}
         onChange={handleAmountChange}
         maxAmount={withdrawableStr}
+        decimals={pool?.asset?.decimals}
         onMaxClick={handleMaxClick}
         disabled={!pool}
         error={overMax ? `Exceeds withdrawable balance (${formatTokenAmount(withdrawableStr)}).` : null}

@@ -32,6 +32,8 @@ interface AmountInputProps {
   /** Defaults to "Amount". */
   label?: React.ReactNode
   placeholder?: string
+  /** Token decimals — clamps preset results so e.g. USDC never shows 18 dp. */
+  decimals?: number
 }
 
 /**
@@ -48,6 +50,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({
   disabled,
   label = 'Amount',
   placeholder = '0.0',
+  decimals,
 }) => (
   <>
     <div className="form-control">
@@ -57,6 +60,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({
           maxAmount={maxAmount}
           onSelect={onChange}
           onMax={onMaxClick}
+          decimals={decimals}
         />
       </div>
       <input

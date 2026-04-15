@@ -188,6 +188,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
         value={amount}
         onChange={handleAmountChange}
         maxAmount={repayMaxStr}
+        decimals={pool?.asset?.decimals}
         onMaxClick={handleMaxClick}
         disabled={!pool}
         error={amountErrorMessage}

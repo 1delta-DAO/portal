@@ -12,7 +12,6 @@
   "dependencies": {
     "@1delta/chain-registry": "^0.0.4",
     "@1delta/providers": "^0.0.53",
-    "@1delta/wnative": "^0.0.6",
     "@rainbow-me/rainbowkit": "^2.2.10",
     "@tailwindcss/postcss": "^4.2.2",
     "@tanstack/react-query": "5.91.3",
