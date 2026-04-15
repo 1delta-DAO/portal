@@ -10,6 +10,18 @@ pnpm i && pnpm start
 
 Set `VITE_BACKEND_BASE_URL` in `.env` to override the default API endpoint. A `VITE_WC_PROJECT_ID` (WalletConnect/Reown) is required for mobile wallet connections.
 
+## Backend API (for integrators)
+
+The UI talks to the 1delta backend at `https://portal.1delta.io`. The API reference is at [`https://portal.1delta.io/v1/docs`](https://portal.1delta.io/v1/docs).
+
+**Do not call the API directly from a forked frontend.** Instead:
+
+1. Generate an API key on the 1delta auth page: [`https://auth.1delta.io/`](https://auth.1delta.io/).
+2. Stand up a thin server-side proxy that forwards requests to `https://portal.1delta.io` and attaches your API key as a header. This keeps the key off the client bundle.
+3. Point `VITE_BACKEND_BASE_URL` at your proxy.
+
+Calling the public endpoint without a key (or exposing the key in client-side code) is not supported for production integrations.
+
 ## Tech Stack
 
 - **React 19** + **TypeScript 5.9** — UI framework
