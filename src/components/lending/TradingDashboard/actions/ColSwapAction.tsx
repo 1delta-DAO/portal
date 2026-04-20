@@ -175,7 +175,7 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
           subAccounts={subAccounts}
           selectedAccountId={accountId ?? null}
           onChange={onAccountIdChange}
-          allowCreate={subAccounts.length === 0}
+          allowCreate={false}
           chainId={chainId}
           lender={selectedLender}
           account={account}

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import type { UserSubAccount } from '../../../hooks/lending/useUserData'
 import { abbreviateUsd } from '../../../utils/format'
-import { fetchNextAccount, type NextAccountData } from '../../../sdk/lending-helper/fetchNextAccount'
+import { useNextAccount } from '../../../hooks/lending/useLenderAccounts'
 
 interface SubAccountSelectorProps {
   subAccounts: UserSubAccount[]
@@ -15,6 +15,10 @@ interface SubAccountSelectorProps {
   account?: string
 }
 
+function isPlaceholder(sub: UserSubAccount): boolean {
+  return sub.health == null && sub.positions.length === 0
+}
+
 export const SubAccountSelector: React.FC<SubAccountSelectorProps> = ({
   subAccounts,
   selectedAccountId,
@@ -24,29 +28,15 @@ export const SubAccountSelector: React.FC<SubAccountSelectorProps> = ({
   lender,
   account,
 }) => {
-  const [nextAccount, setNextAccount] = useState<NextAccountData | null>(null)
-  const [loadingNext, setLoadingNext] = useState(false)
   const [creatingNew, setCreatingNew] = useState(false)
   const [customId, setCustomId] = useState('')
 
-  // Fetch next account info when create is allowed and we have the required params
-  useEffect(() => {
-    if (!allowCreate || !chainId || !lender || !account) {
-      setNextAccount(null)
-      return
-    }
-
-    let cancelled = false
-    setLoadingNext(true)
-
-    fetchNextAccount({ chainId, lender, account }).then((res) => {
-      if (cancelled) return
-      setNextAccount(res.success && res.data ? res.data : null)
-      setLoadingNext(false)
-    })
-
-    return () => { cancelled = true }
-  }, [allowCreate, chainId, lender, account])
+  // Shared cache with useLenderAccounts in the dashboard.
+  const { data: nextAccount, isLoading: loadingNext } = useNextAccount({
+    chainId,
+    lender,
+    account,
+  })
 
   // Reset "creating new" state when switching lenders etc.
   useEffect(() => {
@@ -54,7 +44,7 @@ export const SubAccountSelector: React.FC<SubAccountSelectorProps> = ({
     setCustomId('')
   }, [chainId, lender])
 
-  // Available IDs for SELECT mode: unused IDs within the range
+  // Taken IDs — used to flag collisions when the user types a SELECT-mode ID.
   const activeSet = useMemo(() => {
     if (!nextAccount) return new Set<string>()
     return new Set(nextAccount.activeAccountIds)
@@ -68,7 +58,6 @@ export const SubAccountSelector: React.FC<SubAccountSelectorProps> = ({
   const handleCreateClick = () => {
     if (isSelect) {
       setCreatingNew(true)
-      // Default to the suggested next ID
       const nextId = nextAccount!.nextAccountId
       setCustomId(nextId)
       onChange(nextId)
@@ -81,14 +70,10 @@ export const SubAccountSelector: React.FC<SubAccountSelectorProps> = ({
 
   const handleCustomIdChange = (val: string) => {
     setCustomId(val)
-    // Only pass valid numeric values
     if (/^\d+$/.test(val)) {
       onChange(val)
     }
   }
-
-  // Whether the selected ID is an existing sub-account
-  const isExistingSelected = subAccounts.some((s) => s.accountId === selectedAccountId)
 
   return (
     <div className="form-control">
@@ -96,6 +81,7 @@ export const SubAccountSelector: React.FC<SubAccountSelectorProps> = ({
       <div className="flex flex-wrap gap-1.5">
         {subAccounts.map((sub, i) => {
           const isActive = sub.accountId === selectedAccountId && !creatingNew
+          const placeholder = isPlaceholder(sub)
           return (
             <button
               key={sub.accountId}
@@ -104,22 +90,29 @@ export const SubAccountSelector: React.FC<SubAccountSelectorProps> = ({
                 isActive
                   ? 'border-primary bg-primary/10 ring-1 ring-primary'
                   : 'border-base-300 bg-base-200/50 hover:bg-base-200'
-              }`}
+              } ${placeholder ? 'opacity-60' : ''}`}
               onClick={() => {
                 setCreatingNew(false)
                 onChange(sub.accountId)
               }}
+              title={placeholder ? 'Existing account with no current position' : undefined}
             >
               <span className="font-semibold">#{i + 1}</span>
-              <span className="text-base-content/70">{abbreviateUsd(sub.balanceData.nav)}</span>
-              {sub.health != null && (
-                <span
-                  className={`badge badge-xs font-semibold ${
-                    sub.health < 1.1 ? 'badge-error' : sub.health < 1.3 ? 'badge-warning' : 'badge-success'
-                  }`}
-                >
-                  {sub.health.toFixed(2)}
-                </span>
+              {placeholder ? (
+                <span className="text-base-content/50 italic">empty</span>
+              ) : (
+                <>
+                  <span className="text-base-content/70">{abbreviateUsd(sub.balanceData.nav)}</span>
+                  {sub.health != null && (
+                    <span
+                      className={`badge badge-xs font-semibold ${
+                        sub.health < 1.1 ? 'badge-error' : sub.health < 1.3 ? 'badge-warning' : 'badge-success'
+                      }`}
+                    >
+                      {sub.health.toFixed(2)}
+                    </span>
+                  )}
+                </>
               )}
             </button>
           )

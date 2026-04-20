@@ -18,6 +18,7 @@ import type {
   UserSubAccount,
 } from '../../../hooks/lending/useUserData'
 import { useTokenBalances } from '../../../hooks/lending/useTokenBalances'
+import { useLenderAccounts } from '../../../hooks/lending/useLenderAccounts'
 import { useTokenLists } from '../../../hooks/useTokenLists'
 import { useSyncChain } from '../../../hooks/useSyncChain'
 import type { ActionType } from '../DashboardActions'
@@ -117,12 +118,21 @@ export function LendingDashboard({
   const [assetSearch, setAssetSearch] = useState('')
   const [showMobileAction, setShowMobileAction] = useState(false)
 
-  // Sub-accounts for the selected lender
-  const subAccounts: UserSubAccount[] = useMemo(() => {
+  // Sub-accounts from user-positions (balances + APRs)
+  const userSubAccounts: UserSubAccount[] = useMemo(() => {
     if (!selectedLender || !userData.raw) return []
     const entry = userData.raw.find((e) => e.chainId === chainId && e.lender === selectedLender)
     return entry?.data ?? []
   }, [userData, chainId, selectedLender])
+
+  // Merge with next-account activeAccountIds so existing-but-empty accounts
+  // (e.g. Gearbox Credit Accounts with no current position) still render.
+  const { subAccounts } = useLenderAccounts({
+    chainId,
+    lender: selectedLender,
+    account,
+    userSubAccounts,
+  })
 
   // Auto-select first sub-account when lender or sub-accounts change
   React.useEffect(() => {

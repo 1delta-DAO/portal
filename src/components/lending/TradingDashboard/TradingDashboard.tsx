@@ -17,6 +17,7 @@ import type {
   UserSubAccount,
 } from '../../../hooks/lending/useUserData'
 import { useTokenBalances } from '../../../hooks/lending/useTokenBalances'
+import { useLenderAccounts } from '../../../hooks/lending/useLenderAccounts'
 import { useSyncChain } from '../../../hooks/useSyncChain'
 import { WalletConnect } from '../../connect'
 import { useLenderSelector, LenderSelector } from '../LenderSelector'
@@ -109,12 +110,21 @@ export function TradingDashboard({
   const [showMobileAction, setShowMobileAction] = useState(false)
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
 
-  // Sub-accounts
-  const subAccounts: UserSubAccount[] = useMemo(() => {
+  // Sub-accounts from user-positions (balances + APRs)
+  const userSubAccounts: UserSubAccount[] = useMemo(() => {
     if (!selectedLender || !userData.raw) return []
     const entry = userData.raw.find((e) => e.chainId === chainId && e.lender === selectedLender)
     return entry?.data ?? []
   }, [userData, chainId, selectedLender])
+
+  // Merge with next-account activeAccountIds so existing-but-empty accounts
+  // (e.g. Gearbox Credit Accounts with no current position) still render.
+  const { subAccounts } = useLenderAccounts({
+    chainId,
+    lender: selectedLender,
+    account,
+    userSubAccounts,
+  })
 
   React.useEffect(() => {
     if (subAccounts.length > 0) {
