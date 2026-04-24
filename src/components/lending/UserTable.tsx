@@ -568,16 +568,16 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
       {/* Per-lender groups with sub-account rows */}
       <div className="rounded-box border border-base-300 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="table table-sm w-full">
+          <table className="table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden">
             <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
               <tr>
-                <th>Lender / Account</th>
-                <th>NAV</th>
-                <th>Deposits</th>
-                <th>Debt</th>
-                <th>APR</th>
-                <th>Health</th>
-                <th>Positions</th>
+                <th className="w-[18%]">Lender / Account</th>
+                <th className="w-[11%]">NAV</th>
+                <th className="w-[11%]">Deposits</th>
+                <th className="w-[11%]">Debt</th>
+                <th className="w-[11%]">APR</th>
+                <th className="w-[10%]">Health</th>
+                <th className="w-[28%]">Positions</th>
               </tr>
             </thead>
             <tbody>
@@ -592,19 +592,19 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                     {/* Lender header row */}
                     <tr className="bg-base-200/50">
                       <td colSpan={hasSingleSub ? 1 : 7}>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
                           {(entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI) && (
                             <img
                               src={entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI}
                               alt=""
-                              className="w-4 h-4 rounded-full object-contain"
+                              className="w-4 h-4 rounded-full object-contain shrink-0"
                             />
                           )}
-                          <span className="font-semibold text-sm">
+                          <span className="font-semibold text-sm truncate" title={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}>
                             {entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
                           </span>
                           {!hasSingleSub && (
-                            <span className="text-xs text-base-content/50">
+                            <span className="text-xs text-base-content/50 shrink-0">
                               {subs.length} accounts
                             </span>
                           )}

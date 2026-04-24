@@ -78,12 +78,12 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
       {/* Table */}
       <div className="rounded-box border border-base-300 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="table table-sm w-full">
+          <table className="table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden">
             <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
               <tr>
-                <th>Asset</th>
-                <th className="text-right">Balance</th>
-                <th className="text-right">USD Value</th>
+                <th className="w-[50%]">Asset</th>
+                <th className="w-[25%] text-right">Balance</th>
+                <th className="w-[25%] text-right">USD Value</th>
               </tr>
             </thead>
             <tbody>

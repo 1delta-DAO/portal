@@ -130,27 +130,27 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
     <div className="flex-1 min-w-0 rounded-box border border-base-300 overflow-hidden">
       {/* ── Desktop table ── */}
       <div className="hidden md:block overflow-x-auto">
-        <table className="table table-sm w-full">
+        <table className="table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden">
           <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
             <tr>
-              <th className="w-1/4">Market</th>
-              <th className="cursor-pointer" onClick={() => onToggleSort('apr')}>
+              <th className="w-[20%]">Market</th>
+              <th className="w-[11%] cursor-pointer" onClick={() => onToggleSort('apr')}>
                 APR{sortIndicator('apr')}
               </th>
-              <th className="cursor-pointer" onClick={() => onToggleSort('utilization')} title="Utilization">
+              <th className="w-[8%] cursor-pointer" onClick={() => onToggleSort('utilization')} title="Utilization">
                 Util.{sortIndicator('utilization')}
               </th>
-              <th className="cursor-pointer" onClick={() => onToggleSort('totalDepositsUSD')}>
+              <th className="w-[11%] cursor-pointer" onClick={() => onToggleSort('totalDepositsUSD')}>
                 Deposits{sortIndicator('totalDepositsUSD')}
               </th>
-              <th className="cursor-pointer" onClick={() => onToggleSort('totalLiquidityUSD')} title="Liquidity">
+              <th className="w-[10%] cursor-pointer" onClick={() => onToggleSort('totalLiquidityUSD')} title="Liquidity">
                 Liq.{sortIndicator('totalLiquidityUSD')}
               </th>
-              <th>Price</th>
-              <th className="cursor-pointer" onClick={() => onToggleSort('riskScore')}>
+              <th className="w-[10%]">Price</th>
+              <th className="w-[10%] cursor-pointer" onClick={() => onToggleSort('riskScore')}>
                 Risk{sortIndicator('riskScore')}
               </th>
-              <th>Exposures</th>
+              <th className="w-[20%]">Exposures</th>
             </tr>
           </thead>
           <tbody>
@@ -170,7 +170,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                   }`}
                   onClick={() => onRowClick(p)}
                 >
-                  <td className="w-1/4 max-w-48">
+                  <td>
                     <div className="flex items-center gap-1.5 min-w-0">
                       <AssetPopover
                         address={p.underlyingAddress || p.underlyingInfo?.asset?.address}

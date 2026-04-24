@@ -87,29 +87,29 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
 
       {/* Desktop table */}
       <div className="hidden md:block overflow-x-auto">
-        <table className="table table-sm w-full">
+        <table className="table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden">
           <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
             <tr>
-              <SortableHeader sortKey="symbol" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort}>
+              <SortableHeader sortKey="symbol" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort} className="w-[18%]">
                 Asset
               </SortableHeader>
-              <SortableHeader sortKey="depositApr" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort} title="Deposit APR">
+              <SortableHeader sortKey="depositApr" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort} title="Deposit APR" className="w-[11%]">
                 Dep APR
               </SortableHeader>
-              <SortableHeader sortKey="borrowApr" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort} title="Borrow APR">
+              <SortableHeader sortKey="borrowApr" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort} title="Borrow APR" className="w-[11%]">
                 Bor APR
               </SortableHeader>
-              <th>LTV</th>
-              <SortableHeader sortKey="totalDepositsUSD" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort} title="Total Deposits">
+              <th className="w-[10%]">LTV</th>
+              <SortableHeader sortKey="totalDepositsUSD" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort} title="Total Deposits" className="w-[13%]">
                 Deposits
               </SortableHeader>
-              <SortableHeader sortKey="totalDebtUSD" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort} title="Total Borrows">
+              <SortableHeader sortKey="totalDebtUSD" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort} title="Total Borrows" className="w-[13%]">
                 Borrows
               </SortableHeader>
-              <SortableHeader sortKey="totalLiquidityUSD" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort} title="Liquidity">
+              <SortableHeader sortKey="totalLiquidityUSD" activeKey={sortKey} activeDir={sortDir} onToggle={toggleSort} title="Liquidity" className="w-[12%]">
                 Liq.
               </SortableHeader>
-              <th>Risk</th>
+              <th className="w-[12%]">Risk</th>
             </tr>
           </thead>
           <tbody>
@@ -128,7 +128,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                   key={pool.marketUid}
                   className={`transition-colors ${role ? ROLE_STYLES[role] : ''}`}
                 >
-                  <td className="max-w-40">
+                  <td>
                     <AssetPopover
                       address={pool.underlying}
                       name={pool.asset.name}
