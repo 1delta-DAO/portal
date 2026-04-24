@@ -1,9 +1,139 @@
 import React, { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { PoolRiskBreakdown } from '../../hooks/lending/useFlattenedPools'
+import type { PoolOwnerShare, PoolRiskBreakdown } from '../../hooks/lending/useFlattenedPools'
 import { riskDotColor } from './MarketsView/helpers'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { ModalHeader } from '../common/ModalHeader'
+
+// DaisyUI theme tokens — keep slice colors consistent with the rest of the app
+// and re-color automatically on theme switch.
+const PIE_PALETTE = [
+  'var(--color-primary)',
+  'var(--color-secondary)',
+  'var(--color-accent)',
+  'var(--color-info)',
+  'var(--color-success)',
+  'var(--color-warning)',
+  'var(--color-error)',
+]
+const PIE_OTHERS_COLOR = 'var(--color-base-content)'
+
+function shortOwner(owner: string): string {
+  if (owner === 'others') return 'others'
+  if (owner.startsWith('0x') && owner.length > 12) {
+    return `${owner.slice(0, 6)}…${owner.slice(-4)}`
+  }
+  return owner
+}
+
+function sliceArcPath(
+  cx: number,
+  cy: number,
+  r: number,
+  startAngle: number,
+  endAngle: number,
+): string {
+  const x1 = cx + r * Math.cos(startAngle)
+  const y1 = cy + r * Math.sin(startAngle)
+  const x2 = cx + r * Math.cos(endAngle)
+  const y2 = cy + r * Math.sin(endAngle)
+  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0
+  return `M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`
+}
+
+const OWNER_LEGEND_COLLAPSED_LIMIT = 6
+
+const OwnerDistributionChart: React.FC<{ distribution: PoolOwnerShare[] }> = ({ distribution }) => {
+  // Sort descending by share so the biggest slices draw first and the legend
+  // reads top-heavy. Keep "others" visually distinct even if it lands mid-list.
+  const rows = [...distribution].sort((a, b) => b.share - a.share)
+  const total = rows.reduce((s, r) => s + (r.share > 0 ? r.share : 0), 0)
+  const [expanded, setExpanded] = useState(false)
+
+  if (total <= 0) return null
+
+  const size = 96
+  const r = size / 2
+  const cx = r
+  const cy = r
+
+  const colored = rows.map((row, i) => ({
+    ...row,
+    color: row.owner === 'others' ? PIE_OTHERS_COLOR : PIE_PALETTE[i % PIE_PALETTE.length],
+  }))
+
+  // Single-owner pools draw as a full disc; arc math can't represent a 2π sweep.
+  const singleSlice = colored.length === 1 || colored[0].share / total >= 0.999
+
+  let angle = -Math.PI / 2 // start at 12 o'clock
+  const slices = singleSlice
+    ? []
+    : colored.map((row) => {
+        const sweep = (row.share / total) * 2 * Math.PI
+        const d = sliceArcPath(cx, cy, r, angle, angle + sweep)
+        angle += sweep
+        return { d, color: row.color, key: row.owner }
+      })
+
+  const canCollapse = colored.length > OWNER_LEGEND_COLLAPSED_LIMIT
+  const visible = canCollapse && !expanded
+    ? colored.slice(0, OWNER_LEGEND_COLLAPSED_LIMIT)
+    : colored
+  const hiddenCount = colored.length - visible.length
+
+  return (
+    <div className="flex items-start gap-3 mt-1">
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="shrink-0"
+        aria-label="Owner distribution pie chart"
+      >
+        {singleSlice ? (
+          <circle cx={cx} cy={cy} r={r} fill={colored[0].color} />
+        ) : (
+          slices.map((s) => <path key={s.key} d={s.d} fill={s.color} />)
+        )}
+      </svg>
+      <div className="flex flex-col gap-1 min-w-0 flex-1">
+        <ul className="flex flex-col gap-0.5 text-[10px] min-w-0">
+          {visible.map((row) => (
+            <li key={row.owner} className="flex items-center justify-between gap-2 min-w-0">
+              <span className="inline-flex items-center gap-1.5 min-w-0">
+                <span
+                  className="w-2 h-2 rounded-sm shrink-0"
+                  style={{ backgroundColor: row.color }}
+                />
+                <span
+                  className="font-mono text-base-content/70 truncate"
+                  title={row.owner}
+                >
+                  {shortOwner(row.owner)}
+                </span>
+              </span>
+              <span className="text-base-content/60 shrink-0 tabular-nums">
+                {(row.share * 100).toFixed(2)}%
+              </span>
+            </li>
+          ))}
+        </ul>
+        {canCollapse && (
+          <button
+            type="button"
+            className="text-[10px] text-base-content/60 hover:text-base-content self-start underline underline-offset-2"
+            onClick={(e) => {
+              e.stopPropagation()
+              setExpanded((v) => !v)
+            }}
+          >
+            {expanded ? 'Show less' : `Show ${hiddenCount} more`}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 interface RiskBadgeProps {
   label: string
@@ -45,6 +175,9 @@ const RiskBreakdownContent: React.FC<{ breakdown: PoolRiskBreakdown[] }> = ({ br
               {b.description}
               {b.baseAsset && <span> (base: {b.baseAsset})</span>}
             </div>
+          )}
+          {b.category === 'concentration' && b.ownerDistribution && b.ownerDistribution.length > 0 && (
+            <OwnerDistributionChart distribution={b.ownerDistribution} />
           )}
         </div>
       ))}

@@ -77,6 +77,13 @@ export interface PoolEntry {
   risk: PoolRisk | null
 }
 
+export interface PoolOwnerShare {
+  /** Owner address, or the literal "others" for the tail bucket */
+  owner: string
+  /** Fraction of the pool held by this owner, 0–1 */
+  share: number
+}
+
 export interface PoolRiskBreakdown {
   category: string
   score: number | null
@@ -89,6 +96,8 @@ export interface PoolRiskBreakdown {
   staticBase?: boolean | null
   /** Oracle risk: base asset symbol or address */
   baseAsset?: string | null
+  /** Concentration risk: per-owner share of the pool (shares are fractions 0–1) */
+  ownerDistribution?: PoolOwnerShare[] | null
 }
 
 export interface PoolRisk {
