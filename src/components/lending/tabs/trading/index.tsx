@@ -1,0 +1,621 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'
+import type { InitialActionSelection } from './types'
+import type {
+  LenderData,
+  LenderInfoMap,
+  LenderSummary,
+  PoolDataItem,
+} from '../../../../hooks/lending/usePoolData'
+import { usePoolConfigData } from '../../../../hooks/lending/usePoolData'
+import { ConfigMarketView } from '../../shared/ConfigMarketView'
+import { RiskSelect } from '../../shared/RiskSelect'
+import type {
+  UserDataResult,
+  UserPositionEntry,
+  UserSubAccount,
+} from '../../../../hooks/lending/useUserData'
+import { useTokenBalances } from '../../../../hooks/lending/useTokenBalances'
+import { useLenderAccounts } from '../../../../hooks/lending/useLenderAccounts'
+import { useSyncChain } from '../../../../hooks/useSyncChain'
+import { WalletConnect } from '../../../connect'
+import { useLenderSelector, LenderSelector } from '../../shared/LenderSelector'
+import { TradingMarketTable } from './TradingMarketTable'
+import { LoopAction } from './actions/LoopAction'
+import { ColSwapAction } from './actions/ColSwapAction'
+import { DebtSwapAction } from './actions/DebtSwapAction'
+import { CloseAction } from './actions/CloseAction'
+import type { TradingOperation, SelectedPool, TableHighlight } from './types'
+import { usePersistedFilters } from '../../../../hooks/usePersistedFilters'
+import { YourPositions, type PositionSummary } from '../../shared/YourPositions'
+import { useIsMobile } from '../../../../hooks/useIsMobile'
+
+interface Props {
+  /**
+   * Lightweight per-lender summaries (drives the dropdown). Optional —
+   * `lenderData` is used as a fallback for the dropdown when summaries
+   * aren't passed in.
+   */
+  lenderSummaries?: LenderSummary[]
+  lenderData: LenderData | undefined
+  lenderInfoMap?: LenderInfoMap
+  userData: UserDataResult
+  chainId: string
+  account?: string
+  isPublicDataLoading: boolean
+  isUserDataLoading: boolean
+  /**
+   * Controlled lender selection. Owned by `LendingTab` so the heavy
+   * `useLendingLatest` fetch can be scoped to a single lender.
+   */
+  selectedLender: string
+  onLenderChange: (lender: string) => void
+}
+
+const OPERATIONS: TradingOperation[] = ['Loop', 'ColSwap', 'DebtSwap', 'Close']
+const OP_LABELS: Record<TradingOperation, string> = {
+  Loop: 'Loop',
+  ColSwap: 'Col. Swap',
+  DebtSwap: 'Debt Swap',
+  Close: 'Close',
+}
+
+export function TradingDashboard({
+  lenderSummaries,
+  lenderData,
+  lenderInfoMap,
+  userData,
+  chainId,
+  account,
+  isPublicDataLoading,
+  isUserDataLoading,
+  selectedLender,
+  onLenderChange,
+}: Props) {
+  const { syncChain, currentChainId } = useSyncChain()
+  const isWrongChain = !!account && currentChainId !== Number(chainId)
+  const isMobile = useIsMobile()
+
+  // Dropdown options + balance markers. Selection is now controlled by the
+  // parent (LendingTab) via `selectedLender` / `onLenderChange`.
+  const { lenderOptions, lenderBalances } = useLenderSelector({
+    lenderSummaries,
+    lenderData,
+    lenderInfoMap,
+    userData,
+    chainId,
+  })
+
+  const [selectedSubAccountId, setSelectedSubAccountId] = useState<string | null>(null)
+  // Persisted filters
+  const {
+    filters: tf,
+    setFilter: setTF,
+    resetToDefaults: resetTradingFilters,
+  } = usePersistedFilters(
+    'trading-dashboard',
+    { activeOperation: 'Loop' as string, viewMode: 'config', maxRiskScore: 4 },
+    { chainId }
+  )
+  const activeOperation = tf.activeOperation as TradingOperation
+  const viewMode = tf.viewMode as 'default' | 'config'
+  const maxRiskScore = tf.maxRiskScore
+  const setActiveOperation = (v: TradingOperation) => setTF('activeOperation', v)
+  const setViewMode = (v: 'default' | 'config') => setTF('viewMode', v)
+  const setMaxRiskScore = (v: number) => setTF('maxRiskScore', v)
+
+  // Transient UI state
+  const [selectedPools, setSelectedPools] = useState<SelectedPool[]>([])
+  const [showMobileAction, setShowMobileAction] = useState(false)
+  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
+
+  // Sub-accounts from user-positions (balances + APRs)
+  const userSubAccounts: UserSubAccount[] = useMemo(() => {
+    if (!selectedLender || !userData.raw) return []
+    const entry = userData.raw.find((e) => e.chainId === chainId && e.lender === selectedLender)
+    return entry?.data ?? []
+  }, [userData, chainId, selectedLender])
+
+  // Merge with next-account activeAccountIds so existing-but-empty accounts
+  // (e.g. Gearbox Credit Accounts with no current position) still render.
+  const { subAccounts } = useLenderAccounts({
+    chainId,
+    lender: selectedLender,
+    account,
+    userSubAccounts,
+  })
+
+  React.useEffect(() => {
+    if (subAccounts.length > 0) {
+      setSelectedSubAccountId(subAccounts[0].accountId)
+    } else {
+      setSelectedSubAccountId(null)
+    }
+  }, [subAccounts])
+
+  const activeSubAccount = useMemo(
+    () => subAccounts.find((s) => s.accountId === selectedSubAccountId) ?? null,
+    [subAccounts, selectedSubAccountId]
+  )
+
+  // All pools for selected lender
+  const allPools = useMemo(() => {
+    if (!selectedLender || !lenderData) return []
+    return lenderData[selectedLender] ?? []
+  }, [lenderData, selectedLender])
+
+  // Optimizer → Loop deep-link consumer. Once the lender's pools are
+  // loaded, resolve the `?col=&debt=` addresses to PoolDataItems and pass
+  // them down to the action panel as `initialSelection`. The matched
+  // selection is held in a ref so it survives until the action component
+  // mounts (LoopAction reads it via initialState), then we strip the URL
+  // params so subsequent navigation isn't sticky.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialSelectionRef = useRef<InitialActionSelection | null>(null)
+  const [, forceRender] = useState(0)
+  const deepLinkConsumedRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (allPools.length === 0) return
+    const colAddr = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.collateral)
+    const debtAddr = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.debt)
+    const amountStr = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.amount)
+    if (!colAddr && !debtAddr) return
+
+    const signature = `${selectedLender}:${colAddr ?? ''}:${debtAddr ?? ''}:${amountStr ?? ''}`
+    if (deepLinkConsumedRef.current === signature) return
+    deepLinkConsumedRef.current = signature
+
+    const collateralPool =
+      colAddr != null
+        ? allPools.find((p) => p.underlying.toLowerCase() === colAddr.toLowerCase())
+        : undefined
+    const debtPool =
+      debtAddr != null
+        ? allPools.find((p) => p.underlying.toLowerCase() === debtAddr.toLowerCase())
+        : undefined
+
+    if (collateralPool || debtPool) {
+      initialSelectionRef.current = {
+        collateralPool,
+        debtPool,
+        amount: amountStr ? Number(amountStr) || undefined : undefined,
+      }
+      // Force a re-render so `actionProps.initialSelection` picks up the
+      // new ref content; LoopAction will be remounted via its `key` below.
+      forceRender((n) => n + 1)
+    }
+
+    const next = new URLSearchParams(searchParams)
+    for (const k of Object.values(OPTIMIZER_DEEPLINK_KEYS)) next.delete(k)
+    setSearchParams(next, { replace: true })
+  }, [allPools, searchParams, setSearchParams, selectedLender])
+
+  // Config-grouped pool data
+  const { data: configGroups, isLoading: isConfigLoading } = usePoolConfigData(
+    chainId,
+    selectedLender,
+    maxRiskScore
+  )
+
+  // Auto-select first config when config groups load
+  React.useEffect(() => {
+    if (configGroups && configGroups.length > 0 && !selectedConfigId) {
+      setSelectedConfigId(configGroups[0].configId)
+    }
+  }, [configGroups, selectedConfigId])
+
+  // Reset config selection when lender changes
+  React.useEffect(() => {
+    setSelectedConfigId(null)
+  }, [selectedLender])
+
+  // Active config group
+  const activeConfigGroup = useMemo(
+    () => configGroups?.find((g) => g.configId === selectedConfigId) ?? null,
+    [configGroups, selectedConfigId]
+  )
+
+  // Preferred pools from selected config (bumped to top in dropdowns)
+  const preferredCollateralUids = useMemo(() => {
+    if (!activeConfigGroup?.collaterals) return new Set<string>()
+    return new Set(activeConfigGroup.collaterals.map((c) => c.marketUid))
+  }, [activeConfigGroup])
+
+  const preferredBorrowableUids = useMemo(() => {
+    if (!activeConfigGroup?.borrowables) return new Set<string>()
+    return new Set(activeConfigGroup.borrowables.map((b) => b.marketUid))
+  }, [activeConfigGroup])
+
+  // User's active e-mode category (as string to match PoolConfigGroup.category)
+  const userActiveCategory = activeSubAccount
+    ? String(activeSubAccount.userConfig.selectedMode)
+    : null
+
+  // Config groups sorted with active e-mode first (for <select> dropdowns)
+  const sortedConfigGroups = useMemo(() => {
+    if (!configGroups) return []
+    if (userActiveCategory == null) return configGroups
+    return [...configGroups].sort((a, b) => {
+      const aIsActive = a.category === userActiveCategory
+      const bIsActive = b.category === userActiveCategory
+      if (aIsActive && !bIsActive) return -1
+      if (bIsActive && !aIsActive) return 1
+      return 0
+    })
+  }, [configGroups, userActiveCategory])
+
+  // All pools available as collateral / borrowable (unfiltered)
+  const collateralPools = allPools
+  const borrowablePools = allPools
+
+  const poolAssetAddresses = useMemo(
+    () => [...new Set(allPools.map((p) => p.underlying))],
+    [allPools]
+  )
+
+  const {
+    balances: walletBalances,
+    isBalancesFetching,
+    refetchBalances,
+  } = useTokenBalances({
+    chainId,
+    account,
+    assets: poolAssetAddresses,
+  })
+
+  // User positions scoped to selected sub-account, keyed by marketUid
+  const userPositions = useMemo(() => {
+    const map = new Map<string, UserPositionEntry>()
+    if (!activeSubAccount) return map
+    for (const pos of activeSubAccount.positions) {
+      if (typeof pos === 'object' && pos !== null) {
+        map.set(pos.marketUid, pos)
+      }
+    }
+    return map
+  }, [activeSubAccount])
+
+  // Balance summary
+  const lenderSummary: PositionSummary | null = useMemo(() => {
+    if (!activeSubAccount) return null
+    const bd = activeSubAccount.balanceData
+    if (bd.deposits === 0 && bd.debt === 0) return null
+    const ad = activeSubAccount.aprData
+    return {
+      deposits: bd.deposits,
+      debt: bd.debt,
+      nav: bd.nav,
+      health: activeSubAccount.health,
+      apr: ad.apr,
+      depositApr: ad.depositApr,
+      borrowApr: ad.borrowApr,
+      intrinsicApr: ad.intrinsicApr,
+      intrinsicDepositApr: ad.intrinsicDepositApr,
+      intrinsicBorrowApr: ad.intrinsicBorrowApr,
+    }
+  }, [activeSubAccount])
+
+  // Active positions for cards
+  const activePositions = useMemo(() => {
+    const result: { position: UserPositionEntry; pool: PoolDataItem }[] = []
+    for (const pool of allPools) {
+      const pos = userPositions.get(pool.marketUid)
+      if (pos && (Number(pos.deposits) > 0 || Number(pos.debt) > 0)) {
+        result.push({ position: pos, pool })
+      }
+    }
+    return result
+  }, [allPools, userPositions])
+
+  // Table highlights from action panel's pool selections
+  const tableHighlights: TableHighlight[] = useMemo(
+    () => selectedPools.map((sp) => ({ marketUid: sp.pool.marketUid, role: sp.role })),
+    [selectedPools]
+  )
+
+  // Propagate to the parent (URL-backed) and clear local pool / sub-account
+  // selection so we don't carry stale picks across lenders.
+  const handleLenderChange = (lender: string) => {
+    onLenderChange(lender)
+    setSelectedSubAccountId(null)
+    setSelectedPools([])
+  }
+
+  const handlePoolSelectionChange = useCallback((selections: SelectedPool[]) => {
+    setSelectedPools(selections)
+  }, [])
+
+  const handleAccountIdChange = useCallback((id: string | null) => {
+    setSelectedSubAccountId(id)
+  }, [])
+
+  // Pull (and clear) any pending deep-link selection so we hand it to the
+  // action exactly once. The receiving action's `key` includes the
+  // selection signature, which forces a fresh mount that re-runs its
+  // initialiser with the new pools.
+  const pendingSelection = initialSelectionRef.current
+  if (pendingSelection) initialSelectionRef.current = null
+  const initialSelectionKey = pendingSelection
+    ? `${pendingSelection.collateralPool?.marketUid ?? ''}:${
+        pendingSelection.debtPool?.marketUid ?? ''
+      }:${pendingSelection.amount ?? ''}`
+    : ''
+
+  // Whenever a deep-link arrives, force the active operation to Loop —
+  // every Optimizer row maps to a leveraged loop, not a swap or close.
+  useEffect(() => {
+    if (pendingSelection && activeOperation !== 'Loop') {
+      setActiveOperation('Loop')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSelectionKey])
+
+  if (isPublicDataLoading) {
+    return (
+      <div className="flex justify-center items-center py-10">
+        <span className="loading loading-spinner loading-lg" />
+      </div>
+    )
+  }
+
+  const actionProps = {
+    allPools,
+    collateralPools,
+    borrowablePools,
+    preferredCollateralUids,
+    preferredBorrowableUids,
+    userPositions,
+    walletBalances,
+    subAccounts,
+    selectedLender,
+    chainId,
+    account,
+    accountId: selectedSubAccountId ?? undefined,
+    isBalancesFetching,
+    refetchBalances,
+    onAccountIdChange: handleAccountIdChange,
+    onPoolSelectionChange: handlePoolSelectionChange,
+    initialSelection: pendingSelection ?? undefined,
+  }
+
+  return (
+    <div className="space-y-3 sm:space-y-4">
+      {/* Lender selector */}
+      <LenderSelector
+        lenderOptions={lenderOptions}
+        selectedLender={selectedLender}
+        onChange={handleLenderChange}
+        hasBalances={lenderBalances.size > 0}
+      />
+
+      {/* User positions + sub-account selector */}
+      {account && isUserDataLoading && (
+        <div className="rounded-box border border-base-300 p-3 sm:p-4 flex items-center gap-2">
+          <span className="loading loading-spinner loading-sm" />
+          <span className="text-sm text-base-content/60">Loading positions...</span>
+        </div>
+      )}
+      {account && !isUserDataLoading && subAccounts.length > 0 && (
+        <YourPositions
+          subAccounts={subAccounts}
+          selectedSubAccountId={selectedSubAccountId}
+          onSubAccountChange={setSelectedSubAccountId}
+          summary={lenderSummary}
+          activePositions={activePositions}
+          account={account}
+          chainId={chainId}
+          selectedLender={selectedLender}
+        />
+      )}
+
+      {/* Two column: Market table + Action panel */}
+      <div className="flex gap-4 items-start">
+        {/* Left: Market table (read-only, highlights driven by action panel) */}
+        <div className="flex-1 min-w-0">
+          {/* View mode toggle */}
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <div className="flex items-center gap-0.5 bg-base-200 rounded-lg p-0.5">
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'config'
+                    ? 'bg-base-100 shadow-sm text-base-content'
+                    : 'text-base-content/60 hover:text-base-content'
+                }`}
+                onClick={() => setViewMode('config')}
+              >
+                By Config
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'default'
+                    ? 'bg-base-100 shadow-sm text-base-content'
+                    : 'text-base-content/60 hover:text-base-content'
+                }`}
+                onClick={() => setViewMode('default')}
+              >
+                Default
+              </button>
+            </div>
+
+            <RiskSelect value={maxRiskScore} onChange={setMaxRiskScore} />
+            <button
+              type="button"
+              className="btn btn-xs btn-ghost text-base-content/50"
+              onClick={resetTradingFilters}
+              title="Reset filters to defaults"
+            >
+              Reset
+            </button>
+          </div>
+
+          {viewMode === 'config' ? (
+            <ConfigMarketView
+              configGroups={configGroups ?? []}
+              allPools={allPools}
+              selectedConfigId={selectedConfigId}
+              onConfigChange={setSelectedConfigId}
+              onPoolSelect={(pool) => {
+                handlePoolSelectionChange([{ pool, role: 'output' }])
+              }}
+              userPositions={userPositions}
+              highlights={tableHighlights}
+              isLoading={isConfigLoading}
+              userActiveCategory={userActiveCategory}
+            />
+          ) : (
+            <TradingMarketTable
+              pools={allPools}
+              userPositions={userPositions}
+              highlights={tableHighlights}
+            />
+          )}
+        </div>
+
+        {/* Right: Action panel — desktop only */}
+        <div className="hidden md:block w-72 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
+          {/* Config selector */}
+          {sortedConfigGroups.length > 0 && (
+            <div>
+              <label className="label-text text-xs mb-1 block">Configuration</label>
+              <select
+                className="select select-bordered select-xs w-full"
+                value={selectedConfigId ?? ''}
+                onChange={(e) => setSelectedConfigId(e.target.value)}
+              >
+                {sortedConfigGroups.map((g) => {
+                  const isUserMode =
+                    userActiveCategory !== null && g.category === userActiveCategory
+                  return (
+                    <option key={g.configId} value={g.configId}>
+                      {isUserMode ? '\u2713 ' : ''}
+                      {g.label || `Config ${g.configId}`}
+                      {isUserMode ? ' (active)' : ''}
+                    </option>
+                  )
+                })}
+              </select>
+            </div>
+          )}
+
+          {/* Operation tabs */}
+          <div role="tablist" className="tabs tabs-boxed tabs-xs">
+            {OPERATIONS.map((op) => (
+              <button
+                key={op}
+                type="button"
+                role="tab"
+                className={`tab ${activeOperation === op ? 'tab-active' : ''}`}
+                onClick={() => {
+                  setActiveOperation(op)
+                  setSelectedPools([])
+                }}
+              >
+                {OP_LABELS[op]}
+              </button>
+            ))}
+          </div>
+
+          {/* Wallet / chain guards */}
+          {!account ? (
+            <div className="w-full flex justify-center">
+              <WalletConnect />
+            </div>
+          ) : isWrongChain ? (
+            <button
+              type="button"
+              className="btn btn-warning btn-sm w-full"
+              onClick={() => syncChain(Number(chainId))}
+            >
+              Switch Wallet Chain
+            </button>
+          ) : (
+            <>
+              {activeOperation === 'Loop' && (
+                <LoopAction key={`${selectedLender}:${initialSelectionKey}`} {...actionProps} />
+              )}
+              {activeOperation === 'ColSwap' && (
+                <ColSwapAction key={selectedLender} {...actionProps} />
+              )}
+              {activeOperation === 'DebtSwap' && (
+                <DebtSwapAction key={selectedLender} {...actionProps} />
+              )}
+              {activeOperation === 'Close' && <CloseAction key={selectedLender} {...actionProps} />}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile action button */}
+      <div className="md:hidden fixed bottom-4 left-0 right-0 flex justify-center z-40">
+        <button
+          type="button"
+          className="btn btn-primary btn-sm shadow-lg"
+          onClick={() => setShowMobileAction(true)}
+        >
+          {OP_LABELS[activeOperation]} Action
+        </button>
+      </div>
+
+      {/* Mobile action panel modal */}
+      {isMobile && showMobileAction && (
+        <div className="modal modal-open" onClick={() => setShowMobileAction(false)}>
+          <div className="modal-box max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+              onClick={() => setShowMobileAction(false)}
+            >
+              ✕
+            </button>
+
+            <div className="space-y-3">
+              {/* Operation tabs */}
+              <div role="tablist" className="tabs tabs-boxed tabs-xs">
+                {OPERATIONS.map((op) => (
+                  <button
+                    key={op}
+                    type="button"
+                    role="tab"
+                    className={`tab ${activeOperation === op ? 'tab-active' : ''}`}
+                    onClick={() => {
+                      setActiveOperation(op)
+                      setSelectedPools([])
+                    }}
+                  >
+                    {OP_LABELS[op]}
+                  </button>
+                ))}
+              </div>
+
+              {/* Wallet / chain guards */}
+              {!account ? (
+                <div className="w-full flex justify-center">
+                  <WalletConnect />
+                </div>
+              ) : isWrongChain ? (
+                <button
+                  type="button"
+                  className="btn btn-warning btn-sm w-full"
+                  onClick={() => syncChain(Number(chainId))}
+                >
+                  Switch Wallet Chain
+                </button>
+              ) : (
+                <>
+                  {activeOperation === 'Loop' && <LoopAction {...actionProps} />}
+                  {activeOperation === 'ColSwap' && <ColSwapAction {...actionProps} />}
+                  {activeOperation === 'DebtSwap' && <DebtSwapAction {...actionProps} />}
+                  {activeOperation === 'Close' && <CloseAction {...actionProps} />}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

@@ -4,7 +4,7 @@ import {
   fetchNextAccount,
   type NextAccountData,
 } from '../../sdk/lending-helper/fetchNextAccount'
-import { lenderSupportsSubAccounts } from '../../components/lending/DashboardActions/helpers'
+import { lenderSupportsSubAccounts } from '../../components/lending/actions/helpers'
 import type {
   UserSubAccount,
   UserBalanceData,

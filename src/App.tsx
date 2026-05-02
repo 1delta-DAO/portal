@@ -3,7 +3,7 @@ import { LenderTab } from './components/lending/LendingTab'
 import { ThemeSwitcher } from './components/themeSwitcher'
 import { WalletConnect } from './components/connect'
 import { PortalLogo } from './components/PortalLogo'
-import { IrmDockProvider } from './components/lending/IrmDock'
+import { IrmDockProvider } from './components/lending/shared/IrmDock'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 
 export default function App() {

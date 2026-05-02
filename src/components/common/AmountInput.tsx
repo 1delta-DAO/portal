@@ -1,6 +1,6 @@
 import React from 'react'
-import { sanitizeAmountInput } from '../lending/DashboardActions/format'
-import { AmountQuickButtons } from '../lending/DashboardActions/AmountQuickButtons'
+import { sanitizeAmountInput } from '../lending/actions/format'
+import { AmountQuickButtons } from '../lending/actions/AmountQuickButtons'
 
 interface AmountInputProps {
   /** Decimal string. Owned by the parent. */

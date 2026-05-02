@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Address } from 'viem'
-import { ChainFilterSelect } from '../lending/ChainFilter'
+import { ChainFilterSelect } from '../lending/shared/ChainFilter'
 import { TokenSelector } from './index'
 import type { RawCurrency } from '../../types/currency'
 import { getCurrency } from '../../lib/trade-helpers/utils'
