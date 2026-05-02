@@ -22,6 +22,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
   lenderKey,
   nativeToken,
   subAccount,
+  hideSimulation,
 }) => {
   const [amount, setAmount] = useState('')
   const [isAll, setIsAll] = useState(false)
@@ -159,11 +160,15 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      {/* Projected health factor */}
-      <HealthFactorProjection simulation={simulation} />
+      {!hideSimulation && (
+        <>
+          {/* Projected health factor */}
+          <HealthFactorProjection simulation={simulation} />
 
-      {/* Rate impact */}
-      <RateImpactIndicator rateImpact={rateImpact} />
+          {/* Rate impact */}
+          <RateImpactIndicator rateImpact={rateImpact} />
+        </>
+      )}
 
       {result && !overMax && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">

@@ -333,7 +333,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
 
           return (
             <div
-              key={`m-${p.chainId}-${p.lenderKey}-${p.underlyingAddress}`}
+              key={`m-${p.marketUid}`}
               className={`p-3 cursor-pointer transition-colors ${
                 selected ? 'bg-primary/10' : 'active:bg-base-200'
               }`}

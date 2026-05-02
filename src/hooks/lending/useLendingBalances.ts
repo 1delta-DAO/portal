@@ -26,7 +26,7 @@ export function useLendingBalances(params: {
   const { chainId, account } = params
   const enabled = (params.enabled ?? true) && !!account
 
-  const { data, isLoading, error } = useQuery<TokenBalance[]>({
+  const { data, isLoading, isFetching, error, refetch } = useQuery<TokenBalance[]>({
     queryKey: ['lendingBalances', chainId, account],
     enabled,
     queryFn: async () => {
@@ -56,6 +56,8 @@ export function useLendingBalances(params: {
   return {
     balances: data ?? [],
     isLoading,
+    isFetching,
     error,
+    refetch,
   }
 }

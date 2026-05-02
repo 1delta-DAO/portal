@@ -105,7 +105,9 @@ export function LenderTab() {
   const {
     balances: lendingBalances,
     isLoading: isLendingBalancesLoading,
+    isFetching: isLendingBalancesFetching,
     error: lendingBalancesError,
+    refetch: refetchLendingBalances,
   } = useLendingBalances({ chainId: effectiveChainId, account, enabled: chainsReady })
 
   const isLoading = isLendersLoading || isPublicDataLoading || isUserDataLoading
@@ -185,7 +187,9 @@ export function LenderTab() {
           lenderInfoMap={lenderInfoMap}
           lendingBalances={lendingBalances}
           isLendingBalancesLoading={isLendingBalancesLoading}
+          isLendingBalancesFetching={isLendingBalancesFetching}
           lendingBalancesError={lendingBalancesError}
+          refetchLendingBalances={refetchLendingBalances}
           isLoading={isLoading}
           userDataError={error}
           refetchUserData={refetch}

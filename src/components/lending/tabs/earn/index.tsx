@@ -15,7 +15,9 @@ interface EarnTabProps {
   lenderInfoMap?: LenderInfoMap
   lendingBalances: TokenBalance[]
   isLendingBalancesLoading: boolean
+  isLendingBalancesFetching?: boolean
   lendingBalancesError: any
+  refetchLendingBalances?: () => void
   isLoading: boolean
   userDataError: any
   refetchUserData: () => void
@@ -29,7 +31,9 @@ export function EarnTab({
   lenderInfoMap,
   lendingBalances,
   isLendingBalancesLoading,
+  isLendingBalancesFetching,
   lendingBalancesError,
+  refetchLendingBalances,
   isLoading,
   userDataError,
   refetchUserData,

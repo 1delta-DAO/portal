@@ -43,6 +43,13 @@ export function useTokenBalances(params: {
     queryKey: ['tokenBalances', chainId, account, assetsKey],
     enabled,
     queryFn: async () => {
+      // Hard guard — never hit the endpoint with an empty assets list. The
+      // `enabled` flag should already prevent this, but a stale `refetch()`
+      // call could otherwise produce a `?assets=` URL that 4xx's.
+      if (assets.length === 0 || !account) {
+        return new Map<string, TokenBalance>()
+      }
+
       const url =
         `${BACKEND_BASE_URL}/v1/data/token/balances` +
         `?chainId=${chainId}` +

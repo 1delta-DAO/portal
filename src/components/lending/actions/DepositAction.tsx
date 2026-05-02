@@ -26,6 +26,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   subAccount,
   isBalancesFetching,
   refetchBalances,
+  hideSimulation,
 }) => {
   const [amount, setAmount] = useState('')
   const [useNative, setUseNative] = useState(false)
@@ -59,6 +60,17 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
     setUseNative(false)
     resetState()
   }, [pool?.marketUid])
+
+  // For wnative markets where the user holds the native token but no wrapped
+  // balance (typical: CELO/ETH/MATIC sitting in the wallet, no WCELO/WETH/etc.),
+  // default the toggle to "Pay with native" so the wallet balance display and
+  // the % quick-buttons immediately have something to scale from.
+  useEffect(() => {
+    if (!canUseNative || useNative) return
+    const wrappedBal = parseAmount(walletBalance?.balance ?? '0')
+    const nativeBal = parseAmount(nativeBalance?.balance ?? '0')
+    if (wrappedBal === 0 && nativeBal > 0) setUseNative(true)
+  }, [canUseNative, useNative, walletBalance, nativeBalance])
 
   const activeBal = canUseNative && useNative ? nativeBalance : walletBalance
   const walletAmountStr = activeBal?.balance ?? '0'
@@ -102,8 +114,9 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
         />
       )}
 
-      {/* Wallet balance */}
-      {activeBal && (
+      {/* Wallet balance — always render the row when a pool is selected so the
+          user gets immediate "loading…" feedback instead of an empty space. */}
+      {pool && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60 flex items-center gap-1">
             Wallet balance:
@@ -124,9 +137,18 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
               </button>
             )}
           </span>
-          <span className={`font-medium ${parseAmount(walletAmountStr) === 0 ? 'text-base-content/40' : ''}`}>
-            {formatTokenAmount(activeBal.balance)} (${formatUsd(activeBal.balanceUSD)})
-          </span>
+          {activeBal ? (
+            <span className={`font-medium ${parseAmount(walletAmountStr) === 0 ? 'text-base-content/40' : ''}`}>
+              {formatTokenAmount(activeBal.balance)} (${formatUsd(activeBal.balanceUSD)})
+            </span>
+          ) : isBalancesFetching ? (
+            <span className="flex items-center gap-1 text-base-content/40">
+              <span className="loading loading-spinner w-3 h-3" />
+              Loading…
+            </span>
+          ) : (
+            <span className="text-base-content/40">—</span>
+          )}
         </div>
       )}
 
@@ -159,11 +181,15 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      {/* Projected health factor */}
-      <HealthFactorProjection simulation={simulation} />
+      {!hideSimulation && (
+        <>
+          {/* Projected health factor */}
+          <HealthFactorProjection simulation={simulation} />
 
-      {/* Rate impact */}
-      <RateImpactIndicator rateImpact={rateImpact} />
+          {/* Rate impact */}
+          <RateImpactIndicator rateImpact={rateImpact} />
+        </>
+      )}
 
       {result && !overMax && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">

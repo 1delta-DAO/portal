@@ -21,6 +21,14 @@ interface DepositPanelProps {
   subAccounts?: UserSubAccount[]
   lenderKey?: string
   userPosition?: UserPositionEntry | null
+  isBalancesFetching?: boolean
+  refetchBalances?: () => void
+  /**
+   * Whether the user has any open borrow on the *selected pool's lender*.
+   * Scoped to the lender (not the chain) because cross-lender debt doesn't
+   * share collateral with this deposit, so flagging it would be noise.
+   */
+  hasBorrowOnSelectedLender?: boolean
 }
 
 export const DepositPanel: React.FC<DepositPanelProps> = ({
@@ -34,6 +42,9 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
   subAccounts,
   lenderKey,
   userPosition,
+  isBalancesFetching,
+  refetchBalances,
+  hasBorrowOnSelectedLender,
 }) => {
   const [actionTab, setActionTab] = useState<EarnAction>('Deposit')
   const { syncChain, currentChainId } = useSyncChain()
@@ -41,6 +52,29 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
 
   return (
     <div className="w-72 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
+      {/* Lender header — earn spans many lenders, so unlike the lending tab
+          (which is scoped to one lender) we need to surface which protocol
+          the selected market belongs to. */}
+      {selectedEntry?.lenderInfo && (
+        <div className="flex items-center gap-2 px-1">
+          {selectedEntry.lenderInfo.logoURI && (
+            <img
+              src={selectedEntry.lenderInfo.logoURI}
+              width={20}
+              height={20}
+              alt={selectedEntry.lenderInfo.name}
+              className="rounded-full object-contain w-5 h-5 shrink-0"
+            />
+          )}
+          <span className="font-semibold text-sm truncate" title={selectedEntry.lenderInfo.name}>
+            {selectedEntry.lenderInfo.name}
+          </span>
+          <span className="ml-auto text-[10px] uppercase tracking-wider text-base-content/40">
+            Lender
+          </span>
+        </div>
+      )}
+
       {/* Deposit / Withdraw tabs */}
       <div role="tablist" className="tabs tabs-boxed tabs-xs">
         {(['Deposit', 'Withdraw'] as EarnAction[]).map((t) => (
@@ -92,6 +126,30 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
         </div>
       )}
 
+      {/* Borrow-position warning — earn hides health/simulation, so flag this
+          explicitly so users with open debt on this lender know their action
+          affects health. */}
+      {hasBorrowOnSelectedLender && account && (
+        <div className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-warning/10 border border-warning/30 text-[11px] text-base-content">
+          <svg
+            className="w-3.5 h-3.5 mt-px shrink-0 text-warning"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 9v4" />
+            <path d="M12 17h.01" />
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          </svg>
+          <span>
+            You have an open borrow on this lender. Use the <strong>Lending</strong> tab to see health-factor impact.
+          </span>
+        </div>
+      )}
+
       {/* Action component */}
       {!account ? (
         <div className="w-full flex justify-center">
@@ -116,6 +174,9 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
           nativeBalance={nativeBalance}
           subAccounts={subAccounts}
           lenderKey={lenderKey}
+          isBalancesFetching={isBalancesFetching}
+          refetchBalances={refetchBalances}
+          hideSimulation
         />
       ) : (
         <WithdrawAction
@@ -128,6 +189,9 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
           nativeBalance={nativeBalance}
           subAccounts={subAccounts}
           lenderKey={lenderKey}
+          isBalancesFetching={isBalancesFetching}
+          refetchBalances={refetchBalances}
+          hideSimulation
         />
       )}
     </div>

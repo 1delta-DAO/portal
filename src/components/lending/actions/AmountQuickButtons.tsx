@@ -25,16 +25,21 @@ export const AmountQuickButtons: React.FC<AmountQuickButtonsProps> = ({
   decimals,
 }) => {
   const n = parseFloat(maxAmount)
-  if (!maxAmount || !Number.isFinite(n) || n <= 0) {
-    return null
-  }
+  // Render the buttons unconditionally so they're always visible — when there's
+  // nothing to scale (no wallet balance / no withdrawable / no borrowable),
+  // they render disabled with a tooltip rather than silently disappearing.
+  const hasMax = !!maxAmount && Number.isFinite(n) && n > 0
+  const disabledTitle = hasMax ? undefined : 'No balance to scale from'
 
   return (
     <div className="flex items-center gap-1">
       {entries.map((e) => (
         <PresetButton
           key={e.label}
+          title={disabledTitle}
+          className={hasMax ? '' : 'btn-disabled opacity-50 cursor-not-allowed'}
           onClick={() => {
+            if (!hasMax) return
             if (e.fraction === 1) {
               onMax ? onMax() : onSelect(maxAmount)
             } else {

@@ -28,6 +28,8 @@ export interface ActionPanelProps {
   isBalancesFetching?: boolean
   /** Manually trigger a wallet balance refresh */
   refetchBalances?: () => void
+  /** Hide health-factor projection and rate-impact indicator (used by the plain earn flow) */
+  hideSimulation?: boolean
 }
 
 export interface ActionState {

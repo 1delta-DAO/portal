@@ -175,23 +175,38 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     [resolvedPool]
   )
 
-  // Wallet balance for the selected asset (include native when relevant)
-  const selectedAssets = useMemo(() => {
-    if (!selectedEntry) return []
-    const addrs = [selectedEntry.underlyingAddress]
-    if (selectedIsWrappedNative) addrs.push(zeroAddress)
+  // Mirror the lending tab (tabs/lending/index.tsx) — request balances for
+  // every unique pool *asset* address (not `underlyingAddress`, which is a
+  // different field on PoolEntry that doesn't always match the asset address
+  // the action components later use for the lookup), plus zeroAddress when
+  // any pool is wrapped-native.
+  const hasWrappedNative = useMemo(
+    () => pools.some((p) => isWNative(p.underlyingInfo?.asset)),
+    [pools]
+  )
+  const poolAssetAddresses = useMemo(() => {
+    const addrs = [
+      ...new Set(pools.map((p) => p.underlyingInfo?.asset?.address).filter(Boolean) as string[]),
+    ]
+    if (hasWrappedNative) addrs.push(zeroAddress)
     return addrs
-  }, [selectedEntry, selectedIsWrappedNative])
+  }, [pools, hasWrappedNative])
 
-  const { balances: walletBalances } = useTokenBalances({
+  const {
+    balances: walletBalances,
+    isBalancesFetching,
+    refetchBalances,
+  } = useTokenBalances({
     chainId: chainId ?? '',
     account,
-    assets: selectedAssets,
+    assets: poolAssetAddresses,
   })
+
   const selectedWalletBal = useMemo(() => {
-    if (!selectedEntry?.underlyingAddress) return null
-    return walletBalances.get(selectedEntry.underlyingAddress.toLowerCase()) ?? null
-  }, [selectedEntry, walletBalances])
+    const addr = resolvedPool?.underlying
+    if (!addr) return null
+    return walletBalances.get(addr.toLowerCase()) ?? null
+  }, [resolvedPool, walletBalances])
 
   // Native token info for the selected pool
   const nativeToken = useMemo(() => {
@@ -212,6 +227,16 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     )
     return entry?.data ?? []
   }, [selectedEntry, userData, chainId])
+
+  // True if the user has any outstanding debt on the *selected pool's lender*
+  // — debt on a different lender doesn't share collateral with this deposit,
+  // so flagging it would be noise. Earn hides the health-factor projection,
+  // so this badge points users to the Lending tab when they actually have a
+  // position that could be impacted.
+  const hasBorrowOnSelectedLender = useMemo(() => {
+    if (!selectedEntry || selectedSubAccounts.length === 0) return false
+    return selectedSubAccounts.some((sub) => (sub.balanceData?.debt ?? 0) > 0)
+  }, [selectedEntry, selectedSubAccounts])
 
   // User position for the selected pool (first sub-account with a matching position)
   const selectedUserPosition = useMemo(() => {
@@ -272,8 +297,15 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       )
     }
 
-    if (externalAssetFilter?.trim()) {
-      const addrs = externalAssetFilter.toLowerCase().split(',').filter(Boolean)
+    // External (parent-driven) asset whitelist — used by "Your Assets" row
+    // clicks and the "Filter markets to owned assets" toggle. When this is
+    // active we want the user to see *all* matching markets, so we skip the
+    // numeric value-floor filters below (min APR / TVL / utilization / etc.)
+    // which would otherwise hide valid pools at default thresholds. Risk
+    // score is still enforced.
+    const hasExternalAssetFilter = !!externalAssetFilter?.trim()
+    if (hasExternalAssetFilter) {
+      const addrs = externalAssetFilter!.toLowerCase().split(',').filter(Boolean)
       if (addrs.length > 0) {
         const addrSet = new Set(addrs)
         result = result.filter((p) => addrSet.has((p.underlyingAddress ?? '').toLowerCase()))
@@ -300,69 +332,75 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       })
     }
 
-    // Utilization (percentage inputs)
-    const minU = parseFloat(minUtilPct)
-    const maxU = parseFloat(maxUtilPct)
-    if (!Number.isNaN(minU) || !Number.isNaN(maxU)) {
-      result = result.filter((p) => {
-        const u = computePoolMetrics(p).utilization * 100
-        if (!Number.isNaN(minU) && u < minU) return false
-        if (!Number.isNaN(maxU) && u > maxU) return false
-        return true
-      })
-    }
-
-    // APR (percentage inputs)
-    const minApr = parseFloat(minAprPct)
-    const maxApr = parseFloat(maxAprPct)
-    if (!Number.isNaN(minApr) || !Number.isNaN(maxApr)) {
-      result = result.filter((p) => {
-        const apr = computePoolMetrics(p).apr
-        if (!Number.isNaN(minApr) && apr < minApr) return false
-        if (!Number.isNaN(maxApr) && apr > maxApr) return false
-        return true
-      })
-    }
-
-    // TVL / Deposits USD
-    result = applyMinMax(
-      result,
-      minDepositsUsd,
-      maxDepositsUsd,
-      (p) => parseFloat(p.totalDepositsUsd) || 0
-    )
-
-    // Risk score
+    // Risk score is always enforced (safety floor) regardless of external filter.
     const maxRisk = parseInt(maxRiskScore, 10)
     if (!Number.isNaN(maxRisk)) {
       result = result.filter((p) => (p.risk?.score ?? 0) <= maxRisk)
     }
 
-    // Native deposits
-    result = applyMinMax(
-      result,
-      minDepositsNative,
-      maxDepositsNative,
-      (p) => parseFloat(p.totalDeposits) || 0
-    )
-    // Native debt
-    result = applyMinMax(result, minDebtNative, maxDebtNative, (p) => parseFloat(p.totalDebt) || 0)
-    // Native liquidity
-    result = applyMinMax(
-      result,
-      minLiquidityNative,
-      maxLiquidityNative,
-      (p) => parseFloat(p.totalLiquidity) || 0
-    )
-    // USD debt
-    result = applyMinMax(result, minDebtUsd, maxDebtUsd, (p) => parseFloat(p.totalDebtUsd) || 0)
-    // USD liquidity
-    result = applyMinMax(
-      result,
-      minLiquidityUsd,
-      maxLiquidityUsd,
-      (p) => parseFloat(p.totalLiquidityUsd) || 0
-    )
+    // The remaining filters are value-floors meant to trim the universe of
+    // pools when browsing freely. When the user has explicitly narrowed to
+    // a set of assets via the parent (row click / "owned only" toggle), we
+    // skip them so every market for those assets stays visible.
+    if (!hasExternalAssetFilter) {
+      // Utilization (percentage inputs)
+      const minU = parseFloat(minUtilPct)
+      const maxU = parseFloat(maxUtilPct)
+      if (!Number.isNaN(minU) || !Number.isNaN(maxU)) {
+        result = result.filter((p) => {
+          const u = computePoolMetrics(p).utilization * 100
+          if (!Number.isNaN(minU) && u < minU) return false
+          if (!Number.isNaN(maxU) && u > maxU) return false
+          return true
+        })
+      }
+
+      // APR (percentage inputs)
+      const minApr = parseFloat(minAprPct)
+      const maxApr = parseFloat(maxAprPct)
+      if (!Number.isNaN(minApr) || !Number.isNaN(maxApr)) {
+        result = result.filter((p) => {
+          const apr = computePoolMetrics(p).apr
+          if (!Number.isNaN(minApr) && apr < minApr) return false
+          if (!Number.isNaN(maxApr) && apr > maxApr) return false
+          return true
+        })
+      }
+
+      // TVL / Deposits USD
+      result = applyMinMax(
+        result,
+        minDepositsUsd,
+        maxDepositsUsd,
+        (p) => parseFloat(p.totalDepositsUsd) || 0
+      )
+
+      // Native deposits
+      result = applyMinMax(
+        result,
+        minDepositsNative,
+        maxDepositsNative,
+        (p) => parseFloat(p.totalDeposits) || 0
+      )
+      // Native debt
+      result = applyMinMax(result, minDebtNative, maxDebtNative, (p) => parseFloat(p.totalDebt) || 0)
+      // Native liquidity
+      result = applyMinMax(
+        result,
+        minLiquidityNative,
+        maxLiquidityNative,
+        (p) => parseFloat(p.totalLiquidity) || 0
+      )
+      // USD debt
+      result = applyMinMax(result, minDebtUsd, maxDebtUsd, (p) => parseFloat(p.totalDebtUsd) || 0)
+      // USD liquidity
+      result = applyMinMax(
+        result,
+        minLiquidityUsd,
+        maxLiquidityUsd,
+        (p) => parseFloat(p.totalLiquidityUsd) || 0
+      )
+    }
 
     // --- sorting ---
     result = [...result].sort((a, b) => {
@@ -989,6 +1027,9 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
             subAccounts={selectedSubAccounts}
             lenderKey={selectedEntry?.lenderKey}
             userPosition={selectedUserPosition}
+            isBalancesFetching={isBalancesFetching}
+            refetchBalances={refetchBalances}
+            hasBorrowOnSelectedLender={hasBorrowOnSelectedLender}
           />
         </div>
       </div>
