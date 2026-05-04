@@ -1,9 +1,9 @@
-import { getChainShortName } from '../../../lib/lib-utils'
 import React from 'react'
 import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'
+import type { ChainMeta } from '../../../hooks/useChains'
 
 interface ChainFilterSelectProps {
-  chains: string[]
+  chains: ChainMeta[]
   value: string
   onChange: (value: string) => void
   className?: string
@@ -15,13 +15,15 @@ export const ChainFilterSelect: React.FC<ChainFilterSelectProps> = ({
   onChange,
   className = '',
 }) => {
-  const uniqueChains = Array.from(new Set(chains)).sort()
+  const uniqueChains = Array.from(new Map(chains.map((c) => [c.chainId, c])).values()).sort(
+    (a, b) => a.chainId.localeCompare(b.chainId)
+  )
   const options: SearchableSelectOption[] = [
     { value: 'all', label: 'All chains' },
     ...uniqueChains.map((c) => ({
-      value: c,
-      label: getChainShortName(c),
-      icon: `https://raw.githubusercontent.com/1delta-DAO/chains/main/${c}.webp`,
+      value: c.chainId,
+      label: c.name,
+      icon: c.logoURI,
     })),
   ]
 
