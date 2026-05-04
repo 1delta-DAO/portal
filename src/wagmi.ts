@@ -4,6 +4,7 @@ import type { Chain } from 'viem'
 import {
   mainnet,
   optimism,
+  flare,
   cronos,
   telos,
   xdc,
@@ -14,14 +15,21 @@ import {
   monad,
   sonic,
   manta,
+  xLayer,
   fantom,
+  zksync,
+  pulsechain,
+  stable,
   hyperEvm,
   metis,
   coreDao,
+  lisk,
   moonbeam,
   sei,
   soneium,
+  abstract,
   morph,
+  megaeth,
   mantle,
   kaia,
   base,
@@ -29,19 +37,23 @@ import {
   mode,
   arbitrum,
   celo,
-  avalanche,
   hemi,
+  avalanche,
   linea,
+  bob,
   berachain,
   blast,
+  plumeMainnet,
   taiko,
   scroll,
   katana,
+  corn,
 } from 'viem/chains'
 
 export const evmChainWagmi: [Chain, ...Chain[]] = [
   mainnet,       // 1
   optimism,      // 10
+  flare,         // 14
   cronos,        // 25
   telos,         // 40
   xdc,           // 50
@@ -52,14 +64,21 @@ export const evmChainWagmi: [Chain, ...Chain[]] = [
   monad,         // 143
   sonic,         // 146
   manta,         // 169
+  xLayer,        // 196
   fantom,        // 250
+  zksync,        // 324
+  pulsechain,    // 369
+  stable,        // 988
   hyperEvm,      // 999
   metis,         // 1088
   coreDao,       // 1116
+  lisk,          // 1135
   moonbeam,      // 1284
   sei,           // 1329
   soneium,       // 1868
+  abstract,      // 2741
   morph,         // 2818
+  megaeth,       // 4326
   mantle,        // 5000
   kaia,          // 8217
   base,          // 8453
@@ -67,14 +86,17 @@ export const evmChainWagmi: [Chain, ...Chain[]] = [
   mode,          // 34443
   arbitrum,      // 42161
   celo,          // 42220
-  avalanche,     // 43114
   hemi,          // 43111
+  avalanche,     // 43114
   linea,         // 59144
+  bob,           // 60808
   berachain,     // 80094
   blast,         // 81457
+  plumeMainnet,  // 98866
   taiko,         // 167000
   scroll,        // 534352
   katana,        // 747474
+  corn,          // 21000000
 ]
 
 const RPC_OVERRIDES: Record<number, string> = {
