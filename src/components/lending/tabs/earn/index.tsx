@@ -49,9 +49,9 @@ export function EarnTab({
   }, [selectedAsset, filterOwned, lendingBalances])
 
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="space-y-4 sm:space-y-6">
       {account && (
-        <div className="space-y-3">
+        <section className="space-y-3">
           <div className="flex items-center gap-1 bg-base-200 rounded-lg p-1 w-fit">
             <button
               type="button"
@@ -104,7 +104,7 @@ export function EarnTab({
               refetch={refetchUserData}
             />
           )}
-        </div>
+        </section>
       )}
       <LendingPoolsTable
         chainId={chainId}

@@ -347,33 +347,58 @@ const MobilePoolCards: React.FC<{
                 <span className="text-[10px] text-base-content/50 block">Deposit APR</span>
               </div>
             </div>
-            <div className="flex items-center justify-between mt-2 text-xs text-base-content/70">
-              <span>
-                Borrow: <span className="text-warning font-medium">{mBorTotal.toFixed(2)}%</span>
-                {mIy > 0 && (
-                  <span
-                    className="badge badge-xs bg-warning/15 text-warning border-0 ml-1"
-                    title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
-                  >
-                    +{mIy.toFixed(1)}%
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-3 text-xs">
+              <div className="flex items-baseline justify-between gap-2 min-w-0">
+                <span className="text-base-content/50 shrink-0">Borrow</span>
+                <span className="flex items-baseline gap-1 min-w-0 truncate">
+                  <span className="text-warning font-medium">{mBorTotal.toFixed(2)}%</span>
+                  {mIy > 0 && (
+                    <span
+                      className="badge badge-xs bg-warning/15 text-warning border-0"
+                      title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
+                    >
+                      +{mIy.toFixed(1)}%
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              <div className="flex items-baseline justify-between gap-2 min-w-0">
+                <span className="text-base-content/50 shrink-0">LTV</span>
+                <LtvBadge config={pool.config} variant="inline" />
+              </div>
+
+              <div className="flex items-baseline justify-between gap-2 min-w-0">
+                <span className="text-base-content/50 shrink-0">Deposits</span>
+                <span
+                  className="font-medium truncate text-right"
+                  title={`$${formatUsd(pool.totalDepositsUSD)} · ${formatTokenAmount(pool.totalDeposits)} ${pool.asset.symbol}`}
+                >
+                  {abbreviateUsd(pool.totalDepositsUSD)}
+                  <span className="text-base-content/40 ml-1">
+                    ({abbreviateNumber(pool.totalDeposits)})
                   </span>
-                )}
-              </span>
-              <LtvBadge config={pool.config} variant="inline" />
-              <span title={`${formatTokenAmount(pool.totalDeposits)} ${pool.asset.symbol}`}>
-                Dep: {abbreviateUsd(pool.totalDepositsUSD)}{' '}
-                <span className="text-base-content/40">
-                  ({abbreviateNumber(pool.totalDeposits)})
                 </span>
-              </span>
-              <span title={`${formatTokenAmount(pool.totalLiquidity)} ${pool.asset.symbol}`}>
-                Liq: {abbreviateUsd(pool.totalLiquidityUSD)}{' '}
-                <span className="text-base-content/40">
-                  ({abbreviateNumber(pool.totalLiquidity)})
+              </div>
+
+              <div className="flex items-baseline justify-between gap-2 min-w-0">
+                <span className="text-base-content/50 shrink-0">Liquidity</span>
+                <span
+                  className="font-medium truncate text-right"
+                  title={`$${formatUsd(pool.totalLiquidityUSD)} · ${formatTokenAmount(pool.totalLiquidity)} ${pool.asset.symbol}`}
+                >
+                  {abbreviateUsd(pool.totalLiquidityUSD)}
+                  <span className="text-base-content/40 ml-1">
+                    ({abbreviateNumber(pool.totalLiquidity)})
+                  </span>
                 </span>
-              </span>
+              </div>
+
               {pool.risk && (
-                <RiskBadge label={pool.risk.label} breakdown={pool.risk.breakdown} size="sm" />
+                <div className="col-span-2 flex items-center justify-between gap-2 min-w-0 pt-1 border-t border-base-300/50">
+                  <span className="text-base-content/50">Risk</span>
+                  <RiskBadge label={pool.risk.label} breakdown={pool.risk.breakdown} size="sm" />
+                </div>
               )}
             </div>
           </div>

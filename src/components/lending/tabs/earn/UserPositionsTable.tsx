@@ -136,42 +136,48 @@ const PositionsList: React.FC<{
   if (positions.length === 0) return null
 
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-col gap-1 min-w-0">
       {positions.map((pos) => {
         const addr = pos.underlying ?? pos.underlyingInfo?.asset?.address ?? ''
         const token = addr ? tokens[addr.toLowerCase()] : undefined
         const symbol = token?.symbol ?? ''
         const name = token?.name ?? ''
         const tooltip = name && name !== symbol ? `${name} (${symbol})` : symbol || addr
+        const isDebt = pos.tag === 'debt'
+        const native = isDebt ? Number(pos.debt || 0) : Number(pos.deposits || 0)
+        const usd = isDebt ? pos.debtUSD : pos.depositsUSD
+        const display = symbol || (addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '??')
 
         return (
           <div
             key={`${pos.marketUid}-${pos.tag}`}
-            className="badge badge-outline badge-sm flex gap-1 items-center"
+            className="flex items-center gap-1.5 min-w-0 text-[11px] leading-tight"
             title={tooltip}
           >
             <span
-              className={`text-[10px] font-bold uppercase leading-none ${
-                pos.tag === 'debt' ? 'text-error' : 'text-success'
+              className={`shrink-0 px-1 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${
+                isDebt ? 'bg-error/15 text-error' : 'bg-success/15 text-success'
               }`}
             >
-              {pos.tag}
+              {isDebt ? 'Debt' : 'Coll'}
             </span>
             <Logo
               src={token?.logoURI}
               alt={symbol}
               fallbackText={symbol || addr}
-              className="w-3.5 h-3.5 rounded-full object-contain token-logo"
+              className="w-3.5 h-3.5 rounded-full object-contain token-logo shrink-0"
             />
-            <span className="text-[10px]">
-              {symbol || (addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '??')}
+            <span className="font-medium truncate min-w-0">{display}</span>
+            <span
+              className="ml-auto shrink-0 font-mono tabular-nums text-base-content/80"
+              title={`${native.toLocaleString(undefined, { maximumFractionDigits: 6 })} ($${formatUsd(usd)})`}
+            >
+              {native >= 1 ? native.toFixed(2) : native.toFixed(4)}
             </span>
-            <span className="opacity-70">
-              {pos.tag === 'debt'
-                ? `${Number(pos.debt || 0).toFixed(4)} ($${formatUsd(pos.debtUSD)})`
-                : `${Number(pos.deposits || 0).toFixed(4)} ($${formatUsd(pos.depositsUSD)})`}
+            <span className="shrink-0 font-mono tabular-nums text-base-content/55">
+              ${abbreviateUsd(usd)}
             </span>
-            {pos.tag === 'collateral' && account && (
+            {!isDebt && account && (
               <CollateralToggle
                 marketUid={pos.marketUid}
                 enabled={pos.collateralEnabled}
@@ -415,7 +421,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
 
   if (!account) {
     return (
-      <div className="w-full max-w-4xl mx-auto p-4">
+      <div className="w-full p-4">
         <div className="alert alert-info">
           <span>Connect your wallet to see your lending positions.</span>
         </div>
@@ -433,7 +439,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
 
   if (error) {
     return (
-      <div className="w-full max-w-4xl mx-auto p-4">
+      <div className="w-full p-4">
         <div className="alert alert-error mb-2">
           <span>Failed to load user data: {error.message}</span>
         </div>
@@ -446,7 +452,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
 
   if (!lenderEntries.length) {
     return (
-      <div className="w-full max-w-4xl mx-auto p-4">
+      <div className="w-full p-4">
         <div className="alert alert-info">
           <span>No active lending positions found for this account.</span>
         </div>
@@ -494,18 +500,13 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
 
   // Desktop layout with table
   return (
-    <div className="w-full max-w-6xl mx-auto p-0 sm:p-4 space-y-3 sm:space-y-4">
+    <div className="w-full p-0 sm:p-4 space-y-3 sm:space-y-4">
       {/* Header */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Your Lending Positions</h2>
-          <p className="text-sm text-base-content/70">
-            Grouped by lender, with sub-accounts shown separately.
-          </p>
-        </div>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <h2 className="text-lg font-semibold">Your Lending Positions</h2>
         <div className="flex flex-wrap gap-2 md:justify-end items-center">
-          <button className="btn btn-xs" onClick={refetch}>
-            Refresh balances
+          <button className="btn btn-xs btn-ghost" onClick={refetch} title="Refresh balances">
+            Refresh
           </button>
         </div>
       </div>
@@ -569,13 +570,13 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
           <table className="table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden">
             <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
               <tr>
-                <th className="w-[18%]">Lender / Account</th>
-                <th className="w-[11%]">NAV</th>
-                <th className="w-[11%]">Deposits</th>
-                <th className="w-[11%]">Debt</th>
-                <th className="w-[11%]">APR</th>
-                <th className="w-[10%]">Health</th>
-                <th className="w-[28%]">Positions</th>
+                <th className="w-[16%]">Lender / Account</th>
+                <th className="w-[9%]">NAV</th>
+                <th className="w-[9%]">Deposits</th>
+                <th className="w-[9%]">Debt</th>
+                <th className="w-[9%]">APR</th>
+                <th className="w-[8%]">Health</th>
+                <th className="w-[40%]">Positions</th>
               </tr>
             </thead>
             <tbody>
@@ -627,10 +628,10 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                               )}
                             </div>
                           </td>
-                          <td>
+                          <td className="align-middle">
                             <HealthBadge health={entry.healthFactor ?? subs[0]?.health} />
                           </td>
-                          <td>
+                          <td className="align-middle">
                             <PositionsList
                               positions={collectSubAccountPositions(subs[0] ?? entry.data[0])}
                               tokens={tokens}
@@ -678,10 +679,10 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                                 )}
                               </div>
                             </td>
-                            <td>
+                            <td className="align-middle">
                               <HealthBadge health={sub.health} />
                             </td>
-                            <td>
+                            <td className="align-middle">
                               <PositionsList
                                 positions={positions}
                                 tokens={tokens}

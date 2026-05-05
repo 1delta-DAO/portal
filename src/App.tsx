@@ -24,7 +24,7 @@ export default function App() {
           </div>
         </div>
 
-        <main className="max-w-7xl mx-auto pt-16 sm:pt-24 pb-4 sm:pb-8 px-0 sm:px-6 lg:px-8">
+        <main className="max-w-screen-2xl mx-auto pt-16 sm:pt-24 pb-4 sm:pb-8 px-0 sm:px-6 lg:px-8">
           <div className="space-y-4 flex flex-col items-center">
             <div className="w-full">
               {/* On mobile the card goes edge-to-edge: no rounded corners,

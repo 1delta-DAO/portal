@@ -102,26 +102,37 @@ export function SearchableSelect({
 
         {isOpen && (
           <div className="modal modal-open" onClick={() => setIsOpen(false)}>
-            <div className="modal-box max-w-sm" onClick={(e) => e.stopPropagation()}>
-              <h3 className="font-bold text-lg mb-3">Select Option</h3>
-
-              {/* Search input */}
-              <input
-                ref={inputRef}
-                type="text"
-                className="input input-bordered input-sm w-full mb-3"
-                placeholder={placeholder}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+            <div
+              className="modal-box w-[calc(100vw-1rem)] max-w-sm max-h-[85vh] p-3 sm:p-4 flex flex-col gap-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header: search + close */}
+              <div className="flex items-center gap-2 shrink-0">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  className="input input-bordered input-sm flex-1 min-w-0"
+                  placeholder={placeholder}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost btn-circle shrink-0"
+                  onClick={() => setIsOpen(false)}
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
 
               {/* Options list */}
-              <div className="max-h-64 overflow-y-auto space-y-1">
+              <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1 space-y-1">
                 {filtered.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
-                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-1.5 min-w-0 ${
+                    className={`w-full text-left px-2.5 py-2 text-sm rounded-lg transition-colors flex items-center gap-1.5 min-w-0 ${
                       opt.value === value
                         ? 'bg-primary text-primary-content font-medium'
                         : 'bg-base-200 hover:bg-base-300'
@@ -151,16 +162,6 @@ export function SearchableSelect({
                   </button>
                 ))}
                 {filtered.length === 0 && <EmptyState size="sm" title="No matches" />}
-              </div>
-
-              <div className="modal-action">
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  onClick={() => setIsOpen(false)}
-                >
-                  Close
-                </button>
               </div>
             </div>
           </div>

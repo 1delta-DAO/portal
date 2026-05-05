@@ -126,152 +126,251 @@ export function YourPositions({
         </div>
       )}
 
-      {/* Position cards — split by collateral & debt */}
+      {/* Position rows — split by collateral & debt */}
       {activePositions.length > 0 && (
-        <div className="space-y-2">
-          {/* Deposits row */}
+        <div className="space-y-3">
+          {/* Deposits */}
           {activePositions.some(({ position }) => Number(position.deposits) > 0) && (
-            <div>
-              <span className="text-xs font-semibold text-success mb-1 flex items-center gap-1 flex-wrap">
-                Deposits
-                {summary && (
-                  <>
-                    <span className="font-normal text-base-content/60" title={`$${summary.deposits.toLocaleString(undefined, { maximumFractionDigits: 6 })}`}>
-                      — ${formatUsd(summary.deposits)}
-                    </span>
-                    <span className="font-medium">
-                      {(summary.depositApr + summary.intrinsicDepositApr).toFixed(2)}%
-                    </span>
-                    {summary.intrinsicDepositApr > 0 && (
-                      <span
-                        className="badge badge-xs bg-success/15 text-success border-0 cursor-help"
-                        title={`Base rate: ${summary.depositApr.toFixed(2)}% + Intrinsic yield: ${summary.intrinsicDepositApr.toFixed(2)}%`}
-                      >
-                        +{summary.intrinsicDepositApr.toFixed(1)}%
-                      </span>
-                    )}
-                  </>
-                )}
-              </span>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                {activePositions
-                  .filter(({ position }) => Number(position.deposits) > 0)
-                  .map(({ position, pool }) => (
-                    <div
-                      key={pool.marketUid}
-                      className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
-                        onPoolSelect ? 'cursor-pointer' : ''
-                      } ${
-                        selectedPoolMarketUid === pool.marketUid
-                          ? 'bg-primary/15 ring-1 ring-primary'
-                          : 'bg-base-200/50 hover:bg-base-200'
-                      }`}
-                      onClick={() => onPoolSelect?.(pool)}
-                    >
-                      <AssetPopover
-                        address={pool.underlying}
-                        name={pool.asset.name}
-                        symbol={pool.asset.symbol}
-                        logoURI={pool.asset.logoURI}
-                        marketUid={pool.marketUid}
-                        marketName={pool.name}
-                        currentDepositRate={pool.depositRate + (pool.intrinsicYield ?? 0)}
-                        currentBorrowRate={pool.variableBorrowRate + (pool.intrinsicYield ?? 0)}
-                        oraclePriceUsd={pool.oraclePriceUSD}
-                        chainId={pool.asset.chainId}
-                      >
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <span className="text-sm font-medium">{pool.asset.symbol}</span>
-                          <span className="text-xs text-success truncate" title={`${position.deposits} ($${formatUsd(position.depositsUSD)})`}>
-                            +{formatTokenAmount(position.deposits)} ($
-                            {formatUsd(position.depositsUSD)})
-                          </span>
-                        </div>
-                      </AssetPopover>
-                      {account && (
-                        <div className="flex flex-col items-center shrink-0">
-                          <span className="text-[10px] text-base-content/50 leading-tight">
-                            Coll.
-                          </span>
-                          <CollateralToggle
-                            marketUid={pool.marketUid}
-                            enabled={position.collateralEnabled}
-                            account={account}
-                            chainId={chainId}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-              </div>
-            </div>
+            <PositionSection
+              kind="deposits"
+              positions={activePositions
+                .filter(({ position }) => Number(position.deposits) > 0)
+                .sort((a, b) => (b.position.depositsUSD ?? 0) - (a.position.depositsUSD ?? 0))}
+              summary={summary}
+              account={account}
+              chainId={chainId}
+              selectedPoolMarketUid={selectedPoolMarketUid}
+              onPoolSelect={onPoolSelect}
+            />
           )}
 
-          {/* Debt row */}
+          {/* Debt */}
           {activePositions.some(({ position }) => Number(position.debt) > 0) && (
-            <div>
-              <span className="text-xs font-semibold text-error mb-1 flex items-center gap-1 flex-wrap">
-                Debt
-                {summary && (
-                  <>
-                    <span className="font-normal text-base-content/60" title={`$${summary.debt.toLocaleString(undefined, { maximumFractionDigits: 6 })}`}>
-                      — ${formatUsd(summary.debt)}
-                    </span>
-                    <span className="font-medium">
-                      {(summary.borrowApr + summary.intrinsicBorrowApr).toFixed(2)}%
-                    </span>
-                    {summary.intrinsicBorrowApr > 0 && (
-                      <span
-                        className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help"
-                        title={`Base rate: ${summary.borrowApr.toFixed(2)}% + Intrinsic yield: ${summary.intrinsicBorrowApr.toFixed(2)}%`}
-                      >
-                        +{summary.intrinsicBorrowApr.toFixed(1)}%
-                      </span>
-                    )}
-                  </>
-                )}
-              </span>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                {activePositions
-                  .filter(({ position }) => Number(position.debt) > 0)
-                  .map(({ position, pool }) => (
-                    <div
-                      key={pool.marketUid}
-                      className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
-                        onPoolSelect ? 'cursor-pointer' : ''
-                      } ${
-                        selectedPoolMarketUid === pool.marketUid
-                          ? 'bg-primary/15 ring-1 ring-primary'
-                          : 'bg-base-200/50 hover:bg-base-200'
-                      }`}
-                      onClick={() => onPoolSelect?.(pool)}
-                    >
-                      <AssetPopover
-                        address={pool.underlying}
-                        name={pool.asset.name}
-                        symbol={pool.asset.symbol}
-                        logoURI={pool.asset.logoURI}
-                        marketUid={pool.marketUid}
-                        marketName={pool.name}
-                        currentDepositRate={pool.depositRate + (pool.intrinsicYield ?? 0)}
-                        currentBorrowRate={pool.variableBorrowRate + (pool.intrinsicYield ?? 0)}
-                        oraclePriceUsd={pool.oraclePriceUSD}
-                        chainId={pool.asset.chainId}
-                      >
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <span className="text-sm font-medium">{pool.asset.symbol}</span>
-                          <span className="text-xs text-error truncate" title={`${position.debt} ($${formatUsd(position.debtUSD)})`}>
-                            -{formatTokenAmount(position.debt)} (${formatUsd(position.debtUSD)})
-                          </span>
-                        </div>
-                      </AssetPopover>
-                    </div>
-                  ))}
-              </div>
-            </div>
+            <PositionSection
+              kind="debt"
+              positions={activePositions
+                .filter(({ position }) => Number(position.debt) > 0)
+                .sort((a, b) => (b.position.debtUSD ?? 0) - (a.position.debtUSD ?? 0))}
+              summary={summary}
+              account={account}
+              chainId={chainId}
+              selectedPoolMarketUid={selectedPoolMarketUid}
+              onPoolSelect={onPoolSelect}
+            />
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// PositionSection — dense, aligned position list
+// ---------------------------------------------------------------------------
+
+interface PositionSectionProps {
+  kind: 'deposits' | 'debt'
+  positions: { position: UserPositionEntry; pool: PoolDataItem }[]
+  summary: PositionSummary | null
+  account: string
+  chainId: string
+  selectedPoolMarketUid?: string
+  onPoolSelect?: (pool: PoolDataItem) => void
+}
+
+function PositionSection({
+  kind,
+  positions,
+  summary,
+  account,
+  chainId,
+  selectedPoolMarketUid,
+  onPoolSelect,
+}: PositionSectionProps) {
+  const isDeposits = kind === 'deposits'
+  const accentText = isDeposits ? 'text-success' : 'text-error'
+  const accentBar = isDeposits ? 'bg-success/60' : 'bg-error/60'
+  const shareBarClass = isDeposits ? 'bg-success/40' : 'bg-error/40'
+
+  const totalUsd = isDeposits ? summary?.deposits ?? 0 : summary?.debt ?? 0
+  const baseApr = isDeposits ? summary?.depositApr ?? 0 : summary?.borrowApr ?? 0
+  const intrinsic = isDeposits
+    ? summary?.intrinsicDepositApr ?? 0
+    : summary?.intrinsicBorrowApr ?? 0
+  const totalApr = baseApr + intrinsic
+  const intrinsicPillClass = isDeposits
+    ? 'bg-success/15 text-success'
+    : 'bg-warning/15 text-warning'
+
+  // Largest position in this section — used to scale the share bar so the
+  // biggest entry fills it and the rest are visually proportional.
+  const maxUsd = positions.reduce(
+    (m, { position }) => Math.max(m, isDeposits ? position.depositsUSD : position.debtUSD),
+    0
+  )
+
+  return (
+    <div>
+      {/* Section header */}
+      <div className="flex items-baseline gap-2 mb-1.5 px-1">
+        <span className={`text-xs font-semibold uppercase tracking-wide ${accentText}`}>
+          {isDeposits ? 'Deposits' : 'Debt'}
+        </span>
+        {summary && (
+          <>
+            <span
+              className="text-xs font-mono tabular-nums text-base-content/80"
+              title={`$${totalUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+            >
+              {abbreviateUsd(totalUsd)}
+            </span>
+            <span className="text-[10px] text-base-content/50">@</span>
+            <span className="text-xs font-medium">{totalApr.toFixed(2)}%</span>
+            {intrinsic > 0 && (
+              <span
+                className={`badge badge-xs border-0 cursor-help ${intrinsicPillClass}`}
+                title={`Base rate: ${baseApr.toFixed(2)}% + Intrinsic yield: ${intrinsic.toFixed(2)}%`}
+              >
+                +{intrinsic.toFixed(1)}%
+              </span>
+            )}
+            <span className="text-[10px] text-base-content/40">
+              · {positions.length} {positions.length === 1 ? 'position' : 'positions'}
+            </span>
+          </>
+        )}
+      </div>
+
+      {/* Rows */}
+      <div className="relative rounded-md border border-base-300 overflow-hidden">
+        <span className={`absolute left-0 top-0 bottom-0 w-0.5 ${accentBar}`} />
+        <div className="divide-y divide-base-300">
+          {positions.map(({ position, pool }) => {
+            const native = isDeposits ? Number(position.deposits) : Number(position.debt)
+            const usd = isDeposits ? position.depositsUSD : position.debtUSD
+            const isSelected = selectedPoolMarketUid === pool.marketUid
+
+            const positionApr =
+              (isDeposits ? pool.depositRate : pool.variableBorrowRate) +
+              (pool.intrinsicYield ?? 0)
+            const sharePct = totalUsd > 0 ? (usd / totalUsd) * 100 : 0
+            const barPct = maxUsd > 0 ? Math.max(2, (usd / maxUsd) * 100) : 0
+
+            return (
+              <div
+                key={pool.marketUid}
+                className={`grid grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:grid-cols-[minmax(140px,1.4fr)_72px_minmax(80px,1fr)_96px_140px_40px] items-center gap-x-3 px-3 py-1 pl-4 transition-colors ${
+                  onPoolSelect ? 'cursor-pointer' : ''
+                } ${
+                  isSelected ? 'bg-primary/10 ring-1 ring-primary ring-inset' : 'hover:bg-base-200/60'
+                }`}
+                onClick={() => onPoolSelect?.(pool)}
+              >
+                {/* Asset (logo + symbol + price sub-text) */}
+                <div className="flex items-center min-w-0">
+                  <AssetPopover
+                    address={pool.underlying}
+                    name={pool.asset.name}
+                    symbol={pool.asset.symbol}
+                    logoURI={pool.asset.logoURI}
+                    marketUid={pool.marketUid}
+                    marketName={pool.name}
+                    currentDepositRate={pool.depositRate + (pool.intrinsicYield ?? 0)}
+                    currentBorrowRate={pool.variableBorrowRate + (pool.intrinsicYield ?? 0)}
+                    oraclePriceUsd={pool.oraclePriceUSD}
+                    chainId={pool.asset.chainId}
+                  >
+                    <div className="flex flex-col min-w-0 leading-tight">
+                      <span className="text-sm font-medium truncate">{pool.asset.symbol}</span>
+                      <span className="text-[10px] font-mono tabular-nums flex items-center gap-1.5 min-w-0">
+                        {/* APR shown inline only on mobile — desktop has a dedicated column */}
+                        <span
+                          className={`sm:hidden ${accentText}`}
+                          title={`${isDeposits ? 'Deposit' : 'Borrow'} rate: ${positionApr.toFixed(4)}%`}
+                        >
+                          {positionApr.toFixed(2)}%
+                          <span className="text-base-content/45 ml-0.5 font-sans">APR</span>
+                        </span>
+                        {pool.oraclePriceUSD != null && (
+                          <>
+                            <span className="sm:hidden text-base-content/30">·</span>
+                            <span className="text-base-content/50 truncate">
+                              ${pool.oraclePriceUSD < 1
+                                ? pool.oraclePriceUSD.toPrecision(4)
+                                : pool.oraclePriceUSD.toLocaleString(undefined, {
+                                    maximumFractionDigits: 2,
+                                  })}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  </AssetPopover>
+                </div>
+
+                {/* APR — visually separated from the bar by a right divider */}
+                <div
+                  className="hidden sm:flex flex-col items-start justify-center leading-tight pr-3 border-r border-base-300/60"
+                  title={`${isDeposits ? 'Deposit' : 'Borrow'} rate: ${positionApr.toFixed(4)}%`}
+                >
+                  <span className={`text-xs font-medium tabular-nums ${accentText}`}>
+                    {positionApr.toFixed(2)}%
+                  </span>
+                  <span className="text-[9px] uppercase tracking-wide text-base-content/40">
+                    APR
+                  </span>
+                </div>
+
+                {/* Share bar — visualizes this position's share of the section total */}
+                <div
+                  className="hidden sm:flex items-center gap-2 min-w-0"
+                  title={`${sharePct.toFixed(2)}% of ${isDeposits ? 'deposits' : 'debt'}`}
+                >
+                  <div className="flex-1 h-1.5 rounded-full bg-base-300/60 overflow-hidden">
+                    <div
+                      className={`h-full ${shareBarClass} rounded-full transition-all`}
+                      style={{ width: `${barPct}%` }}
+                    />
+                  </div>
+                  <span className="shrink-0 text-[10px] font-mono tabular-nums text-base-content/55 w-10 text-right">
+                    {sharePct >= 10 ? sharePct.toFixed(0) : sharePct.toFixed(1)}%
+                    <span className="text-base-content/30 ml-0.5">sh</span>
+                  </span>
+                </div>
+
+                {/* USD value */}
+                <span
+                  className={`text-right text-sm font-semibold font-mono tabular-nums ${accentText}`}
+                  title={`$${formatUsd(usd)}`}
+                >
+                  {abbreviateUsd(usd)}
+                </span>
+
+                {/* Native amount */}
+                <span
+                  className="hidden sm:inline text-right text-xs font-mono tabular-nums text-base-content/60 truncate"
+                  title={`${native.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${pool.asset.symbol}`}
+                >
+                  {formatTokenAmount(native)}
+                  <span className="text-base-content/40 ml-1">{pool.asset.symbol}</span>
+                </span>
+
+                {/* Collateral toggle (deposits only) */}
+                <div className="flex justify-end">
+                  {isDeposits && account && (
+                    <CollateralToggle
+                      marketUid={pool.marketUid}
+                      enabled={position.collateralEnabled}
+                      account={account}
+                      chainId={chainId}
+                    />
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
