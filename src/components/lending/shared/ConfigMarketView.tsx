@@ -12,6 +12,7 @@ import { RiskBadge } from './RiskBadge'
 import { useTablePagination } from '../../../hooks/useTablePagination'
 import { TablePagination } from '../../common/TablePagination'
 import { EmptyState } from '../../common/EmptyState'
+import { Logo } from '../../common/Logo'
 
 interface Props {
   configGroups: PoolConfigGroup[]
@@ -357,13 +358,11 @@ const IconStack: React.FC<{ items: ConfigMarketItem[] | null; max?: number }> = 
     <div className="flex items-center">
       <div className="flex -space-x-1.5">
         {visible.map((item) => (
-          <img
+          <Logo
             key={item.marketUid}
             src={item.underlyingInfo.asset.logoURI}
-            width={22}
-            height={22}
             alt={item.underlyingInfo.asset.symbol}
-            title={item.underlyingInfo.asset.symbol}
+            fallbackText={item.underlyingInfo.asset.symbol}
             className="rounded-full object-contain w-5.5 h-5.5 border-2 border-base-100 bg-base-100 token-logo"
           />
         ))}

@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { PoolExposure } from '../../../../hooks/lending/useFlattenedPools'
+import { Logo } from '../../../common/Logo'
 
 interface ExposureCellProps {
   exposures: PoolExposure[]
@@ -56,23 +57,13 @@ export const ExposureCell: React.FC<ExposureCellProps> = ({ exposures, chainToke
         className="inline-block rounded-full border border-base-100"
         style={{ marginLeft: idx === 0 ? 0 : OVERLAP, zIndex: idx }}
       >
-        {token?.logoURI ? (
-          <img
-            src={token.logoURI}
-            width={ICON_SIZE}
-            height={ICON_SIZE}
-            alt={symbol}
-            className="rounded-full object-contain token-logo"
-            style={{ width: ICON_SIZE, height: ICON_SIZE }}
-          />
-        ) : (
-          <span
-            className="bg-base-300 rounded-full flex items-center justify-center text-[8px] font-bold"
-            style={{ width: ICON_SIZE, height: ICON_SIZE }}
-          >
-            {symbol.charAt(0)}
-          </span>
-        )}
+        <Logo
+          src={token?.logoURI}
+          alt={symbol}
+          fallbackText={symbol}
+          size={ICON_SIZE}
+          className="rounded-full object-contain token-logo"
+        />
       </span>
     )
   }

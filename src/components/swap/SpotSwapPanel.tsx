@@ -15,6 +15,7 @@ import { useSyncChain } from '../../hooks/useSyncChain'
 import { WalletConnect } from '../connect'
 import { getCurrency } from '../../lib/trade-helpers/utils'
 import { useDebounce } from '../../hooks/useDebounce'
+import { Logo } from '../common/Logo'
 
 interface SpotSwapPanelProps {
   chainId: string
@@ -458,9 +459,10 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
             >
               {tokenIn ? (
                 <>
-                  <img
+                  <Logo
                     src={tokenIn.logoURI}
                     alt={tokenIn.symbol}
+                    fallbackText={tokenIn.symbol}
                     className="w-5 h-5 rounded-full object-contain token-logo"
                   />
                   <div className="flex flex-col items-start">
@@ -562,9 +564,10 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
             >
               {tokenOut ? (
                 <>
-                  <img
+                  <Logo
                     src={tokenOut.logoURI}
                     alt={tokenOut.symbol}
+                    fallbackText={tokenOut.symbol}
                     className="w-5 h-5 rounded-full object-contain token-logo"
                   />
                   <div className="flex flex-col items-start">

@@ -1,5 +1,6 @@
 import React from 'react'
 import type { RawCurrency } from '../../../types/currency'
+import { Logo } from '../../common/Logo'
 
 interface NativeCurrencySelectorProps {
   wrappedSymbol: string
@@ -41,15 +42,12 @@ export const NativeCurrencySelector: React.FC<NativeCurrencySelectorProps> = ({
           }`}
           onClick={() => onChange(true)}
         >
-          {nativeToken.logoURI && (
-            <img
-              src={nativeToken.logoURI}
-              width={14}
-              height={14}
-              alt={nativeToken.symbol}
-              className="rounded-full object-contain w-3.5 h-3.5 token-logo"
-            />
-          )}
+          <Logo
+            src={nativeToken.logoURI}
+            alt={nativeToken.symbol}
+            fallbackText={nativeToken.symbol}
+            className="rounded-full object-contain w-3.5 h-3.5 token-logo"
+          />
           <span className="font-medium">{nativeToken.symbol}</span>
         </button>
       </div>

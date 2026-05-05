@@ -3,6 +3,7 @@ import type { RawCurrency } from '../../../../lib/lib-utils'
 import { useTokenLists } from '../../../../hooks/useTokenLists'
 import { useDebounce } from '../../../../hooks/useDebounce'
 import { useAvailableLendingAssets } from '../../../../hooks/lending/useAvailableLendingAssets'
+import { Logo } from '../../../common/Logo'
 
 type Preset = 'all' | 'stables' | 'majors'
 
@@ -169,7 +170,7 @@ export function TokenMultiPicker({ chainId, selected, onChange, label, placehold
                 className="badge badge-neutral gap-1 cursor-default"
                 onClick={(e) => e.stopPropagation()}
               >
-                {t?.logoURI && <img src={t.logoURI} alt="" className="w-3 h-3 rounded-full" />}
+                <Logo src={t?.logoURI} alt={t?.symbol ?? addr} fallbackText={t?.symbol ?? addr} className="w-3 h-3 rounded-full" />
                 {t?.symbol ?? `${addr.slice(0, 6)}…`}
                 <button
                   type="button"
@@ -228,7 +229,7 @@ export function TokenMultiPicker({ chainId, selected, onChange, label, placehold
                     }`}
                     onClick={() => toggle(t.address)}
                   >
-                    {t.logoURI && <img src={t.logoURI} alt="" className="w-5 h-5 rounded-full" />}
+                    <Logo src={t.logoURI} alt={t.symbol ?? t.address} fallbackText={t.symbol ?? t.address} className="w-5 h-5 rounded-full" />
                     <span className="font-medium">{t.symbol ?? t.address.slice(0, 6)}</span>
                     <span className="text-base-content/60 text-xs truncate">{t.name}</span>
                     {t.assetGroup && (

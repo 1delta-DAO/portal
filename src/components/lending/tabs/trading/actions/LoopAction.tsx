@@ -13,6 +13,7 @@ import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes, buildSimulationBody } from '../useTradingQuotes'
 import { TradingTransactionSuccess } from '../TradingTransactionSuccess'
 import { RateImpactIndicator } from '../../../actions/RateImpactIndicator'
+import { Logo } from '../../../../common/Logo'
 import { SimulationIndicator } from '../../../actions/SimulationIndicator'
 import { SubAccountSelector } from '../../../actions/SubAccountSelector'
 import { lenderSupportsSubAccounts } from '../../../actions/helpers'
@@ -452,11 +453,10 @@ export const LoopAction: React.FC<TradingActionProps> = ({
                       setPayAmount('')
                     }}
                   >
-                    <img
+                    <Logo
                       src={c.logoURI}
-                      width={16}
-                      height={16}
                       alt={c.symbol}
+                      fallbackText={c.symbol}
                       className="rounded-full object-contain w-4 h-4 token-logo"
                     />
                     <span className="font-medium">{c.symbol}</span>

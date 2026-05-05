@@ -11,6 +11,7 @@ import {
 import { WalletConnect } from '../../../connect'
 import type { TokenBalance } from '../../../../hooks/lending/useTokenBalances'
 import type { RawCurrency } from '../../../../types/currency'
+import { Logo } from '../../../common/Logo'
 
 interface ActionContentProps {
   actionTab: ActionType
@@ -101,11 +102,10 @@ const SelectedAssetBadge: React.FC<{
 }> = ({ pool, lenderInfo }) =>
   pool ? (
     <div className="flex items-center gap-2 p-2 rounded-lg bg-base-200">
-      <img
+      <Logo
         src={pool.asset.logoURI}
-        width={32}
-        height={32}
         alt={pool.asset.symbol}
+        fallbackText={pool.asset.symbol}
         className="rounded-full object-contain w-8 h-8 shrink-0 token-logo"
       />
       <div className="flex flex-col min-w-0">
@@ -114,7 +114,7 @@ const SelectedAssetBadge: React.FC<{
         </span>
         {lenderInfo ? (
           <span className="text-xs text-base-content/60 truncate flex items-center gap-1">
-            <img src={lenderInfo.logoURI} width={14} height={14} alt={lenderInfo.name} className="rounded-full object-contain w-3.5 h-3.5" />
+            <Logo src={lenderInfo.logoURI} alt={lenderInfo.name} fallbackText={lenderInfo.name} className="rounded-full object-contain w-3.5 h-3.5" />
             {lenderInfo.name}
           </span>
         ) : (

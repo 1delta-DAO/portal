@@ -10,6 +10,7 @@ import {
   type LendingDeepLinkAction,
 } from '../../../../utils/routes'
 import { LenderBadge } from '../../shared/LenderBadge'
+import { Logo } from '../../../common/Logo'
 
 interface OptimizerPaginationState {
   page: number
@@ -51,7 +52,12 @@ const fmtTok = (n: number | undefined, sym?: string) =>
 function AssetCell({ asset }: { asset: OptimizerPairRow['collateral'] }) {
   return (
     <div className="flex items-center gap-2 min-w-0">
-      {asset.logoURI && <img src={asset.logoURI} alt="" className="w-5 h-5 rounded-full shrink-0" />}
+      <Logo
+        src={asset.logoURI}
+        alt={asset.symbol ?? asset.address}
+        fallbackText={asset.symbol ?? asset.address}
+        className="w-5 h-5 rounded-full shrink-0"
+      />
       <div className="min-w-0">
         <div className="font-medium text-sm truncate">{asset.symbol ?? asset.address.slice(0, 6)}</div>
         <div className="text-[10px] text-base-content/50 truncate">{asset.name}</div>

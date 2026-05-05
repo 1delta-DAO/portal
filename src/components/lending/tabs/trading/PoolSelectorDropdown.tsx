@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react'
 import type { PoolDataItem } from '../../../../hooks/lending/usePoolData'
 import type { UserPositionEntry } from '../../../../hooks/lending/useUserData'
+import { Logo } from '../../../common/Logo'
 
 interface PoolSelectorDropdownProps {
   pools: PoolDataItem[]
@@ -114,11 +115,10 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
       >
         {value ? (
           <>
-            <img
+            <Logo
               src={value.asset.logoURI}
-              width={20}
-              height={20}
               alt={value.asset.symbol}
+              fallbackText={value.asset.symbol}
               className="rounded-full object-contain w-5 h-5 token-logo"
             />
             <span className="truncate">
@@ -182,11 +182,10 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
                     setSearch('')
                   }}
                 >
-                  <img
+                  <Logo
                     src={pool.asset.logoURI}
-                    width={20}
-                    height={20}
                     alt={pool.asset.symbol}
+                    fallbackText={pool.asset.symbol}
                     className="rounded-full object-contain w-5 h-5 shrink-0 token-logo"
                   />
                   <div className="flex flex-col min-w-0 flex-1">

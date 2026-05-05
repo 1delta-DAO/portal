@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useIsMobile } from '../../../hooks/useIsMobile'
 import { EmptyState } from '../../common/EmptyState'
+import { Logo } from '../../common/Logo'
 
 export interface SearchableSelectOption {
   value: string
@@ -80,8 +81,13 @@ export function SearchableSelect({
           <span className="truncate flex-1 min-w-0 flex items-center gap-1.5 pr-4">
             {selectedOption ? (
               <>
-                {selectedOption.icon && (
-                  <img src={selectedOption.icon} alt="" className="w-4 h-4 rounded-full token-logo" />
+                {selectedOption.icon !== undefined && (
+                  <Logo
+                    src={selectedOption.icon}
+                    alt={selectedOption.label}
+                    fallbackText={selectedOption.label}
+                    className="w-4 h-4 rounded-full token-logo"
+                  />
                 )}
                 {selectedOption.indicator && (
                   <span className="opacity-60">{selectedOption.indicator}</span>
@@ -122,8 +128,13 @@ export function SearchableSelect({
                     }`}
                     onClick={() => handleSelect(opt.value)}
                   >
-                    {opt.icon && (
-                      <img src={opt.icon} alt="" className="w-4 h-4 rounded-full shrink-0 token-logo" />
+                    {opt.icon !== undefined && (
+                      <Logo
+                        src={opt.icon}
+                        alt={opt.label}
+                        fallbackText={opt.label}
+                        className="w-4 h-4 rounded-full shrink-0 token-logo"
+                      />
                     )}
                     {opt.indicator && (
                       <span className="opacity-60 text-xs shrink-0">{opt.indicator}</span>
@@ -170,8 +181,13 @@ export function SearchableSelect({
         <span className="truncate flex items-center gap-1.5 pr-4">
           {selectedOption ? (
             <>
-              {selectedOption.icon && (
-                <img src={selectedOption.icon} alt="" className="w-4 h-4 rounded-full token-logo" />
+              {selectedOption.icon !== undefined && (
+                <Logo
+                  src={selectedOption.icon}
+                  alt={selectedOption.label}
+                  fallbackText={selectedOption.label}
+                  className="w-4 h-4 rounded-full token-logo"
+                />
               )}
               {selectedOption.indicator && (
                 <span className="opacity-60">{selectedOption.indicator}</span>
@@ -218,8 +234,13 @@ export function SearchableSelect({
                   }`}
                   onClick={() => handleSelect(opt.value)}
                 >
-                  {opt.icon && (
-                    <img src={opt.icon} alt="" className="w-4 h-4 rounded-full shrink-0 token-logo" />
+                  {opt.icon !== undefined && (
+                    <Logo
+                      src={opt.icon}
+                      alt={opt.label}
+                      fallbackText={opt.label}
+                      className="w-4 h-4 rounded-full shrink-0 token-logo"
+                    />
                   )}
                   {opt.indicator && (
                     <span className="opacity-60 text-xs shrink-0">{opt.indicator}</span>

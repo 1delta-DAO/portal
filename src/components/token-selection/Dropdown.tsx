@@ -3,6 +3,7 @@ import type { Address } from 'viem'
 import type { RawCurrency } from '../../types/currency'
 import type { TokenRowData } from './types'
 import { TokenRow } from './TokenRow'
+import { Logo } from '../common/Logo'
 
 interface TokenSelectorDropdownModeProps {
   dropdownRef: React.RefObject<HTMLDivElement>
@@ -48,9 +49,10 @@ export const TokenSelectorDropdownMode: React.FC<TokenSelectorDropdownModeProps>
       >
         {selected ? (
           <>
-            <img
+            <Logo
               src={selected.logoURI}
               alt={selected.symbol}
+              fallbackText={selected.symbol}
               className="w-5 h-5 rounded-full object-contain"
             />
             <span className="font-medium">{selected.symbol}</span>

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IrmDetailsButton } from './IrmDock'
+import { Logo } from '../../common/Logo'
 
 // ---------------------------------------------------------------------------
 // Reusable copy-to-clipboard row
@@ -167,19 +168,12 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
       >
         {/* Icon */}
         <div className="relative shrink-0 group-hover:opacity-75 transition-opacity">
-          {logoURI ? (
-            <img
-              src={logoURI}
-              width={24}
-              height={24}
-              alt={symbol}
-              className="rounded-full object-contain w-6 h-6 token-logo"
-            />
-          ) : (
-            <div className="bg-base-300 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-              {(symbol || name || '?').charAt(0)}
-            </div>
-          )}
+          <Logo
+            src={logoURI}
+            alt={symbol}
+            fallbackText={symbol || name}
+            className="rounded-full object-contain w-6 h-6 token-logo"
+          />
           {positionDot && (
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100" />
           )}
@@ -201,15 +195,12 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
             {/* Header */}
             <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2 border-b border-base-300">
               <div className="flex items-center gap-2">
-                {logoURI && (
-                  <img
-                    src={logoURI}
-                    width={20}
-                    height={20}
-                    alt={symbol}
-                    className="rounded-full w-5 h-5 shrink-0 token-logo"
-                  />
-                )}
+                <Logo
+                  src={logoURI}
+                  alt={symbol}
+                  fallbackText={symbol || name}
+                  className="rounded-full w-5 h-5 shrink-0 token-logo"
+                />
                 <span className="font-semibold text-sm">{symbol}</span>
               </div>
               <button

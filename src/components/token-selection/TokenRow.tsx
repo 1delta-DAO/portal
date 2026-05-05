@@ -1,5 +1,6 @@
 import React from 'react'
 import type { RawCurrency } from '../../types/currency'
+import { Logo } from '../common/Logo'
 
 interface TokenRowProps {
   token: RawCurrency
@@ -48,13 +49,11 @@ export const TokenRow: React.FC<TokenRowProps> = ({
     }`}
     onClick={onClick}
   >
-    <img
+    <Logo
       src={token.logoURI}
       alt={token.symbol}
+      fallbackText={token.symbol}
       className="w-8 h-8 rounded-full object-contain shrink-0"
-      onError={(e) => {
-        ;(e.target as HTMLImageElement).style.display = 'none'
-      }}
     />
     <div className="flex flex-col items-start min-w-0 flex-1">
       <div className="flex items-center gap-1.5 min-w-0 max-w-full">

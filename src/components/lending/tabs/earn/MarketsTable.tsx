@@ -9,6 +9,7 @@ import { AssetPopover } from '../../shared/AssetPopover'
 import { RiskBadge } from '../../shared/RiskBadge'
 import { buildPath } from '../../../../utils/routes'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
+import { Logo } from '../../../common/Logo'
 
 /** Compact radial utilization indicator */
 const UtilCircle: React.FC<{ pct: number }> = ({ pct }) => {
@@ -193,9 +194,12 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                             className="text-[10px] text-base-content/60 flex items-center gap-1 min-w-0"
                             title={p.lenderKey}
                           >
-                            {p.lenderInfo?.logoURI && (
-                              <img src={p.lenderInfo.logoURI} width={12} height={12} alt="" className="rounded-full object-contain w-3 h-3 shrink-0 token-logo" />
-                            )}
+                            <Logo
+                              src={p.lenderInfo?.logoURI}
+                              alt={p.lenderInfo?.name ?? p.lenderKey}
+                              fallbackText={p.lenderInfo?.name ?? p.lenderKey}
+                              className="rounded-full object-contain w-3 h-3 shrink-0 token-logo"
+                            />
                             <span className="truncate">{p.lenderInfo?.name ?? p.lenderKey}</span>
                           </span>
                         </div>
@@ -363,9 +367,12 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                         className="text-[10px] text-base-content/60 flex items-center gap-1 min-w-0"
                         title={p.lenderKey}
                       >
-                        {p.lenderInfo?.logoURI && (
-                          <img src={p.lenderInfo.logoURI} width={12} height={12} alt="" className="rounded-full object-contain w-3 h-3 shrink-0 token-logo" />
-                        )}
+                        <Logo
+                          src={p.lenderInfo?.logoURI}
+                          alt={p.lenderInfo?.name ?? p.lenderKey}
+                          fallbackText={p.lenderInfo?.name ?? p.lenderKey}
+                          className="rounded-full object-contain w-3 h-3 shrink-0 token-logo"
+                        />
                         <span className="truncate">{p.lenderInfo?.name ?? p.lenderKey}</span>
                       </span>
                     </div>

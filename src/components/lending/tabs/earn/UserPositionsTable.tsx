@@ -13,6 +13,7 @@ import { abbreviateUsd } from '../../../../utils/format'
 import { fetchCollateralToggle } from '../../../../sdk/lending-helper/fetchLendingAction'
 import { useIsMobile } from '../../../../hooks/useIsMobile'
 import { HealthBadge } from '../../../common/HealthBadge'
+import { Logo } from '../../../common/Logo'
 
 interface UserLenderPositionsTableProps {
   account?: string
@@ -156,13 +157,12 @@ const PositionsList: React.FC<{
             >
               {pos.tag}
             </span>
-            {token?.logoURI ? (
-              <img
-                src={token.logoURI}
-                alt={symbol}
-                className="w-3.5 h-3.5 rounded-full object-contain token-logo"
-              />
-            ) : null}
+            <Logo
+              src={token?.logoURI}
+              alt={symbol}
+              fallbackText={symbol || addr}
+              className="w-3.5 h-3.5 rounded-full object-contain token-logo"
+            />
             <span className="text-[10px]">
               {symbol || (addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '??')}
             </span>
@@ -320,13 +320,12 @@ const MobileLenderCard: React.FC<{
         {/* Lender header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {(entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI) && (
-              <img
-                src={entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI}
-                alt=""
-                className="w-5 h-5 rounded-full object-contain"
-              />
-            )}
+            <Logo
+              src={entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI}
+              alt={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
+              fallbackText={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
+              className="w-5 h-5 rounded-full object-contain"
+            />
             <h3 className="font-semibold text-base">
               {entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
             </h3>
@@ -592,13 +591,12 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                     <tr className="bg-base-200/50">
                       <td colSpan={hasSingleSub ? 1 : 7}>
                         <div className="flex items-center gap-2 min-w-0">
-                          {(entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI) && (
-                            <img
-                              src={entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI}
-                              alt=""
-                              className="w-4 h-4 rounded-full object-contain shrink-0"
-                            />
-                          )}
+                          <Logo
+                            src={entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI}
+                            alt={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
+                            fallbackText={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
+                            className="w-4 h-4 rounded-full object-contain shrink-0"
+                          />
                           <span className="font-semibold text-sm truncate" title={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}>
                             {entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
                           </span>

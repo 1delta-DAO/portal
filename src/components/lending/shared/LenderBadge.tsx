@@ -1,4 +1,5 @@
 import React from 'react'
+import { Logo } from '../../common/Logo'
 
 interface LenderBadgeProps {
   /** Internal lender key, e.g. AAVE_V3, RADIANT_V2, MORPHO_BLUE. */
@@ -37,15 +38,12 @@ export const LenderBadge: React.FC<LenderBadgeProps> = ({
       className={`inline-flex items-center gap-1 max-w-[140px] badge badge-ghost badge-sm ${className}`}
       title={tooltip}
     >
-      {logoURI && (
-        <img
-          src={logoURI}
-          width={12}
-          height={12}
-          alt=""
-          className="rounded-full object-contain w-3 h-3 shrink-0"
-        />
-      )}
+      <Logo
+        src={logoURI}
+        alt={display}
+        fallbackText={display}
+        className="rounded-full object-contain w-3 h-3 shrink-0"
+      />
       <span className="truncate">{truncated}</span>
     </span>
   )

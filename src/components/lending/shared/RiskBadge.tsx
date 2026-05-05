@@ -26,6 +26,46 @@ function shortOwner(owner: string): string {
   return owner
 }
 
+const CopyOwnerButton: React.FC<{ owner: string }> = ({ owner }) => {
+  const [copied, setCopied] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  React.useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+
+  const copy = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    navigator.clipboard.writeText(owner)
+    setCopied(true)
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => setCopied(false), 1200)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="shrink-0 text-base-content/40 hover:text-primary transition-colors"
+      title={copied ? 'Copied!' : `Copy ${owner}`}
+      aria-label={`Copy ${owner}`}
+    >
+      {copied ? (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-success"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      ) : (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          strokeLinecap="round" strokeLinejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+          <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+        </svg>
+      )}
+    </button>
+  )
+}
+
 function sliceArcPath(
   cx: number,
   cy: number,
@@ -111,6 +151,7 @@ const OwnerDistributionChart: React.FC<{ distribution: PoolOwnerShare[] }> = ({ 
                 >
                   {shortOwner(row.owner)}
                 </span>
+                {row.owner !== 'others' && <CopyOwnerButton owner={row.owner} />}
               </span>
               <span className="text-base-content/60 shrink-0 tabular-nums">
                 {(row.share * 100).toFixed(2)}%

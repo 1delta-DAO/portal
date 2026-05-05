@@ -7,6 +7,7 @@ import type { TokenBalance } from '../../../../hooks/lending/useTokenBalances'
 import { useSyncChain } from '../../../../hooks/useSyncChain'
 import { DepositAction, WithdrawAction } from '../../actions'
 import { WalletConnect } from '../../../connect'
+import { Logo } from '../../../common/Logo'
 
 type EarnAction = 'Deposit' | 'Withdraw'
 
@@ -57,15 +58,12 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
           the selected market belongs to. */}
       {selectedEntry?.lenderInfo && (
         <div className="flex items-center gap-2 px-1">
-          {selectedEntry.lenderInfo.logoURI && (
-            <img
-              src={selectedEntry.lenderInfo.logoURI}
-              width={20}
-              height={20}
-              alt={selectedEntry.lenderInfo.name}
-              className="rounded-full object-contain w-5 h-5 shrink-0"
-            />
-          )}
+          <Logo
+            src={selectedEntry.lenderInfo.logoURI}
+            alt={selectedEntry.lenderInfo.name}
+            fallbackText={selectedEntry.lenderInfo.name}
+            className="rounded-full object-contain w-5 h-5 shrink-0"
+          />
           <span className="font-semibold text-sm truncate" title={selectedEntry.lenderInfo.name}>
             {selectedEntry.lenderInfo.name}
           </span>
@@ -93,11 +91,10 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
       {/* Selected asset display */}
       {resolvedPool ? (
         <div className="flex items-center gap-2 p-2 rounded-lg bg-base-200">
-          <img
+          <Logo
             src={resolvedPool.asset.logoURI}
-            width={32}
-            height={32}
             alt={resolvedPool.asset.symbol}
+            fallbackText={resolvedPool.asset.symbol}
             className="rounded-full object-contain w-8 h-8 shrink-0 token-logo"
           />
           <div className="flex flex-col min-w-0">
