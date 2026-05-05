@@ -302,9 +302,25 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
       {quotes.length > 0 && (
         <div className="space-y-1.5">
           <span className="text-xs font-medium">Quotes</span>
-          {quotes.map((q, i) => (
-            <QuoteCard key={i} quote={q} index={i} isSelected={selectedIndex === i} onClick={() => selectQuote(i)} operation="DebtSwap" inSymbol={debtInPool?.asset.symbol} outSymbol={debtOutPool?.asset.symbol} />
-          ))}
+          {(() => {
+            const impacts = quotes
+              .map((q) => q.priceImpactUSD)
+              .filter((v): v is number => v != null)
+            const bestImpact = impacts.length > 0 ? Math.max(...impacts) : undefined
+            return quotes.map((q, i) => (
+              <QuoteCard
+                key={i}
+                quote={q}
+                index={i}
+                isSelected={selectedIndex === i}
+                onClick={() => selectQuote(i)}
+                operation="DebtSwap"
+                inSymbol={debtInPool?.asset.symbol}
+                outSymbol={debtOutPool?.asset.symbol}
+                bestPriceImpactUSD={bestImpact}
+              />
+            ))
+          })()}
         </div>
       )}
 

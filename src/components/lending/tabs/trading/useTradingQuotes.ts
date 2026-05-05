@@ -40,11 +40,50 @@ const ENDPOINTS: Record<TradingOperation, string> = {
   Close: `${BACKEND_BASE_URL}/v1/actions/loop/close`,
 }
 
+interface QuoteDeltaItem {
+  amount: string | number
+  amountUSD: number
+  position: string
+  asset?: {
+    decimals?: number
+    symbol?: string
+    logoURI?: string
+  }
+}
+
 interface QuoteDeltas {
   aggregator: string
   tradeInput: number
   tradeOutput: number
-  deltas?: Array<{ amountUSD: number; position: string }>
+  deltas?: QuoteDeltaItem[]
+}
+
+/** Convert a raw delta amount string to its native-unit float value. */
+function deltaNativeAbs(d: QuoteDeltaItem): number {
+  const decimals = d.asset?.decimals ?? 0
+  const raw = typeof d.amount === 'string' ? parseFloat(d.amount) : d.amount
+  if (!Number.isFinite(raw)) return 0
+  return Math.abs(raw) / 10 ** decimals
+}
+
+/** Pick the delta whose native-unit magnitude is closest to `target`. */
+function matchDeltaByAmount(
+  deltas: QuoteDeltaItem[],
+  target: number,
+  exclude?: QuoteDeltaItem
+): QuoteDeltaItem | undefined {
+  if (!deltas.length || !Number.isFinite(target) || target === 0) return undefined
+  let best: QuoteDeltaItem | undefined
+  let bestDiff = Infinity
+  for (const d of deltas) {
+    if (d === exclude) continue
+    const diff = Math.abs(deltaNativeAbs(d) - target)
+    if (diff < bestDiff) {
+      bestDiff = diff
+      best = d
+    }
+  }
+  return best
 }
 
 function normalizeQuotes(
@@ -56,6 +95,12 @@ function normalizeQuotes(
     let aggregator = 'Unknown'
     let tradeAmountIn = 0
     let tradeAmountOut = 0
+    let tradeAmountInUSD: number | undefined
+    let tradeAmountOutUSD: number | undefined
+    let inSymbol: string | undefined
+    let inLogoURI: string | undefined
+    let outSymbol: string | undefined
+    let outLogoURI: string | undefined
     let positionCollateralUSD: number | undefined
     let positionDebtUSD: number | undefined
 
@@ -64,13 +109,36 @@ function normalizeQuotes(
       aggregator = deltas.aggregator ?? 'Unknown'
       tradeAmountIn = deltas.tradeInput ?? 0
       tradeAmountOut = deltas.tradeOutput ?? 0
-      // Loop responses include nested deltas with per-position USD values
-      if (deltas.deltas) {
-        for (const d of deltas.deltas) {
-          if (d.position === 'collateral') positionCollateralUSD = d.amountUSD
-          else if (d.position === 'debt') positionDebtUSD = d.amountUSD
-        }
+      const items = deltas.deltas ?? []
+
+      for (const d of items) {
+        if (d.position === 'collateral') positionCollateralUSD = d.amountUSD
+        else if (d.position === 'debt') positionDebtUSD = d.amountUSD
       }
+
+      // Match each delta to the input / output side of the swap by native
+      // magnitude. Each quote's `tradeInput` / `tradeOutput` are token-unit
+      // floats; we compare against |delta.amount| / 10^decimals to find the
+      // owner-asset on each side, then read its USD + logo from there.
+      const inDelta = matchDeltaByAmount(items, tradeAmountIn)
+      const outDelta = matchDeltaByAmount(items, tradeAmountOut, inDelta)
+      if (inDelta) {
+        tradeAmountInUSD = Math.abs(inDelta.amountUSD)
+        inSymbol = inDelta.asset?.symbol
+        inLogoURI = inDelta.asset?.logoURI
+      }
+      if (outDelta) {
+        tradeAmountOutUSD = Math.abs(outDelta.amountUSD)
+        outSymbol = outDelta.asset?.symbol
+        outLogoURI = outDelta.asset?.logoURI
+      }
+    }
+
+    let priceImpactUSD: number | undefined
+    let priceImpactPct: number | undefined
+    if (tradeAmountInUSD != null && tradeAmountOutUSD != null) {
+      priceImpactUSD = tradeAmountOutUSD - tradeAmountInUSD
+      if (tradeAmountInUSD > 0) priceImpactPct = priceImpactUSD / tradeAmountInUSD
     }
 
     // Transaction data comes from actions.alternatives (matched by index),
@@ -81,6 +149,14 @@ function normalizeQuotes(
       aggregator,
       tradeAmountIn,
       tradeAmountOut,
+      tradeAmountInUSD,
+      tradeAmountOutUSD,
+      priceImpactUSD,
+      priceImpactPct,
+      inSymbol,
+      inLogoURI,
+      outSymbol,
+      outLogoURI,
       positionCollateralUSD,
       positionDebtUSD,
       tx,

@@ -26,6 +26,20 @@ export interface TradingQuote {
   aggregator: string
   tradeAmountIn: number
   tradeAmountOut: number
+  /** USD value of the input leg of the swap (absolute). */
+  tradeAmountInUSD?: number
+  /** USD value of the output leg of the swap (absolute). */
+  tradeAmountOutUSD?: number
+  /** outUSD - inUSD (negative = swap costs the user). */
+  priceImpactUSD?: number
+  /** priceImpactUSD / inUSD as a fraction (e.g. -0.044 for -4.4%). */
+  priceImpactPct?: number
+  /** Resolved input asset metadata from the deltas (preferred over caller-supplied props). */
+  inSymbol?: string
+  inLogoURI?: string
+  /** Resolved output asset metadata from the deltas. */
+  outSymbol?: string
+  outLogoURI?: string
   positionCollateralUSD?: number
   positionDebtUSD?: number
   tx: Tx

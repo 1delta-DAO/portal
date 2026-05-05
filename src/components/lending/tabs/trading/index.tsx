@@ -477,29 +477,32 @@ export function TradingDashboard({
 
         {/* Right: Action panel — desktop only */}
         <div className="hidden md:block w-72 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
-          {/* Config selector */}
-          {sortedConfigGroups.length > 0 && (
-            <div>
-              <label className="label-text text-xs mb-1 block">Configuration</label>
-              <select
-                className="select select-bordered select-xs w-full"
-                value={selectedConfigId ?? ''}
-                onChange={(e) => setSelectedConfigId(e.target.value)}
-              >
-                {sortedConfigGroups.map((g) => {
-                  const isUserMode =
-                    userActiveCategory !== null && g.category === userActiveCategory
-                  return (
-                    <option key={g.configId} value={g.configId}>
-                      {isUserMode ? '\u2713 ' : ''}
-                      {g.label || `Config ${g.configId}`}
-                      {isUserMode ? ' (active)' : ''}
-                    </option>
-                  )
-                })}
-              </select>
-            </div>
-          )}
+          {/* Active config \u2014 selected from the table; shown read-only here */}
+          {sortedConfigGroups.length > 0 &&
+            (() => {
+              const active = sortedConfigGroups.find((g) => g.configId === selectedConfigId)
+              if (!active) return null
+              const rawLabel = (active.label || `Config ${active.configId}`).trim()
+              const labelText =
+                rawLabel.toLowerCase() === 'disabled' ? 'Standard (no e-mode)' : rawLabel
+              const isUserMode =
+                userActiveCategory !== null && active.category === userActiveCategory
+              return (
+                <div className="flex items-baseline justify-between gap-2 px-1">
+                  <span className="text-[10px] uppercase tracking-wider text-base-content/40 shrink-0">
+                    Config
+                  </span>
+                  <span className="text-xs font-medium truncate" title={labelText}>
+                    {labelText}
+                    {isUserMode && (
+                      <span className="ml-1.5 text-[10px] font-medium text-success/80">
+                        active
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )
+            })()}
 
           {/* Operation tabs */}
           <div role="tablist" className="tabs tabs-boxed tabs-xs">
