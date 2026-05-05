@@ -77,15 +77,17 @@ async function fetchApi<T extends { success: boolean; error?: { code: string; me
  */
 export async function fetchUserDataViaRpc(
   chainId: string,
-  account: string
+  account: string,
+  lenders?: string[]
 ): Promise<FetchUserDataResult> {
   // Step 1: Get RPC call descriptors from backend
   // Smaller batches on chains with many lenders / flaky RPCs
   const SMALL_BATCH_CHAINS = new Set(['1', '8453', '42161'])
   const batches = SMALL_BATCH_CHAINS.has(chainId) ? `&batchSize=1000` : ''
+  const lendersParam = lenders && lenders.length > 0 ? `&lenders=${lenders.join(',')}` : ''
   const rpcCallUrl =
     `${BACKEND_BASE_URL}/v1/data/lending/user-positions/rpc-call` +
-    `?chains=${chainId}&account=${account}${batches}`
+    `?chains=${chainId}&account=${account}${batches}${lendersParam}`
 
   const {
     data: { rpcCallId, rpcCalls },

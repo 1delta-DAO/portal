@@ -96,10 +96,21 @@ export function LenderTab() {
     lenderKeysToFetch,
     chainsReady
   )
+  // Scope the user-positions fetch to a single lender on the lending/looping
+  // tabs (the UI only ever shows one lender's data there). Earn aggregates
+  // across all lenders, so it keeps the unfiltered fetch.
+  const userDataLenders = useMemo(
+    () =>
+      (activeTab === 'lending' || activeTab === 'trading') && activeLender
+        ? [activeLender]
+        : undefined,
+    [activeTab, activeLender]
+  )
   const { userData, isUserDataLoading, error, refetch } = useUserData({
     chainId: effectiveChainId,
     account,
     enabled: chainsReady,
+    lenders: userDataLenders,
   })
   const { data: tokens } = useTokenLists(chainsReady ? effectiveChainId : undefined)
   const {

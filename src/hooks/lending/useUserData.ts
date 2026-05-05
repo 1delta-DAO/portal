@@ -222,18 +222,25 @@ const USE_RPC_FETCH = true
  * useUserData
  * Fetches user lending positions from the /lending/user-positions endpoint.
  */
-export function useUserData(params: { chainId: string; account?: string; enabled?: boolean }) {
-  const { chainId, account } = params
+export function useUserData(params: {
+  chainId: string
+  account?: string
+  enabled?: boolean
+  lenders?: string[]
+}) {
+  const { chainId, account, lenders } = params
   const enabled = (params.enabled ?? true) && !!account
 
-  const url = `${endpointUserData}?chains=${chainId}&account=${account}`
+  const lendersKey = lenders && lenders.length > 0 ? [...lenders].sort().join(',') : ''
+  const lendersQuery = lendersKey ? `&lenders=${lendersKey}` : ''
+  const url = `${endpointUserData}?chains=${chainId}&account=${account}${lendersQuery}`
 
   const { data, isLoading, isFetching, error, refetch } = useQuery<UserDataResult>({
-    queryKey: ['userData', chainId, account],
+    queryKey: ['userData', chainId, account, lendersKey],
     enabled,
     queryFn: async () => {
       if (USE_RPC_FETCH) {
-        const result = await fetchUserDataViaRpc(chainId, account!)
+        const result = await fetchUserDataViaRpc(chainId, account!, lenders)
         return {
           raw: result.data.map(transformUserDataEntry),
           summary: result.summary,
