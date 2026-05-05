@@ -5,7 +5,7 @@ import type {
   PoolDataItem,
 } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry } from '../../../hooks/lending/useUserData'
-import type { TableHighlight, PoolRole } from '../tabs/trading/types'
+import type { TableHighlight, PoolRole, PoolSide } from '../tabs/trading/types'
 import { abbreviateUsd, abbreviateNumber, formatUsd, formatTokenAmount } from '../../../utils/format'
 import { AssetPopover } from './AssetPopover'
 import { RiskBadge } from './RiskBadge'
@@ -18,7 +18,10 @@ interface Props {
   configGroups: PoolConfigGroup[]
   allPools: PoolDataItem[]
   selectedMarketUid?: string
-  onPoolSelect: (pool: PoolDataItem) => void
+  /** Called when a row is clicked. `side` is the row's side
+   *  (`collateral` or `borrowable`) so multi-leg actions can route the click
+   *  to the matching slot. Single-side consumers (lending tab) can ignore it. */
+  onPoolSelect: (pool: PoolDataItem, side: PoolSide) => void
   userPositions: Map<string, UserPositionEntry>
   highlights?: TableHighlight[]
   isLoading?: boolean
@@ -31,10 +34,26 @@ interface Props {
 
 const PAGE_SIZE = 8
 
-const ROLE_STYLES: Record<PoolRole, string> = {
-  input: 'bg-error/10 border-l-2 border-l-error',
-  output: 'bg-success/10 border-l-2 border-l-success',
-  pay: 'bg-warning/10 border-l-2 border-l-warning',
+/** Thin left-rail accent that signals a Loop role on the row. No background
+ *  tint — that lane is reserved for hover / inspect-selected state, so role
+ *  selection (rail + trailing chip) doesn't collide with side type or row
+ *  selection state. */
+const ROLE_RAIL: Record<PoolRole, string> = {
+  input: 'border-l-[3px] border-l-error',
+  output: 'border-l-[3px] border-l-success',
+  pay: 'border-l-[3px] border-l-warning',
+}
+
+const ROLE_LABEL: Record<PoolRole, string> = {
+  input: 'Loop In',
+  output: 'Loop Out',
+  pay: 'Pay',
+}
+
+const ROLE_CHIP_CLASS: Record<PoolRole, string> = {
+  input: 'bg-error/15 text-error',
+  output: 'bg-success/15 text-success',
+  pay: 'bg-warning/15 text-warning',
 }
 
 /** "Disabled" is the API's term for "no e-mode" — confusing in the UI, where
@@ -181,18 +200,21 @@ export const ConfigMarketView: React.FC<Props> = ({
     return map
   }, [allPools])
 
-  // Highlight map for trading view
+  // Highlight map for trading view, keyed by `${marketUid}|${side}` so the
+  // role only lights up the row that actually corresponds to the action's
+  // selection — without the side, the same asset's collateral and borrowable
+  // rows would both inherit the highlight.
   const highlightMap = useMemo(() => {
     const map = new Map<string, PoolRole>()
     if (highlights) {
-      for (const h of highlights) map.set(h.marketUid, h.role)
+      for (const h of highlights) map.set(`${h.marketUid}|${h.side}`, h.role)
     }
     return map
   }, [highlights])
 
-  const handleRowClick = (marketUid: string) => {
+  const handleRowClick = (marketUid: string, side: PoolSide) => {
     const pool = poolMap.get(marketUid)
-    if (pool) onPoolSelect(pool)
+    if (pool) onPoolSelect(pool, side)
   }
 
   if (isLoading) {
@@ -507,7 +529,7 @@ interface CombinedDetailTableProps {
   selectedMarketUid?: string
   userPositions: Map<string, UserPositionEntry>
   highlightMap: Map<string, PoolRole>
-  onRowClick: (marketUid: string) => void
+  onRowClick: (marketUid: string, side: PoolSide) => void
   poolMap: Map<string, PoolDataItem>
 }
 
@@ -576,11 +598,27 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
     })
   }, [allRows, side, filter, sortKey, sortDir])
 
-  const detailPagination = useTablePagination(filteredSorted, DETAIL_PAGE_SIZE, [
+  // Pin rows that carry a Loop role to the top — without this, a highlighted
+  // row (e.g. the debt-repay output) can sort below the page boundary and be
+  // invisible until the user paginates. The pin is stable so the within-pinned
+  // and within-unpinned ordering still respects the user's chosen sort.
+  const pinnedSorted = useMemo(() => {
+    if (highlightMap.size === 0) return filteredSorted
+    const pinned: DetailRow[] = []
+    const rest: DetailRow[] = []
+    for (const r of filteredSorted) {
+      if (highlightMap.has(`${r.item.marketUid}|${r.side}`)) pinned.push(r)
+      else rest.push(r)
+    }
+    return [...pinned, ...rest]
+  }, [filteredSorted, highlightMap])
+
+  const detailPagination = useTablePagination(pinnedSorted, DETAIL_PAGE_SIZE, [
     side,
     filter,
     sortKey,
     sortDir,
+    highlightMap,
   ])
   const { pagedItems: pagedRows } = detailPagination
 
@@ -648,40 +686,43 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
               <thead className="[&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
                 <tr>
                   <th
-                    className="w-[8%] cursor-pointer select-none"
+                    className="w-[7%] cursor-pointer select-none"
                     onClick={() => toggleSort('side')}
                   >
                     Side{sortIndicator('side')}
                   </th>
-                  <th className="w-[24%]">Asset</th>
+                  <th className="w-[22%]">Asset</th>
                   <th
-                    className="w-[10%] cursor-pointer select-none"
+                    className="w-[9%] cursor-pointer select-none"
                     onClick={() => toggleSort('apr')}
                   >
                     APR{sortIndicator('apr')}
                   </th>
                   <th
-                    className="w-[8%] cursor-pointer select-none"
+                    className="w-[7%] cursor-pointer select-none"
                     onClick={() => toggleSort('ltv')}
                     title="Loan-to-value (collateral only)"
                   >
                     LTV{sortIndicator('ltv')}
                   </th>
-                  <th className="w-[12%]">Deposits</th>
+                  <th className="w-[11%]">Deposits</th>
                   <th
-                    className="w-[12%] cursor-pointer select-none"
+                    className="w-[11%] cursor-pointer select-none"
                     onClick={() => toggleSort('liquidity')}
                     title="Borrow liquidity (borrowable) / Deposits (collateral)"
                   >
                     Liquidity{sortIndicator('liquidity')}
                   </th>
-                  <th className="w-[12%]">Debt</th>
+                  <th className="w-[11%]">Debt</th>
+                  <th className="w-[12%]" title="Loop role: this row's slot in the active loop action">
+                    Role
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {pagedRows.map(({ side: rowSide, item }) => {
                   const isSelected = selectedMarketUid === item.marketUid
-                  const role = highlightMap.get(item.marketUid)
+                  const role = highlightMap.get(`${item.marketUid}|${rowSide}`)
                   const userPos = userPositions.get(item.marketUid)
                   const hasPosition =
                     userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
@@ -695,13 +736,9 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                     <tr
                       key={`${rowSide}-${item.marketUid}`}
                       className={`cursor-pointer transition-colors ${
-                        isSelected
-                          ? 'bg-primary/10'
-                          : role
-                            ? ROLE_STYLES[role]
-                            : 'hover:bg-base-200'
-                      }`}
-                      onClick={() => onRowClick(item.marketUid)}
+                        isSelected ? 'bg-primary/10' : 'hover:bg-base-200'
+                      } ${role ? ROLE_RAIL[role] : ''}`}
+                      onClick={() => onRowClick(item.marketUid, rowSide)}
                     >
                       <td>
                         <SideBadge side={rowSide} />
@@ -783,6 +820,9 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                           )}
                         </div>
                       </td>
+                      <td>
+                        <RoleChip role={role} />
+                      </td>
                     </tr>
                   )
                 })}
@@ -794,7 +834,7 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
           <div className="md:hidden divide-y divide-base-300">
             {pagedRows.map(({ side: rowSide, item }) => {
               const isSelected = selectedMarketUid === item.marketUid
-              const role = highlightMap.get(item.marketUid)
+              const role = highlightMap.get(`${item.marketUid}|${rowSide}`)
               const userPos = userPositions.get(item.marketUid)
               const hasPosition =
                 userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
@@ -808,13 +848,9 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                 <div
                   key={`m-${rowSide}-${item.marketUid}`}
                   className={`p-3 cursor-pointer transition-colors ${
-                    isSelected
-                      ? 'bg-primary/10'
-                      : role
-                        ? ROLE_STYLES[role]
-                        : 'active:bg-base-200'
-                  }`}
-                  onClick={() => onRowClick(item.marketUid)}
+                    isSelected ? 'bg-primary/10' : 'active:bg-base-200'
+                  } ${role ? ROLE_RAIL[role] : ''}`}
+                  onClick={() => onRowClick(item.marketUid, rowSide)}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
@@ -825,7 +861,8 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                         entityName={pool?.name}
                       />
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                      {role && <RoleChip role={role} />}
                       {rowSide === 'collateral' ? (
                         <>
                           <AprCell rate={item.depositRate} iy={iy} color="success" />
@@ -927,6 +964,25 @@ const ExpandChevron: React.FC<{ expanded: boolean }> = ({ expanded }) => (
     />
   </svg>
 )
+
+/**
+ * Trailing role chip — pairs with the colored left rail to signal which
+ * Loop slot this row is currently filling. Renders an empty placeholder
+ * when no role is assigned so the column doesn't visually collapse.
+ */
+const RoleChip: React.FC<{ role: PoolRole | undefined }> = ({ role }) => {
+  if (!role) {
+    return <span className="text-[10px] text-base-content/30">—</span>
+  }
+  return (
+    <span
+      className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${ROLE_CHIP_CLASS[role]}`}
+      title={`Selected as ${ROLE_LABEL[role]} in the active loop action`}
+    >
+      {ROLE_LABEL[role]}
+    </span>
+  )
+}
 
 const SideBadge: React.FC<{ side: 'collateral' | 'borrowable' }> = ({ side }) => {
   const isColl = side === 'collateral'

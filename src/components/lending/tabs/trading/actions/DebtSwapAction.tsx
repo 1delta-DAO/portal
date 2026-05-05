@@ -32,6 +32,8 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
   accountId,
   onAccountIdChange,
   onPoolSelectionChange,
+  pendingMarketClick,
+  consumeMarketClick,
 }) => {
   const [debtInPool, setDebtInPool] = useState<PoolDataItem | null>(null)
   const [debtOutPool, setDebtOutPool] = useState<PoolDataItem | null>(null)
@@ -50,10 +52,31 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
   // Notify parent
   useEffect(() => {
     const selections: SelectedPool[] = []
-    if (debtInPool) selections.push({ pool: debtInPool, role: 'input' })
-    if (debtOutPool) selections.push({ pool: debtOutPool, role: 'output' })
+    if (debtInPool) selections.push({ pool: debtInPool, role: 'input', side: 'borrowable' })
+    if (debtOutPool) selections.push({ pool: debtOutPool, role: 'output', side: 'borrowable' })
     onPoolSelectionChange(selections)
   }, [debtInPool, debtOutPool, onPoolSelectionChange])
+
+  // Apply by-config row clicks. Both slots are borrowable-side, so use the
+  // same fuzzy fill rule as ColSwap: empty slot first, otherwise replace
+  // the input.
+  useEffect(() => {
+    if (!pendingMarketClick) return
+    if (pendingMarketClick.side !== 'borrowable') {
+      consumeMarketClick?.()
+      return
+    }
+    const pool = pendingMarketClick.pool
+    if (!debtInPool) setDebtInPool(pool)
+    else if (!debtOutPool) setDebtOutPool(pool)
+    else setDebtInPool(pool)
+    consumeMarketClick?.()
+  }, [pendingMarketClick, consumeMarketClick, debtInPool, debtOutPool])
+
+  // Clear stale quotes when either side of the swap changes.
+  useEffect(() => {
+    reset()
+  }, [debtInPool?.marketUid, debtOutPool?.marketUid])
 
   // Debt swap range (flash-loan aware max)
   const [swapRange, setSwapRange] = useState<LoopRangeEntry | null>(null)

@@ -126,6 +126,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   onAccountIdChange,
   onPoolSelectionChange,
   initialSelection,
+  pendingMarketClick,
+  consumeMarketClick,
 }) => {
   const { data: chainTokens } = useTokenLists(chainId)
 
@@ -195,19 +197,34 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
   const selectedPayCurrency = payCurrencies.find((c) => c.address === payCurrencyAddress) ?? null
 
-  // Reset pay currency when pools change
+  // Reset pay currency + clear stale quotes when the user picks a different
+  // collateral or debt pool — old quotes reference the previous pair and are
+  // no longer actionable.
   useEffect(() => {
     setPayCurrencyAddress(null)
     setPayAmount('')
+    reset()
   }, [collateralPool?.marketUid, debtPool?.marketUid])
 
   // Notify parent of pool selections for table highlighting
   useEffect(() => {
     const selections: SelectedPool[] = []
-    if (collateralPool) selections.push({ pool: collateralPool, role: 'output' })
-    if (debtPool) selections.push({ pool: debtPool, role: 'input' })
+    if (collateralPool) selections.push({ pool: collateralPool, role: 'output', side: 'collateral' })
+    if (debtPool) selections.push({ pool: debtPool, role: 'input', side: 'borrowable' })
     onPoolSelectionChange(selections)
   }, [collateralPool, debtPool, onPoolSelectionChange])
+
+  // Apply by-config row clicks: collateral row → collateralPool slot,
+  // borrowable row → debtPool slot. Side is unambiguous for Loop.
+  useEffect(() => {
+    if (!pendingMarketClick) return
+    if (pendingMarketClick.side === 'collateral') {
+      setCollateralPool(pendingMarketClick.pool)
+    } else {
+      setDebtPool(pendingMarketClick.pool)
+    }
+    consumeMarketClick?.()
+  }, [pendingMarketClick, consumeMarketClick])
 
   // Loop range (max leverage size)
   const [loopRange, setLoopRange] = useState<LoopRangeEntry | null>(null)
@@ -451,6 +468,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
                     onClick={() => {
                       setPayCurrencyAddress(c.address)
                       setPayAmount('')
+                      reset()
                     }}
                   >
                     <Logo

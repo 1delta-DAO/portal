@@ -12,6 +12,8 @@ import { WalletConnect } from '../../../connect'
 import type { TokenBalance } from '../../../../hooks/lending/useTokenBalances'
 import type { RawCurrency } from '../../../../types/currency'
 import { Logo } from '../../../common/Logo'
+import { useSpyMode } from '../../../../contexts/SpyMode'
+import { SpyModeNotice } from '../../shared/SpyModeNotice'
 
 interface ActionContentProps {
   actionTab: ActionType
@@ -144,6 +146,18 @@ const WalletGate: React.FC<Omit<WalletGateProps, 'account'> & { account?: string
   chainId,
   ...rest
 }) => {
+  const { isSpyMode } = useSpyMode()
+  // Spy mode: keep the action UI enabled so quotes / tx-build paths can be
+  // exercised against the spied account. Signing will fail at the wallet
+  // step — the SpyModeNotice banner sets that expectation.
+  if (isSpyMode) {
+    return (
+      <>
+        <SpyModeNotice />
+        <ActionContent account={account ?? ''} chainId={chainId} {...rest} />
+      </>
+    )
+  }
   if (!account) {
     return (
       <div className="w-full flex justify-center">

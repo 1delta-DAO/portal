@@ -4,15 +4,22 @@ import type { TokenBalance } from '../../../../hooks/lending/useTokenBalances'
 
 export type TradingOperation = 'Loop' | 'ColSwap' | 'DebtSwap' | 'Close'
 export type PoolRole = 'input' | 'output' | 'pay'
+/** Which view-side of a pool the selection applies to. By-config splits the
+ *  same `marketUid` into a Collateral row and a Borrowable row, so the role
+ *  highlight needs the side to land on the correct one. */
+export type PoolSide = 'collateral' | 'borrowable'
 
 export interface SelectedPool {
   pool: PoolDataItem
   role: PoolRole
+  /** Which row in the by-config table this selection should highlight. */
+  side: PoolSide
 }
 
 export interface TableHighlight {
   marketUid: string
   role: PoolRole
+  side: PoolSide
 }
 
 export interface Tx {
@@ -63,6 +70,16 @@ export interface InitialActionSelection {
   amount?: number
 }
 
+/** Buffered click on a by-config row — routed to the active action's
+ *  matching slot via a useEffect. The `nonce` lets the same row clicked
+ *  twice still trigger an apply (otherwise the prop reference would be
+ *  stable and the effect wouldn't re-run). */
+export interface PendingMarketClick {
+  pool: PoolDataItem
+  side: PoolSide
+  nonce: number
+}
+
 export interface TradingActionProps {
   allPools: PoolDataItem[]
   /** All pools (dropdowns show all, with preferred ones bumped to top). */
@@ -86,4 +103,8 @@ export interface TradingActionProps {
   onPoolSelectionChange: (selections: SelectedPool[]) => void
   /** Deep-link seed (e.g. Optimizer → Loop). Consumed once on mount. */
   initialSelection?: InitialActionSelection
+  /** Click on a by-config row. Each action implements its own routing logic
+   *  (which slot to fill) and calls `consumeMarketClick` once applied. */
+  pendingMarketClick?: PendingMarketClick | null
+  consumeMarketClick?: () => void
 }

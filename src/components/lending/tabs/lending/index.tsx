@@ -395,7 +395,8 @@ export function LendingDashboard({
           chainId={chainId}
           selectedLender={selectedLender}
           selectedPoolMarketUid={selectedPool?.marketUid}
-          onPoolSelect={handlePoolSelect}
+          // Lending is single-side; ignore the side hint.
+          onPoolSelect={(pool) => handlePoolSelect(pool)}
         />
       )}
 
@@ -446,7 +447,9 @@ export function LendingDashboard({
               configGroups={configGroups ?? []}
               allPools={allPools}
               selectedMarketUid={selectedPool?.marketUid}
-              onPoolSelect={handlePoolSelect}
+              // Lending is single-side (one selected market drives the panel),
+              // so the row's side hint isn't used here.
+              onPoolSelect={(pool) => handlePoolSelect(pool)}
               userPositions={userPositions}
               isLoading={isConfigLoading}
               userActiveCategory={

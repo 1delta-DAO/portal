@@ -1,6 +1,7 @@
 import React from 'react'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry, UserSubAccount } from '../../../hooks/lending/useUserData'
+import type { PoolSide } from '../tabs/trading/types'
 import { formatUsd, abbreviateUsd, formatTokenAmount } from '../../../utils/format'
 import { AssetPopover } from './AssetPopover'
 import { EModeBadge } from './EModeAnalysisModal'
@@ -33,8 +34,10 @@ export interface YourPositionsProps {
   selectedLender?: string
   /** Highlights a position card */
   selectedPoolMarketUid?: string
-  /** Makes position cards clickable */
-  onPoolSelect?: (pool: PoolDataItem) => void
+  /** Makes position cards clickable. `side` is `'collateral'` for entries
+   *  in the Deposits section, `'borrowable'` for entries in the Debt section
+   *  — so multi-leg actions can route the click to the matching slot. */
+  onPoolSelect?: (pool: PoolDataItem, side: PoolSide) => void
 }
 
 export function YourPositions({
@@ -175,7 +178,7 @@ interface PositionSectionProps {
   account: string
   chainId: string
   selectedPoolMarketUid?: string
-  onPoolSelect?: (pool: PoolDataItem) => void
+  onPoolSelect?: (pool: PoolDataItem, side: PoolSide) => void
 }
 
 function PositionSection({
@@ -264,7 +267,9 @@ function PositionSection({
                 } ${
                   isSelected ? 'bg-primary/10 ring-1 ring-primary ring-inset' : 'hover:bg-base-200/60'
                 }`}
-                onClick={() => onPoolSelect?.(pool)}
+                onClick={() =>
+                  onPoolSelect?.(pool, isDeposits ? 'collateral' : 'borrowable')
+                }
               >
                 {/* Asset (logo + symbol + price sub-text) */}
                 <div className="flex items-center min-w-0">

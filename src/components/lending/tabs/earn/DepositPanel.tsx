@@ -5,9 +5,11 @@ import type { PoolDataItem } from '../../../../hooks/lending/usePoolData'
 import type { UserPositionEntry, UserSubAccount } from '../../../../hooks/lending/useUserData'
 import type { TokenBalance } from '../../../../hooks/lending/useTokenBalances'
 import { useSyncChain } from '../../../../hooks/useSyncChain'
+import { useSpyMode } from '../../../../contexts/SpyMode'
 import { DepositAction, WithdrawAction } from '../../actions'
 import { WalletConnect } from '../../../connect'
 import { Logo } from '../../../common/Logo'
+import { SpyModeNotice } from '../../shared/SpyModeNotice'
 
 type EarnAction = 'Deposit' | 'Withdraw'
 
@@ -49,7 +51,9 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
 }) => {
   const [actionTab, setActionTab] = useState<EarnAction>('Deposit')
   const { syncChain, currentChainId } = useSyncChain()
-  const isWrongChain = !!account && !!chainId && currentChainId !== Number(chainId)
+  const { isSpyMode } = useSpyMode()
+  const isWrongChain =
+    !isSpyMode && !!account && !!chainId && currentChainId !== Number(chainId)
 
   return (
     <div className="w-72 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
@@ -147,12 +151,13 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
         </div>
       )}
 
-      {/* Action component */}
-      {!account ? (
+      {/* Action component (spy mode keeps actions enabled — signing will fail) */}
+      {isSpyMode && <SpyModeNotice />}
+      {!isSpyMode && !account ? (
         <div className="w-full flex justify-center">
           <WalletConnect />
         </div>
-      ) : isWrongChain ? (
+      ) : !isSpyMode && isWrongChain ? (
         <button
           type="button"
           className="btn btn-warning btn-sm w-full"

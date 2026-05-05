@@ -33,6 +33,8 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
   accountId,
   onAccountIdChange,
   onPoolSelectionChange,
+  pendingMarketClick,
+  consumeMarketClick,
 }) => {
   const [colInPool, setColInPool] = useState<PoolDataItem | null>(null)
   const [colOutPool, setColOutPool] = useState<PoolDataItem | null>(null)
@@ -52,10 +54,33 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
   // Notify parent
   useEffect(() => {
     const selections: SelectedPool[] = []
-    if (colInPool) selections.push({ pool: colInPool, role: 'input' })
-    if (colOutPool) selections.push({ pool: colOutPool, role: 'output' })
+    if (colInPool) selections.push({ pool: colInPool, role: 'input', side: 'collateral' })
+    if (colOutPool) selections.push({ pool: colOutPool, role: 'output', side: 'collateral' })
     onPoolSelectionChange(selections)
   }, [colInPool, colOutPool, onPoolSelectionChange])
+
+  // Apply by-config row clicks. Both slots are collateral-side, so the side
+  // alone doesn't disambiguate; use a fuzzy rule: fill empty slot first,
+  // otherwise replace the input (more common user intent — narrowing the
+  // output and trying alternative source assets).
+  useEffect(() => {
+    if (!pendingMarketClick) return
+    // Borrowable rows aren't actionable for ColSwap — drop the click.
+    if (pendingMarketClick.side !== 'collateral') {
+      consumeMarketClick?.()
+      return
+    }
+    const pool = pendingMarketClick.pool
+    if (!colInPool) setColInPool(pool)
+    else if (!colOutPool) setColOutPool(pool)
+    else setColInPool(pool)
+    consumeMarketClick?.()
+  }, [pendingMarketClick, consumeMarketClick, colInPool, colOutPool])
+
+  // Clear stale quotes when either side of the swap changes.
+  useEffect(() => {
+    reset()
+  }, [colInPool?.marketUid, colOutPool?.marketUid])
 
   // Swap range (flash-loan aware max)
   const [swapRange, setSwapRange] = useState<LoopRangeEntry | null>(null)

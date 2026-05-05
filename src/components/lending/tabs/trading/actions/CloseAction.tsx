@@ -34,6 +34,8 @@ export const CloseAction: React.FC<TradingActionProps> = ({
   accountId,
   onAccountIdChange,
   onPoolSelectionChange,
+  pendingMarketClick,
+  consumeMarketClick,
 }) => {
   const [collateralPool, setCollateralPool] = useState<PoolDataItem | null>(null)
   const [debtPool, setDebtPool] = useState<PoolDataItem | null>(null)
@@ -53,10 +55,28 @@ export const CloseAction: React.FC<TradingActionProps> = ({
   // Notify parent
   useEffect(() => {
     const selections: SelectedPool[] = []
-    if (collateralPool) selections.push({ pool: collateralPool, role: 'input' })
-    if (debtPool) selections.push({ pool: debtPool, role: 'output' })
+    if (collateralPool) selections.push({ pool: collateralPool, role: 'input', side: 'collateral' })
+    if (debtPool) selections.push({ pool: debtPool, role: 'output', side: 'borrowable' })
     onPoolSelectionChange(selections)
   }, [collateralPool, debtPool, onPoolSelectionChange])
+
+  // Apply by-config row clicks: collateral row → collateralPool, borrowable
+  // row → debtPool. Side is unambiguous for Close.
+  useEffect(() => {
+    if (!pendingMarketClick) return
+    if (pendingMarketClick.side === 'collateral') {
+      setCollateralPool(pendingMarketClick.pool)
+    } else {
+      setDebtPool(pendingMarketClick.pool)
+    }
+    consumeMarketClick?.()
+  }, [pendingMarketClick, consumeMarketClick])
+
+  // Clear stale quotes when the user picks a different pair — the old
+  // routes reference the previous markets.
+  useEffect(() => {
+    reset()
+  }, [collateralPool?.marketUid, debtPool?.marketUid])
 
   // Close range (flash-loan aware max)
   const [closeRange, setCloseRange] = useState<LoopRangeEntry | null>(null)

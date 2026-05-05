@@ -19,8 +19,10 @@ import type {
 import { useTokenBalances } from '../../../../hooks/lending/useTokenBalances'
 import { useLenderAccounts } from '../../../../hooks/lending/useLenderAccounts'
 import { useSyncChain } from '../../../../hooks/useSyncChain'
+import { useSpyMode } from '../../../../contexts/SpyMode'
 import { WalletConnect } from '../../../connect'
 import { useLenderSelector, LenderSelector } from '../../shared/LenderSelector'
+import { SpyModeNotice } from '../../shared/SpyModeNotice'
 import { TradingMarketTable } from './TradingMarketTable'
 import { LoopAction } from './actions/LoopAction'
 import { ColSwapAction } from './actions/ColSwapAction'
@@ -74,7 +76,11 @@ export function TradingDashboard({
   onLenderChange,
 }: Props) {
   const { syncChain, currentChainId } = useSyncChain()
-  const isWrongChain = !!account && currentChainId !== Number(chainId)
+  const { isSpyMode } = useSpyMode()
+  // In spy mode `account` is the spied address (not the connected wallet),
+  // so the wallet/chain gates would always misfire. Hide them entirely and
+  // show a read-only notice instead.
+  const isWrongChain = !isSpyMode && !!account && currentChainId !== Number(chainId)
   const isMobile = useIsMobile()
 
   // Dropdown options + balance markers. Selection is now controlled by the
@@ -109,6 +115,15 @@ export function TradingDashboard({
   const [selectedPools, setSelectedPools] = useState<SelectedPool[]>([])
   const [showMobileAction, setShowMobileAction] = useState(false)
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
+  // Click on a by-config row → buffered here so the active action's effect
+  // can route it to the matching slot. Cleared by the action via
+  // consumeMarketClick once it's been applied.
+  const [pendingMarketClick, setPendingMarketClick] = useState<{
+    pool: PoolDataItem
+    side: 'collateral' | 'borrowable'
+    /** Bumped on every set so the same row clicked twice still triggers. */
+    nonce: number
+  } | null>(null)
 
   // Sub-accounts from user-positions (balances + APRs)
   const userSubAccounts: UserSubAccount[] = useMemo(() => {
@@ -311,7 +326,12 @@ export function TradingDashboard({
 
   // Table highlights from action panel's pool selections
   const tableHighlights: TableHighlight[] = useMemo(
-    () => selectedPools.map((sp) => ({ marketUid: sp.pool.marketUid, role: sp.role })),
+    () =>
+      selectedPools.map((sp) => ({
+        marketUid: sp.pool.marketUid,
+        role: sp.role,
+        side: sp.side,
+      })),
     [selectedPools]
   )
 
@@ -321,6 +341,7 @@ export function TradingDashboard({
     onLenderChange(lender)
     setSelectedSubAccountId(null)
     setSelectedPools([])
+    setPendingMarketClick(null)
   }
 
   const handlePoolSelectionChange = useCallback((selections: SelectedPool[]) => {
@@ -378,6 +399,8 @@ export function TradingDashboard({
     onAccountIdChange: handleAccountIdChange,
     onPoolSelectionChange: handlePoolSelectionChange,
     initialSelection: pendingSelection ?? undefined,
+    pendingMarketClick,
+    consumeMarketClick: () => setPendingMarketClick(null),
   }
 
   return (
@@ -407,6 +430,13 @@ export function TradingDashboard({
           account={account}
           chainId={chainId}
           selectedLender={selectedLender}
+          // Click on a position row → buffer it for the active action's
+          // routing effect. Same plumbing as by-config row clicks: deposits
+          // section fires with side='collateral', debt section with
+          // side='borrowable'.
+          onPoolSelect={(pool, side) =>
+            setPendingMarketClick({ pool, side, nonce: Date.now() })
+          }
         />
       )}
 
@@ -458,8 +488,8 @@ export function TradingDashboard({
               allPools={allPools}
               selectedConfigId={selectedConfigId}
               onConfigChange={setSelectedConfigId}
-              onPoolSelect={(pool) => {
-                handlePoolSelectionChange([{ pool, role: 'output' }])
+              onPoolSelect={(pool, side) => {
+                setPendingMarketClick({ pool, side, nonce: Date.now() })
               }}
               userPositions={userPositions}
               highlights={tableHighlights}
@@ -515,6 +545,7 @@ export function TradingDashboard({
                 onClick={() => {
                   setActiveOperation(op)
                   setSelectedPools([])
+                  setPendingMarketClick(null)
                 }}
               >
                 {OP_LABELS[op]}
@@ -522,12 +553,13 @@ export function TradingDashboard({
             ))}
           </div>
 
-          {/* Wallet / chain guards */}
-          {!account ? (
+          {/* Wallet / chain guards (suppressed in spy mode — quotes still work) */}
+          {isSpyMode && <SpyModeNotice />}
+          {!isSpyMode && !account ? (
             <div className="w-full flex justify-center">
               <WalletConnect />
             </div>
-          ) : isWrongChain ? (
+          ) : !isSpyMode && isWrongChain ? (
             <button
               type="button"
               className="btn btn-warning btn-sm w-full"
@@ -594,12 +626,13 @@ export function TradingDashboard({
                 ))}
               </div>
 
-              {/* Wallet / chain guards */}
-              {!account ? (
+              {/* Wallet / chain guards (suppressed in spy mode — quotes still work) */}
+              {isSpyMode && <SpyModeNotice />}
+              {!isSpyMode && !account ? (
                 <div className="w-full flex justify-center">
                   <WalletConnect />
                 </div>
-              ) : isWrongChain ? (
+              ) : !isSpyMode && isWrongChain ? (
                 <button
                   type="button"
                   className="btn btn-warning btn-sm w-full"
