@@ -349,9 +349,12 @@ export const ConfigMarketView: React.FC<Props> = ({
                         </td>
                       </tr>
 
-                      {/* Inline-expanded detail row */}
+                      {/* Inline-expanded detail row — no shared background tint
+                          here, otherwise every inner row would look hovered
+                          at once and the per-row `hover:bg-base-200` becomes
+                          indistinguishable. */}
                       {isActive && (
-                        <tr className="bg-primary/5">
+                        <tr>
                           <td colSpan={COL_COUNT} className="p-0">
                             <CombinedDetailTable
                               group={g}
