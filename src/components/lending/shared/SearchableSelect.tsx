@@ -55,6 +55,21 @@ export function SearchableSelect({
     if (isOpen) inputRef.current?.focus()
   }, [isOpen])
 
+  // Lock body scroll while the mobile modal is open so touch scrolling
+  // happens inside the options list instead of the page behind it.
+  useEffect(() => {
+    if (!isMobile || !isOpen) return
+    const { body } = document
+    const previousOverflow = body.style.overflow
+    const previousOverscroll = body.style.overscrollBehavior
+    body.style.overflow = 'hidden'
+    body.style.overscrollBehavior = 'contain'
+    return () => {
+      body.style.overflow = previousOverflow
+      body.style.overscrollBehavior = previousOverscroll
+    }
+  }, [isMobile, isOpen])
+
   const selectedOption = options.find((o) => o.value === value)
 
   const filtered = useMemo(() => {
@@ -127,7 +142,7 @@ export function SearchableSelect({
               </div>
 
               {/* Options list */}
-              <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1 space-y-1">
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain -mx-1 px-1 space-y-1">
                 {filtered.map((opt) => (
                   <button
                     key={opt.value}
