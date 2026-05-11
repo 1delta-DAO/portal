@@ -55,38 +55,39 @@ export function SearchableSelect({
     if (isOpen) inputRef.current?.focus()
   }, [isOpen])
 
-  // Lock body scroll while the mobile modal is open so touch scrolling
+  // Lock page scroll while the mobile modal is open so touch scrolling
   // happens inside the options list instead of the page behind it.
-  // iOS Safari ignores `overflow: hidden` on body for touch events, so we
-  // pin the body with `position: fixed` and restore the scroll position on close.
+  // The app's scroll container is <html> (overflow-y: auto in globals.css),
+  // so we lock the documentElement and pin the body to preserve scroll position.
   useEffect(() => {
     if (!isMobile || !isOpen) return
+    const html = document.documentElement
     const { body } = document
     const scrollY = window.scrollY
     const prev = {
-      overflow: body.style.overflow,
-      overscrollBehavior: body.style.overscrollBehavior,
-      position: body.style.position,
-      top: body.style.top,
-      left: body.style.left,
-      right: body.style.right,
-      width: body.style.width,
+      htmlOverflow: html.style.overflow,
+      htmlOverscroll: html.style.overscrollBehavior,
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyLeft: body.style.left,
+      bodyRight: body.style.right,
+      bodyWidth: body.style.width,
     }
-    body.style.overflow = 'hidden'
-    body.style.overscrollBehavior = 'contain'
+    html.style.overflow = 'hidden'
+    html.style.overscrollBehavior = 'contain'
     body.style.position = 'fixed'
     body.style.top = `-${scrollY}px`
     body.style.left = '0'
     body.style.right = '0'
     body.style.width = '100%'
     return () => {
-      body.style.overflow = prev.overflow
-      body.style.overscrollBehavior = prev.overscrollBehavior
-      body.style.position = prev.position
-      body.style.top = prev.top
-      body.style.left = prev.left
-      body.style.right = prev.right
-      body.style.width = prev.width
+      html.style.overflow = prev.htmlOverflow
+      html.style.overscrollBehavior = prev.htmlOverscroll
+      body.style.position = prev.bodyPosition
+      body.style.top = prev.bodyTop
+      body.style.left = prev.bodyLeft
+      body.style.right = prev.bodyRight
+      body.style.width = prev.bodyWidth
       window.scrollTo(0, scrollY)
     }
   }, [isMobile, isOpen])
