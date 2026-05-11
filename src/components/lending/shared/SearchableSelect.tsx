@@ -57,16 +57,37 @@ export function SearchableSelect({
 
   // Lock body scroll while the mobile modal is open so touch scrolling
   // happens inside the options list instead of the page behind it.
+  // iOS Safari ignores `overflow: hidden` on body for touch events, so we
+  // pin the body with `position: fixed` and restore the scroll position on close.
   useEffect(() => {
     if (!isMobile || !isOpen) return
     const { body } = document
-    const previousOverflow = body.style.overflow
-    const previousOverscroll = body.style.overscrollBehavior
+    const scrollY = window.scrollY
+    const prev = {
+      overflow: body.style.overflow,
+      overscrollBehavior: body.style.overscrollBehavior,
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+    }
     body.style.overflow = 'hidden'
     body.style.overscrollBehavior = 'contain'
+    body.style.position = 'fixed'
+    body.style.top = `-${scrollY}px`
+    body.style.left = '0'
+    body.style.right = '0'
+    body.style.width = '100%'
     return () => {
-      body.style.overflow = previousOverflow
-      body.style.overscrollBehavior = previousOverscroll
+      body.style.overflow = prev.overflow
+      body.style.overscrollBehavior = prev.overscrollBehavior
+      body.style.position = prev.position
+      body.style.top = prev.top
+      body.style.left = prev.left
+      body.style.right = prev.right
+      body.style.width = prev.width
+      window.scrollTo(0, scrollY)
     }
   }, [isMobile, isOpen])
 
@@ -118,7 +139,7 @@ export function SearchableSelect({
         {isOpen && (
           <div className="modal modal-open" onClick={() => setIsOpen(false)}>
             <div
-              className="modal-box w-[calc(100vw-1rem)] max-w-sm max-h-[85vh] p-3 sm:p-4 flex flex-col gap-3"
+              className="modal-box w-[calc(100vw-1rem)] max-w-sm max-h-[85vh] p-3 sm:p-4 flex flex-col gap-3 overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header: search + close */}
@@ -142,7 +163,7 @@ export function SearchableSelect({
               </div>
 
               {/* Options list */}
-              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain -mx-1 px-1 space-y-1">
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y -mx-1 px-1 space-y-1">
                 {filtered.map((opt) => (
                   <button
                     key={opt.value}
