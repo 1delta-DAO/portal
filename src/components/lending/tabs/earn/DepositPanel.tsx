@@ -32,6 +32,8 @@ interface DepositPanelProps {
    * share collateral with this deposit, so flagging it would be noise.
    */
   hasBorrowOnSelectedLender?: boolean
+  /** Spot USD price of the selected pool's underlying asset (forwarded to Deposit for the monthly-earnings estimate). */
+  priceUsd?: number
 }
 
 export const DepositPanel: React.FC<DepositPanelProps> = ({
@@ -48,6 +50,7 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
   isBalancesFetching,
   refetchBalances,
   hasBorrowOnSelectedLender,
+  priceUsd,
 }) => {
   const [actionTab, setActionTab] = useState<EarnAction>('Deposit')
   const { syncChain, currentChainId } = useSyncChain()
@@ -178,6 +181,7 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
           lenderKey={lenderKey}
           isBalancesFetching={isBalancesFetching}
           refetchBalances={refetchBalances}
+          priceUsd={priceUsd}
           hideSimulation
         />
       ) : (
@@ -193,6 +197,7 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
           lenderKey={lenderKey}
           isBalancesFetching={isBalancesFetching}
           refetchBalances={refetchBalances}
+          priceUsd={priceUsd}
           hideSimulation
         />
       )}

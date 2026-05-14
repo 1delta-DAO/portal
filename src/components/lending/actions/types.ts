@@ -30,6 +30,8 @@ export interface ActionPanelProps {
   refetchBalances?: () => void
   /** Hide health-factor projection and rate-impact indicator (used by the plain earn flow) */
   hideSimulation?: boolean
+  /** Spot USD price of the pool's underlying asset. Used by Deposit to surface an estimated monthly earnings figure. */
+  priceUsd?: number
 }
 
 export interface ActionState {

@@ -169,6 +169,18 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     [selectedEntry]
   )
 
+  // Spot USD price for the selected underlying — prefer the live market price,
+  // fall back to the oracle price. Forwarded to DepositPanel so the deposit
+  // form can show an estimated monthly earnings figure.
+  const selectedPriceUsd = useMemo(() => {
+    if (!selectedEntry) return undefined
+    return (
+      selectedEntry.underlyingInfo?.prices?.priceUsd ||
+      selectedEntry.underlyingInfo?.oraclePrice?.oraclePriceUsd ||
+      undefined
+    )
+  }, [selectedEntry])
+
   // Whether the selected pool's underlying is wrapped native
   const selectedIsWrappedNative = useMemo(
     () => !!resolvedPool && isWNative(resolvedPool.asset),
@@ -1029,6 +1041,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
             isBalancesFetching={isBalancesFetching}
             refetchBalances={refetchBalances}
             hasBorrowOnSelectedLender={hasBorrowOnSelectedLender}
+            priceUsd={selectedPriceUsd}
           />
         </div>
       </div>
@@ -1055,6 +1068,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
               subAccounts={selectedSubAccounts}
               lenderKey={selectedEntry?.lenderKey}
               userPosition={selectedUserPosition}
+              priceUsd={selectedPriceUsd}
             />
           </div>
         </div>

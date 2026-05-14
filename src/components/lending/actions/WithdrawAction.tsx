@@ -23,6 +23,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
   nativeToken,
   subAccount,
   hideSimulation,
+  priceUsd,
 }) => {
   const [amount, setAmount] = useState('')
   const [isAll, setIsAll] = useState(false)
@@ -77,6 +78,20 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
   const withdrawableStr = String(userPosition?.withdrawable ?? '0')
   const depositsStr = String(userPosition?.deposits ?? '0')
   const overMax = !isAll && parseAmount(withdrawableStr) > 0 && parseAmount(amount) > parseAmount(withdrawableStr) + 1e-9
+
+  // Estimated earnings forfeited by withdrawing this amount. depositRate is
+  // in percent units. Prefer the simulation's projected deposit rate (post-tx)
+  // when available — withdrawing typically raises utilization and the rate.
+  // Fall back to the pool's current rate and to oraclePriceUSD.
+  const effectivePriceUsd = priceUsd ?? pool?.oraclePriceUSD ?? 0
+  const projectedAprPct = rateImpact?.find((e) => e.marketUid === pool?.marketUid)
+    ?.depositRate?.projected
+  const aprPct = projectedAprPct ?? pool?.depositRate ?? 0
+  const amountNum = parseAmount(amount)
+  const monthlyForfeitedUsd =
+    amountNum > 0 && effectivePriceUsd > 0 && aprPct > 0
+      ? (amountNum * effectivePriceUsd * (aprPct / 100)) / 12
+      : 0
 
   // Any user input (typing or 25/50/75 presets) clears the isAll flag.
   const handleAmountChange = (val: string) => {
@@ -150,6 +165,17 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
         disabled={!pool}
         error={overMax ? `Exceeds withdrawable balance (${formatTokenAmount(withdrawableStr)}).` : null}
       />
+
+      {/* Estimated earnings forfeited by this withdrawal. */}
+      {monthlyForfeitedUsd > 0 && (
+        <div className="text-xs flex items-center justify-between gap-2 px-1">
+          <span className="text-base-content/60 whitespace-nowrap">Forfeited / month</span>
+          <span className="text-warning font-medium whitespace-nowrap">
+            ~${formatUsd(monthlyForfeitedUsd)}
+            <span className="text-base-content/40 font-normal ml-1">({aprPct.toFixed(2)}%)</span>
+          </span>
+        </div>
+      )}
 
       {error && <div className="text-error text-xs wrap-break-word">{error}</div>}
 

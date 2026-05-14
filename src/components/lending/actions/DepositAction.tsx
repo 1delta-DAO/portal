@@ -27,6 +27,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   isBalancesFetching,
   refetchBalances,
   hideSimulation,
+  priceUsd,
 }) => {
   const [amount, setAmount] = useState('')
   const [useNative, setUseNative] = useState(false)
@@ -75,6 +76,21 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   const activeBal = canUseNative && useNative ? nativeBalance : walletBalance
   const walletAmountStr = activeBal?.balance ?? '0'
   const overMax = parseAmount(walletAmountStr) > 0 && parseAmount(amount) > parseAmount(walletAmountStr) + 1e-9
+
+  // Estimated monthly earnings: depositRate is in percent units (e.g. 5 = 5% APR).
+  // Prefer the simulation's projected deposit rate (post-tx) when the backend
+  // returns one for this market — supplying a depositor can move the rate
+  // appreciably, so the post-tx APR is the more honest forecast. Fall back to
+  // the pool's current rate, and likewise to oraclePriceUSD for the price.
+  const effectivePriceUsd = priceUsd ?? pool?.oraclePriceUSD ?? 0
+  const projectedAprPct = rateImpact?.find((e) => e.marketUid === pool?.marketUid)
+    ?.depositRate?.projected
+  const aprPct = projectedAprPct ?? pool?.depositRate ?? 0
+  const amountNum = parseAmount(amount)
+  const monthlyEarnUsd =
+    amountNum > 0 && effectivePriceUsd > 0 && aprPct > 0
+      ? (amountNum * effectivePriceUsd * (aprPct / 100)) / 12
+      : 0
 
   if (txSuccess) {
     return (
@@ -171,6 +187,18 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
         disabled={!pool}
         error={overMax ? `Exceeds wallet balance (${formatTokenAmount(walletAmountStr)}).` : null}
       />
+
+      {/* Estimated monthly earnings — surfaces what the user will earn on this
+          deposit based on the market's current deposit APR. */}
+      {monthlyEarnUsd > 0 && (
+        <div className="text-xs flex items-center justify-between gap-2 px-1">
+          <span className="text-base-content/60 whitespace-nowrap">Earnings / month</span>
+          <span className="text-success font-medium whitespace-nowrap">
+            ~${formatUsd(monthlyEarnUsd)}
+            <span className="text-base-content/40 font-normal ml-1">({aprPct.toFixed(2)}%)</span>
+          </span>
+        </div>
+      )}
 
       {error && <div className="text-error text-xs wrap-break-word">{error}</div>}
 

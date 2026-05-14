@@ -26,6 +26,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   subAccount,
   isBalancesFetching,
   refetchBalances,
+  priceUsd,
 }) => {
   const [amount, setAmount] = useState('')
   const [isAll, setIsAll] = useState(false)
@@ -91,6 +92,20 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   const overWallet = !isAll && hasBal && compareAmountStrings(amount || '0', activeBalStr) > 0
   const overDebt = !isAll && hasDebt && compareAmountStrings(amount || '0', debtStr) > 0
   const overMax = overWallet || overDebt
+
+  // Estimated monthly interest saved by this repayment. variableBorrowRate
+  // is in percent units. Prefer the simulation's projected borrow rate
+  // (post-tx) when available — repaying lowers utilization and therefore
+  // the rate. Fall back to the pool's current rate and to oraclePriceUSD.
+  const effectivePriceUsd = priceUsd ?? pool?.oraclePriceUSD ?? 0
+  const projectedBorrowAprPct = rateImpact?.find((e) => e.marketUid === pool?.marketUid)
+    ?.borrowRate?.projected
+  const borrowAprPct = projectedBorrowAprPct ?? pool?.variableBorrowRate ?? 0
+  const amountNum = parseAmount(amount)
+  const monthlySavedUsd =
+    amountNum > 0 && effectivePriceUsd > 0 && borrowAprPct > 0
+      ? (amountNum * effectivePriceUsd * (borrowAprPct / 100)) / 12
+      : 0
 
   // Any user input (typing or 25/50/75 presets) clears the isAll flag.
   const handleAmountChange = (val: string) => {
@@ -193,6 +208,17 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
         disabled={!pool}
         error={amountErrorMessage}
       />
+
+      {/* Estimated monthly interest saved by this repayment. */}
+      {monthlySavedUsd > 0 && (
+        <div className="text-xs flex items-center justify-between gap-2 px-1">
+          <span className="text-base-content/60 whitespace-nowrap">Saved / month</span>
+          <span className="text-success font-medium whitespace-nowrap">
+            ~${formatUsd(monthlySavedUsd)}
+            <span className="text-base-content/40 font-normal ml-1">({borrowAprPct.toFixed(2)}%)</span>
+          </span>
+        </div>
+      )}
 
       {error && <div className="text-error text-xs wrap-break-word">{error}</div>}
 

@@ -25,6 +25,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   subAccount,
   isBalancesFetching,
   refetchBalances,
+  priceUsd,
 }) => {
   const [amount, setAmount] = useState('')
   const [useNative, setUseNative] = useState(false)
@@ -64,6 +65,20 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   const borrowableStr = String(userPosition?.borrowable ?? '0')
   const debtTotal = parseAmount(debtStr) + parseAmount(debtStableStr)
   const overMax = parseAmount(borrowableStr) > 0 && parseAmount(amount) > parseAmount(borrowableStr) + 1e-9
+
+  // Estimated monthly interest: variableBorrowRate is in percent units.
+  // Prefer the simulation's projected borrow rate (post-tx) when available —
+  // adding borrow demand can move the rate appreciably. Fall back to the
+  // pool's current rate, and likewise to oraclePriceUSD for the price.
+  const effectivePriceUsd = priceUsd ?? pool?.oraclePriceUSD ?? 0
+  const projectedBorrowAprPct = rateImpact?.find((e) => e.marketUid === pool?.marketUid)
+    ?.borrowRate?.projected
+  const borrowAprPct = projectedBorrowAprPct ?? pool?.variableBorrowRate ?? 0
+  const amountNum = parseAmount(amount)
+  const monthlyInterestUsd =
+    amountNum > 0 && effectivePriceUsd > 0 && borrowAprPct > 0
+      ? (amountNum * effectivePriceUsd * (borrowAprPct / 100)) / 12
+      : 0
 
   if (txSuccess) {
     return (
@@ -162,6 +177,17 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
         disabled={!pool}
         error={overMax ? `Exceeds borrowable amount (${formatTokenAmount(borrowableStr)}).` : null}
       />
+
+      {/* Estimated monthly interest — mirror of the deposit-side earnings row. */}
+      {monthlyInterestUsd > 0 && (
+        <div className="text-xs flex items-center justify-between gap-2 px-1">
+          <span className="text-base-content/60 whitespace-nowrap">Interest / month</span>
+          <span className="text-error font-medium whitespace-nowrap">
+            ~${formatUsd(monthlyInterestUsd)}
+            <span className="text-base-content/40 font-normal ml-1">({borrowAprPct.toFixed(2)}%)</span>
+          </span>
+        </div>
+      )}
 
       {error && <div className="text-error text-xs wrap-break-word">{error}</div>}
 
