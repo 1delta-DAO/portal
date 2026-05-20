@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
+import { isValidAddress } from '../../../utils/addressValidation'
+import { useUserData } from '../../../hooks/lending/useUserData'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
 import { formatTokenAmount, formatUsd, parseAmount } from './format'
@@ -28,6 +30,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   refetchBalances,
   hideSimulation,
   priceUsd,
+  allowCustomReceiver,
 }) => {
   const [amount, setAmount] = useState('')
   const [useNative, setUseNative] = useState(false)
@@ -35,10 +38,97 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   const hasSubAccounts = lenderSupportsSubAccounts(lenderKey)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(accountId ?? null)
 
-  // Sync with parent's accountId when it changes
+  // Custom-receiver state — only visible when `allowCustomReceiver` is true
+  // (the earn deposit flow). Null override == "deposit to operator".
+  const [receiverOverride, setReceiverOverride] = useState<string | null>(null)
+  const [receiverDraft, setReceiverDraft] = useState('')
+  const [editingReceiver, setEditingReceiver] = useState(false)
+  const effectiveReceiver = allowCustomReceiver && receiverOverride
+    ? receiverOverride
+    : account
+
+  // Sync with parent's accountId when it changes — but only while we're
+  // depositing to the operator. Once the user overrides the receiver, the
+  // operator's sub-account is no longer meaningful and we let the user pick
+  // one of the receiver's accounts.
   useEffect(() => {
+    if (allowCustomReceiver && receiverOverride) return
     setSelectedAccountId(accountId ?? null)
-  }, [accountId])
+  }, [accountId, allowCustomReceiver, receiverOverride])
+
+  // Fetch the receiver's lending data, scoped to the selected lender so we
+  // only pull what we need to render their sub-accounts and current position.
+  const receiverDataQuery = useUserData({
+    chainId,
+    account: receiverOverride ?? undefined,
+    enabled: !!allowCustomReceiver && !!receiverOverride && !!lenderKey,
+    lenders: lenderKey ? [lenderKey] : undefined,
+  })
+  const receiverLenderEntry = useMemo(() => {
+    if (!receiverDataQuery.userData?.raw) return null
+    return (
+      receiverDataQuery.userData.raw.find(
+        (e) => e.lender === lenderKey && e.chainId === chainId
+      ) ?? null
+    )
+  }, [receiverDataQuery.userData, lenderKey, chainId])
+  const receiverSubAccounts = receiverLenderEntry?.data ?? []
+
+  // The list shown in the SubAccountSelector — operator's by default, but
+  // receiver's when an override is active.
+  const effectiveSubAccounts =
+    allowCustomReceiver && receiverOverride ? receiverSubAccounts : subAccounts ?? []
+
+  // Reset the chosen sub-account whenever the receiver changes (sub-account
+  // IDs don't carry semantics across owners). The auto-pick below then fills
+  // in a sensible default once the receiver's data has landed.
+  const autoPickedForReceiverRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!allowCustomReceiver) return
+    setSelectedAccountId(null)
+    autoPickedForReceiverRef.current = null
+  }, [allowCustomReceiver, receiverOverride])
+
+  // Auto-pick the receiver's sub-account with the highest USD deposits as the
+  // default selection. Runs exactly once per receiver change — once the user
+  // taps a different sub-account, our ref still matches the current receiver
+  // so this effect early-returns and respects the user's choice.
+  useEffect(() => {
+    if (!allowCustomReceiver || !receiverOverride) return
+    if (receiverDataQuery.isUserDataLoading) return
+    if (autoPickedForReceiverRef.current === receiverOverride) return
+    if (receiverSubAccounts.length > 0) {
+      const best = receiverSubAccounts.reduce((acc, sub) =>
+        (sub.balanceData?.deposits ?? 0) > (acc.balanceData?.deposits ?? 0) ? sub : acc
+      )
+      setSelectedAccountId(best.accountId)
+    }
+    autoPickedForReceiverRef.current = receiverOverride
+  }, [
+    allowCustomReceiver,
+    receiverOverride,
+    receiverSubAccounts,
+    receiverDataQuery.isUserDataLoading,
+  ])
+
+  // Position to display under the amount input: receiver's current deposit
+  // on this market when an override is set, otherwise the operator's.
+  const receiverPosition = useMemo(() => {
+    if (!allowCustomReceiver || !receiverOverride || !pool) return null
+    for (const sub of receiverSubAccounts) {
+      // When the user has picked a specific receiver sub-account, only look
+      // at that one — otherwise sum across all sub-accounts would mislead.
+      if (selectedAccountId && sub.accountId !== selectedAccountId) continue
+      for (const pos of sub.positions) {
+        if (typeof pos === 'object' && pos !== null && pos.marketUid === pool.marketUid) {
+          return pos
+        }
+      }
+    }
+    return null
+  }, [allowCustomReceiver, receiverOverride, receiverSubAccounts, selectedAccountId, pool])
+  const displayPosition =
+    allowCustomReceiver && receiverOverride ? receiverPosition : userPosition
 
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
@@ -47,6 +137,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       actionType: 'Deposit',
       pool,
       account,
+      receiver: effectiveReceiver,
       amount,
       isAll: false,
       payAsset: canUseNative && useNative ? zeroAddress : undefined,
@@ -106,16 +197,178 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
 
   return (
     <div className="space-y-3">
-      {/* Sub-account selector */}
+      {/* Custom receiver row — surfaces the address that will own the deposit
+          (shares accrue here). Defaults to the operator; integrators can paste
+          a different address to preview the flow and inspect the receiver's
+          existing position on this lender. Earn only. */}
+      {allowCustomReceiver && (account || receiverOverride) && (
+        <div className="rounded-lg border border-base-300 px-2 py-1.5 text-xs space-y-1">
+          {editingReceiver ? (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-base-content/60">Receiver</span>
+                <button
+                  type="button"
+                  className="text-[10px] text-base-content/40 hover:text-base-content"
+                  onClick={() => {
+                    setEditingReceiver(false)
+                    setReceiverDraft('')
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+              <input
+                type="text"
+                spellCheck={false}
+                autoFocus
+                className={`input input-bordered input-xs w-full font-mono ${
+                  receiverDraft && !isValidAddress(receiverDraft) ? 'input-error' : ''
+                }`}
+                placeholder="0x… (defaults to operator)"
+                value={receiverDraft}
+                onChange={(e) => setReceiverDraft(e.target.value.trim())}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && isValidAddress(receiverDraft)) {
+                    setReceiverOverride(receiverDraft)
+                    setEditingReceiver(false)
+                  } else if (e.key === 'Escape') {
+                    setEditingReceiver(false)
+                    setReceiverDraft('')
+                  }
+                }}
+              />
+              <div className="flex items-center justify-between gap-1">
+                <span
+                  className={`text-[10px] ${
+                    receiverDraft && !isValidAddress(receiverDraft)
+                      ? 'text-error'
+                      : 'text-base-content/40'
+                  }`}
+                >
+                  {receiverDraft
+                    ? isValidAddress(receiverDraft)
+                      ? 'Valid checksum'
+                      : 'Not a valid address'
+                    : 'Paste an EVM address'}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-primary"
+                  disabled={!isValidAddress(receiverDraft)}
+                  onClick={() => {
+                    setReceiverOverride(receiverDraft)
+                    setEditingReceiver(false)
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-base-content/60">Receiver</span>
+              <div className="flex items-center gap-1">
+                <span
+                  className="font-mono text-[11px] truncate max-w-35"
+                  title={effectiveReceiver ?? ''}
+                >
+                  {receiverOverride
+                    ? `${receiverOverride.slice(0, 6)}…${receiverOverride.slice(-4)}`
+                    : 'Operator'}
+                </span>
+                <button
+                  type="button"
+                  className="text-base-content/40 hover:text-base-content"
+                  title="Edit receiver"
+                  onClick={() => {
+                    setReceiverDraft(receiverOverride ?? '')
+                    setEditingReceiver(true)
+                  }}
+                >
+                  <svg
+                    className="w-3 h-3"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </button>
+                {receiverOverride && (
+                  <button
+                    type="button"
+                    className="text-base-content/40 hover:text-base-content"
+                    title="Reset to operator"
+                    onClick={() => {
+                      setReceiverOverride(null)
+                      setReceiverDraft('')
+                    }}
+                  >
+                    <svg
+                      className="w-3 h-3"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M18 6 6 18" />
+                      <path d="m6 6 12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Receiver-fetch status — only when a custom receiver is set. Surfaces
+          a fetch error inline (with a retry) and explicitly tells the user
+          when the receiver has no sub-accounts on this lender yet, so the
+          empty selector below isn't ambiguous. */}
+      {allowCustomReceiver && receiverOverride && hasSubAccounts && (
+        <>
+          {receiverDataQuery.error ? (
+            <div className="rounded-lg border border-error/30 bg-error/10 px-2 py-1.5 text-[11px] flex items-center justify-between gap-2">
+              <span className="text-error truncate" title={(receiverDataQuery.error as Error).message}>
+                Couldn't load receiver data: {(receiverDataQuery.error as Error).message}
+              </span>
+              <button
+                type="button"
+                className="btn btn-xs btn-outline btn-error"
+                onClick={() => receiverDataQuery.refetch()}
+              >
+                Retry
+              </button>
+            </div>
+          ) : !receiverDataQuery.isUserDataLoading && receiverSubAccounts.length === 0 ? (
+            <div className="rounded-lg border border-base-300 px-2 py-1.5 text-[11px] text-base-content/60">
+              Receiver has no sub-accounts on this lender yet. Use{' '}
+              <span className="font-medium">+ New</span> below to create one.
+            </div>
+          ) : null}
+        </>
+      )}
+
+      {/* Sub-account selector. When a custom receiver is set, the list
+          switches to the receiver's sub-accounts (and the next-account create
+          flow queries against the receiver address). */}
       {hasSubAccounts && (
         <SubAccountSelector
-          subAccounts={subAccounts ?? []}
+          subAccounts={effectiveSubAccounts}
           selectedAccountId={selectedAccountId}
           onChange={setSelectedAccountId}
           allowCreate
           chainId={chainId}
           lender={lenderKey}
-          account={account}
+          account={effectiveReceiver}
         />
       )}
 
@@ -168,15 +421,38 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      {/* Current deposits */}
-      {userPosition && Number(userPosition.deposits) > 0 && (
+      {/* Current deposits — the receiver's when a custom receiver is set,
+          otherwise the operator's. While the receiver's data is still in
+          flight we show a loading row. On error we show a dash + tooltip,
+          so the user doesn't conflate a fetch failure with "no position." */}
+      {allowCustomReceiver && receiverOverride && receiverDataQuery.isUserDataLoading ? (
         <div className="text-xs flex justify-between px-1">
-          <span className="text-base-content/60">Current deposits:</span>
-          <span className="text-success font-medium">
-            {formatTokenAmount(userPosition.deposits)} (${formatUsd(userPosition.depositsUSD)})
+          <span className="text-base-content/60">Receiver deposits:</span>
+          <span className="flex items-center gap-1 text-base-content/40">
+            <span className="loading loading-spinner w-3 h-3" />
+            Loading…
           </span>
         </div>
-      )}
+      ) : allowCustomReceiver && receiverOverride && receiverDataQuery.error ? (
+        <div className="text-xs flex justify-between px-1">
+          <span className="text-base-content/60">Receiver deposits:</span>
+          <span
+            className="text-error/80"
+            title={(receiverDataQuery.error as Error).message}
+          >
+            unavailable
+          </span>
+        </div>
+      ) : displayPosition && Number(displayPosition.deposits) > 0 ? (
+        <div className="text-xs flex justify-between px-1">
+          <span className="text-base-content/60">
+            {allowCustomReceiver && receiverOverride ? 'Receiver deposits:' : 'Current deposits:'}
+          </span>
+          <span className="text-success font-medium">
+            {formatTokenAmount(displayPosition.deposits)} (${formatUsd(displayPosition.depositsUSD)})
+          </span>
+        </div>
+      ) : null}
 
       {/* Amount input */}
       <AmountInput

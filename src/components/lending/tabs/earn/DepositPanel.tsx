@@ -183,6 +183,7 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
           refetchBalances={refetchBalances}
           priceUsd={priceUsd}
           hideSimulation
+          allowCustomReceiver
         />
       ) : (
         <WithdrawAction

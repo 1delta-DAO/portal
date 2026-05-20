@@ -32,6 +32,12 @@ export interface ActionPanelProps {
   hideSimulation?: boolean
   /** Spot USD price of the pool's underlying asset. Used by Deposit to surface an estimated monthly earnings figure. */
   priceUsd?: number
+  /**
+   * When true, exposes the "custom receiver" affordance — used by the earn
+   * Deposit panel so integrators can deposit on behalf of a different address.
+   * Off everywhere else (the main lending tab assumes operator == receiver).
+   */
+  allowCustomReceiver?: boolean
 }
 
 export interface ActionState {

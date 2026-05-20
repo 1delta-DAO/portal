@@ -17,6 +17,13 @@ export function useActionExecution(params: {
   actionType: ActionType
   pool: PoolDataItem | null
   account?: string
+  /**
+   * Address that should receive the action's output (shares on Deposit,
+   * underlying on Withdraw, …). Defaults to `account` when omitted. Used by
+   * the earn deposit flow's "custom receiver" affordance so integrators can
+   * simulate flows where depositor ≠ receiver.
+   */
+  receiver?: string
   amount: string
   isAll: boolean
   /** For Deposit / Repay: address of the token to pay with */
@@ -30,8 +37,20 @@ export function useActionExecution(params: {
   /** Active sub-account — when provided, enables simulation via `simulate` param */
   subAccount?: UserSubAccount
 }) {
-  const { actionType, pool, account, amount, isAll, payAsset, receiveAsset, accountId, chainId, subAccount } =
-    params
+  const {
+    actionType,
+    pool,
+    account,
+    receiver,
+    amount,
+    isAll,
+    payAsset,
+    receiveAsset,
+    accountId,
+    chainId,
+    subAccount,
+  } = params
+  const effectiveReceiver = receiver && receiver.length > 0 ? receiver : account
   const { send } = useSendLendingTransaction({ chainId: chainId ?? '', account })
 
   const [result, setResult] = useState<LendingActionResponseWithSimulation | null>(null)
@@ -131,7 +150,7 @@ export function useActionExecution(params: {
         operator: account,
         amount: parsedAmount.toString(),
         actionType,
-        receiver: account,
+        receiver: effectiveReceiver,
         isAll: isAll || undefined,
         payAsset,
         receiveAsset,
@@ -151,7 +170,7 @@ export function useActionExecution(params: {
     }
 
     doFetch()
-  }, [debouncedAmount, pool?.marketUid, account, isAll, payAsset, receiveAsset, accountId, actionType, shouldSimulate])
+  }, [debouncedAmount, pool?.marketUid, account, effectiveReceiver, isAll, payAsset, receiveAsset, accountId, actionType, shouldSimulate])
 
   /** Execute the next pending permission transaction */
   const executeNextPermission = async () => {

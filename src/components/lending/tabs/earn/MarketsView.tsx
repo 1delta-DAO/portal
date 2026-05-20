@@ -283,6 +283,14 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
 
   // Filtering + sorting
   const filteredAndSortedPools = useMemo(() => {
+    // Some lenders (e.g. Fluid) don't populate the top-level `underlyingAddress`
+    // on pool entries — the canonical asset address only lives under
+    // `underlyingInfo.asset.address`. Use a small helper so address-based
+    // matches (search box, asset filter, parent-driven whitelist) treat both
+    // as equivalent and stop accidentally hiding those pools.
+    const poolUnderlying = (p: PoolEntry) =>
+      (p.underlyingAddress || p.underlyingInfo?.asset?.address || '').toLowerCase()
+
     let result = pools
 
     if (selectedLender !== 'all') {
@@ -293,9 +301,11 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       const q = search.toLowerCase()
       result = result.filter(
         (p) =>
-          (p.underlyingAddress ?? '').toLowerCase().includes(q) ||
+          poolUnderlying(p).includes(q) ||
           (p.lenderKey ?? '').toLowerCase().includes(q) ||
+          (p.lenderInfo?.name ?? '').toLowerCase().includes(q) ||
           (p.underlyingInfo?.asset?.assetGroup ?? '').toLowerCase().includes(q) ||
+          (p.underlyingInfo?.asset?.symbol ?? '').toLowerCase().includes(q) ||
           (p.name ?? '').toLowerCase().includes(q)
       )
     }
@@ -305,7 +315,8 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       result = result.filter(
         (p) =>
           (p.underlyingInfo?.asset?.assetGroup ?? '').toLowerCase().includes(q) ||
-          (p.underlyingAddress ?? '').toLowerCase().includes(q)
+          (p.underlyingInfo?.asset?.symbol ?? '').toLowerCase().includes(q) ||
+          poolUnderlying(p).includes(q)
       )
     }
 
@@ -320,9 +331,17 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       const addrs = externalAssetFilter!.toLowerCase().split(',').filter(Boolean)
       if (addrs.length > 0) {
         const addrSet = new Set(addrs)
-        result = result.filter((p) => addrSet.has((p.underlyingAddress ?? '').toLowerCase()))
+        result = result.filter((p) => addrSet.has(poolUnderlying(p)))
       }
     }
+
+    // Deposit-only markets (e.g. Fluid "Collateral X" pools) have
+    // `borrowingEnabled: false`, which means 0% utilization and ~0% deposit
+    // APR are inherent — not a signal the market is junk. The util/APR
+    // floors are written for two-sided lending markets, so we exempt
+    // deposit-only pools rather than letting the defaults silently hide them.
+    const isDepositOnly = (p: PoolEntry) =>
+      p.flags?.borrowingEnabled === false && p.flags?.depositsEnabled !== false
 
     // --- numeric range helpers ---
     const applyMinMax = (
@@ -351,15 +370,17 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     }
 
     // The remaining filters are value-floors meant to trim the universe of
-    // pools when browsing freely. When the user has explicitly narrowed to
-    // a set of assets via the parent (row click / "owned only" toggle), we
-    // skip them so every market for those assets stays visible.
+    // pools when browsing freely. When the user has explicitly narrowed via
+    // the parent (row click / "owned only"), we skip them so every market
+    // for those assets stays visible.
     if (!hasExternalAssetFilter) {
-      // Utilization (percentage inputs)
+      // Utilization (percentage inputs). Deposit-only pools are exempt —
+      // see `isDepositOnly` above.
       const minU = parseFloat(minUtilPct)
       const maxU = parseFloat(maxUtilPct)
       if (!Number.isNaN(minU) || !Number.isNaN(maxU)) {
         result = result.filter((p) => {
+          if (isDepositOnly(p)) return true
           const u = computePoolMetrics(p).utilization * 100
           if (!Number.isNaN(minU) && u < minU) return false
           if (!Number.isNaN(maxU) && u > maxU) return false
@@ -367,11 +388,13 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
         })
       }
 
-      // APR (percentage inputs)
+      // APR (percentage inputs). Deposit-only pools have structurally low
+      // deposit rates (no borrow demand), so they're exempt too.
       const minApr = parseFloat(minAprPct)
       const maxApr = parseFloat(maxAprPct)
       if (!Number.isNaN(minApr) || !Number.isNaN(maxApr)) {
         result = result.filter((p) => {
+          if (isDepositOnly(p)) return true
           const apr = computePoolMetrics(p).apr
           if (!Number.isNaN(minApr) && apr < minApr) return false
           if (!Number.isNaN(maxApr) && apr > maxApr) return false

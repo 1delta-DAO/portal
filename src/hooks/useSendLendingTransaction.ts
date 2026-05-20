@@ -39,6 +39,10 @@ export function useSendLendingTransaction(params: {
     })
     queryClient.invalidateQueries({ queryKey: ['lendingBalances', chainId, account] })
     queryClient.invalidateQueries({
+      queryKey: ['userVaults', chainId, account],
+      exact: false,
+    })
+    queryClient.invalidateQueries({
       queryKey: ['balanceQuery', account],
       exact: false,
     })
@@ -52,6 +56,10 @@ export function useSendLendingTransaction(params: {
       exact: false,
     })
     queryClient.refetchQueries({ queryKey: ['lendingBalances', chainId, account] })
+    queryClient.refetchQueries({
+      queryKey: ['userVaults', chainId, account],
+      exact: false,
+    })
     queryClient.refetchQueries({
       queryKey: ['balanceQuery', account],
       exact: false,

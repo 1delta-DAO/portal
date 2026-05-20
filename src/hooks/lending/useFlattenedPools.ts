@@ -49,12 +49,22 @@ export interface LenderInfo {
   logoURI: string
 }
 
+export interface PoolFlags {
+  isActive?: boolean
+  isFrozen?: boolean
+  hasStable?: boolean
+  borrowingEnabled?: boolean
+  collateralActive?: boolean
+  depositsEnabled?: boolean
+}
+
 export interface PoolEntry {
   chainId: string
   marketUid: string
   name: string
   lenderKey: string
   lenderInfo?: LenderInfo
+  flags?: PoolFlags
   underlyingAddress: string
   depositRate: string
   variableBorrowRate: string
