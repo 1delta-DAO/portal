@@ -83,7 +83,7 @@ export async function fetchUserDataViaRpc(
   // Step 1: Get RPC call descriptors from backend
   // Smaller batches on chains with many lenders / flaky RPCs
   const SMALL_BATCH_CHAINS = new Set(['1', '8453', '42161'])
-  const batches = SMALL_BATCH_CHAINS.has(chainId) ? `&batchSize=1000` : ''
+  const batches = SMALL_BATCH_CHAINS.has(chainId) ? `&batchSize=500` : ''
   const lendersParam = lenders && lenders.length > 0 ? `&lenders=${lenders.join(',')}` : ''
   const rpcCallUrl =
     `${BACKEND_BASE_URL}/v1/data/lending/user-positions/rpc-call` +

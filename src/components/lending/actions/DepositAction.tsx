@@ -74,10 +74,40 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   }, [receiverDataQuery.userData, lenderKey, chainId])
   const receiverSubAccounts = receiverLenderEntry?.data ?? []
 
-  // The list shown in the SubAccountSelector — operator's by default, but
-  // receiver's when an override is active.
+  // Operator-data fallback. The earn flow doesn't auto-fetch full user data
+  // anymore (the global query only fires on the Lending / Looping tabs), so
+  // when the parent hands us an empty `subAccounts` for a multi-account
+  // lender we kick off a lender-scoped fetch here. Same React Query, same
+  // cache key — if the Lending tab has already loaded it for this lender,
+  // this hits the cache and returns synchronously.
+  const operatorFallbackNeeded =
+    !(allowCustomReceiver && receiverOverride) &&
+    hasSubAccounts &&
+    !!account &&
+    !!lenderKey &&
+    !!chainId &&
+    (!subAccounts || subAccounts.length === 0)
+  const operatorDataQuery = useUserData({
+    chainId,
+    account,
+    enabled: operatorFallbackNeeded,
+    lenders: lenderKey ? [lenderKey] : undefined,
+  })
+  const operatorFallbackSubs = useMemo(() => {
+    if (!operatorDataQuery.userData?.raw) return []
+    const entry = operatorDataQuery.userData.raw.find(
+      (e) => e.lender === lenderKey && e.chainId === chainId
+    )
+    return entry?.data ?? []
+  }, [operatorDataQuery.userData, lenderKey, chainId])
+
+  // The list shown in the SubAccountSelector — receiver's when an override
+  // is active, otherwise the parent's prop (Lending tab) falling back to our
+  // own scoped fetch (Earn tab).
+  const operatorSubs =
+    subAccounts && subAccounts.length > 0 ? subAccounts : operatorFallbackSubs
   const effectiveSubAccounts =
-    allowCustomReceiver && receiverOverride ? receiverSubAccounts : subAccounts ?? []
+    allowCustomReceiver && receiverOverride ? receiverSubAccounts : operatorSubs
 
   // Reset the chosen sub-account whenever the receiver changes (sub-account
   // IDs don't carry semantics across owners). The auto-pick below then fills
@@ -111,6 +141,27 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
     receiverDataQuery.isUserDataLoading,
   ])
 
+  // Auto-pick the operator's highest-deposit sub-account when no selection is
+  // active yet (earn flow doesn't pass an `accountId` prop). Without this,
+  // multi-account lenders (Euler V2, Fluid, …) would receive `accountId:
+  // undefined` and the worker would fall through to a default — usually
+  // *not* the account the user thinks they're depositing into.
+  //
+  // The Lending tab explicitly passes `accountId`, so `selectedAccountId` is
+  // already truthy on mount there and this effect early-returns. Skipped
+  // entirely while a receiver override is active (that path has its own
+  // dedicated auto-pick above).
+  useEffect(() => {
+    if (allowCustomReceiver && receiverOverride) return
+    if (!hasSubAccounts) return
+    if (selectedAccountId) return
+    if (operatorSubs.length === 0) return
+    const best = operatorSubs.reduce((acc, sub) =>
+      (sub.balanceData?.deposits ?? 0) > (acc.balanceData?.deposits ?? 0) ? sub : acc
+    )
+    setSelectedAccountId(best.accountId)
+  }, [allowCustomReceiver, receiverOverride, hasSubAccounts, selectedAccountId, operatorSubs])
+
   // Position to display under the amount input: receiver's current deposit
   // on this market when an override is set, otherwise the operator's.
   const receiverPosition = useMemo(() => {
@@ -127,8 +178,29 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
     }
     return null
   }, [allowCustomReceiver, receiverOverride, receiverSubAccounts, selectedAccountId, pool])
+
+  // For multi-account lenders the parent's `userPosition` prop returns the
+  // first match across *all* sub-accounts, which can show the wrong figure
+  // when the operator holds the same market in multiple subs. Re-derive from
+  // the prop `subAccounts` filtered by the actually-selected sub.
+  const operatorPosition = useMemo(() => {
+    if (!hasSubAccounts) return userPosition
+    if (!pool || operatorSubs.length === 0) return userPosition
+    for (const sub of operatorSubs) {
+      if (selectedAccountId && sub.accountId !== selectedAccountId) continue
+      for (const pos of sub.positions) {
+        if (typeof pos === 'object' && pos !== null && pos.marketUid === pool.marketUid) {
+          return pos
+        }
+      }
+    }
+    // Fall through to the prop only when nothing matched — preserves behavior
+    // for single-account lenders that the parent computes correctly.
+    return null
+  }, [hasSubAccounts, pool, operatorSubs, selectedAccountId, userPosition])
+
   const displayPosition =
-    allowCustomReceiver && receiverOverride ? receiverPosition : userPosition
+    allowCustomReceiver && receiverOverride ? receiverPosition : operatorPosition
 
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
@@ -352,6 +424,34 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
             <div className="rounded-lg border border-base-300 px-2 py-1.5 text-[11px] text-base-content/60">
               Receiver has no sub-accounts on this lender yet. Use{' '}
               <span className="font-medium">+ New</span> below to create one.
+            </div>
+          ) : null}
+        </>
+      )}
+
+      {/* Operator-fallback fetch status — only visible on the Earn path when
+          the parent didn't pre-load sub-accounts for this lender. Surfaces
+          the in-flight state so the empty selector doesn't look broken, and
+          the fetch error if the lender-scoped RPC roundtrip fails. */}
+      {operatorFallbackNeeded && !(allowCustomReceiver && receiverOverride) && (
+        <>
+          {operatorDataQuery.error ? (
+            <div className="rounded-lg border border-error/30 bg-error/10 px-2 py-1.5 text-[11px] flex items-center justify-between gap-2">
+              <span className="text-error truncate" title={(operatorDataQuery.error as Error).message}>
+                Couldn't load your accounts on this lender: {(operatorDataQuery.error as Error).message}
+              </span>
+              <button
+                type="button"
+                className="btn btn-xs btn-outline btn-error"
+                onClick={() => operatorDataQuery.refetch()}
+              >
+                Retry
+              </button>
+            </div>
+          ) : operatorDataQuery.isUserDataLoading ? (
+            <div className="rounded-lg border border-base-300 px-2 py-1.5 text-[11px] text-base-content/60 flex items-center gap-2">
+              <span className="loading loading-spinner w-2.5 h-2.5" />
+              Loading your accounts on this lender…
             </div>
           ) : null}
         </>
