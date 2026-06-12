@@ -20,6 +20,8 @@ import {
   fetchLoopRange,
   type LoopRangeEntry,
 } from '../../../../../sdk/lending-helper/fetchLoopRange'
+import { loansForMarket } from '../../../../../hooks/lending/useUserData'
+import { termLabel, loanDebtString, maturityDisplay, loanRatePct } from '../../../shared/brokeredLoans'
 
 export const CloseAction: React.FC<TradingActionProps> = ({
   collateralPools,
@@ -86,6 +88,19 @@ export const CloseAction: React.FC<TradingActionProps> = ({
     () => subAccounts.find((s) => s.accountId === accountId) ?? null,
     [subAccounts, accountId]
   )
+
+  // Brokered (Lista) debt: each fixed loan repays by its own loanId — pick which
+  // one this close targets. (BROKERED_MARKETS.md §6)
+  const brokeredLoans =
+    activeSubAccount && debtPool ? loansForMarket(activeSubAccount.positions, debtPool.marketUid) : []
+  const isDebtBrokered =
+    !!debtPool && (debtPool.variableBorrowDisabled === true || brokeredLoans.length > 0)
+  const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
+  useEffect(() => {
+    setSelectedLoanId(brokeredLoans[0]?.loanId ?? null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debtPool?.marketUid, brokeredLoans.length])
+  const selectedLoan = brokeredLoans.find((l) => l.loanId === selectedLoanId) ?? null
 
   useEffect(() => {
     if (!collateralPool || !debtPool || !selectedLender || !chainId) {
@@ -179,12 +194,15 @@ export const CloseAction: React.FC<TradingActionProps> = ({
       irModeOut: LendingMode.VARIABLE,
       tradeType,
       ...(isAll ? { isAll: true } : {}),
+      // Brokered debt: repay the selected fixed loan by its loanId. (Docs §6)
+      ...(isDebtBrokered && selectedLoanId ? { loanId: selectedLoanId } : {}),
       usePendleMintRedeem: false,
       ...(accountId ? { accountId } : {}),
     }, account, activeSubAccount ? buildSimulationBody(activeSubAccount) : undefined)
   }
 
-  const canFetch = !!collateralPool && !!debtPool && !!exactAmount
+  const canFetch =
+    !!collateralPool && !!debtPool && !!exactAmount && (!isDebtBrokered || selectedLoan != null)
 
   if (txSuccess) {
     return <TradingTransactionSuccess operation={txSuccess.operation} hash={txSuccess.hash} onDismiss={dismissSuccess} />
@@ -278,6 +296,64 @@ export const CloseAction: React.FC<TradingActionProps> = ({
           positionType="debt"
           preferredUids={preferredBorrowableUids}
         />
+
+        {/* Loan picker — brokered (Lista) debt repays per loanId. */}
+        {isDebtBrokered && (
+          <div className="mt-1.5 rounded-lg border border-warning/30 bg-warning/5 p-2 space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="badge badge-xs bg-warning/20 text-warning border-0 font-medium">
+                Fixed-term
+              </span>
+              <span className="text-[10px] text-base-content/60">Choose the loan to close</span>
+            </div>
+            {brokeredLoans.length > 0 ? (
+              <div className="flex flex-col gap-1.5">
+                {brokeredLoans.map((loan) => {
+                  const active = loan.loanId === selectedLoanId
+                  const mat = maturityDisplay(loan)
+                  const ratePct = loanRatePct(loan)
+                  return (
+                    <button
+                      key={loan.loanId}
+                      type="button"
+                      onClick={() => {
+                        setSelectedLoanId(loan.loanId ?? null)
+                        reset()
+                      }}
+                      className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border text-left transition-colors cursor-pointer ${
+                        active
+                          ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                          : 'border-base-300 bg-base-200/50 hover:bg-base-200'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-xs font-semibold">{termLabel(loan)}</span>
+                        {ratePct != null && (
+                          <span className="text-[10px] font-mono tabular-nums text-warning">
+                            {ratePct.toFixed(2)}%
+                          </span>
+                        )}
+                        {mat.isPast && (
+                          <span className="badge badge-xs bg-warning/15 text-warning border-0">
+                            Matured
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-xs font-mono tabular-nums text-error shrink-0">
+                        {formatTokenForInput(loanDebtString(loan))} {debtPool?.asset.symbol}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <span className="text-[10px] text-base-content/50">
+                No fixed loans found for this market{accountId ? '' : ' — select a sub-account'}.
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="form-control mt-1.5">
           <div className="flex items-center justify-between mb-0.5">
             <label className="label-text text-xs">

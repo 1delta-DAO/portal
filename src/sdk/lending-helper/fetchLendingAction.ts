@@ -11,6 +11,16 @@ export interface LendingActionParams {
   isAll?: boolean
   lendingMode?: string
   accountId?: string
+  /**
+   * Brokered (Lista) borrow only: the chosen fixed-term id from the market's
+   * `terms[]` rate card. Selects which fixed loan to open. See BROKERED_MARKETS.md §6.
+   */
+  termId?: number
+  /**
+   * Brokered (Lista) repay only: the loan's posId to repay, or the
+   * `FLEX_LOAN_ID` sentinel to target the dynamic/flex position.
+   */
+  loanId?: string
   /** When true, the server runs an e2e simulation and returns projected health factor / balances */
   simulate?: boolean
   /** When provided, sent as POST body for simulation (same shape as loop simulation body) */
@@ -121,6 +131,8 @@ export async function fetchLendingAction(
     if (params.isAll != null) qs.set('isAll', String(params.isAll))
     if (params.lendingMode) qs.set('lendingMode', params.lendingMode)
     if (params.accountId) qs.set('accountId', params.accountId)
+    if (params.termId != null) qs.set('termId', String(params.termId))
+    if (params.loanId != null) qs.set('loanId', params.loanId)
     if (params.simulate) qs.set('simulate', 'true')
 
     const url = `${LENDING_ACTIONS_BASE}/${action}?${qs}`

@@ -3,9 +3,12 @@ import { zeroAddress } from 'viem'
 import { isWNative } from '../../../../../lib/lib-utils'
 import { isValidAddress } from '../../../../../utils/addressValidation'
 import type { RawCurrency } from '../../../../../types/currency'
-import type {
-  UserVaultItem,
-  VaultEntry,
+import {
+  vaultFamily,
+  withdrawalStyle,
+  type UserVaultItem,
+  type VaultActionVerb,
+  type VaultEntry,
 } from '../../../../../sdk/vaults-helper'
 import { useSyncChain } from '../../../../../hooks/useSyncChain'
 import { useSpyMode } from '../../../../../contexts/SpyMode'
@@ -28,6 +31,7 @@ import {
   formatSupplyRate,
   isSupplyRateMeaningful,
 } from './helpers'
+import { DelegationPicker } from './DelegationPicker'
 
 type VaultAction = 'Deposit' | 'Withdraw'
 
@@ -65,6 +69,8 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
   const [amount, setAmount] = useState('')
   const [useNative, setUseNative] = useState(false)
   const [isAll, setIsAll] = useState(false)
+  // LST delegation choice (validator / group / pool id), null = server default.
+  const [delegationChoice, setDelegationChoice] = useState<string | null>(null)
   // Custom-receiver state. `receiverOverride` is null when shares/underlying
   // should go to the operator (default); set to a checksum-validated address
   // when the integrator wants to test a flow where depositor ≠ receiver.
@@ -87,6 +93,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
     setAmount('')
     setUseNative(false)
     setIsAll(false)
+    setDelegationChoice(null)
   }, [selected?.address.toLowerCase()])
 
   // For wrapped-native vaults, if the user holds native but no wrapped, default
@@ -99,15 +106,42 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
   }, [canUseNative, useNative, walletBalance, nativeBalance, tab])
 
   const payAsset = canUseNative && useNative && tab === 'Deposit' ? zeroAddress : undefined
-  const provider = supportsProviderNativeDeposit && useNative && tab === 'Deposit'
+  const nativeProvider = supportsProviderNativeDeposit && useNative && tab === 'Deposit'
     ? selected?.provider
     : undefined
+
+  // Async families (lst / gmx / lagoon) don't exit instantly — the Withdraw tab
+  // builds a `request-withdraw` instead, and the matured request is claimed
+  // later from the Pending Withdrawals list.
+  const family = selected ? vaultFamily(selected.provider) : 'erc4626'
+  const isAsyncWithdraw = tab === 'Withdraw' && withdrawalStyle(family) === 'async'
+  const withdrawVerb: VaultActionVerb | undefined = isAsyncWithdraw
+    ? 'request-withdraw'
+    : undefined
+  // request-withdraw takes the amount in share/LST units, so for async exits the
+  // input maxes out on the share balance rather than the underlying-equivalent.
+  const isAllDirect = tab === 'Withdraw' && !isAsyncWithdraw && isAll
+
+  // LST delegation (validator / group / pool selection) — deposit-only. When a
+  // choice is made, echo it back under the delegation's `optionKey`. A required
+  // picker gates the deposit until a choice exists.
+  const delegation = tab === 'Deposit' ? selected?.delegation : undefined
+  const delegationReady = !delegation || !delegation.required || !!delegationChoice
+  const extraParams = useMemo(
+    () =>
+      delegation && delegationChoice
+        ? { [delegation.optionKey]: delegationChoice }
+        : undefined,
+    [delegation, delegationChoice]
+  )
 
   const effectiveReceiver = receiverOverride ?? account
 
   const exec = useVaultActionExecution(
     {
       actionType: tab,
+      verb: withdrawVerb,
+      provider: selected?.provider ?? 'morpho',
       chainId,
       account,
       receiver: effectiveReceiver,
@@ -115,10 +149,11 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
       underlying: selected?.underlying,
       decimals: selected?.decimals,
       amount,
-      isAll: tab === 'Withdraw' && isAll,
-      sharesRaw: tab === 'Withdraw' && isAll ? userPosition?.sharesRaw : undefined,
+      isAll: isAllDirect,
+      sharesRaw: isAllDirect ? userPosition?.sharesRaw : undefined,
       payAsset,
-      provider,
+      nativeProvider,
+      extraParams,
     },
     underlyingToken?.symbol ?? selected?.symbol ?? ''
   )
@@ -151,11 +186,14 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
 
   const activeBal = canUseNative && useNative && tab === 'Deposit' ? nativeBalance : walletBalance
 
-  // For Withdraw, the "max" is the user's underlying-equivalent balance.
+  // For Withdraw, the "max" is the user's underlying-equivalent balance — except
+  // async exits redeem in share units, so they max out on the share balance.
   const maxAmountStr =
     tab === 'Deposit'
       ? activeBal?.balance ?? '0'
-      : userPosition?.assets ?? '0'
+      : isAsyncWithdraw
+        ? userPosition?.shares ?? '0'
+        : userPosition?.assets ?? '0'
 
   const overMax =
     !isAll &&
@@ -210,6 +248,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
               setTab(t)
               setAmount('')
               setIsAll(false)
+              setDelegationChoice(null)
               exec.resetState()
             }}
           >
@@ -549,8 +588,14 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
             onMaxClick={
               tab === 'Withdraw' && userPosition
                 ? () => {
-                    setIsAll(true)
-                    setAmount(userPosition.assets)
+                    if (isAsyncWithdraw) {
+                      // request-withdraw amount is in share units; no isAll path.
+                      setIsAll(false)
+                      setAmount(userPosition.shares)
+                    } else {
+                      setIsAll(true)
+                      setAmount(userPosition.assets)
+                    }
                   }
                 : undefined
             }
@@ -562,6 +607,19 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
                 : null
             }
           />
+
+          {/* LST delegation picker (Deposit only) — validator / group / pool */}
+          {tab === 'Deposit' && selected && delegation && (
+            <DelegationPicker
+              chainId={chainId}
+              shareToken={selected.address}
+              delegation={delegation}
+              underlyingDecimals={underlyingToken?.decimals ?? selected.decimals}
+              underlyingSymbol={underlyingToken?.symbol ?? selected.symbol}
+              value={delegationChoice}
+              onChange={setDelegationChoice}
+            />
+          )}
 
           {/* APR-derived monthly earnings estimate (Deposit only) */}
           {tab === 'Deposit' && selected && isSupplyRateMeaningful(selected) && (() => {
@@ -581,6 +639,16 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
             )
           })()}
 
+          {/* Async exit explainer — the request matures off-chain, then is
+              claimed from the Pending Withdrawals list below the table. */}
+          {isAsyncWithdraw && selected && (
+            <div className="text-[11px] text-base-content/60 wrap-break-word px-1">
+              {PROVIDER_LABELS[selected.provider]} withdrawals are asynchronous:
+              this submits a redeem request. Once it matures, claim it from
+              “Pending withdrawals”.
+            </div>
+          )}
+
           {exec.error && <div className="text-error text-xs wrap-break-word">{exec.error}</div>}
 
           {exec.loading && (
@@ -590,8 +658,16 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
             </div>
           )}
 
+          {/* Delegation required but not yet chosen */}
+          {tab === 'Deposit' && delegation?.required && !delegationReady && (
+            <div className="text-[11px] text-warning px-1">
+              Select a {delegation.kind === 'validatorGroup' ? 'validator group' : delegation.kind}{' '}
+              to continue.
+            </div>
+          )}
+
           {/* Permissions */}
-          {exec.result && !overMax && exec.hasPermissions && !exec.allPermissionsDone && (
+          {exec.result && !overMax && delegationReady && exec.hasPermissions && !exec.allPermissionsDone && (
             <div className="space-y-1">
               <span className="text-xs text-base-content/60">
                 Approvals ({exec.permissionsCompleted}/{exec.permissions.length})
@@ -631,7 +707,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
           )}
 
           {/* Execute */}
-          {exec.result && !overMax && (!exec.hasPermissions || exec.allPermissionsDone) && (
+          {exec.result && !overMax && delegationReady && (!exec.hasPermissions || exec.allPermissionsDone) && (
             <button
               type="button"
               className="btn btn-success btn-sm w-full"
@@ -640,6 +716,8 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
             >
               {exec.executingMain ? (
                 <span className="loading loading-spinner loading-xs" />
+              ) : isAsyncWithdraw ? (
+                'Request Withdrawal'
               ) : (
                 `Execute ${tab}`
               )}

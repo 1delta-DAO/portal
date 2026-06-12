@@ -327,6 +327,17 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     debouncedPayAmount,
   ])
 
+  // Brokered (Lista) debt markets borrow at a fixed term — pick one from the
+  // rate card; variable borrow isn't offered through the app. (BROKERED_MARKETS.md §6)
+  const debtTerms = debtPool?.terms ?? []
+  const isDebtBrokered = !!debtPool && (debtPool.variableBorrowDisabled === true || debtTerms.length > 0)
+  const [selectedTermId, setSelectedTermId] = useState<number | null>(null)
+  useEffect(() => {
+    setSelectedTermId(debtTerms.length > 0 ? debtTerms[0].termId : null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debtPool?.marketUid, debtTerms.length])
+  const selectedTerm = debtTerms.find((t) => t.termId === selectedTermId) ?? null
+
   // Max amounts
   const debtPos = debtPool ? userPositions.get(debtPool.marketUid) : null
   const maxBorrowableStr = debtPos ? String(debtPos.borrowable) : '0'
@@ -348,6 +359,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
         debtAmount: parseUnits(debtAmount || '0', debtPool.asset.decimals).toString(),
         slippage: (parseFloat(slippage) || 0.3) * 100,
         borrowMode: LendingMode.VARIABLE,
+        // Brokered debt: open the borrow at the chosen fixed term. (Docs §6)
+        ...(isDebtBrokered && selectedTermId != null ? { termId: selectedTermId } : {}),
         usePendleMintRedeem: false,
         ...(selectedPayCurrency ? { payAsset: selectedPayCurrency.address } : {}),
         ...(selectedPayCurrency && payAmount
@@ -362,7 +375,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
   const allowCreateAccount = !!selectedPayCurrency && !!payAmount
 
-  const canFetch = !!collateralPool && !!debtPool && !!debtAmount
+  const canFetch =
+    !!collateralPool && !!debtPool && !!debtAmount && (!isDebtBrokered || selectedTerm != null)
 
   if (txSuccess) {
     return <TradingTransactionSuccess operation={txSuccess.operation} hash={txSuccess.hash} onDismiss={dismissSuccess} />
@@ -407,6 +421,52 @@ export const LoopAction: React.FC<TradingActionProps> = ({
           positionType="debt"
           preferredUids={preferredBorrowableUids}
         />
+
+        {/* Fixed-term selector — brokered (Lista) debt markets only. */}
+        {isDebtBrokered && (
+          <div className="mt-1.5 rounded-lg border border-warning/30 bg-warning/5 p-2 space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center rounded-md bg-warning/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide leading-none text-warning whitespace-nowrap">
+                Fixed-term
+              </span>
+              <span className="text-[10px] text-base-content/60 leading-tight">
+                Variable borrow unavailable — pick a term
+              </span>
+            </div>
+            {debtTerms.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {debtTerms.map((t) => {
+                  const active = t.termId === selectedTermId
+                  return (
+                    <button
+                      key={t.termId}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTermId(t.termId)
+                        reset()
+                      }}
+                      className={`flex flex-col items-start px-2.5 py-1 rounded-lg border text-left transition-colors cursor-pointer ${
+                        active
+                          ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                          : 'border-base-300 bg-base-200/50 hover:bg-base-200'
+                      }`}
+                    >
+                      <span className="text-xs font-semibold">{t.durationDays}-day</span>
+                      <span className="text-[10px] font-mono tabular-nums text-warning">
+                        {t.apr.toFixed(2)}%
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <span className="text-[10px] text-base-content/50">
+                Fixed-term borrowing is currently unavailable for this market.
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="form-control mt-1.5">
           <div className="flex items-center justify-between mb-0.5">
             <label className="label-text text-xs">Debt Amount</label>

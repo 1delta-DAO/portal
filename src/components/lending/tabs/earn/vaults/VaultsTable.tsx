@@ -9,13 +9,21 @@ import {
   PROVIDER_LOGOS,
   formatSupplyRate,
   hasLiquidity,
-  humanAssets,
   isSupplyRateMeaningful,
   liquidityNative,
   liquidityUsd,
+  tvlNative,
   tvlUsd,
   type VaultSortKey,
 } from './helpers'
+
+/** Share prices hover around ~1.0, so currency-style 2dp loses signal. */
+function fmtSharePrice(n: number): string {
+  if (!Number.isFinite(n)) return '—'
+  const abs = Math.abs(n)
+  const dp = abs >= 1000 ? 2 : abs >= 1 ? 4 : 6
+  return n.toLocaleString(undefined, { maximumFractionDigits: dp })
+}
 
 interface VaultsTableProps {
   vaults: VaultEntry[]
@@ -100,27 +108,30 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
         <table className="table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden">
           <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
             <tr>
-              <th className="w-[24%] cursor-pointer" onClick={() => onToggleSort('name')}>
+              <th className="w-[22%] cursor-pointer" onClick={() => onToggleSort('name')}>
                 Vault{sortIndicator('name')}
               </th>
-              <th className="w-[14%] cursor-pointer" onClick={() => onToggleSort('provider')}>
+              <th className="w-[12%] cursor-pointer" onClick={() => onToggleSort('provider')}>
                 Provider{sortIndicator('provider')}
               </th>
-              <th className="w-[12%]">Underlying</th>
-              <th className="w-[10%] cursor-pointer" onClick={() => onToggleSort('supplyRate')}>
+              <th className="w-[11%]">Underlying</th>
+              <th className="w-[9%] cursor-pointer" onClick={() => onToggleSort('supplyRate')}>
                 APR{sortIndicator('supplyRate')}
               </th>
-              <th className="w-[13%] cursor-pointer" onClick={() => onToggleSort('totalAssetsUsd')}>
+              <th className="w-[12%]" title="Price per share">
+                Share price
+              </th>
+              <th className="w-[12%] cursor-pointer" onClick={() => onToggleSort('totalAssetsUsd')}>
                 TVL{sortIndicator('totalAssetsUsd')}
               </th>
               <th
-                className="w-[13%] cursor-pointer"
+                className="w-[12%] cursor-pointer"
                 onClick={() => onToggleSort('liquidityUsd')}
                 title="Withdrawable liquidity"
               >
                 Liq.{sortIndicator('liquidityUsd')}
               </th>
-              <th className="w-[14%]">Curator</th>
+              <th className="w-[10%]">Curator</th>
             </tr>
           </thead>
           <tbody>
@@ -130,7 +141,7 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
               // catalog's vault decimals (== underlying decimals by ERC-4626).
               const decimals = underlyingToken?.decimals ?? v.decimals
               const sel = isSelected(v)
-              const tvlNative = humanAssets(v.totalAssets, decimals)
+              const tvlNativeVal = tvlNative(v, decimals)
               const usd = tvlUsd(v, decimals)
               return (
                 <tr
@@ -187,18 +198,43 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                     </span>
                   </td>
                   <td>
+                    {v.sharePriceUsd != null || v.sharePrice != null ? (
+                      <div className="flex flex-col text-xs">
+                        <span
+                          className="font-semibold"
+                          title={
+                            v.sharePrice != null
+                              ? `${fmtSharePrice(v.sharePrice)} ${underlyingToken?.symbol ?? ''}`
+                              : undefined
+                          }
+                        >
+                          {v.sharePriceUsd != null
+                            ? `$${fmtSharePrice(v.sharePriceUsd)}`
+                            : `${fmtSharePrice(v.sharePrice!)} ${underlyingToken?.symbol ?? ''}`}
+                        </span>
+                        {v.sharePriceUsd != null && v.sharePrice != null && (
+                          <span className="text-base-content/60 truncate">
+                            {fmtSharePrice(v.sharePrice)} {underlyingToken?.symbol ?? ''}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-base-content/40">—</span>
+                    )}
+                  </td>
+                  <td>
                     <div className="flex flex-col text-xs">
                       <span className="font-semibold" title={usd ? `$${formatUsd(usd)}` : undefined}>
                         {usd
                           ? abbreviateUsd(usd)
-                          : `${abbreviateNumber(tvlNative)} ${underlyingToken?.symbol ?? ''}`}
+                          : `${abbreviateNumber(tvlNativeVal)} ${underlyingToken?.symbol ?? ''}`}
                       </span>
                       {usd > 0 && (
                         <span
                           className="text-base-content/60 truncate"
-                          title={`${tvlNative} ${underlyingToken?.symbol ?? ''}`}
+                          title={`${tvlNativeVal} ${underlyingToken?.symbol ?? ''}`}
                         >
-                          {abbreviateNumber(tvlNative)} {underlyingToken?.symbol ?? ''}
+                          {abbreviateNumber(tvlNativeVal)} {underlyingToken?.symbol ?? ''}
                         </span>
                       )}
                     </div>
@@ -245,7 +281,7 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
               )
             })}
             {totalItems === 0 && (
-              <TableEmptyRow colSpan={7}>No vaults match your filters.</TableEmptyRow>
+              <TableEmptyRow colSpan={8}>No vaults match your filters.</TableEmptyRow>
             )}
           </tbody>
         </table>
@@ -263,7 +299,7 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
           const underlyingToken = chainTokens[v.underlying.toLowerCase()]
           const decimals = underlyingToken?.decimals ?? v.decimals
           const sel = isSelected(v)
-          const tvlNative = humanAssets(v.totalAssets, decimals)
+          const tvlNativeVal = tvlNative(v, decimals)
           const usd = tvlUsd(v, decimals)
           return (
             <div
@@ -316,9 +352,19 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                   <span className="font-medium text-base-content">
                     {usd
                       ? abbreviateUsd(usd)
-                      : `${abbreviateNumber(tvlNative)} ${underlyingToken?.symbol ?? ''}`}
+                      : `${abbreviateNumber(tvlNativeVal)} ${underlyingToken?.symbol ?? ''}`}
                   </span>
                 </span>
+                {(v.sharePriceUsd != null || v.sharePrice != null) && (
+                  <span>
+                    PPS:{' '}
+                    <span className="font-medium text-base-content">
+                      {v.sharePriceUsd != null
+                        ? `$${fmtSharePrice(v.sharePriceUsd)}`
+                        : `${fmtSharePrice(v.sharePrice!)} ${underlyingToken?.symbol ?? ''}`}
+                    </span>
+                  </span>
+                )}
                 {hasLiquidity(v) && (
                   <span>
                     Liq:{' '}

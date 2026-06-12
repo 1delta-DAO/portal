@@ -56,6 +56,25 @@ export interface PoolFlags {
   borrowingEnabled?: boolean
   collateralActive?: boolean
   depositsEnabled?: boolean
+  /**
+   * Brokered (Lista) markets: variable borrowing isn't offered through the
+   * 1delta composer — borrowers pick a fixed term from `terms[]`. The raw
+   * `variableBorrowRate` is 0 here and should not be ranked. See BROKERED_MARKETS.md.
+   */
+  variableBorrowDisabled?: boolean
+}
+
+/**
+ * One fixed-term option from a brokered market's rate card. `apr` is a percent
+ * (e.g. 3.85 = 3.85%), same unit as the pool's other rates. See BROKERED_MARKETS.md §2.
+ */
+export interface PoolTerm {
+  /** Broker term identifier — passed to the borrow builder as `termId`. */
+  termId: number
+  /** How long the position is locked at the fixed rate. */
+  durationDays: number
+  /** Annualised fixed borrow rate, percent. */
+  apr: number
 }
 
 export interface PoolEntry {
@@ -85,6 +104,18 @@ export interface PoolEntry {
   rewards: unknown | null
   underlyingInfo: PoolUnderlyingInfo
   risk: PoolRisk | null
+  /**
+   * Brokered (Lista) rate card — termId/durationDays/apr serialized as strings.
+   * `null`/absent ⇒ not brokered; `[]` ⇒ the broker pruned the menu (treat as
+   * inactive). See BROKERED_MARKETS.md §2-3.
+   */
+  terms?: Array<{
+    termId: number | string
+    durationDays: number | string
+    apr: number | string
+  }> | null
+  /** Mirror of `flags.variableBorrowDisabled`, surfaced top-level by `/pools`. */
+  variableBorrowDisabled?: boolean
 }
 
 export interface PoolOwnerShare {

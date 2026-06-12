@@ -9,6 +9,7 @@ import type { TableHighlight, PoolRole, PoolSide } from '../tabs/trading/types'
 import { abbreviateUsd, abbreviateNumber, formatUsd, formatTokenAmount } from '../../../utils/format'
 import { AssetPopover } from './AssetPopover'
 import { RiskBadge } from './RiskBadge'
+import { BrokeredAprCell } from './BrokeredAprCell'
 import { useTablePagination } from '../../../hooks/useTablePagination'
 import { TablePagination } from '../../common/TablePagination'
 import { EmptyState } from '../../common/EmptyState'
@@ -734,6 +735,8 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                   const sym = item.underlyingInfo.asset.symbol
                   const liqUsd = item.totalLiquidityUsd ?? item.totalDepositsUsd - item.totalDebtUsd
                   const liqToken = item.totalLiquidity ?? pool?.totalLiquidity
+                  const isBrokered =
+                    !!pool && (pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0)
 
                   return (
                     <tr
@@ -756,6 +759,8 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                       <td>
                         {rowSide === 'collateral' ? (
                           <AprCell rate={item.depositRate} iy={iy} color="success" />
+                        ) : isBrokered ? (
+                          <BrokeredAprCell terms={pool?.terms} />
                         ) : (
                           <AprCell rate={item.variableBorrowRate} iy={iy} color="warning" />
                         )}
@@ -846,6 +851,8 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
               const sym = item.underlyingInfo.asset.symbol
               const liqUsd = item.totalLiquidityUsd ?? item.totalDepositsUsd - item.totalDebtUsd
               const liqToken = item.totalLiquidity ?? pool?.totalLiquidity
+              const isBrokered =
+                !!pool && (pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0)
 
               return (
                 <div
@@ -871,6 +878,13 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                           <AprCell rate={item.depositRate} iy={iy} color="success" />
                           <span className="text-[10px] text-base-content/50 block">
                             Deposit APR
+                          </span>
+                        </>
+                      ) : isBrokered ? (
+                        <>
+                          <BrokeredAprCell terms={pool?.terms} />
+                          <span className="text-[10px] text-base-content/50 block">
+                            Fixed-term
                           </span>
                         </>
                       ) : (

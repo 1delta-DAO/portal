@@ -17,6 +17,7 @@ import type {
   UserPositionEntry,
   UserSubAccount,
 } from '../../../../hooks/lending/useUserData'
+import { isAggregatePosition, isLoanPosition } from '../../../../hooks/lending/useUserData'
 import { useTokenBalances } from '../../../../hooks/lending/useTokenBalances'
 import { useLenderAccounts } from '../../../../hooks/lending/useLenderAccounts'
 import { useTokenLists } from '../../../../hooks/useTokenLists'
@@ -252,7 +253,10 @@ export function LendingDashboard({
     const map = new Map<string, UserPositionEntry>()
     if (!activeSubAccount) return map
     for (const pos of activeSubAccount.positions) {
-      if (typeof pos === 'object' && pos !== null) {
+      // Skip per-loan brokered rows — they share `marketUid` with the
+      // aggregate row and would clobber it. Per-market consumers want the
+      // aggregate; the loan list reads the per-loan rows separately.
+      if (typeof pos === 'object' && pos !== null && isAggregatePosition(pos)) {
         map.set(pos.marketUid, pos)
       }
     }
@@ -285,12 +289,26 @@ export function LendingDashboard({
     const result: { position: UserPositionEntry; pool: PoolDataItem }[] = []
     for (const pool of allPools) {
       const pos = userPositions.get(pool.marketUid)
-      if (pos && (Number(pos.deposits) > 0 || Number(pos.debt) > 0)) {
+      if (pos && (Number(pos.deposits) > 0 || Number(pos.debt) > 0 || Number(pos.debtStable) > 0)) {
         result.push({ position: pos, pool })
       }
     }
     return result
   }, [allPools, userPositions])
+
+  // Per-loan brokered rows grouped by market, for the YourPositions breakdown.
+  const loansByMarket = useMemo(() => {
+    const map = new Map<string, UserPositionEntry[]>()
+    if (!activeSubAccount) return map
+    for (const pos of activeSubAccount.positions) {
+      if (typeof pos === 'object' && pos !== null && isLoanPosition(pos)) {
+        const arr = map.get(pos.marketUid) ?? []
+        arr.push(pos)
+        map.set(pos.marketUid, arr)
+      }
+    }
+    return map
+  }, [activeSubAccount])
 
   // Handle market row click - toggles asset selection
   const handlePoolSelect = (pool: PoolDataItem) => {
@@ -391,6 +409,7 @@ export function LendingDashboard({
           onSubAccountChange={setSelectedSubAccountId}
           summary={lenderSummary}
           activePositions={activePositions}
+          loansByMarket={loansByMarket}
           account={account}
           chainId={chainId}
           selectedLender={selectedLender}

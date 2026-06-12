@@ -15,7 +15,7 @@ export interface FetchVaultsCatalogParams {
 
 export interface FetchVaultsCatalogResult {
   success: boolean
-  /** Provider-keyed map exactly as the backend returns it. */
+  /** Raw catalog page(s) exactly as the backend returns them. */
   raw?: VaultsCatalogResponse
   /** Flattened list normalized to the {@link VaultEntry} shape. */
   vaults?: VaultEntry[]
@@ -23,6 +23,9 @@ export interface FetchVaultsCatalogResult {
 }
 
 const ENDPOINT = `${BACKEND_BASE_URL}/v1/data/vaults`
+
+/** Backend caps `count` at 1000; we page until a short page is returned. */
+const PAGE_SIZE = 1000
 
 export async function fetchVaultsCatalog(
   params: FetchVaultsCatalogParams
@@ -32,28 +35,44 @@ export async function fetchVaultsCatalog(
       ? params.providers
       : VAULT_PROVIDERS
 
-    const qs = new URLSearchParams()
-    qs.set('chainId', params.chainId)
-    qs.set('providers', providers.join(','))
+    const items: RawVault[] = []
+    let start = 0
 
-    const res = await fetch(`${ENDPOINT}?${qs}`)
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return {
-        success: false,
-        error: `HTTP ${res.status}: ${text || res.statusText}`,
+    // The endpoint paginates (default 100, max 1000). Walk the cursor so the
+    // catalog never silently truncates when a chain has more vaults than a page.
+    for (;;) {
+      const qs = new URLSearchParams()
+      qs.set('chainId', params.chainId)
+      qs.set('providers', providers.join(','))
+      qs.set('start', String(start))
+      qs.set('count', String(PAGE_SIZE))
+
+      const res = await fetch(`${ENDPOINT}?${qs}`)
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        return {
+          success: false,
+          error: `HTTP ${res.status}: ${text || res.statusText}`,
+        }
       }
+
+      const json = await res.json()
+      if (!json.success) {
+        return {
+          success: false,
+          error: json.error?.message ?? 'Vaults catalog returned success: false',
+        }
+      }
+
+      const page: VaultsCatalogResponse = json.data ?? {}
+      const pageItems = Array.isArray(page.items) ? page.items : []
+      items.push(...pageItems)
+
+      if (pageItems.length < PAGE_SIZE) break
+      start += PAGE_SIZE
     }
 
-    const json = await res.json()
-    if (!json.success) {
-      return {
-        success: false,
-        error: json.error?.message ?? 'Vaults catalog returned success: false',
-      }
-    }
-
-    const raw: VaultsCatalogResponse = json.data ?? {}
+    const raw: VaultsCatalogResponse = { start: 0, count: items.length, items }
     const vaults = flattenCatalog(raw)
     return { success: true, raw, vaults }
   } catch (err: any) {
@@ -62,47 +81,52 @@ export async function fetchVaultsCatalog(
 }
 
 /**
- * Normalize a provider-keyed catalog into a flat `VaultEntry[]` so tables,
- * filters and search can treat every provider uniformly. Provider-specific
- * fields (curators, protocolVersion, etc.) survive in `extras`.
+ * Normalize the flat `items[]` page into a `VaultEntry[]` so tables, filters
+ * and search can treat every provider uniformly. The full raw row survives in
+ * `extras` for provider-specific UI needs.
  */
 function flattenCatalog(raw: VaultsCatalogResponse): VaultEntry[] {
   const out: VaultEntry[] = []
-  for (const provider of VAULT_PROVIDERS) {
-    const bag = raw[provider]
-    if (!bag) continue
-    for (const value of Object.values(bag)) {
-      const entry = normalizeVault(provider, value)
-      if (entry) out.push(entry)
-    }
+  for (const value of raw.items ?? []) {
+    const entry = normalizeVault(value)
+    if (entry) out.push(entry)
   }
   return out
 }
 
-function normalizeVault(provider: VaultProvider, v: RawVault): VaultEntry | null {
-  const address = (v.address ?? '').toString()
+function normalizeVault(v: RawVault): VaultEntry | null {
+  const address = (v.vaultAddress ?? '').toString()
   const underlying = (v.underlying ?? '').toString()
   if (!address || !underlying) return null
+
+  const provider = (v.provider ?? '').toString() as VaultProvider
+  const rates = v.rates ?? {}
+  const tvl = v.tvl ?? {}
+  const liq = v.liquidity ?? {}
+  const price = v.underlyingInfo?.prices ?? {}
 
   return {
     provider,
     address,
     underlying,
     symbol: (v.symbol ?? '').toString(),
-    name: (v.name ?? v.symbol ?? '').toString(),
+    name: (v.displayName ?? v.name ?? v.symbol ?? '').toString(),
     decimals: typeof v.decimals === 'number' ? v.decimals : 18,
-    totalAssets: v.totalAssets != null ? String(v.totalAssets) : '0',
-    totalSupply: v.totalSupply != null ? String(v.totalSupply) : '0',
-    totalAssetsUsd: typeof v.totalAssetsUsd === 'number' ? v.totalAssetsUsd : undefined,
-    liquidity: v.liquidity != null ? String(v.liquidity) : undefined,
-    liquidityFormatted:
-      typeof v.liquidityFormatted === 'number' ? v.liquidityFormatted : undefined,
-    liquidityUsd: typeof v.liquidityUsd === 'number' ? v.liquidityUsd : undefined,
-    underlyingPriceUsd:
-      typeof v.underlyingPriceUsd === 'number' ? v.underlyingPriceUsd : undefined,
-    supplyRate: toNumber(v.supplyRate),
-    fee: toNumber(v.fee),
+    totalAssets: tvl.totalAssets != null ? String(tvl.totalAssets) : '0',
+    totalAssetsFormatted: toNumber(tvl.totalAssetsFormatted),
+    totalSupply: tvl.totalSupply != null ? String(tvl.totalSupply) : '0',
+    totalAssetsUsd: toNumber(tvl.totalAssetsUsd),
+    liquidity: liq.liquidity != null ? String(liq.liquidity) : undefined,
+    liquidityFormatted: toNumber(liq.liquidityFormatted),
+    liquidityUsd: toNumber(liq.liquidityUsd),
+    underlyingPriceUsd: toNumber(price.priceUsd),
+    sharePrice: toNumber(v.sharePrice),
+    sharePriceUsd: toNumber(v.sharePriceUsd),
+    // `totalRate` is the depositor's all-in APR (deposit + rewards).
+    supplyRate: toNumber(rates.totalRate),
+    fee: toNumber(rates.fee),
     curator: deriveCurator(provider, v),
+    delegation: v.providerMeta?.delegation ?? undefined,
     extras: v,
   }
 }
@@ -117,16 +141,19 @@ function toNumber(v: unknown): number | undefined {
 }
 
 function deriveCurator(provider: VaultProvider, v: RawVault): string | undefined {
+  // The backend now exposes the curator name at the top level for every
+  // provider; prefer it, then fall back to providerMeta / per-provider labels.
+  if (v.curatorName) return v.curatorName
+
+  const meta = v.providerMeta ?? {}
   switch (provider) {
     case 'morpho': {
-      const first = v.curators?.[0]
-      if (!first) return undefined
-      return typeof first === 'string' ? first : first.name
+      const first = meta.curators?.[0]
+      if (first) return typeof first === 'string' ? first : first.name
+      return undefined
     }
-    case 'gearbox':
-      return v.curatorName
     case 'silo':
-      return v.protocolVersion ? `Silo ${v.protocolVersion}` : 'Silo'
+      return meta.protocolVersion ? `Silo ${meta.protocolVersion}` : 'Silo'
     case 'fluid':
       return 'Fluid'
     case 'euler-earn':

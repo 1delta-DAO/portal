@@ -32,6 +32,10 @@ export function useActionExecution(params: {
   receiveAsset?: string
   /** Sub-account ID for multi-account lenders */
   accountId?: string
+  /** Brokered Borrow: chosen fixed-term id from the market's `terms[]` rate card. */
+  termId?: number
+  /** Brokered Repay: the loan's posId (or `FLEX_LOAN_ID` for the flex position). */
+  loanId?: string
   /** Chain ID string for query invalidation */
   chainId?: string
   /** Active sub-account — when provided, enables simulation via `simulate` param */
@@ -47,6 +51,8 @@ export function useActionExecution(params: {
     payAsset,
     receiveAsset,
     accountId,
+    termId,
+    loanId,
     chainId,
     subAccount,
   } = params
@@ -155,6 +161,8 @@ export function useActionExecution(params: {
         payAsset,
         receiveAsset,
         accountId,
+        termId,
+        loanId,
         simulate: shouldSimulate,
         simulationBody,
       })
@@ -170,7 +178,7 @@ export function useActionExecution(params: {
     }
 
     doFetch()
-  }, [debouncedAmount, pool?.marketUid, account, effectiveReceiver, isAll, payAsset, receiveAsset, accountId, actionType, shouldSimulate])
+  }, [debouncedAmount, pool?.marketUid, account, effectiveReceiver, isAll, payAsset, receiveAsset, accountId, termId, loanId, actionType, shouldSimulate])
 
   /** Execute the next pending permission transaction */
   const executeNextPermission = async () => {

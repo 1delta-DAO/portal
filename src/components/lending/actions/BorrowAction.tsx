@@ -37,6 +37,20 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
     setSelectedAccountId(accountId ?? null)
   }, [accountId])
 
+  // Brokered (Lista) markets only offer fixed-term borrowing — pick a term from
+  // the rate card; variable borrow isn't available through the app. (Spec §3-4.)
+  const terms = pool?.terms ?? []
+  const isBrokered = !!pool && (pool.variableBorrowDisabled === true || terms.length > 0)
+  const hasTerms = terms.length > 0
+  const [selectedTermId, setSelectedTermId] = useState<number | null>(null)
+
+  // Default to the first term whenever the market (or its menu) changes.
+  useEffect(() => {
+    setSelectedTermId(terms.length > 0 ? terms[0].termId : null)
+  }, [pool?.marketUid, terms.length])
+
+  const selectedTerm = terms.find((t) => t.termId === selectedTermId) ?? null
+
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
   const { result, simulation, rateImpact, loading, executingPermission, executingMain, permissions, hasPermissions, permissionsCompleted, allPermissionsDone, error, txSuccess, executeNextPermission, executeMain, resetState, dismissSuccess } =
@@ -48,6 +62,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
       isAll: false,
       receiveAsset: canUseNative && useNative ? zeroAddress : undefined,
       accountId: hasSubAccounts ? selectedAccountId ?? undefined : undefined,
+      termId: isBrokered ? selectedTermId ?? undefined : undefined,
       chainId,
       subAccount,
     })
@@ -73,7 +88,11 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   const effectivePriceUsd = priceUsd ?? pool?.oraclePriceUSD ?? 0
   const projectedBorrowAprPct = rateImpact?.find((e) => e.marketUid === pool?.marketUid)
     ?.borrowRate?.projected
-  const borrowAprPct = projectedBorrowAprPct ?? pool?.variableBorrowRate ?? 0
+  // Brokered borrow is a fixed rate from the chosen term; otherwise use the
+  // (post-tx projected, else current) variable rate.
+  const borrowAprPct = isBrokered
+    ? selectedTerm?.apr ?? 0
+    : projectedBorrowAprPct ?? pool?.variableBorrowRate ?? 0
   const amountNum = parseAmount(amount)
   const monthlyInterestUsd =
     amountNum > 0 && effectivePriceUsd > 0 && borrowAprPct > 0
@@ -113,6 +132,41 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
           onChange={setUseNative}
           label="Receive as"
         />
+      )}
+
+      {/* Fixed-term selector (brokered markets only). */}
+      {isBrokered && (
+        <div className="space-y-1.5">
+          <span className="text-xs text-base-content/60 px-1">Fixed term</span>
+          {hasTerms ? (
+            <div className="flex flex-wrap gap-1.5">
+              {terms.map((t) => {
+                const active = t.termId === selectedTermId
+                return (
+                  <button
+                    key={t.termId}
+                    type="button"
+                    onClick={() => setSelectedTermId(t.termId)}
+                    className={`flex flex-col items-start px-2.5 py-1.5 rounded-lg border text-left transition-colors cursor-pointer ${
+                      active
+                        ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                        : 'border-base-300 bg-base-200/50 hover:bg-base-200'
+                    }`}
+                  >
+                    <span className="text-xs font-semibold">{t.durationDays}-day</span>
+                    <span className="text-[10px] font-mono tabular-nums text-warning">
+                      {t.apr.toFixed(2)}%
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-xs text-base-content/50 px-1">
+              Fixed-term borrowing is currently unavailable for this market.
+            </div>
+          )}
+        </div>
       )}
 
       {/* Wallet balance */}
@@ -160,11 +214,15 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      {/* Pool info */}
+      {/* Pool info — fixed term rate when brokered, else the variable rate. */}
       {pool && (
         <div className="text-xs flex justify-between px-1">
-          <span className="text-base-content/60">Borrow APR:</span>
-          <span className="text-warning font-medium">{pool.variableBorrowRate.toFixed(2)}%</span>
+          <span className="text-base-content/60">
+            {isBrokered ? 'Fixed borrow APR:' : 'Borrow APR:'}
+          </span>
+          <span className="text-warning font-medium">
+            {(isBrokered ? selectedTerm?.apr ?? 0 : pool.variableBorrowRate).toFixed(2)}%
+          </span>
         </div>
       )}
 
@@ -174,7 +232,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
         onChange={setAmount}
         maxAmount={borrowableStr}
         decimals={pool?.asset?.decimals}
-        disabled={!pool}
+        disabled={!pool || (isBrokered && !selectedTerm)}
         error={overMax ? `Exceeds borrowable amount (${formatTokenAmount(borrowableStr)}).` : null}
       />
 

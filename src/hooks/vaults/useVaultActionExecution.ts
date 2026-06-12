@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { parseUnits } from 'viem'
 import {
   fetchVaultAction,
+  verbForActionType,
   type VaultActionResponse,
   type VaultActionType,
+  type VaultActionVerb,
   type VaultProvider,
 } from '../../sdk/vaults-helper'
 import { useSendLendingTransaction } from '../useSendLendingTransaction'
@@ -11,6 +13,13 @@ import { useDebounce } from '../useDebounce'
 
 export interface UseVaultActionExecutionParams {
   actionType: VaultActionType
+  /**
+   * Builder verb. Defaults to deposit/withdraw derived from `actionType`. Async
+   * families pass `request-withdraw` here so the panel can keep a single tab.
+   */
+  verb?: VaultActionVerb
+  /** The vault's provider — selects the calldata-builder family/route. */
+  provider: VaultProvider
   chainId: string
   account?: string
   /**
@@ -35,10 +44,15 @@ export interface UseVaultActionExecutionParams {
   payAsset?: string
   /** Native-out toggle for withdraws (composer path — currently bugged upstream). */
   receiveAsset?: string
-  /** Opt-in to provider-native flows (currently only fluid for fWETH `depositNative`). */
-  provider?: VaultProvider
+  /** Opt-in to provider-native deposit (currently only fluid for fWETH `depositNative`). */
+  nativeProvider?: VaultProvider
   /** Routing mode override. */
   mode?: 'auto' | 'direct' | 'proxy'
+  /**
+   * Extra query params echoed verbatim into the builder — e.g. an LST
+   * delegation choice under its `optionKey` (`validatorGroup`, `poolId`, …).
+   */
+  extraParams?: Record<string, string | number | undefined>
 }
 
 export interface UseVaultActionExecutionResult {
@@ -82,6 +96,8 @@ export function useVaultActionExecution(
 ): UseVaultActionExecutionResult {
   const {
     actionType,
+    verb: verbOverride,
+    provider,
     chainId,
     account,
     receiver,
@@ -93,9 +109,13 @@ export function useVaultActionExecution(
     sharesRaw,
     payAsset,
     receiveAsset,
-    provider,
+    nativeProvider,
     mode,
+    extraParams,
   } = params
+  const verb = verbOverride ?? verbForActionType(actionType)
+  // Stable dep key so a changed delegation choice re-builds the transaction.
+  const extraParamsKey = JSON.stringify(extraParams ?? {})
   const effectiveReceiver = receiver && receiver.length > 0 ? receiver : account
 
   const { send } = useSendLendingTransaction({ chainId, account })
@@ -155,7 +175,8 @@ export function useVaultActionExecution(
       const parsedAmount = isAll ? '0' : parseUnits(debouncedAmount || '0', dec).toString()
 
       const response = await fetchVaultAction({
-        actionType,
+        verb,
+        provider,
         chainId,
         vault,
         underlying,
@@ -164,10 +185,11 @@ export function useVaultActionExecution(
         receiver: effectiveReceiver,
         payAsset,
         receiveAsset,
-        provider,
+        nativeProvider,
         mode,
         isAll,
         sharesRaw,
+        ref: extraParams,
       })
 
       if (fetchIdRef.current !== fetchId) return
@@ -192,8 +214,11 @@ export function useVaultActionExecution(
     sharesRaw,
     payAsset,
     receiveAsset,
+    nativeProvider,
     provider,
+    verb,
     mode,
+    extraParamsKey,
     actionType,
     chainId,
   ])
@@ -218,8 +243,9 @@ export function useVaultActionExecution(
     setExecutingMain(true)
     setError(null)
 
+    // Strict order: transactions → postTransactions (permissions already ran).
     let lastHash: string | undefined
-    for (const tx of result.transactions) {
+    for (const tx of [...result.transactions, ...result.postTransactions]) {
       const { ok, error: txError, hash } = await send(tx)
       if (!ok) {
         setError(txError ?? 'Transaction failed')

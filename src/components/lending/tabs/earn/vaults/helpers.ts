@@ -15,6 +15,11 @@ export const PROVIDER_LABELS: Record<VaultProvider, string> = {
   morpho: 'Morpho',
   silo: 'Silo',
   'euler-earn': 'Euler Earn',
+  lst: 'Liquid Staking',
+  savings: 'Savings',
+  lagoon: 'Lagoon',
+  hypercore: 'HyperCore',
+  gmx: 'GMX',
 }
 
 export const PROVIDER_LOGOS: Partial<Record<VaultProvider, string>> = {
@@ -37,8 +42,15 @@ export function formatSupplyRate(entry: VaultEntry): string {
   return `${(entry.supplyRate ?? 0).toFixed(2)}%`
 }
 
-/** True when `BigInt(totalSupply) > 0n` — filters out freshly-deployed empties. */
+/**
+ * True when the vault has any positive TVL signal — filters out
+ * freshly-deployed empties. Checks raw `totalSupply` first, then the
+ * backend-formatted / USD figures so providers that only populate those
+ * (e.g. GMX, which leaves raw `totalSupply`/`totalAssets` null) aren't dropped.
+ */
 export function hasTvl(entry: VaultEntry): boolean {
+  if ((entry.totalAssetsFormatted ?? 0) > 0) return true
+  if ((entry.totalAssetsUsd ?? 0) > 0) return true
   try {
     return BigInt(entry.totalSupply) > 0n
   } catch {
@@ -63,9 +75,21 @@ export function humanAssets(rawAssets: string, decimals: number): number {
 }
 
 /**
+ * TVL in native underlying units. Prefers the backend-formatted figure (the
+ * only one some providers like GMX populate), then decodes the raw integer
+ * `totalAssets` against the underlying decimals.
+ */
+export function tvlNative(entry: VaultEntry, underlyingDecimals: number): number {
+  if (typeof entry.totalAssetsFormatted === 'number' && entry.totalAssetsFormatted > 0) {
+    return entry.totalAssetsFormatted
+  }
+  return humanAssets(entry.totalAssets, underlyingDecimals)
+}
+
+/**
  * USD TVL with a derived fallback for providers (notably Euler Earn) that
  * don't always populate `totalAssetsUsd`. When both an underlying price and
- * raw assets are present we can reconstruct it locally — otherwise return 0
+ * assets are present we can reconstruct it locally — otherwise return 0
  * and let the caller decide how to render "unknown".
  */
 export function tvlUsd(entry: VaultEntry, underlyingDecimals: number): number {
@@ -74,7 +98,7 @@ export function tvlUsd(entry: VaultEntry, underlyingDecimals: number): number {
   }
   const price = entry.underlyingPriceUsd ?? 0
   if (price <= 0) return 0
-  return humanAssets(entry.totalAssets, underlyingDecimals) * price
+  return tvlNative(entry, underlyingDecimals) * price
 }
 
 /**
@@ -121,8 +145,8 @@ export function compareVaults(a: VaultEntry, b: VaultEntry, key: VaultSortKey): 
     case 'totalAssets': {
       // Compare in human units so vaults across different decimals (USDC 6 vs.
       // WETH 18) don't sort as if the smaller-decimal vault is microscopic.
-      const an = humanAssets(a.totalAssets, a.decimals)
-      const bn = humanAssets(b.totalAssets, b.decimals)
+      const an = tvlNative(a, a.decimals)
+      const bn = tvlNative(b, b.decimals)
       return an - bn
     }
     case 'liquidityUsd':

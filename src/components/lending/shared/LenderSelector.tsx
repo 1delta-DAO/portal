@@ -159,6 +159,8 @@ export const LenderSelector: React.FC<LenderSelectorProps> = ({
         value={selectedLender}
         onChange={onChange}
         placeholder="Search lenders..."
+        menuClassName="min-w-full w-max max-w-md"
+        listMaxHeightClassName="max-h-[28rem]"
       />
     </div>
     {hasBalances && (

@@ -4,6 +4,7 @@ import type { UserPositionEntry } from '../../../../hooks/lending/useUserData'
 import type { TableHighlight, PoolRole } from './types'
 import { abbreviateUsd, abbreviateNumber, formatUsd, formatTokenAmount } from '../../../../utils/format'
 import { AssetPopover } from '../../shared/AssetPopover'
+import { BrokeredAprCell } from '../../shared/BrokeredAprCell'
 import { sortPools, type SortKey, LtvBadge } from '../../dashboard'
 import { RiskBadge } from '../../shared/RiskBadge'
 import { useTableSort } from '../../../../hooks/useTableSort'
@@ -122,6 +123,8 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
               const iy = pool.intrinsicYield ?? 0
               const depositTotal = pool.depositRate + iy
               const borrowTotal = pool.variableBorrowRate + iy
+              const isBrokered =
+                pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0
 
               return (
                 <tr
@@ -179,19 +182,23 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                     </div>
                   </td>
                   <td>
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm font-medium text-warning">
-                        {borrowTotal.toFixed(2)}%
-                      </span>
-                      {iy > 0 && (
-                        <span
-                          className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help"
-                          title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}% (paid by borrower)`}
-                        >
-                          +{iy.toFixed(1)}%
+                    {isBrokered ? (
+                      <BrokeredAprCell terms={pool.terms} />
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm font-medium text-warning">
+                          {borrowTotal.toFixed(2)}%
                         </span>
-                      )}
-                    </div>
+                        {iy > 0 && (
+                          <span
+                            className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help"
+                            title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}% (paid by borrower)`}
+                          >
+                            +{iy.toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td>
                     <LtvBadge config={pool.config} variant="cell" />
@@ -279,6 +286,11 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
           const mIy = pool.intrinsicYield ?? 0
           const mDepTotal = pool.depositRate + mIy
           const mBorTotal = pool.variableBorrowRate + mIy
+          const mIsBrokered =
+            pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0
+          const mBestTermApr = pool.terms?.length
+            ? Math.min(...pool.terms.map((t) => t.apr))
+            : null
 
           return (
             <div
@@ -330,17 +342,31 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                 </div>
               </div>
               <div className="flex items-center justify-between mt-2 text-xs text-base-content/70">
-                <span>
-                  Borrow: <span className="text-warning font-medium">{mBorTotal.toFixed(2)}%</span>
-                  {mIy > 0 && (
-                    <span
-                      className="badge badge-xs bg-warning/15 text-warning border-0 ml-1"
-                      title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
-                    >
-                      +{mIy.toFixed(1)}%
+                {mIsBrokered ? (
+                  <span title="Fixed-term borrowing only — variable borrow unavailable">
+                    Borrow:{' '}
+                    <span className="badge badge-xs bg-warning/20 text-warning border-0 font-medium ml-0.5">
+                      Fixed
                     </span>
-                  )}
-                </span>
+                    {mBestTermApr != null && (
+                      <span className="text-warning font-medium ml-1">
+                        from {mBestTermApr.toFixed(2)}%
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span>
+                    Borrow: <span className="text-warning font-medium">{mBorTotal.toFixed(2)}%</span>
+                    {mIy > 0 && (
+                      <span
+                        className="badge badge-xs bg-warning/15 text-warning border-0 ml-1"
+                        title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
+                      >
+                        +{mIy.toFixed(1)}%
+                      </span>
+                    )}
+                  </span>
+                )}
                 <LtvBadge config={pool.config} variant="inline" />
                 <span title={`${formatTokenAmount(pool.totalDeposits)} ${pool.asset.symbol}`}>Dep: {abbreviateUsd(pool.totalDepositsUSD)} <span className="text-base-content/40">({abbreviateNumber(pool.totalDeposits)})</span></span>
                 <span title={`${formatTokenAmount(pool.totalLiquidity)} ${pool.asset.symbol}`}>Liq: {abbreviateUsd(pool.totalLiquidityUSD)} <span className="text-base-content/40">({abbreviateNumber(pool.totalLiquidity)})</span></span>

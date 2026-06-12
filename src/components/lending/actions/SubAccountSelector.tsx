@@ -19,6 +19,31 @@ function isPlaceholder(sub: UserSubAccount): boolean {
   return sub.health == null && sub.positions.length === 0
 }
 
+// Above this, a range bound is effectively "unbounded" (e.g. uint256 max) and
+// not worth printing literally.
+const RANGE_DISPLAY_LIMIT = 1_000_000_000n
+
+/**
+ * Turns a raw [lo, hi] account-id range into a short hint. Lenders like
+ * DOLOMITE allow the full uint256 space, so the literal upper bound is
+ * meaningless — collapse it to a human-readable hint instead.
+ */
+function formatAccountIdRange(range: [string, string]): string | null {
+  let lo: bigint
+  let hi: bigint
+  try {
+    lo = BigInt(range[0])
+    hi = BigInt(range[1])
+  } catch {
+    return `${range[0]}–${range[1]}`
+  }
+  const unbounded = hi > RANGE_DISPLAY_LIMIT
+  if (unbounded) {
+    return lo > 0n ? `any ID ≥ ${lo.toString()}` : 'any ID'
+  }
+  return `${lo.toString()}–${hi.toString()}`
+}
+
 export const SubAccountSelector: React.FC<SubAccountSelectorProps> = ({
   subAccounts,
   selectedAccountId,
@@ -152,9 +177,11 @@ export const SubAccountSelector: React.FC<SubAccountSelectorProps> = ({
             onChange={(e) => handleCustomIdChange(e.target.value)}
             placeholder={nextAccount.nextAccountId}
           />
-          <span className="text-[10px] text-base-content/40">
-            {nextAccount.accountIdRange[0]}–{nextAccount.accountIdRange[1]}
-          </span>
+          {formatAccountIdRange(nextAccount.accountIdRange) && (
+            <span className="text-[10px] text-base-content/40">
+              {formatAccountIdRange(nextAccount.accountIdRange)}
+            </span>
+          )}
           {customId && activeSet.has(customId) && (
             <span className="text-[10px] text-error">Already in use</span>
           )}

@@ -17,6 +17,7 @@ import {
 import { VaultsTable } from './VaultsTable'
 import { VaultActionPanel } from './VaultActionPanel'
 import { UserVaultsTable } from './UserVaultsTable'
+import { PendingWithdrawals } from './PendingWithdrawals'
 import {
   PROVIDER_LABELS,
   compareVaults,
@@ -78,10 +79,9 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
   const [showMobileAction, setShowMobileAction] = useState(false)
 
   // ---- Catalog ----
-  const { vaults, isVaultsLoading, vaultsError } = useVaultsCatalog({
-    chainId,
-    providers: selectedProviders.length > 0 ? selectedProviders : undefined,
-  })
+  // Fetch every provider once per chain; provider selection is applied as a
+  // client-side filter below so toggling it never refetches.
+  const { vaults, isVaultsLoading, vaultsError } = useVaultsCatalog({ chainId })
 
   // Catalog map for cheap "is this vault in scope" lookups by the user-positions
   // table (which uses it to surface the Manage button).
@@ -89,6 +89,18 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
     const map = new Map<string, VaultEntry>()
     for (const v of vaults) map.set(v.address.toLowerCase(), v)
     return map
+  }, [vaults])
+
+  // Only the providers actually present on this chain get a filter pill — no
+  // point offering Lagoon/GMX/etc. where the catalog has none. Counts come for
+  // free and make the breakdown legible. Kept in canonical VAULT_PROVIDERS order.
+  const availableProviders = useMemo(() => {
+    const counts = new Map<VaultProvider, number>()
+    for (const v of vaults) counts.set(v.provider, (counts.get(v.provider) ?? 0) + 1)
+    return VAULT_PROVIDERS.filter((p) => counts.has(p)).map((p) => ({
+      provider: p,
+      count: counts.get(p) ?? 0,
+    }))
   }, [vaults])
 
   // ---- User positions ----
@@ -316,6 +328,15 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
         />
       )}
 
+      {/* Pending async withdrawals (lst / gmx / lagoon) — request → claim. */}
+      {account && (
+        <PendingWithdrawals
+          chainId={chainId}
+          account={account}
+          catalogByVault={catalogByVault}
+        />
+      )}
+
       {/* Catalog header */}
       <div className="w-full p-0 sm:p-4 space-y-3 sm:space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -347,7 +368,7 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
         {/* Provider chips + numeric filters */}
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-wrap gap-1.5">
-            {VAULT_PROVIDERS.map((p) => {
+            {availableProviders.map(({ provider: p, count }) => {
               const active = selectedProviders.includes(p)
               return (
                 <button
@@ -357,6 +378,7 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
                   onClick={() => toggleProvider(p)}
                 >
                   {PROVIDER_LABELS[p]}
+                  <span className="ml-1 opacity-60">{count}</span>
                 </button>
               )
             })}

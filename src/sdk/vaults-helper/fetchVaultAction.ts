@@ -1,42 +1,65 @@
 import { BACKEND_BASE_URL } from '../../config/backend'
-import type { VaultProvider } from './types'
+import {
+  resolveVaultRoute,
+  vaultFamily,
+  type VaultActionVerb,
+  type VaultProvider,
+} from './types'
 
 export type VaultActionType = 'Deposit' | 'Withdraw'
 
+/** Maps the UI's coarse tab to a builder verb (instant-exit families only). */
+export function verbForActionType(t: VaultActionType): VaultActionVerb {
+  return t === 'Deposit' ? 'deposit' : 'withdraw'
+}
+
 export interface VaultActionParams {
-  actionType: VaultActionType
+  /** Which builder verb to invoke. */
+  verb: VaultActionVerb
+  /**
+   * The vault's provider — selects the calldata-builder family/route. NOTE:
+   * this is *routing only*; the native-deposit opt-in is `nativeProvider`.
+   */
+  provider: VaultProvider
   chainId: string
-  /** Vault contract address (share token). */
+  /** Vault contract address (the share token). */
   vault: string
-  /** Underlying ERC-20 the vault accepts. */
-  underlying: string
-  /** Operator EOA that signs the transaction. */
+  /** Underlying ERC-20 the vault accepts (required for generic ERC-4626). */
+  underlying?: string
+  /** Operator EOA that signs the transaction. `receiver` defaults to it. */
   operator: string
-  /** Amount in **underlying units** (raw). For withdraw, ignored when `isAll`. */
-  amount: string
-  /** Receiver of the resulting shares (deposit) or underlying (withdraw). Defaults to operator. */
+  /** Amount in the relevant token's smallest unit. Ignored for `claim`/`cancel`. */
+  amount?: string
+  /** Receiver of the resulting shares (deposit) or underlying (withdraw). */
   receiver?: string
-  /** Address of the asset the user wants to *pay* with (deposit) — zeroAddress for native ETH. */
+  /** Asset the user pays with (deposit) — zeroAddress for native. */
   payAsset?: string
-  /** Address of the asset the user wants to *receive* (withdraw) — currently composer-blocked for native ETH. */
+  /** Asset the user receives (withdraw, where the composer supports it). */
   receiveAsset?: string
-  /** Opt-in to a provider-native flow (currently only `provider=fluid` for fWETH `depositNative`). */
-  provider?: VaultProvider
-  /** Routing mode override. Default 'auto' lets the worker pick direct vs. composer. */
+  /**
+   * Provider-native deposit opt-in for generic ERC-4626 (currently only
+   * `fluid` for fWETH `depositNative`). Sent as the backend's `provider` query.
+   */
+  nativeProvider?: VaultProvider
+  /** Routing mode override. Default 'auto' lets the worker pick. */
   mode?: 'auto' | 'direct' | 'proxy'
+  /** Lagoon settlement mode (sync vs async). */
+  settlement?: 'sync' | 'async'
   /** Withdraw-all flag. When true, amount is ignored. */
   isAll?: boolean
-  /**
-   * Pre-fetched share balance for `isAll` withdraws. When provided, request is
-   * POSTed so the worker doesn't have to read `balanceOf` from its own RPC.
-   * Required if your state lives on a different RPC than the worker's.
-   */
+  /** Pre-fetched share balance for `isAll` withdraws (POST path). */
   sharesRaw?: string
+  /**
+   * Protocol-native request references for `claim` / `cancel`, captured from a
+   * `/v1/data/vaults/withdrawals` entry. Undefined values are dropped.
+   */
+  ref?: Record<string, string | number | undefined>
 }
 
 export interface VaultTransaction {
   to: string
   data: string
+  /** Decimal string of wei. Carries the execution fee for async families (GMX). */
   value: string
 }
 
@@ -45,8 +68,12 @@ export interface VaultPermission extends VaultTransaction {
 }
 
 export interface VaultActionResponse {
-  transactions: VaultTransaction[]
+  /** ERC-20 approvals — run FIRST. */
   permissions: VaultPermission[]
+  /** The action itself — run in array order, after permissions. */
+  transactions: VaultTransaction[]
+  /** Optional follow-ups (e.g. unwrap) — run LAST. */
+  postTransactions: VaultTransaction[]
 }
 
 export interface VaultActionResult {
@@ -61,22 +88,52 @@ export async function fetchVaultAction(
   params: VaultActionParams
 ): Promise<VaultActionResult> {
   try {
-    const action = params.actionType.toLowerCase()
+    const family = vaultFamily(params.provider)
+    const route = resolveVaultRoute(family, params.verb)
+
     const qs = new URLSearchParams()
     qs.set('chainId', params.chainId)
-    qs.set('vault', params.vault)
-    qs.set('underlying', params.underlying)
-    qs.set('amount', params.amount)
+
+    // Vault identity differs by route style.
+    if (route.idStyle === 'share') {
+      qs.set('shareToken', params.vault)
+    } else {
+      qs.set('vault', params.vault)
+      if (params.underlying) qs.set('underlying', params.underlying)
+    }
+
     qs.set('operator', params.operator)
+
+    // Fixed per-route params (interface=hypercore, kind=lagoon, …).
+    for (const [k, v] of Object.entries(route.baseQuery)) qs.set(k, v)
+
+    // The verb travels in `action` for dedicated-family routes; for generic
+    // routes it's already encoded in the path segment.
+    if (route.actionInQuery) qs.set('action', params.verb)
+
+    // Amount only matters for deposit / withdraw / request-withdraw.
+    const verbUsesAmount =
+      params.verb === 'deposit' ||
+      params.verb === 'withdraw' ||
+      params.verb === 'request-withdraw'
+    if (verbUsesAmount && params.amount != null) qs.set('amount', params.amount)
 
     if (params.receiver) qs.set('receiver', params.receiver)
     if (params.payAsset) qs.set('payAsset', params.payAsset)
     if (params.receiveAsset) qs.set('receiveAsset', params.receiveAsset)
-    if (params.provider) qs.set('provider', params.provider)
+    if (params.nativeProvider) qs.set('provider', params.nativeProvider)
     if (params.mode) qs.set('mode', params.mode)
+    if (params.settlement) qs.set('mode', params.settlement)
     if (params.isAll) qs.set('isAll', 'true')
 
-    const url = `${VAULT_ACTIONS_BASE}/${action}?${qs}`
+    // Pass-through request references for claim/cancel (drop empties).
+    if (params.ref) {
+      for (const [k, v] of Object.entries(params.ref)) {
+        if (v != null && String(v).length > 0) qs.set(k, String(v))
+      }
+    }
+
+    const url = `${VAULT_ACTIONS_BASE}/${route.segment}?${qs}`
 
     // POST path: caller supplied `sharesRaw` for isAll withdraws (works against
     // any RPC). GET path: worker reads balanceOf from its own RPC.
@@ -105,11 +162,13 @@ export async function fetchVaultAction(
       }
     }
 
+    const actions = json.actions ?? {}
     return {
       success: true,
       data: {
-        transactions: json.actions?.transactions ?? [],
-        permissions: json.actions?.permissions ?? [],
+        permissions: actions.permissions ?? [],
+        transactions: actions.transactions ?? [],
+        postTransactions: actions.postTransactions ?? [],
       },
     }
   } catch (err: any) {

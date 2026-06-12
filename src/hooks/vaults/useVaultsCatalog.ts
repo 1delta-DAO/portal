@@ -1,31 +1,27 @@
 import { useQuery } from '@tanstack/react-query'
-import {
-  fetchVaultsCatalog,
-  type VaultEntry,
-  type VaultProvider,
-} from '../../sdk/vaults-helper'
+import { fetchVaultsCatalog, type VaultEntry } from '../../sdk/vaults-helper'
 
 export interface UseVaultsCatalogParams {
   chainId?: string
-  providers?: VaultProvider[]
   enabled?: boolean
 }
 
 /**
- * Fetches the per-chain vault catalog across providers and flattens to a
- * uniform `VaultEntry[]`. Matches the guide's recommended 20-30s SWR window
- * (the backend caches the underlying response for ~20s already).
+ * Fetches the per-chain vault catalog for *every* provider and flattens to a
+ * uniform `VaultEntry[]`. Provider selection is a pure client-side filter (see
+ * the vaults view), so it deliberately does NOT participate in the query key —
+ * toggling providers must never trigger a refetch. Matches the guide's 20-30s
+ * SWR window (the backend caches the underlying response for ~20s already).
  */
 export function useVaultsCatalog(params: UseVaultsCatalogParams) {
-  const { chainId, providers, enabled = true } = params
-  const providersKey = (providers ?? []).join(',')
+  const { chainId, enabled = true } = params
 
   const { data, isLoading, isFetching, error, refetch } = useQuery<VaultEntry[]>({
-    queryKey: ['vaultsCatalog', chainId ?? '', providersKey],
+    queryKey: ['vaultsCatalog', chainId ?? ''],
     enabled: enabled && !!chainId,
     queryFn: async () => {
       if (!chainId) return []
-      const res = await fetchVaultsCatalog({ chainId, providers })
+      const res = await fetchVaultsCatalog({ chainId })
       if (!res.success) throw new Error(res.error ?? 'Failed to load vaults catalog')
       return res.vaults ?? []
     },

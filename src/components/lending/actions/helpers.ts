@@ -1,5 +1,5 @@
 /** Lenders that support multiple sub-accounts per user */
-const MULTI_ACCOUNT_LENDERS = new Set(['INIT', 'EULER_V2'])
+const MULTI_ACCOUNT_LENDERS = new Set(['INIT', 'EULER_V2', 'DOLOMITE'])
 
 export function lenderSupportsSubAccounts(lender?: string): boolean {
   if (!lender) return false

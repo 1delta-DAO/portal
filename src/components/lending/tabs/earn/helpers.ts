@@ -90,5 +90,13 @@ export function poolEntryToPoolDataItem(entry: PoolEntry): PoolDataItem {
     isFrozen: false,
     oraclePrice: info.oraclePrice?.oraclePrice ?? undefined,
     oraclePriceUSD: info.oraclePrice?.oraclePriceUsd ?? undefined,
+    terms: entry.terms
+      ? entry.terms.map((t) => ({
+          termId: Number(t.termId),
+          durationDays: Number(t.durationDays),
+          apr: Number(t.apr),
+        }))
+      : null,
+    variableBorrowDisabled: entry.variableBorrowDisabled ?? entry.flags?.variableBorrowDisabled ?? false,
   }
 }

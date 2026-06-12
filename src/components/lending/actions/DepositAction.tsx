@@ -171,7 +171,8 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       // at that one — otherwise sum across all sub-accounts would mislead.
       if (selectedAccountId && sub.accountId !== selectedAccountId) continue
       for (const pos of sub.positions) {
-        if (typeof pos === 'object' && pos !== null && pos.marketUid === pool.marketUid) {
+        // Aggregate row only — skip per-loan brokered rows that share marketUid.
+        if (typeof pos === 'object' && pos !== null && !pos.term && pos.marketUid === pool.marketUid) {
           return pos
         }
       }
@@ -189,7 +190,8 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
     for (const sub of operatorSubs) {
       if (selectedAccountId && sub.accountId !== selectedAccountId) continue
       for (const pos of sub.positions) {
-        if (typeof pos === 'object' && pos !== null && pos.marketUid === pool.marketUid) {
+        // Aggregate row only — skip per-loan brokered rows that share marketUid.
+        if (typeof pos === 'object' && pos !== null && !pos.term && pos.marketUid === pool.marketUid) {
           return pos
         }
       }

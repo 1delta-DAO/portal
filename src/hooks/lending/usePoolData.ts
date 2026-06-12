@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { PoolRiskBreakdown, PoolRisk, LenderInfo } from './useFlattenedPools'
+import type { PoolRiskBreakdown, PoolRisk, PoolTerm, LenderInfo } from './useFlattenedPools'
 import { BACKEND_BASE_URL } from '../../config/backend'
 
 const endpointLendingLatest = `${BACKEND_BASE_URL}/v1/data/lending/latest`
@@ -58,7 +58,15 @@ interface RawMarket {
     hasStable: boolean | null
     borrowingEnabled: boolean | null
     collateralActive: boolean | null
+    variableBorrowDisabled?: boolean | null
   } | null
+  // Raw rate card — the API serializes termId/durationDays/apr as strings
+  // (BROKERED_MARKETS.md §2); coerced to numbers in the transform.
+  terms?: Array<{
+    termId: number | string
+    durationDays: number | string
+    apr: number | string
+  }> | null
   underlyingInfo: {
     asset: {
       chainId: string
@@ -144,6 +152,13 @@ export interface PoolDataItem {
   oraclePriceUSD?: number
   risk?: PoolRisk | null
   params?: any
+  /**
+   * Brokered (Lista) rate card. Non-empty ⇒ fixed-term-only borrowing; offer
+   * these terms instead of a variable borrow. See BROKERED_MARKETS.md.
+   */
+  terms?: PoolTerm[] | null
+  /** True when variable borrowing isn't offered (brokered markets). */
+  variableBorrowDisabled?: boolean
 }
 
 export interface PoolAsset {
@@ -226,6 +241,15 @@ function rawMarketToPoolDataItem(raw: RawMarket): PoolDataItem {
     oraclePriceUSD: info.oraclePrice?.oraclePriceUsd ?? undefined,
     risk: raw.risk ?? null,
     params: raw.params,
+    // Coerce the string-serialized rate card into clean numbers.
+    terms: raw.terms
+      ? raw.terms.map((t) => ({
+          termId: Number(t.termId),
+          durationDays: Number(t.durationDays),
+          apr: Number(t.apr),
+        }))
+      : null,
+    variableBorrowDisabled: raw.flags?.variableBorrowDisabled ?? false,
   }
 }
 

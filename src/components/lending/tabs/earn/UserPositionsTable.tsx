@@ -53,6 +53,10 @@ type TaggedPosition = UserPositionEntry & { tag: 'collateral' | 'debt' }
 function collectSubAccountPositions(sub: UserSubAccount): TaggedPosition[] {
   const result: TaggedPosition[] = []
   for (const pos of extractPositions(sub.positions)) {
+    // Per-loan brokered rows are a breakdown of the aggregate (same marketUid)
+    // and get their own loan-list UI — keep them out of the generic table so
+    // totals aren't double-counted.
+    if (pos.term != null) continue
     if (Number(pos.deposits) > 0) {
       result.push({ ...pos, tag: 'collateral' })
     }

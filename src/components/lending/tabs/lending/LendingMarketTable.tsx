@@ -10,6 +10,7 @@ import {
 import { type SortKey, LtvBadge } from '../../dashboard'
 import { AssetPopover } from '../../shared/AssetPopover'
 import { RiskBadge } from '../../shared/RiskBadge'
+import { BrokeredAprCell } from '../../shared/BrokeredAprCell'
 import { useTablePagination } from '../../../../hooks/useTablePagination'
 import { SortableHeader } from '../../../common/SortableHeader'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
@@ -98,6 +99,8 @@ export const LendingMarketTable: React.FC<Props> = ({
               const iy = pool.intrinsicYield ?? 0
               const depositTotal = pool.depositRate + iy
               const borrowTotal = pool.variableBorrowRate + iy
+              const isBrokered =
+                pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0
 
               return (
                 <tr
@@ -158,19 +161,23 @@ export const LendingMarketTable: React.FC<Props> = ({
                     </div>
                   </td>
                   <td>
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm font-medium text-warning">
-                        {borrowTotal.toFixed(2)}%
-                      </span>
-                      {iy > 0 && (
-                        <span
-                          className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help"
-                          title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}% (paid by borrower)`}
-                        >
-                          +{iy.toFixed(1)}%
+                    {isBrokered ? (
+                      <BrokeredAprCell terms={pool.terms} />
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm font-medium text-warning">
+                          {borrowTotal.toFixed(2)}%
                         </span>
-                      )}
-                    </div>
+                        {iy > 0 && (
+                          <span
+                            className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help"
+                            title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}% (paid by borrower)`}
+                          >
+                            +{iy.toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td>
                     <LtvBadge config={pool.config} variant="cell" />
@@ -301,6 +308,11 @@ const MobilePoolCards: React.FC<{
         const mIy = pool.intrinsicYield ?? 0
         const mDepTotal = pool.depositRate + mIy
         const mBorTotal = pool.variableBorrowRate + mIy
+        const mIsBrokered =
+          pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0
+        const mBestTermApr = pool.terms?.length
+          ? Math.min(...pool.terms.map((t) => t.apr))
+          : null
 
         return (
           <div
@@ -350,6 +362,19 @@ const MobilePoolCards: React.FC<{
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-3 text-xs">
               <div className="flex items-baseline justify-between gap-2 min-w-0">
                 <span className="text-base-content/50 shrink-0">Borrow</span>
+                {mIsBrokered ? (
+                  <span
+                    className="flex items-baseline gap-1 min-w-0 truncate"
+                    title="Fixed-term borrowing only — variable borrow unavailable"
+                  >
+                    <span className="badge badge-xs bg-warning/20 text-warning border-0 font-medium">
+                      Fixed
+                    </span>
+                    {mBestTermApr != null && (
+                      <span className="text-warning font-medium">from {mBestTermApr.toFixed(2)}%</span>
+                    )}
+                  </span>
+                ) : (
                 <span className="flex items-baseline gap-1 min-w-0 truncate">
                   <span className="text-warning font-medium">{mBorTotal.toFixed(2)}%</span>
                   {mIy > 0 && (
@@ -361,6 +386,7 @@ const MobilePoolCards: React.FC<{
                     </span>
                   )}
                 </span>
+                )}
               </div>
 
               <div className="flex items-baseline justify-between gap-2 min-w-0">

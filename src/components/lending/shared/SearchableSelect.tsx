@@ -22,6 +22,17 @@ interface SearchableSelectProps {
   onChange: (value: string) => void
   placeholder?: string
   className?: string
+  /**
+   * Desktop: width constraints for the dropdown panel. Defaults to a compact
+   * `max-w-xs`; pass a roomier value (e.g. `max-w-md`) for option lists with
+   * long labels + trailing text so they don't truncate as aggressively.
+   */
+  menuClassName?: string
+  /**
+   * Desktop: max-height of the scrollable options list. Defaults to `max-h-52`
+   * (~6 rows); bump it to show more options at once.
+   */
+  listMaxHeightClassName?: string
 }
 
 export function SearchableSelect({
@@ -30,6 +41,8 @@ export function SearchableSelect({
   onChange,
   placeholder = 'Search...',
   className = '',
+  menuClassName = 'min-w-full w-max max-w-xs',
+  listMaxHeightClassName = 'max-h-52',
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -240,7 +253,7 @@ export function SearchableSelect({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 mt-1 min-w-full w-max max-w-xs rounded-box border border-base-300 bg-base-100 shadow-lg">
+        <div className={`absolute z-50 mt-1 rounded-box border border-base-300 bg-base-100 shadow-lg ${menuClassName}`}>
           {/* Search input */}
           <div className="p-1.5">
             <input
@@ -262,7 +275,7 @@ export function SearchableSelect({
           </div>
 
           {/* Options list */}
-          <ul className="max-h-52 overflow-y-auto py-1">
+          <ul className={`${listMaxHeightClassName} overflow-y-auto py-1`}>
             {filtered.map((opt) => (
               <li key={opt.value}>
                 <button

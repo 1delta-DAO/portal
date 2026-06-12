@@ -11,6 +11,15 @@ import { lenderSupportsSubAccounts } from './helpers'
 import { HealthFactorProjection } from './HealthFactorProjection'
 import { RateImpactIndicator } from './RateImpactIndicator'
 import { TransactionSuccess } from './TransactionSuccess'
+import { loansForMarket } from '../../../hooks/lending/useUserData'
+import {
+  loanDebtString,
+  closeNowAmountString,
+  termLabel,
+  hasEarlyRepayPenalty,
+  maturityDisplay,
+  loanRatePct,
+} from '../shared/brokeredLoans'
 
 export const RepayAction: React.FC<ActionPanelProps> = ({
   pool,
@@ -39,6 +48,19 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
     setSelectedAccountId(accountId ?? null)
   }, [accountId])
 
+  // Brokered (Lista) markets carry per-loan rows that must each be repaid by
+  // their own `loanId` — no aggregate repay. Pick the loan to close. (Spec §3.)
+  const brokeredLoans = pool && subAccount ? loansForMarket(subAccount.positions, pool.marketUid) : []
+  const isBrokered = brokeredLoans.length > 0
+  const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSelectedLoanId(brokeredLoans[0]?.loanId ?? null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pool?.marketUid, brokeredLoans.length])
+
+  const selectedLoan = brokeredLoans.find((l) => l.loanId === selectedLoanId) ?? null
+
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
   const {
@@ -63,34 +85,49 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
     pool,
     account,
     amount,
-    isAll,
+    // Brokered repay is always amount-based (close = debt + penalty, excess
+    // refunded) and targets a specific loanId — never the aggregate isAll path.
+    isAll: isBrokered ? false : isAll,
     payAsset: canUseNative && useNative ? zeroAddress : undefined,
     accountId: hasSubAccounts ? (selectedAccountId ?? undefined) : undefined,
+    loanId: isBrokered ? (selectedLoanId ?? undefined) : undefined,
     chainId,
     subAccount,
   })
 
-  // Reset when pool changes
+  // Reset when pool *or* the selected loan changes.
   useEffect(() => {
     setAmount('')
     setIsAll(false)
     setUseNative(false)
     resetState()
-  }, [pool?.marketUid])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pool?.marketUid, selectedLoanId])
 
-  const debtStr = userPosition
-    ? addAmountStrings(String(userPosition.debt ?? '0'), String(userPosition.debtStable ?? '0'))
-    : '0'
+  // Outstanding debt: the selected loan's debt for brokered markets, else the
+  // market aggregate. `closeNowStr` adds the early-repay penalty (0 once matured).
+  const debtStr = isBrokered
+    ? selectedLoan
+      ? loanDebtString(selectedLoan)
+      : '0'
+    : userPosition
+      ? addAmountStrings(String(userPosition.debt ?? '0'), String(userPosition.debtStable ?? '0'))
+      : '0'
+  const closeNowStr = isBrokered && selectedLoan ? closeNowAmountString(selectedLoan) : debtStr
   const debtTotal = parseAmount(debtStr) // only for display
 
   const activeBal = canUseNative && useNative ? nativeBalance : walletBalance
   const activeBalStr = activeBal?.balance ?? '0'
   const hasDebt = compareAmountStrings(debtStr, '0') > 0
   const hasBal = compareAmountStrings(activeBalStr, '0') > 0
-  const repayMaxStr = hasDebt && hasBal ? minAmountString(debtStr, activeBalStr) : '0'
+  // "Max" closes the loan fully — for brokered that's debt + penalty (capped by
+  // wallet); the broker refunds any excess.
+  const repayTargetStr = isBrokered ? closeNowStr : debtStr
+  const repayMaxStr = hasDebt && hasBal ? minAmountString(repayTargetStr, activeBalStr) : '0'
 
   const overWallet = !isAll && hasBal && compareAmountStrings(amount || '0', activeBalStr) > 0
-  const overDebt = !isAll && hasDebt && compareAmountStrings(amount || '0', debtStr) > 0
+  // For brokered loans the ceiling is the full-close amount (debt + penalty).
+  const overDebt = !isAll && hasDebt && compareAmountStrings(amount || '0', repayTargetStr) > 0
   const overMax = overWallet || overDebt
 
   // Estimated monthly interest saved by this repayment. variableBorrowRate
@@ -114,9 +151,10 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   }
 
   // The "Max" preset flips isAll=true so the backend repays the full debt
-  // via the dedicated isAll flag instead of a snapshot amount.
+  // via the dedicated isAll flag instead of a snapshot amount. Brokered loans
+  // close by explicit amount (debt + penalty), so keep isAll off there.
   const handleMaxClick = () => {
-    setIsAll(true)
+    setIsAll(!isBrokered)
     if (compareAmountStrings(repayMaxStr, '0') > 0) setAmount(repayMaxStr)
   }
 
@@ -157,6 +195,56 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
         />
       )}
 
+      {/* Loan picker (brokered markets) — each fixed loan repays separately. */}
+      {isBrokered && (
+        <div className="space-y-1.5">
+          <span className="text-xs text-base-content/60 px-1">Loan to repay</span>
+          <div className="flex flex-col gap-1.5">
+            {brokeredLoans.map((loan) => {
+              const active = loan.loanId === selectedLoanId
+              const mat = maturityDisplay(loan)
+              const ratePct = loanRatePct(loan)
+              return (
+                <button
+                  key={loan.loanId}
+                  type="button"
+                  onClick={() => setSelectedLoanId(loan.loanId ?? null)}
+                  className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border text-left transition-colors cursor-pointer ${
+                    active
+                      ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                      : 'border-base-300 bg-base-200/50 hover:bg-base-200'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-xs font-semibold">{termLabel(loan)}</span>
+                    {ratePct != null && (
+                      <span className="text-[10px] font-mono tabular-nums text-warning">
+                        {ratePct.toFixed(2)}%
+                      </span>
+                    )}
+                    {mat.isPast && (
+                      <span className="badge badge-xs bg-warning/15 text-warning border-0">
+                        Matured
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs font-mono tabular-nums text-error">
+                      {formatTokenAmount(loanDebtString(loan))}
+                    </span>
+                    {!mat.isFlex && (
+                      <span className="text-[10px] text-base-content/45 w-14 text-right">
+                        {mat.isPast ? 'frozen' : mat.label}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Native/wrapped selector */}
       {canUseNative && nativeToken && (
         <NativeCurrencySelector
@@ -187,14 +275,46 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      {/* Outstanding debt */}
-      {userPosition && debtTotal > 0 && (
+      {/* Outstanding debt — aggregate (standard) or selected loan (brokered). */}
+      {!isBrokered && userPosition && debtTotal > 0 && (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Outstanding debt:</span>
           <span className="text-error font-medium">
             {formatTokenAmount(debtTotal)} ($
             {formatUsd(userPosition.debtUSD + userPosition.debtStableUSD)})
           </span>
+        </div>
+      )}
+      {isBrokered && selectedLoan && debtTotal > 0 && (
+        <div className="space-y-1">
+          <div className="text-xs flex justify-between px-1">
+            <span className="text-base-content/60">Loan debt:</span>
+            <span className="text-error font-medium">
+              {formatTokenAmount(debtTotal)} {pool?.asset.symbol}
+            </span>
+          </div>
+          {hasEarlyRepayPenalty(selectedLoan) ? (
+            <>
+              <div className="text-xs flex justify-between px-1">
+                <span className="text-base-content/60">Early-repay penalty:</span>
+                <span className="text-warning font-medium">
+                  +{formatTokenAmount(selectedLoan.term?.earlyRepayPenalty ?? '0')} {pool?.asset.symbol}
+                </span>
+              </div>
+              <div className="text-xs flex justify-between px-1">
+                <span className="text-base-content/60">Close now:</span>
+                <span className="font-semibold">
+                  {formatTokenAmount(closeNowStr)} {pool?.asset.symbol}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="text-[11px] text-base-content/50 px-1">
+              {maturityDisplay(selectedLoan).isPast
+                ? 'Matured — no early-repay penalty. Interest is frozen.'
+                : 'No early-repay penalty.'}
+            </div>
+          )}
         </div>
       )}
 

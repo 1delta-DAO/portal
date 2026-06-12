@@ -8,6 +8,19 @@ import { EModeBadge } from './EModeAnalysisModal'
 import { CollateralToggle } from '../tabs/earn/UserPositionsTable'
 import { HealthBadge } from '../../common/HealthBadge'
 import { EmptyState } from '../../common/EmptyState'
+import {
+  loanDebtString,
+  termLabel,
+  maturityDisplay,
+  loanRatePct,
+  hasEarlyRepayPenalty,
+} from './brokeredLoans'
+
+/** Total debt of a position in token units — variable + stable (brokered fixed
+ *  debt sits in the stable slot). */
+const debtNative = (p: UserPositionEntry) => Number(p.debt) + Number(p.debtStable)
+/** Total debt of a position in USD — variable + stable. */
+const debtUsd = (p: UserPositionEntry) => (p.debtUSD ?? 0) + (p.debtStableUSD ?? 0)
 
 export interface PositionSummary {
   deposits: number
@@ -28,6 +41,11 @@ export interface YourPositionsProps {
   onSubAccountChange: (id: string) => void
   summary: PositionSummary | null
   activePositions: { position: UserPositionEntry; pool: PoolDataItem }[]
+  /**
+   * Per-loan brokered rows grouped by `marketUid`. When a debt row's market has
+   * entries here, its loans are listed beneath it (each repaid individually).
+   */
+  loansByMarket?: Map<string, UserPositionEntry[]>
   account: string
   chainId: string
   /** Enables borrow mode badge on sub-account chips when set */
@@ -46,6 +64,7 @@ export function YourPositions({
   onSubAccountChange,
   summary,
   activePositions,
+  loansByMarket,
   account,
   chainId,
   selectedLender,
@@ -148,17 +167,18 @@ export function YourPositions({
           )}
 
           {/* Debt */}
-          {activePositions.some(({ position }) => Number(position.debt) > 0) && (
+          {activePositions.some(({ position }) => debtNative(position) > 0) && (
             <PositionSection
               kind="debt"
               positions={activePositions
-                .filter(({ position }) => Number(position.debt) > 0)
-                .sort((a, b) => (b.position.debtUSD ?? 0) - (a.position.debtUSD ?? 0))}
+                .filter(({ position }) => debtNative(position) > 0)
+                .sort((a, b) => debtUsd(b.position) - debtUsd(a.position))}
               summary={summary}
               account={account}
               chainId={chainId}
               selectedPoolMarketUid={selectedPoolMarketUid}
               onPoolSelect={onPoolSelect}
+              loansByMarket={loansByMarket}
             />
           )}
         </div>
@@ -179,6 +199,7 @@ interface PositionSectionProps {
   chainId: string
   selectedPoolMarketUid?: string
   onPoolSelect?: (pool: PoolDataItem, side: PoolSide) => void
+  loansByMarket?: Map<string, UserPositionEntry[]>
 }
 
 function PositionSection({
@@ -189,6 +210,7 @@ function PositionSection({
   chainId,
   selectedPoolMarketUid,
   onPoolSelect,
+  loansByMarket,
 }: PositionSectionProps) {
   const isDeposits = kind === 'deposits'
   const accentText = isDeposits ? 'text-success' : 'text-error'
@@ -208,7 +230,7 @@ function PositionSection({
   // Largest position in this section — used to scale the share bar so the
   // biggest entry fills it and the rest are visually proportional.
   const maxUsd = positions.reduce(
-    (m, { position }) => Math.max(m, isDeposits ? position.depositsUSD : position.debtUSD),
+    (m, { position }) => Math.max(m, isDeposits ? position.depositsUSD : debtUsd(position)),
     0
   )
 
@@ -249,9 +271,10 @@ function PositionSection({
         <span className={`absolute left-0 top-0 bottom-0 w-0.5 ${accentBar}`} />
         <div className="divide-y divide-base-300">
           {positions.map(({ position, pool }) => {
-            const native = isDeposits ? Number(position.deposits) : Number(position.debt)
-            const usd = isDeposits ? position.depositsUSD : position.debtUSD
+            const native = isDeposits ? Number(position.deposits) : debtNative(position)
+            const usd = isDeposits ? position.depositsUSD : debtUsd(position)
             const isSelected = selectedPoolMarketUid === pool.marketUid
+            const loans = !isDeposits ? loansByMarket?.get(pool.marketUid) : undefined
 
             const positionApr =
               (isDeposits ? pool.depositRate : pool.variableBorrowRate) +
@@ -260,8 +283,8 @@ function PositionSection({
             const barPct = maxUsd > 0 ? Math.max(2, (usd / maxUsd) * 100) : 0
 
             return (
+              <React.Fragment key={pool.marketUid}>
               <div
-                key={pool.marketUid}
                 className={`grid grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:grid-cols-[minmax(140px,1.4fr)_72px_minmax(80px,1fr)_96px_140px_40px] items-center gap-x-3 px-3 py-1 pl-4 transition-colors ${
                   onPoolSelect ? 'cursor-pointer' : ''
                 } ${
@@ -372,10 +395,77 @@ function PositionSection({
                   )}
                 </div>
               </div>
+              {loans && loans.length > 0 && (
+                <LoanBreakdown
+                  loans={loans}
+                  symbol={pool.asset.symbol}
+                  marketVariableRate={pool.variableBorrowRate + (pool.intrinsicYield ?? 0)}
+                />
+              )}
+              </React.Fragment>
             )
           })}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// LoanBreakdown — per-loan rows for a brokered (fixed-term) market.
+// One health/collateral pool backs every loan; these are a read-only breakdown
+// of the market's aggregate debt (don't sum them into totals). See the
+// brokered user-positions UI spec §2.
+// ---------------------------------------------------------------------------
+
+function LoanBreakdown({
+  loans,
+  symbol,
+  marketVariableRate,
+}: {
+  loans: UserPositionEntry[]
+  symbol: string
+  marketVariableRate: number
+}) {
+  return (
+    <div className="bg-base-200/40 px-3 py-1.5 pl-6 space-y-1">
+      {loans.map((loan) => {
+        const mat = maturityDisplay(loan)
+        const ratePct = loanRatePct(loan)
+        const penalty = hasEarlyRepayPenalty(loan)
+        return (
+          <div
+            key={`${loan.marketUid}|${loan.loanId}`}
+            className="flex items-center justify-between gap-2 text-[11px]"
+          >
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span className="font-medium text-base-content/80">{termLabel(loan)}</span>
+              <span className="font-mono tabular-nums text-warning">
+                {ratePct != null ? `${ratePct.toFixed(2)}%` : `${marketVariableRate.toFixed(2)}% var`}
+              </span>
+              {mat.isPast && (
+                <span className="badge badge-xs bg-warning/15 text-warning border-0">Matured</span>
+              )}
+              {penalty && (
+                <span
+                  className="text-warning/70 cursor-help"
+                  title={`Early-repay penalty: ${formatTokenAmount(loan.term?.earlyRepayPenalty ?? '0')} ${symbol}`}
+                >
+                  ⚠ penalty
+                </span>
+              )}
+            </span>
+            <span className="flex items-center gap-2 shrink-0">
+              <span className="font-mono tabular-nums text-error">
+                {formatTokenAmount(loanDebtString(loan))} {symbol}
+              </span>
+              <span className="text-base-content/45 w-16 text-right">
+                {mat.isFlex ? '—' : mat.isPast ? 'frozen' : `in ${mat.label}`}
+              </span>
+            </span>
+          </div>
+        )
+      })}
     </div>
   )
 }
