@@ -10,6 +10,7 @@ export type VaultProvider =
   | 'fluid'
   | 'gearbox'
   | 'morpho'
+  | 'lista'
   | 'silo'
   | 'euler-earn'
   | 'lst'
@@ -22,6 +23,7 @@ export const VAULT_PROVIDERS: VaultProvider[] = [
   'fluid',
   'gearbox',
   'morpho',
+  'lista',
   'silo',
   'euler-earn',
   'lst',

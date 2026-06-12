@@ -498,8 +498,10 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
         <>
           {/* Native/wrapped selector (deposit only) */}
           {tab === 'Deposit' && canUseNative && nativeToken && (
+            // The wrapped option is the underlying you pay with (e.g. WBNB),
+            // not the vault share token (e.g. MEVBNB).
             <NativeCurrencySelector
-              wrappedSymbol={selected!.symbol || underlyingToken?.symbol || 'TOKEN'}
+              wrappedSymbol={underlyingToken?.symbol || selected!.symbol || 'TOKEN'}
               nativeToken={nativeToken}
               useNative={useNative}
               onChange={setUseNative}

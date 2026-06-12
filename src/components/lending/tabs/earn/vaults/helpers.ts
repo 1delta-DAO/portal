@@ -13,6 +13,7 @@ export const PROVIDER_LABELS: Record<VaultProvider, string> = {
   fluid: 'Fluid',
   gearbox: 'Gearbox',
   morpho: 'Morpho',
+  lista: 'Lista',
   silo: 'Silo',
   'euler-earn': 'Euler Earn',
   lst: 'Liquid Staking',
