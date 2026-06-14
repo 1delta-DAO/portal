@@ -16,6 +16,7 @@ import {
   tvlUsd,
   type VaultSortKey,
 } from './helpers'
+import { VaultPopover } from './VaultPopover'
 
 /** Share prices hover around ~1.0, so currency-style 2dp loses signal. */
 function fmtSharePrice(n: number): string {
@@ -27,6 +28,7 @@ function fmtSharePrice(n: number): string {
 
 interface VaultsTableProps {
   vaults: VaultEntry[]
+  chainId?: string
   chainTokens: Record<string, RawCurrency>
   sortKey: VaultSortKey
   sortDir: 'asc' | 'desc'
@@ -43,6 +45,7 @@ interface VaultsTableProps {
 
 export const VaultsTable: React.FC<VaultsTableProps> = ({
   vaults,
+  chainId,
   chainTokens,
   sortKey,
   sortDir,
@@ -152,14 +155,21 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                   onClick={() => onRowClick(v)}
                 >
                   <td>
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-medium truncate" title={v.name}>
-                        {v.name || v.symbol || `${v.address.slice(0, 6)}...${v.address.slice(-4)}`}
-                      </span>
-                      <span className="text-[10px] text-base-content/60 truncate" title={v.symbol}>
-                        {v.symbol}
-                      </span>
-                    </div>
+                    <VaultPopover
+                      vault={v}
+                      chainId={chainId}
+                      underlyingSymbol={underlyingToken?.symbol}
+                      underlyingLogo={underlyingToken?.logoURI}
+                    >
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-medium truncate" title={v.name}>
+                          {v.name || v.symbol || `${v.address.slice(0, 6)}...${v.address.slice(-4)}`}
+                        </span>
+                        <span className="text-[10px] text-base-content/60 truncate" title={v.symbol}>
+                          {v.symbol}
+                        </span>
+                      </div>
+                    </VaultPopover>
                   </td>
                   <td>
                     <div className="flex items-center gap-1.5 min-w-0">
@@ -312,9 +322,9 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <Logo
-                    src={underlyingToken?.logoURI}
-                    alt={underlyingToken?.symbol ?? v.underlying}
-                    fallbackText={underlyingToken?.symbol ?? v.underlying}
+                    src={v.logoURI ?? underlyingToken?.logoURI}
+                    alt={v.symbol || underlyingToken?.symbol || v.underlying}
+                    fallbackText={v.symbol || underlyingToken?.symbol || v.underlying}
                     className="rounded-full object-contain w-7 h-7 shrink-0 token-logo"
                   />
                   <div className="flex flex-col min-w-0">

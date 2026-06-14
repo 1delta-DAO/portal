@@ -261,9 +261,9 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
       {selected ? (
         <div className="flex items-center gap-2 p-2 rounded-lg bg-base-200">
           <Logo
-            src={underlyingToken?.logoURI}
-            alt={underlyingToken?.symbol ?? selected.symbol}
-            fallbackText={underlyingToken?.symbol ?? selected.symbol}
+            src={selected.logoURI ?? underlyingToken?.logoURI}
+            alt={selected.symbol || underlyingToken?.symbol}
+            fallbackText={selected.symbol || underlyingToken?.symbol}
             className="rounded-full object-contain w-8 h-8 shrink-0 token-logo"
           />
           <div className="flex flex-col min-w-0">

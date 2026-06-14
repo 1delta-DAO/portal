@@ -227,6 +227,17 @@ export interface VaultEntry {
   /** Curator label (provider-specific shape — see `extras` for raw). */
   curator?: string
   /**
+   * Resolved vault icon — the backend's `vaultInfo.logoURI` (branded share-token
+   * logo → underlying asset logo → curator logo). Use this to render the vault.
+   */
+  logoURI?: string
+  /** Share-token asset class (e.g. `USDC`), from `vaultInfo.assetGroup`. */
+  assetGroup?: string
+  /** NAV behaviour — `yield-bearing` vs `volatile` (`vaultInfo.yieldProfile`). */
+  yieldProfile?: string
+  /** Underlying denomination — `stable` vs `volatile` (`vaultInfo.denomination`). */
+  denomination?: string
+  /**
    * Delegation requirement for LST mints (validator/group/pool selection).
    * Absent ⇒ pooled deposit, no picker. See {@link VaultDelegation}.
    */
@@ -336,6 +347,20 @@ export interface RawVault {
       priceUsd?: number
       priceTs?: string
     } | null
+  } | null
+  /**
+   * The vault's own identity bundle — icon + name + classification — mirroring
+   * `underlyingInfo.asset` (the token). Present on every provider; some fields
+   * are null where they don't apply (e.g. HyperCore has no resolvable icon).
+   */
+  vaultInfo?: {
+    address?: string
+    symbol?: string | null
+    name?: string | null
+    logoURI?: string | null
+    assetGroup?: string | null
+    yieldProfile?: string | null
+    denomination?: string | null
   } | null
   providerMeta?: {
     curators?: Array<{ name?: string } | string> | null

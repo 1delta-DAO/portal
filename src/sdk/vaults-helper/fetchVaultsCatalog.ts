@@ -104,13 +104,16 @@ function normalizeVault(v: RawVault): VaultEntry | null {
   const tvl = v.tvl ?? {}
   const liq = v.liquidity ?? {}
   const price = v.underlyingInfo?.prices ?? {}
+  // Prefer the dedicated `vaultInfo` bundle (icon + name + classification),
+  // falling back to the loose top-level fields for older backends.
+  const info = v.vaultInfo ?? {}
 
   return {
     provider,
     address,
     underlying,
-    symbol: (v.symbol ?? '').toString(),
-    name: (v.displayName ?? v.name ?? v.symbol ?? '').toString(),
+    symbol: (info.symbol ?? v.symbol ?? '').toString(),
+    name: (info.name ?? v.displayName ?? v.name ?? v.symbol ?? '').toString(),
     decimals: typeof v.decimals === 'number' ? v.decimals : 18,
     totalAssets: tvl.totalAssets != null ? String(tvl.totalAssets) : '0',
     totalAssetsFormatted: toNumber(tvl.totalAssetsFormatted),
@@ -126,6 +129,12 @@ function normalizeVault(v: RawVault): VaultEntry | null {
     supplyRate: toNumber(rates.totalRate),
     fee: toNumber(rates.fee),
     curator: deriveCurator(provider, v),
+    // Resolved icon — vaultInfo first, then the underlying asset's logo.
+    logoURI:
+      info.logoURI ?? v.underlyingInfo?.asset?.logoURI ?? undefined,
+    assetGroup: info.assetGroup ?? undefined,
+    yieldProfile: info.yieldProfile ?? undefined,
+    denomination: info.denomination ?? undefined,
     delegation: v.providerMeta?.delegation ?? undefined,
     extras: v,
   }

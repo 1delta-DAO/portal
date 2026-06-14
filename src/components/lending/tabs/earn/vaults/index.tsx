@@ -457,6 +457,7 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
         <div className="flex gap-4 items-start">
           <VaultsTable
             vaults={paged}
+            chainId={chainId}
             chainTokens={chainTokens}
             sortKey={sortKey}
             sortDir={sortDir}

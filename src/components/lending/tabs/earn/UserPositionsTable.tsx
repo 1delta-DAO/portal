@@ -14,6 +14,7 @@ import { fetchCollateralToggle } from '../../../../sdk/lending-helper/fetchLendi
 import { useIsMobile } from '../../../../hooks/useIsMobile'
 import { HealthBadge } from '../../../common/HealthBadge'
 import { Logo } from '../../../common/Logo'
+import { termLabel, loanRatePct, maturityDisplay } from '../../shared/brokeredLoans'
 
 interface UserLenderPositionsTableProps {
   account?: string
@@ -60,11 +61,30 @@ function collectSubAccountPositions(sub: UserSubAccount): TaggedPosition[] {
     if (Number(pos.deposits) > 0) {
       result.push({ ...pos, tag: 'collateral' })
     }
-    if (Number(pos.debt) > 0) {
+    // Brokered fixed-loan debt lives in the stable slot, flex/variable in `debt`;
+    // sum both so the aggregate debt row renders for fixed-term markets too.
+    if (Number(pos.debt) + Number(pos.debtStable) > 0) {
       result.push({ ...pos, tag: 'debt' })
     }
   }
   return result
+}
+
+/**
+ * Map each market to its fixed-term (non-flex) loans in this sub-account. These
+ * per-loan rows are filtered out of the generic table, so we surface their
+ * existence as a "Fixed" pill on the matching debt line. (See BROKERED_MARKETS.md.)
+ */
+function fixedLoansByMarket(sub: UserSubAccount): Map<string, UserPositionEntry[]> {
+  const map = new Map<string, UserPositionEntry[]>()
+  for (const p of extractPositions(sub.positions)) {
+    if (p.term && !p.term.isDynamic) {
+      const arr = map.get(p.marketUid)
+      if (arr) arr.push(p)
+      else map.set(p.marketUid, [p])
+    }
+  }
+  return map
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +156,9 @@ const PositionsList: React.FC<{
   tokens: Record<string, RawCurrency>
   account?: string
   chainId: string
-}> = ({ positions, tokens, account, chainId }) => {
+  /** Fixed-term loans per market — marks the matching debt line as fixed-rate. */
+  fixedLoans?: Map<string, UserPositionEntry[]>
+}> = ({ positions, tokens, account, chainId, fixedLoans }) => {
   if (positions.length === 0) return null
 
   return (
@@ -148,9 +170,12 @@ const PositionsList: React.FC<{
         const name = token?.name ?? ''
         const tooltip = name && name !== symbol ? `${name} (${symbol})` : symbol || addr
         const isDebt = pos.tag === 'debt'
-        const native = isDebt ? Number(pos.debt || 0) : Number(pos.deposits || 0)
-        const usd = isDebt ? pos.debtUSD : pos.depositsUSD
+        const native = isDebt
+          ? Number(pos.debt || 0) + Number(pos.debtStable || 0)
+          : Number(pos.deposits || 0)
+        const usd = isDebt ? pos.debtUSD + pos.debtStableUSD : pos.depositsUSD
         const display = symbol || (addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '??')
+        const fixed = isDebt ? fixedLoans?.get(pos.marketUid) : undefined
 
         return (
           <div
@@ -181,6 +206,30 @@ const PositionsList: React.FC<{
             <span className="shrink-0 font-mono tabular-nums text-base-content/55">
               ${abbreviateUsd(usd)}
             </span>
+            {fixed && fixed.length > 0 && (() => {
+              const single = fixed.length === 1 ? fixed[0] : null
+              const rate = single ? loanRatePct(single) : null
+              const label = single
+                ? `Fixed${rate != null ? ` ${rate.toFixed(2)}%` : ''}`
+                : `Fixed ×${fixed.length}`
+              const tip = fixed
+                .map((l) => {
+                  const r = loanRatePct(l)
+                  const m = maturityDisplay(l)
+                  return `${termLabel(l)}${r != null ? ` @ ${r.toFixed(2)}%` : ''}${
+                    m.isFlex ? '' : m.isPast ? ' · matured' : ` · ${m.label} left`
+                  }`
+                })
+                .join('\n')
+              return (
+                <span
+                  className="shrink-0 px-1 py-0.5 rounded text-[9px] font-semibold bg-warning/15 text-warning cursor-help whitespace-nowrap"
+                  title={`Fixed-term loan${fixed.length > 1 ? 's' : ''}:\n${tip}`}
+                >
+                  {label}
+                </span>
+              )
+            })()}
             {!isDebt && account && (
               <CollateralToggle
                 marketUid={pos.marketUid}
@@ -305,6 +354,7 @@ const MobileSubAccountCard: React.FC<{
             tokens={tokens}
             account={account}
             chainId={chainId}
+            fixedLoans={fixedLoansByMarket(sub)}
           />
         </div>
       )}
@@ -384,6 +434,7 @@ const MobileLenderCard: React.FC<{
                 tokens={tokens}
                 account={account}
                 chainId={chainId}
+                fixedLoans={fixedLoansByMarket(subs[0] ?? entry.data[0])}
               />
             </div>
           </>
@@ -641,6 +692,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                               tokens={tokens}
                               account={account}
                               chainId={chainId}
+                              fixedLoans={fixedLoansByMarket(subs[0] ?? entry.data[0])}
                             />
                           </td>
                         </>
@@ -692,6 +744,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                                 tokens={tokens}
                                 account={account}
                                 chainId={chainId}
+                                fixedLoans={fixedLoansByMarket(sub)}
                               />
                             </td>
                           </tr>
