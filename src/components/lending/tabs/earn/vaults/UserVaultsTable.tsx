@@ -102,9 +102,9 @@ export const UserVaultsTable: React.FC<UserVaultsTableProps> = ({
               <tr>
                 <th className="w-[28%]">Vault</th>
                 <th className="w-[16%]">Provider</th>
-                <th className="w-[18%]">Position</th>
-                <th className="w-[14%]">Shares</th>
-                <th className="w-[14%]">Value</th>
+                <th className="w-[18%] text-right">Position</th>
+                <th className="w-[14%] text-right">Shares</th>
+                <th className="w-[14%] text-right">Value</th>
                 <th className="w-[10%]"></th>
               </tr>
             </thead>
@@ -149,18 +149,18 @@ export const UserVaultsTable: React.FC<UserVaultsTableProps> = ({
                         <span className="text-xs text-base-content/40">—</span>
                       )}
                     </td>
-                    <td>
-                      <div className="flex flex-col text-xs">
+                    <td className="text-right">
+                      <div className="flex flex-col items-end text-xs">
                         <span className="font-semibold">{formatTokenAmount(it.assets)}</span>
                         <span className="text-base-content/60 truncate">
                           {underlyingToken?.symbol ?? ''}
                         </span>
                       </div>
                     </td>
-                    <td className="text-xs text-base-content/70">
+                    <td className="text-xs text-base-content/70 text-right">
                       {formatTokenAmount(it.shares)}
                     </td>
-                    <td>
+                    <td className="text-right">
                       <span className="text-sm font-semibold" title={`$${formatUsd(it.balanceUSD)}`}>
                         {abbreviateUsd(it.balanceUSD)}
                       </span>

@@ -317,7 +317,7 @@ function PositionSection({
                           title={`${isDeposits ? 'Deposit' : 'Borrow'} rate: ${positionApr.toFixed(4)}%`}
                         >
                           {positionApr.toFixed(2)}%
-                          <span className="text-base-content/45 ml-0.5 font-sans">APR</span>
+                          <span className="text-base-content/50 ml-0.5 font-sans">APR</span>
                         </span>
                         {pool.oraclePriceUSD != null && (
                           <>
@@ -360,7 +360,7 @@ function PositionSection({
                       style={{ width: `${barPct}%` }}
                     />
                   </div>
-                  <span className="shrink-0 text-[10px] font-mono tabular-nums text-base-content/55 w-10 text-right">
+                  <span className="shrink-0 text-[10px] font-mono tabular-nums text-base-content/50 w-10 text-right">
                     {sharePct >= 10 ? sharePct.toFixed(0) : sharePct.toFixed(1)}%
                     <span className="text-base-content/30 ml-0.5">sh</span>
                   </span>
@@ -459,7 +459,7 @@ function LoanBreakdown({
               <span className="font-mono tabular-nums text-error">
                 {formatTokenAmount(loanDebtString(loan))} {symbol}
               </span>
-              <span className="text-base-content/45 w-16 text-right">
+              <span className="text-base-content/50 w-16 text-right">
                 {mat.isFlex ? '—' : mat.isPast ? 'frozen' : `in ${mat.label}`}
               </span>
             </span>

@@ -39,14 +39,14 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         </div>
       )}
       <p
-        className={`text-base-content/55 ${
+        className={`text-base-content/50 ${
           isSm ? 'text-xs' : 'text-sm font-medium'
         }`}
       >
         {title}
       </p>
       {description && (
-        <p className="text-[10px] text-base-content/35 max-w-xs">{description}</p>
+        <p className="text-[10px] text-base-content/40 max-w-xs">{description}</p>
       )}
       {action && <div className="mt-1">{action}</div>}
     </div>

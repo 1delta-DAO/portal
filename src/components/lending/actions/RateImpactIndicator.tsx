@@ -124,7 +124,7 @@ export const RateImpactIndicator: React.FC<{
 
   return (
     <div className="flex flex-col gap-1 text-xs px-1 py-1.5 rounded-lg bg-base-200/60">
-      <div className="text-[10px] font-semibold text-base-content/45 uppercase tracking-wider mb-0.5">
+      <div className="text-[10px] font-semibold text-base-content/50 uppercase tracking-wider mb-0.5">
         Rate Impact
       </div>
       {validEntries.map((entry) => (

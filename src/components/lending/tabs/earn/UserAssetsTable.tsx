@@ -4,12 +4,7 @@ import type { TokenBalance } from '../../../../hooks/lending/useTokenBalances'
 import { AssetPopover } from '../../shared/AssetPopover'
 import { EmptyState } from '../../../common/EmptyState'
 import { ErrorAlert } from '../../../common/ErrorAlert'
-
-function formatUsd(v: number) {
-  return v.toLocaleString(undefined, {
-    maximumFractionDigits: v < 1000 ? 2 : 0,
-  })
-}
+import { formatUsd } from '../../../../utils/format'
 
 interface UserAssetsTableProps {
   balances: TokenBalance[]
@@ -79,7 +74,7 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
       <div className="rounded-box border border-base-300 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden">
-            <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
+            <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
               <tr>
                 <th className="w-[50%]">Asset</th>
                 <th className="w-[25%] text-right">Balance</th>

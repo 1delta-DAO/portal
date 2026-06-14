@@ -301,7 +301,7 @@ export const CloseAction: React.FC<TradingActionProps> = ({
         {isDebtBrokered && (
           <div className="mt-1.5 rounded-lg border border-warning/30 bg-warning/5 p-2 space-y-1.5">
             <div className="flex items-center gap-1.5">
-              <span className="badge badge-xs bg-warning/20 text-warning border-0 font-medium">
+              <span className="badge badge-xs bg-warning/15 text-warning border-0 font-medium">
                 Fixed-term
               </span>
               <span className="text-[10px] text-base-content/60">Choose the loan to close</span>

@@ -10,6 +10,30 @@
   body, #root {
     min-height: 100%;
   }
+
+  /* Tabular figures everywhere by default so numbers in tables and panels
+     share a fixed digit width and line up vertically. Opt out with
+     `proportional-nums` on prose where it isn't wanted. */
+  :root {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Accessibility: honour the OS "reduce motion" setting. Pro/terminal tools
+     should default to restraint — kill transitions/animations and smooth
+     scroll for users who ask for it. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer utilities {

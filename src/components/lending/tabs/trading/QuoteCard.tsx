@@ -81,7 +81,7 @@ const Side: React.FC<SideProps> = ({ amount, symbol, usd, logoURI, side }) => {
         </div>
         {usd != null && (
           <div
-            className="text-[10px] text-base-content/55 tabular-nums truncate"
+            className="text-[10px] text-base-content/50 tabular-nums truncate"
             title={fmtFullUsd(usd)}
           >
             {fmtCompactUsd(usd)}

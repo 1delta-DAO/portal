@@ -1,0 +1,250 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { Logo } from './Logo'
+
+// ---------------------------------------------------------------------------
+// Shared field rows used inside popover bodies
+// ---------------------------------------------------------------------------
+
+/** A labelled field row: muted label on the left, value on the right. */
+export function PopoverField({
+  label,
+  value,
+  capitalize = false,
+}: {
+  label: string
+  value: React.ReactNode
+  capitalize?: boolean
+}) {
+  return (
+    <div className="flex items-start gap-2">
+      <span className="text-base-content/50 shrink-0 w-16">{label}</span>
+      <span className={`font-medium truncate ${capitalize ? 'capitalize' : ''}`}>{value}</span>
+    </div>
+  )
+}
+
+/** A field row whose value is a copy-to-clipboard address/id. */
+export function CopyRow({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout>>(null)
+
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+
+  const short = `${value.slice(0, 6)}…${value.slice(-4)}`
+
+  const copy = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      navigator.clipboard.writeText(value)
+      setCopied(true)
+      if (timer.current) clearTimeout(timer.current)
+      timer.current = setTimeout(() => setCopied(false), 1500)
+    },
+    [value]
+  )
+
+  return (
+    <div className="flex items-start gap-2">
+      <span className="text-base-content/50 shrink-0 w-16">{label}</span>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 font-mono text-[10px] hover:text-primary transition-colors min-w-0"
+        onClick={copy}
+        title={`Copy ${label.toLowerCase()}: ${value}`}
+      >
+        {copied ? (
+          <span className="text-success font-sans">Copied!</span>
+        ) : (
+          <>
+            {short}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-3 h-3 opacity-40 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+            </svg>
+          </>
+        )}
+      </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// PortalPopover
+// ---------------------------------------------------------------------------
+
+interface PortalPopoverProps {
+  /** Logo shown both in the trigger and the popover header. */
+  logoURI?: string
+  /** Primary symbol shown in the header. */
+  symbol: string
+  /** Fallback text for the logo when the symbol is empty. */
+  fallbackText?: string
+  /** Small primary-colored dot on the trigger icon (e.g. "has position"). */
+  positionDot?: boolean
+  /** Hover title on the trigger. */
+  triggerTitle?: string
+  /** Trigger label content (rendered next to the icon). */
+  trigger: React.ReactNode
+  /** Popover body — a stack of `PopoverField` / `CopyRow` rows. */
+  children: React.ReactNode
+}
+
+/**
+ * Inline icon + label that opens a click-triggered detail popover. The popover
+ * is rendered through a React portal so it escapes `overflow:hidden` containers
+ * (tables, cards) and flips above the trigger when there isn't room below.
+ *
+ * Single source of truth for AssetPopover / VaultPopover, which were ~95%
+ * duplicates. They now just supply the header identity and body fields.
+ */
+export const PortalPopover: React.FC<PortalPopoverProps> = ({
+  logoURI,
+  symbol,
+  fallbackText,
+  positionDot,
+  triggerTitle = 'Click for details',
+  trigger,
+  children,
+}) => {
+  const [visible, setVisible] = useState(false)
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null)
+
+  const triggerRef = useRef<HTMLDivElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
+
+  const reposition = useCallback(() => {
+    if (!triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    const popH = popoverRef.current?.offsetHeight ?? 300
+    const popW = 240 // w-60 = 15rem = 240px
+    const gap = 6
+    const top =
+      rect.bottom + gap + popH > window.innerHeight ? rect.top - gap - popH : rect.bottom + gap
+    const left = Math.min(rect.left, window.innerWidth - popW - 8)
+    setCoords({ top, left })
+  }, [])
+
+  const toggle = useCallback(() => {
+    // Don't stop propagation — let the click bubble so the parent row handler
+    // (e.g. market/vault selection) still fires.
+    if (visible) {
+      setVisible(false)
+      return
+    }
+    reposition()
+    setVisible(true)
+  }, [visible, reposition])
+
+  // Close on outside click
+  useEffect(() => {
+    if (!visible) return
+    const handler = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (!triggerRef.current?.contains(t) && !popoverRef.current?.contains(t)) {
+        setVisible(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [visible])
+
+  // Reposition on scroll / resize while visible
+  useEffect(() => {
+    if (!visible) return
+    window.addEventListener('scroll', reposition, true)
+    window.addEventListener('resize', reposition)
+    return () => {
+      window.removeEventListener('scroll', reposition, true)
+      window.removeEventListener('resize', reposition)
+    }
+  }, [visible, reposition])
+
+  // Re-measure once mounted so the flip logic uses the actual height
+  useEffect(() => {
+    if (visible && popoverRef.current) reposition()
+  }, [visible, reposition])
+
+  return (
+    <>
+      <div
+        ref={triggerRef}
+        className="relative flex items-center gap-2 min-w-0 cursor-pointer select-none group"
+        onClick={toggle}
+        title={triggerTitle}
+      >
+        <div className="relative shrink-0 group-hover:opacity-75 transition-opacity">
+          <Logo
+            src={logoURI}
+            alt={symbol}
+            fallbackText={fallbackText ?? symbol}
+            className="rounded-full object-contain w-6 h-6 token-logo"
+          />
+          {positionDot && (
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1 group-hover:opacity-75 transition-opacity">{trigger}</div>
+      </div>
+
+      {visible &&
+        coords &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            className="fixed z-9999 shadow-xl bg-base-200 rounded-box w-60 border border-base-300 animate-in fade-in zoom-in-95 duration-100 origin-top-left"
+            style={{ top: coords.top, left: coords.left }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2 border-b border-base-300">
+              <div className="flex items-center gap-2 min-w-0">
+                <Logo
+                  src={logoURI}
+                  alt={symbol}
+                  fallbackText={fallbackText ?? symbol}
+                  className="rounded-full w-5 h-5 shrink-0 token-logo"
+                />
+                <span className="font-semibold text-sm truncate">{symbol}</span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs btn-circle -mr-1"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setVisible(false)
+                }}
+                aria-label="Close"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-3 h-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-3 py-2 space-y-1.5 text-xs">{children}</div>
+          </div>,
+          document.body
+        )}
+    </>
+  )
+}

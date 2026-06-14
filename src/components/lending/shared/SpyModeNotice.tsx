@@ -16,7 +16,7 @@ export const SpyModeNotice: React.FC<{ className?: string }> = ({ className = ''
         ⦿
       </span>
       <span className="font-semibold text-warning">Spy mode</span>
-      <span className="text-base-content/55">— quotes work, signing will fail</span>
+      <span className="text-base-content/50">— quotes work, signing will fail</span>
     </div>
   </div>
 )

@@ -66,25 +66,25 @@ export const LendingMarketTable: React.FC<Props> = ({
       {/* Desktop table */}
       <div className="hidden md:block overflow-x-auto">
         <table className="table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden">
-          <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
+          <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
             <tr>
               <SortableHeader sortKey="symbol" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} className="w-[18%]">
                 Asset
               </SortableHeader>
-              <SortableHeader sortKey="depositApr" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Deposit APR" className="w-[11%]">
+              <SortableHeader sortKey="depositApr" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Deposit APR" className="w-[11%] text-right">
                 Dep APR
               </SortableHeader>
-              <SortableHeader sortKey="borrowApr" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Borrow APR" className="w-[11%]">
+              <SortableHeader sortKey="borrowApr" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Borrow APR" className="w-[11%] text-right">
                 Bor APR
               </SortableHeader>
               <th className="w-[10%]">LTV</th>
-              <SortableHeader sortKey="totalDepositsUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Total Deposits" className="w-[13%]">
+              <SortableHeader sortKey="totalDepositsUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Total Deposits" className="w-[13%] text-right">
                 Deposits
               </SortableHeader>
-              <SortableHeader sortKey="totalDebtUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Total Borrows" className="w-[13%]">
+              <SortableHeader sortKey="totalDebtUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Total Borrows" className="w-[13%] text-right">
                 Borrows
               </SortableHeader>
-              <SortableHeader sortKey="totalLiquidityUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Liquidity" className="w-[12%]">
+              <SortableHeader sortKey="totalLiquidityUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Liquidity" className="w-[12%] text-right">
                 Liq.
               </SortableHeader>
               <th className="w-[12%]">Risk</th>
@@ -145,8 +145,8 @@ export const LendingMarketTable: React.FC<Props> = ({
                       </div>
                     </AssetPopover>
                   </td>
-                  <td>
-                    <div className="flex items-center gap-1">
+                  <td className="text-right">
+                    <div className="flex items-center justify-end gap-1">
                       <span className="text-sm font-medium text-success">
                         {depositTotal.toFixed(2)}%
                       </span>
@@ -160,11 +160,11 @@ export const LendingMarketTable: React.FC<Props> = ({
                       )}
                     </div>
                   </td>
-                  <td>
+                  <td className="text-right">
                     {isBrokered ? (
                       <BrokeredAprCell terms={pool.terms} />
                     ) : (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center justify-end gap-1">
                         <span className="text-sm font-medium text-warning">
                           {borrowTotal.toFixed(2)}%
                         </span>
@@ -182,8 +182,8 @@ export const LendingMarketTable: React.FC<Props> = ({
                   <td>
                     <LtvBadge config={pool.config} variant="cell" />
                   </td>
-                  <td>
-                    <div className="flex flex-col">
+                  <td className="text-right">
+                    <div className="flex flex-col items-end">
                       <span className="text-xs" title={`$${formatUsd(pool.totalDepositsUSD)}`}>
                         {abbreviateUsd(pool.totalDepositsUSD)}
                       </span>
@@ -195,8 +195,8 @@ export const LendingMarketTable: React.FC<Props> = ({
                       </span>
                     </div>
                   </td>
-                  <td>
-                    <div className="flex flex-col">
+                  <td className="text-right">
+                    <div className="flex flex-col items-end">
                       <span className="text-xs" title={`$${formatUsd(pool.totalDebtUSD)}`}>
                         {abbreviateUsd(pool.totalDebtUSD)}
                       </span>
@@ -208,8 +208,8 @@ export const LendingMarketTable: React.FC<Props> = ({
                       </span>
                     </div>
                   </td>
-                  <td>
-                    <div className="flex flex-col">
+                  <td className="text-right">
+                    <div className="flex flex-col items-end">
                       <span className="text-xs" title={`$${formatUsd(pool.totalLiquidityUSD)}`}>
                         {abbreviateUsd(pool.totalLiquidityUSD)}
                       </span>
@@ -367,7 +367,7 @@ const MobilePoolCards: React.FC<{
                     className="flex items-baseline gap-1 min-w-0 truncate"
                     title="Fixed-term borrowing only — variable borrow unavailable"
                   >
-                    <span className="badge badge-xs bg-warning/20 text-warning border-0 font-medium">
+                    <span className="badge badge-xs bg-warning/15 text-warning border-0 font-medium">
                       Fixed
                     </span>
                     {mBestTermApr != null && (

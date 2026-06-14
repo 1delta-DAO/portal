@@ -233,7 +233,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
                       {formatTokenAmount(loanDebtString(loan))}
                     </span>
                     {!mat.isFlex && (
-                      <span className="text-[10px] text-base-content/45 w-14 text-right">
+                      <span className="text-[10px] text-base-content/50 w-14 text-right">
                         {mat.isPast ? 'frozen' : mat.label}
                       </span>
                     )}

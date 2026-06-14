@@ -5,6 +5,7 @@ import { TokenSelector } from './index'
 import type { RawCurrency } from '../../types/currency'
 import { getCurrency } from '../../lib/trade-helpers/utils'
 import { useChains } from '../../hooks/useChains'
+import { ModalHeader } from '../common/ModalHeader'
 
 type TokenSelectorModalProps = {
   open: boolean
@@ -77,12 +78,7 @@ export function TokenSelectorModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* header */}
-        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-base-300 shrink-0">
-          <h3 className="font-bold min-w-0 truncate">Select a token</h3>
-          <button className="btn btn-sm btn-ghost shrink-0" onClick={onClose}>
-            ✕
-          </button>
-        </div>
+        <ModalHeader title="Select a token" onClose={onClose} className="shrink-0" />
 
         {/* search + chain selector. min-w-0 cascades so the input can shrink
             past its placeholder width on narrow viewports; the chain selector

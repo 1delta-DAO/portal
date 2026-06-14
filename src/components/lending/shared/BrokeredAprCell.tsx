@@ -31,7 +31,7 @@ export const BrokeredAprCell: React.FC<{ terms?: PoolTerm[] | null }> = ({ terms
       onMouseLeave={hide}
       title={list.length === 0 ? 'Fixed-term borrowing only — variable borrow unavailable' : undefined}
     >
-      <span className="badge badge-xs bg-warning/20 text-warning border-0 font-medium">Fixed</span>
+      <span className="badge badge-xs bg-warning/15 text-warning border-0 font-medium">Fixed</span>
       {bestApr != null && (
         <span className="text-xs font-medium tabular-nums text-warning whitespace-nowrap">
           from {bestApr.toFixed(2)}%

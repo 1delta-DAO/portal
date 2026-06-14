@@ -169,7 +169,7 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-1 w-full max-h-80 flex flex-col rounded-lg border border-base-300 bg-base-100 shadow-xl overflow-hidden">
+        <div className="absolute z-50 mt-1 w-full max-h-80 flex flex-col rounded-box border border-base-300 bg-base-100 shadow-lg overflow-hidden">
           <div className="bg-base-100 p-2 border-b border-base-300 shrink-0">
             <input
               type="text"

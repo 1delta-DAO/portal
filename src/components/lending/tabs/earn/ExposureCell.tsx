@@ -102,9 +102,9 @@ export const ExposureCell: React.FC<ExposureCellProps> = ({ exposures, chainToke
         pos &&
         createPortal(
           <>
-            <div className="fixed inset-0 z-90" onClick={closePopover} />
+            <div className="fixed inset-0 z-9998" onClick={closePopover} />
             <div
-              className="fixed z-100 shadow-lg bg-base-100 rounded-box p-2 max-w-xs max-h-60 overflow-auto border border-base-300"
+              className="fixed z-9999 shadow-xl bg-base-200 rounded-box p-2 max-w-xs max-h-60 overflow-auto border border-base-300"
               style={{ top: pos.top, left: pos.left }}
             >
               {collaterals.length > 0 && (

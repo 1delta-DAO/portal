@@ -109,7 +109,7 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
       {/* Desktop */}
       <div className="hidden md:block overflow-x-auto">
         <table className="table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden">
-          <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
+          <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
             <tr>
               <th className="w-[22%] cursor-pointer" onClick={() => onToggleSort('name')}>
                 Vault{sortIndicator('name')}
@@ -118,17 +118,17 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                 Provider{sortIndicator('provider')}
               </th>
               <th className="w-[11%]">Underlying</th>
-              <th className="w-[9%] cursor-pointer" onClick={() => onToggleSort('supplyRate')}>
+              <th className="w-[9%] cursor-pointer text-right" onClick={() => onToggleSort('supplyRate')}>
                 APR{sortIndicator('supplyRate')}
               </th>
-              <th className="w-[12%]" title="Price per share">
+              <th className="w-[12%] text-right" title="Price per share">
                 Share price
               </th>
-              <th className="w-[12%] cursor-pointer" onClick={() => onToggleSort('totalAssetsUsd')}>
+              <th className="w-[12%] cursor-pointer text-right" onClick={() => onToggleSort('totalAssetsUsd')}>
                 TVL{sortIndicator('totalAssetsUsd')}
               </th>
               <th
-                className="w-[12%] cursor-pointer"
+                className="w-[12%] cursor-pointer text-right"
                 onClick={() => onToggleSort('liquidityUsd')}
                 title="Withdrawable liquidity"
               >
@@ -197,7 +197,7 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                       </span>
                     </div>
                   </td>
-                  <td>
+                  <td className="text-right">
                     <span
                       className={`text-xs font-semibold ${
                         isSupplyRateMeaningful(v) ? 'text-success' : 'text-base-content/40'
@@ -207,9 +207,9 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                       {formatSupplyRate(v)}
                     </span>
                   </td>
-                  <td>
+                  <td className="text-right">
                     {v.sharePriceUsd != null || v.sharePrice != null ? (
-                      <div className="flex flex-col text-xs">
+                      <div className="flex flex-col items-end text-xs">
                         <span
                           className="font-semibold"
                           title={
@@ -232,8 +232,8 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                       <span className="text-xs text-base-content/40">—</span>
                     )}
                   </td>
-                  <td>
-                    <div className="flex flex-col text-xs">
+                  <td className="text-right">
+                    <div className="flex flex-col items-end text-xs">
                       <span className="font-semibold" title={usd ? `$${formatUsd(usd)}` : undefined}>
                         {usd
                           ? abbreviateUsd(usd)
@@ -249,13 +249,13 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                       )}
                     </div>
                   </td>
-                  <td>
+                  <td className="text-right">
                     {hasLiquidity(v) ? (
                       (() => {
                         const liqNative = liquidityNative(v, decimals)
                         const liqUsd = liquidityUsd(v, decimals)
                         return (
-                          <div className="flex flex-col text-xs">
+                          <div className="flex flex-col items-end text-xs">
                             <span
                               className="font-semibold"
                               title={liqUsd ? `$${formatUsd(liqUsd)}` : undefined}

@@ -258,18 +258,18 @@ export const ConfigMarketView: React.FC<Props> = ({
           {/* Desktop table — selected row inline-expands with detail panel */}
           <div className="hidden md:block overflow-x-auto">
             <table className="table table-sm w-full">
-              <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
+              <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
                 <tr>
                   <th className="w-[20%]">Config</th>
                   <th className="w-[16%]">Collaterals</th>
                   <th className="w-[16%]">Borrowables</th>
-                  <th className="w-[8%]" title="Highest LTV across this config's collateral assets">
+                  <th className="w-[8%] text-right" title="Highest LTV across this config's collateral assets">
                     Max LTV
                   </th>
-                  <th className="w-[10%]" title="Best deposit APR across this config's collateral assets (incl. intrinsic yield)">
+                  <th className="w-[10%] text-right" title="Best deposit APR across this config's collateral assets (incl. intrinsic yield)">
                     Best APR
                   </th>
-                  <th className="w-[14%]" title="Total available borrow liquidity across borrowables">
+                  <th className="w-[14%] text-right" title="Total available borrow liquidity across borrowables">
                     Borrow Liq.
                   </th>
                   <th className="w-[10%]">Risk</th>
@@ -315,7 +315,7 @@ export const ConfigMarketView: React.FC<Props> = ({
                         <td>
                           <AssetPreview items={g.borrowables} count={stats.borCount} />
                         </td>
-                        <td>
+                        <td className="text-right">
                           {stats.maxLtv > 0 ? (
                             <span className="text-xs font-medium tabular-nums">
                               {(stats.maxLtv * 100).toFixed(0)}%
@@ -324,7 +324,7 @@ export const ConfigMarketView: React.FC<Props> = ({
                             <span className="text-xs text-base-content/40">—</span>
                           )}
                         </td>
-                        <td>
+                        <td className="text-right">
                           {stats.bestDepositApr > 0 ? (
                             <span className="text-xs font-medium text-success tabular-nums">
                               {stats.bestDepositApr.toFixed(2)}%
@@ -333,7 +333,7 @@ export const ConfigMarketView: React.FC<Props> = ({
                             <span className="text-xs text-base-content/40">—</span>
                           )}
                         </td>
-                        <td>
+                        <td className="text-right">
                           <span
                             className="text-xs tabular-nums"
                             title={`$${formatUsd(stats.borrowLiquidity)}`}
@@ -703,21 +703,21 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                     APR{sortIndicator('apr')}
                   </th>
                   <th
-                    className="w-[7%] cursor-pointer select-none"
+                    className="w-[7%] cursor-pointer select-none text-right"
                     onClick={() => toggleSort('ltv')}
                     title="Loan-to-value (collateral only)"
                   >
                     LTV{sortIndicator('ltv')}
                   </th>
-                  <th className="w-[11%]">Deposits</th>
+                  <th className="w-[11%] text-right">Deposits</th>
                   <th
-                    className="w-[11%] cursor-pointer select-none"
+                    className="w-[11%] cursor-pointer select-none text-right"
                     onClick={() => toggleSort('liquidity')}
                     title="Borrow liquidity (borrowable) / Deposits (collateral)"
                   >
                     Liquidity{sortIndicator('liquidity')}
                   </th>
-                  <th className="w-[11%]">Debt</th>
+                  <th className="w-[11%] text-right">Debt</th>
                   <th className="w-[12%]" title="Loop role: this row's slot in the active loop action">
                     Role
                   </th>
@@ -765,7 +765,7 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                           <AprCell rate={item.variableBorrowRate} iy={iy} color="warning" />
                         )}
                       </td>
-                      <td>
+                      <td className="text-right">
                         {rowSide === 'collateral' ? (
                           <span className="text-xs font-medium tabular-nums">
                             {(item.borrowCollateralFactor * 100).toFixed(0)}%
@@ -774,8 +774,8 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                           <span className="text-xs text-base-content/30">—</span>
                         )}
                       </td>
-                      <td>
-                        <div className="flex flex-col">
+                      <td className="text-right">
+                        <div className="flex flex-col items-end">
                           <span
                             className="text-xs tabular-nums"
                             title={`$${formatUsd(item.totalDepositsUsd)}`}
@@ -792,8 +792,8 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                           )}
                         </div>
                       </td>
-                      <td>
-                        <div className="flex flex-col">
+                      <td className="text-right">
+                        <div className="flex flex-col items-end">
                           <span
                             className="text-xs tabular-nums"
                             title={`$${formatUsd(liqUsd)}`}
@@ -810,8 +810,8 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                           )}
                         </div>
                       </td>
-                      <td>
-                        <div className="flex flex-col">
+                      <td className="text-right">
+                        <div className="flex flex-col items-end">
                           <span
                             className="text-xs tabular-nums"
                             title={`$${formatUsd(item.totalDebtUsd)}`}

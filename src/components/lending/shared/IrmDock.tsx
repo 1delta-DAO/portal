@@ -99,19 +99,19 @@ function IrmDockedPanel({
         {/* Current rate stats */}
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl bg-base-200 px-3 py-2">
-            <p className="text-[10px] text-base-content/45 mb-1 leading-none">Deposit APR</p>
+            <p className="text-[10px] text-base-content/50 mb-1 leading-none">Deposit APR</p>
             <p className="text-lg font-bold leading-none tabular-nums" style={{ color: DEPOSIT_COLOR }}>
               {currentDepositRate !== undefined ? `${currentDepositRate.toFixed(2)}%` : '—'}
             </p>
           </div>
           <div className="rounded-xl bg-base-200 px-3 py-2">
-            <p className="text-[10px] text-base-content/45 mb-1 leading-none">Borrow APR</p>
+            <p className="text-[10px] text-base-content/50 mb-1 leading-none">Borrow APR</p>
             <p className="text-lg font-bold leading-none tabular-nums" style={{ color: BORROW_COLOR }}>
               {currentBorrowRate !== undefined ? `${currentBorrowRate.toFixed(2)}%` : '—'}
             </p>
           </div>
           <div className="rounded-xl bg-base-200 px-3 py-2">
-            <p className="text-[10px] text-base-content/45 mb-1 leading-none">Utilization</p>
+            <p className="text-[10px] text-base-content/50 mb-1 leading-none">Utilization</p>
             <p className="text-lg font-bold leading-none tabular-nums text-base-content/70">
               {currentUtilization !== undefined ? `${(currentUtilization * 100).toFixed(1)}%` : '—'}
             </p>
@@ -163,14 +163,14 @@ function IrmDockedPanel({
             <div className="flex items-center gap-4 mb-2 text-xs">
               <span className="flex items-center gap-1.5">
                 <span className="w-4 h-0.5 rounded inline-block" style={{ background: DEPOSIT_COLOR }} />
-                <span className="text-base-content/55">Deposit APR</span>
+                <span className="text-base-content/50">Deposit APR</span>
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-4 h-0.5 rounded inline-block" style={{ background: BORROW_COLOR }} />
-                <span className="text-base-content/55">Borrow APR</span>
+                <span className="text-base-content/50">Borrow APR</span>
               </span>
               {currentUtilization !== undefined && (
-                <span className="flex items-center gap-1.5 ml-auto text-[10px] text-base-content/35">
+                <span className="flex items-center gap-1.5 ml-auto text-[10px] text-base-content/40">
                   <svg width="12" height="8" viewBox="0 0 12 8">
                     <line x1="0" y1="4" x2="12" y2="4" stroke="currentColor" strokeDasharray="3 2" strokeWidth="1.5" />
                   </svg>

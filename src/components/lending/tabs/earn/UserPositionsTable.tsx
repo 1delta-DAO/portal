@@ -203,7 +203,7 @@ const PositionsList: React.FC<{
             >
               {native >= 1 ? native.toFixed(2) : native.toFixed(4)}
             </span>
-            <span className="shrink-0 font-mono tabular-nums text-base-content/55">
+            <span className="shrink-0 font-mono tabular-nums text-base-content/50">
               ${abbreviateUsd(usd)}
             </span>
             {fixed && fixed.length > 0 && (() => {
@@ -623,13 +623,13 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
       <div className="rounded-box border border-base-300 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden">
-            <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
+            <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
               <tr>
                 <th className="w-[16%]">Lender / Account</th>
-                <th className="w-[9%]">NAV</th>
-                <th className="w-[9%]">Deposits</th>
-                <th className="w-[9%]">Debt</th>
-                <th className="w-[9%]">APR</th>
+                <th className="w-[9%] text-right">NAV</th>
+                <th className="w-[9%] text-right">Deposits</th>
+                <th className="w-[9%] text-right">Debt</th>
+                <th className="w-[9%] text-right">APR</th>
                 <th className="w-[8%]">Health</th>
                 <th className="w-[40%]">Positions</th>
               </tr>
@@ -665,11 +665,11 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                       </td>
                       {hasSingleSub && (
                         <>
-                          <td className="text-xs font-semibold">{abbreviateUsd(entry.balanceData.nav)}</td>
-                          <td className="text-xs">{abbreviateUsd(entry.balanceData.deposits)}</td>
-                          <td className="text-xs">{abbreviateUsd(entry.balanceData.debt)}</td>
+                          <td className="text-xs font-semibold text-right">{abbreviateUsd(entry.balanceData.nav)}</td>
+                          <td className="text-xs text-right">{abbreviateUsd(entry.balanceData.deposits)}</td>
+                          <td className="text-xs text-right">{abbreviateUsd(entry.balanceData.debt)}</td>
                           <td>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center justify-end gap-1">
                               <span className="text-xs font-semibold">
                                 {(entry.aprData.apr + entry.aprData.intrinsicApr).toFixed(2)}%
                               </span>
@@ -717,11 +717,11 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                                 {sub.accountId.slice(0, 8)}...
                               </span>
                             </td>
-                            <td className="text-xs font-semibold">{abbreviateUsd(bal.nav)}</td>
-                            <td className="text-xs">{abbreviateUsd(bal.deposits)}</td>
-                            <td className="text-xs">{abbreviateUsd(bal.debt)}</td>
+                            <td className="text-xs font-semibold text-right">{abbreviateUsd(bal.nav)}</td>
+                            <td className="text-xs text-right">{abbreviateUsd(bal.deposits)}</td>
+                            <td className="text-xs text-right">{abbreviateUsd(bal.debt)}</td>
                             <td>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center justify-end gap-1">
                                 <span className="text-xs font-semibold">
                                   {(sub.aprData.apr + sub.aprData.intrinsicApr).toFixed(2)}%
                                 </span>

@@ -132,22 +132,22 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
       {/* ── Desktop table ── */}
       <div className="hidden md:block overflow-x-auto">
         <table className="table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden">
-          <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
+          <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
             <tr>
               <th className="w-[20%]">Market</th>
-              <th className="w-[11%] cursor-pointer" onClick={() => onToggleSort('apr')}>
+              <th className="w-[11%] cursor-pointer text-right" onClick={() => onToggleSort('apr')}>
                 APR{sortIndicator('apr')}
               </th>
-              <th className="w-[8%] cursor-pointer" onClick={() => onToggleSort('utilization')} title="Utilization">
+              <th className="w-[8%] cursor-pointer text-right" onClick={() => onToggleSort('utilization')} title="Utilization">
                 Util.{sortIndicator('utilization')}
               </th>
-              <th className="w-[11%] cursor-pointer" onClick={() => onToggleSort('totalDepositsUSD')}>
+              <th className="w-[11%] cursor-pointer text-right" onClick={() => onToggleSort('totalDepositsUSD')}>
                 Deposits{sortIndicator('totalDepositsUSD')}
               </th>
-              <th className="w-[10%] cursor-pointer" onClick={() => onToggleSort('totalLiquidityUSD')} title="Liquidity">
+              <th className="w-[10%] cursor-pointer text-right" onClick={() => onToggleSort('totalLiquidityUSD')} title="Liquidity">
                 Liq.{sortIndicator('totalLiquidityUSD')}
               </th>
-              <th className="w-[10%]">Price</th>
+              <th className="w-[10%] text-right">Price</th>
               <th className="w-[10%] cursor-pointer" onClick={() => onToggleSort('riskScore')}>
                 Risk{sortIndicator('riskScore')}
               </th>
@@ -218,8 +218,8 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                       </a>
                     </div>
                   </td>
-                  <td>
-                    <div className="flex items-center gap-1 text-xs">
+                  <td className="text-right">
+                    <div className="flex items-center justify-end gap-1 text-xs">
                       <span className="font-semibold text-success">
                         {(apr + intrinsicYield).toFixed(2)}%
                       </span>
@@ -233,11 +233,11 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                       )}
                     </div>
                   </td>
-                  <td>
+                  <td className="text-right">
                     <UtilCircle pct={utilPct} />
                   </td>
-                  <td>
-                    <div className="flex flex-col text-xs">
+                  <td className="text-right">
+                    <div className="flex flex-col items-end text-xs">
                       <span className="font-semibold" title={`$${formatUsd(totalDepositsUSD)}`}>
                         {abbreviateUsd(totalDepositsUSD)}
                       </span>
@@ -246,7 +246,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                       </span>
                     </div>
                   </td>
-                  <td>
+                  <td className="text-right">
                     <span
                       className="text-xs font-semibold"
                       title={`$${formatUsd(totalLiquidityUSD)}`}
@@ -254,8 +254,8 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                       {abbreviateUsd(totalLiquidityUSD)}
                     </span>
                   </td>
-                  <td>
-                    <div className="flex flex-col text-xs">
+                  <td className="text-right">
+                    <div className="flex flex-col items-end text-xs">
                       {price > 0 && (
                         <span className="font-semibold">${getFormattedPrice(price)}</span>
                       )}
