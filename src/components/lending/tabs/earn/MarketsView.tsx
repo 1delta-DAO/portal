@@ -760,7 +760,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
           {showExtendedFilters && (
             <div
               ref={popoverRef}
-              className={`absolute right-0 z-50 bg-base-200 border border-base-300 rounded-lg shadow-xl p-4 w-85 space-y-3 max-h-[80vh] overflow-y-auto ${popoverAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+              className={`absolute right-0 z-50 bg-base-200 border border-base-300 rounded-lg shadow-xl p-4 w-85 space-y-3 max-h-[80dvh] overflow-y-auto ${popoverAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}
             >
               {/* Asset filter */}
               <div className="form-control">

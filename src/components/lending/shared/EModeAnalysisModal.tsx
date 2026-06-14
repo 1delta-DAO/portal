@@ -229,7 +229,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
 
       {/* modal */}
       <div
-        className="relative z-50 bg-base-100 rounded-box shadow-lg w-full max-w-lg max-h-[80vh] flex flex-col"
+        className="relative z-50 bg-base-100 rounded-box shadow-lg w-full max-w-lg max-h-[80dvh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

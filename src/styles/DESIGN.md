@@ -101,6 +101,13 @@ Empty / null / non-finite → always `—` (`EMPTY_VALUE`). Never `-`, `–`, `N
 - Badges: `<Badge tone="success|error|warning|info|neutral">` → tinted pill
   (`bg-{tone}/15 text-{tone}`, border-0). Tint is **/15** everywhere (not /20).
 - Modals: `<ModalHeader title onClose />` for the header; `modal modal-open` + `modal-box`.
+  - **Mobile scroll rules** (or the modal won't scroll on a phone): size the box
+    with `dvh`, not `vh` (`vh` includes the area behind the browser chrome, so
+    content sits off-screen); make the box `flex flex-col` + `overflow-hidden`
+    with one inner `flex-1 min-h-0 overflow-y-auto overscroll-contain` scroll
+    region; lock the page with `overflow: hidden` on `<html>`/`<body>` — **never**
+    pin `<body>` to `position: fixed`, which kills touch-scroll of the inner list
+    on iOS/Android.
 - Floating popovers: `bg-base-200 border border-base-300 rounded-box shadow-xl`.
 - Dropdowns: `bg-base-100 border border-base-300 rounded-box shadow-lg`.
 - Inputs: `input input-bordered input-sm` (forms), `input-xs` (dense grids);

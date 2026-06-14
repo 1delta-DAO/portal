@@ -70,38 +70,29 @@ export function SearchableSelect({
 
   // Lock page scroll while the mobile modal is open so touch scrolling
   // happens inside the options list instead of the page behind it.
-  // The app's scroll container is <html> (overflow-y: auto in globals.css),
-  // so we lock the documentElement and pin the body to preserve scroll position.
+  //
+  // The app's scroll container is <html> (overflow-y: auto in globals.css), so
+  // freezing `overflow: hidden` on it locks the page at its current position.
+  // We deliberately DON'T pin <body> with `position: fixed` — that trick
+  // preserves scroll position but breaks touch-scrolling of the modal's inner
+  // `overflow-y-auto` list on iOS/Android, which is exactly the bug this
+  // replaces. `overscroll-behavior: contain` keeps scroll chaining out.
   useEffect(() => {
     if (!isMobile || !isOpen) return
     const html = document.documentElement
     const { body } = document
-    const scrollY = window.scrollY
     const prev = {
       htmlOverflow: html.style.overflow,
       htmlOverscroll: html.style.overscrollBehavior,
-      bodyPosition: body.style.position,
-      bodyTop: body.style.top,
-      bodyLeft: body.style.left,
-      bodyRight: body.style.right,
-      bodyWidth: body.style.width,
+      bodyOverflow: body.style.overflow,
     }
     html.style.overflow = 'hidden'
     html.style.overscrollBehavior = 'contain'
-    body.style.position = 'fixed'
-    body.style.top = `-${scrollY}px`
-    body.style.left = '0'
-    body.style.right = '0'
-    body.style.width = '100%'
+    body.style.overflow = 'hidden'
     return () => {
       html.style.overflow = prev.htmlOverflow
       html.style.overscrollBehavior = prev.htmlOverscroll
-      body.style.position = prev.bodyPosition
-      body.style.top = prev.bodyTop
-      body.style.left = prev.bodyLeft
-      body.style.right = prev.bodyRight
-      body.style.width = prev.bodyWidth
-      window.scrollTo(0, scrollY)
+      body.style.overflow = prev.bodyOverflow
     }
   }, [isMobile, isOpen])
 
@@ -153,7 +144,7 @@ export function SearchableSelect({
         {isOpen && (
           <div className="modal modal-open" onClick={() => setIsOpen(false)}>
             <div
-              className="modal-box w-[calc(100vw-1rem)] max-w-sm max-h-[85vh] p-3 sm:p-4 flex flex-col gap-3 overflow-hidden"
+              className="modal-box w-[calc(100vw-1rem)] max-w-sm max-h-[85dvh] p-3 sm:p-4 flex flex-col gap-3 overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header: search + close */}
