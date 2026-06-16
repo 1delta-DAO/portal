@@ -104,14 +104,17 @@ Empty / null / non-finite → always `—` (`EMPTY_VALUE`). Never `-`, `–`, `N
   - **Mobile scroll rules** (or the modal won't scroll on iOS):
     - Size with `dvh`, never `vh` (`vh` includes the area behind the browser
       chrome, so content sits off-screen).
-    - The scrollable region must be a **real scroll container with its own
-      explicit `max-h-[…dvh]` + `overflow-y-auto overscroll-contain`** (see
-      `SearchableSelect`, `ListMode`). Do **NOT** rely on `flex-1 min-h-0`
+    - **Inner scroll:** the scrollable region must be a real scroll container
+      with its own explicit `max-h-[…dvh]` + `overflow-y-auto overscroll-contain`
+      (see `SearchableSelect`, `ListMode`). Do **NOT** rely on `flex-1 min-h-0`
       inside a `position: fixed` / grid-centered `.modal`: iOS Safari fails to
       bound the flex child, the list grows to full height, the parent merely
       clips it, and the drag chains to the page instead of scrolling.
-    - Lock the page with `overflow: hidden` on `<html>`/`<body>`. Do **not** pin
-      `<body>` to `position: fixed`.
+    - **Background lock:** iOS ignores `overflow: hidden` on `<html>`/`<body>`,
+      so pin `<body>` to `position: fixed` at `top: -scrollY` while open and
+      restore scroll on close. This is safe *because* the inner list is its own
+      scroll container (above) — the two MUST be paired. Without the pin,
+      dismissing the keyboard leaves the page scrollable behind the modal.
 - Floating popovers: `bg-base-200 border border-base-300 rounded-box shadow-xl`.
 - Dropdowns: `bg-base-100 border border-base-300 rounded-box shadow-lg`.
 - Inputs: `input input-bordered input-sm` (forms), `input-xs` (dense grids);

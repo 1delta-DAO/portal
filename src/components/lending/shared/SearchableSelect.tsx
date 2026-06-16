@@ -68,31 +68,47 @@ export function SearchableSelect({
     if (isOpen) inputRef.current?.focus()
   }, [isOpen])
 
-  // Lock page scroll while the mobile modal is open so touch scrolling
-  // happens inside the options list instead of the page behind it.
+  // Lock page scroll while the mobile modal is open so touch dragging scrolls
+  // the options list, not the page behind it.
   //
-  // The app's scroll container is <html> (overflow-y: auto in globals.css), so
-  // freezing `overflow: hidden` on it locks the page at its current position.
-  // We deliberately DON'T pin <body> with `position: fixed` — that trick
-  // preserves scroll position but breaks touch-scrolling of the modal's inner
-  // `overflow-y-auto` list on iOS/Android, which is exactly the bug this
-  // replaces. `overscroll-behavior: contain` keeps scroll chaining out.
+  // iOS Safari ignores `overflow: hidden` on <html>/<body> for the main
+  // document scroller, so the ONLY reliable lock is pinning <body> to
+  // `position: fixed` at a negative top offset (and restoring scroll on close).
+  // This is safe for the modal's own scrolling because the options list is a
+  // real scroll container with its own max-height + overflow-y-auto (it does
+  // NOT depend on the page scroller). Without this, dismissing the keyboard
+  // leaves the document scrollable and drags move the background.
   useEffect(() => {
     if (!isMobile || !isOpen) return
     const html = document.documentElement
     const { body } = document
+    const scrollY = window.scrollY
     const prev = {
-      htmlOverflow: html.style.overflow,
       htmlOverscroll: html.style.overscrollBehavior,
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyLeft: body.style.left,
+      bodyRight: body.style.right,
+      bodyWidth: body.style.width,
       bodyOverflow: body.style.overflow,
     }
-    html.style.overflow = 'hidden'
     html.style.overscrollBehavior = 'contain'
+    body.style.position = 'fixed'
+    body.style.top = `-${scrollY}px`
+    body.style.left = '0'
+    body.style.right = '0'
+    body.style.width = '100%'
     body.style.overflow = 'hidden'
     return () => {
-      html.style.overflow = prev.htmlOverflow
       html.style.overscrollBehavior = prev.htmlOverscroll
+      body.style.position = prev.bodyPosition
+      body.style.top = prev.bodyTop
+      body.style.left = prev.bodyLeft
+      body.style.right = prev.bodyRight
+      body.style.width = prev.bodyWidth
       body.style.overflow = prev.bodyOverflow
+      // Restore the pre-lock scroll position (body was pinned at -scrollY).
+      window.scrollTo(0, scrollY)
     }
   }, [isMobile, isOpen])
 
