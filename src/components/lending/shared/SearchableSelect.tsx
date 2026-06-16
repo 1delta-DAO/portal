@@ -144,7 +144,7 @@ export function SearchableSelect({
         {isOpen && (
           <div className="modal modal-open" onClick={() => setIsOpen(false)}>
             <div
-              className="modal-box w-[calc(100vw-1rem)] max-w-sm max-h-[85dvh] p-3 sm:p-4 flex flex-col gap-3 overflow-hidden"
+              className="modal-box w-[calc(100vw-1rem)] max-w-sm max-h-[90dvh] p-3 sm:p-4 flex flex-col gap-3"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header: search + close */}
@@ -167,8 +167,19 @@ export function SearchableSelect({
                 </button>
               </div>
 
-              {/* Options list */}
-              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y -mx-1 px-1 space-y-1">
+              {/* Options list.
+                  iOS-reliable scroll: the list is the scroll container with its
+                  OWN explicit max-height + overflow-y-auto. We deliberately do
+                  NOT use `flex-1 min-h-0` here — inside a position:fixed,
+                  grid-centered `.modal`, iOS Safari fails to give a flex-1 child
+                  a bounded height, so the list grows to full content height, the
+                  parent just clips it, and the drag chains to the page instead of
+                  scrolling the list. An explicit max-height makes the list a real
+                  scroller. */}
+              <div
+                className="overflow-y-auto overscroll-contain touch-pan-y max-h-[70dvh] -mx-1 px-1 space-y-1"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
                 {filtered.map((opt) => (
                   <button
                     key={opt.value}

@@ -11,7 +11,11 @@ interface PoolSelectorDropdownProps {
   label: string
   positionType: 'deposits' | 'debt'
   disabled?: boolean
-  /** MarketUids from the active config — these are sorted to the top. */
+  /**
+   * MarketUids selectable for this side in the active config (collaterals or
+   * borrowables). When non-empty, the list is filtered to just these by default
+   * — a "Show all" toggle reveals the rest; without it, all pools show.
+   */
   preferredUids?: Set<string>
 }
 
@@ -61,6 +65,12 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
 }) => {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  // When a config is active we filter the list down to the assets actually
+  // selectable for this side in that config (i.e. `preferredUids` — the config
+  // group's collaterals / borrowables, which already honor the per-config
+  // `collateralDisabled` / `debtDisabled` flags). `showAll` lets the user opt
+  // back into the full market list.
+  const [showAll, setShowAll] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   // Close on outside click
@@ -72,21 +82,43 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // Sort pools: preferred (config group) first, then positions, then alphabetical
-  const sorted = useMemo(() => {
+  // Reset to the config-filtered view whenever the active config (and thus the
+  // selectable set) changes, so switching configs doesn't silently keep the
+  // full list open.
+  useEffect(() => {
+    setShowAll(false)
+  }, [preferredUids])
+
+  const hasPreferred = !!(preferredUids && preferredUids.size > 0)
+
+  // Filter + sort. With a config active, default to only the selectable assets;
+  // `showAll` reveals the rest. The selected asset is always kept visible so a
+  // prior out-of-config selection doesn't vanish from the list.
+  const { visible, configCount, otherCount } = useMemo(() => {
     const q = search.toLowerCase()
-    const filtered = pools.filter(
+    const textFiltered = pools.filter(
       (p) =>
         !q || p.asset.symbol.toLowerCase().includes(q) || p.asset.name.toLowerCase().includes(q)
     )
 
-    const hasPreferred = preferredUids && preferredUids.size > 0
+    let configCount = 0
+    if (hasPreferred) {
+      for (const p of textFiltered) if (preferredUids!.has(p.marketUid)) configCount++
+    }
+    const otherCount = textFiltered.length - configCount
 
-    return [...filtered].sort((a, b) => {
+    const base =
+      hasPreferred && !showAll
+        ? textFiltered.filter(
+            (p) => preferredUids!.has(p.marketUid) || p.marketUid === value?.marketUid
+          )
+        : textFiltered
+
+    const visible = [...base].sort((a, b) => {
       // Preferred pools first
       if (hasPreferred) {
-        const prefA = preferredUids.has(a.marketUid)
-        const prefB = preferredUids.has(b.marketUid)
+        const prefA = preferredUids!.has(a.marketUid)
+        const prefB = preferredUids!.has(b.marketUid)
         if (prefA && !prefB) return -1
         if (prefB && !prefA) return 1
       }
@@ -108,7 +140,9 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
       if (valB > 0 && valA === 0) return 1
       return a.asset.symbol.localeCompare(b.asset.symbol)
     })
-  }, [pools, search, userPositions, positionType, preferredUids])
+
+    return { visible, configCount, otherCount }
+  }, [pools, search, userPositions, positionType, preferredUids, hasPreferred, showAll, value])
 
   const getPosition = (pool: PoolDataItem): PositionInfo | null => {
     const pos = userPositions.get(pool.marketUid)
@@ -180,25 +214,40 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
               autoFocus
             />
           </div>
+          {hasPreferred && (otherCount > 0 || showAll) && (
+            <button
+              type="button"
+              className="shrink-0 flex items-center justify-between gap-2 w-full px-2 py-1.5 text-[11px] border-b border-base-300 bg-base-100 text-base-content/60 hover:text-base-content hover:bg-base-200 transition-colors"
+              onClick={() => setShowAll((v) => !v)}
+            >
+              <span>
+                {showAll
+                  ? `Showing all markets (${configCount} selectable in config)`
+                  : `Showing config only (${configCount} selectable)`}
+              </span>
+              <span className="font-medium text-primary/80">
+                {showAll ? 'Show config only' : `Show all (+${otherCount})`}
+              </span>
+            </button>
+          )}
           <div className="overflow-y-auto flex-1 min-h-0">
-            {sorted.length === 0 && (
+            {visible.length === 0 && (
               <div className="px-3 py-3 text-xs text-base-content/50 text-center">
-                No assets found
+                {hasPreferred && !showAll ? 'Nothing selectable in this config' : 'No assets found'}
               </div>
             )}
-            {sorted.map((pool, idx) => {
+            {visible.map((pool, idx) => {
               const position = getPosition(pool)
               const isSelected = value?.marketUid === pool.marketUid
-              const hasPreferred = preferredUids && preferredUids.size > 0
-              const isPreferred = hasPreferred && preferredUids.has(pool.marketUid)
+              const isPreferred = hasPreferred && preferredUids!.has(pool.marketUid)
 
               // Show separator between preferred and non-preferred groups
-              const prevPool = idx > 0 ? sorted[idx - 1] : null
+              const prevPool = idx > 0 ? visible[idx - 1] : null
               const showSeparator =
                 hasPreferred &&
                 !isPreferred &&
                 prevPool &&
-                preferredUids.has(prevPool.marketUid)
+                preferredUids!.has(prevPool.marketUid)
 
               return (
                 <React.Fragment key={pool.marketUid}>
