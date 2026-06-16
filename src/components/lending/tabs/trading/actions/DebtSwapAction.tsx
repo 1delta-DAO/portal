@@ -362,13 +362,13 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
       {selectedIndex !== null && (
         <div className="space-y-1.5">
           {permissions.map((tx, i) => (
-            <button key={`perm-${i}`} type="button" className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 whitespace-normal text-xs" title={tx.description || 'Approve'} onClick={() => executeNextPermission()}>
-              {tx.description || 'Approve'}
+            <button key={`perm-${i}`} type="button" className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs" title={tx.description || 'Approve'} onClick={() => executeNextPermission(i)}>
+              <span className="block truncate max-w-full">{tx.description || 'Approve'}</span>
             </button>
           ))}
           {transactions.map((tx, i) => (
-            <button key={`tx-${i}`} type="button" className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 whitespace-normal text-xs" title={tx.description || 'Execute Setup Transaction'} onClick={() => executeNextTransaction()}>
-              {tx.description || 'Execute Setup Transaction'}
+            <button key={`tx-${i}`} type="button" className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs" title={tx.description || 'Execute Setup Transaction'} onClick={() => executeNextTransaction(i)}>
+              <span className="block truncate max-w-full">{tx.description || 'Execute Setup Transaction'}</span>
             </button>
           ))}
           <button type="button" className="btn btn-success btn-sm w-full" disabled={executingQuote} onClick={() => executeQuote('DebtSwap')}>

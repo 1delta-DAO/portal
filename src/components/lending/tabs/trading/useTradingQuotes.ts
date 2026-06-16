@@ -188,11 +188,11 @@ interface QuoteState {
   simulation: SimulationResult | null
   selectedIndex: number | null
   loading: boolean
-  executingPermission: boolean
-  executingTransaction: boolean
+  executingPermissionIdx: number | null
+  executingTransactionIdx: number | null
   executingQuote: boolean
-  permissionsCompleted: number
-  transactionsCompleted: number
+  completedPermissions: number[]
+  completedTransactions: number[]
   txSuccess: TxSuccessState | null
   error: string | null
 }
@@ -208,11 +208,11 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
     simulation: null,
     selectedIndex: null,
     loading: false,
-    executingPermission: false,
-    executingTransaction: false,
+    executingPermissionIdx: null,
+    executingTransactionIdx: null,
     executingQuote: false,
-    permissionsCompleted: 0,
-    transactionsCompleted: 0,
+    completedPermissions: [],
+    completedTransactions: [],
     txSuccess: null,
     error: null,
   }
@@ -236,8 +236,8 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
         rateImpact: null,
         simulation: null,
         selectedIndex: null,
-        permissionsCompleted: 0,
-        transactionsCompleted: 0,
+        completedPermissions: [],
+        completedTransactions: [],
         txSuccess: null,
       }))
 
@@ -306,29 +306,29 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
     setState((s) => ({ ...s, selectedIndex: index }))
   }, [])
 
-  const executeNextPermission = useCallback(async () => {
-    const idx = state.permissionsCompleted
-    if (idx >= state.permissions.length) return
-    setState((s) => ({ ...s, executingPermission: true, error: null }))
+  const executeNextPermission = useCallback(async (idx: number) => {
+    if (idx < 0 || idx >= state.permissions.length) return
+    setState((s) => ({ ...s, executingPermissionIdx: idx, error: null }))
     const { ok, error: txError } = await send(state.permissions[idx])
-    if (ok) {
-      setState((s) => ({ ...s, executingPermission: false, permissionsCompleted: s.permissionsCompleted + 1 }))
-    } else {
-      setState((s) => ({ ...s, executingPermission: false, error: txError ?? 'Permission failed' }))
-    }
-  }, [state.permissionsCompleted, state.permissions, send])
+    setState((s) => ({
+      ...s,
+      executingPermissionIdx: null,
+      completedPermissions: ok && !s.completedPermissions.includes(idx) ? [...s.completedPermissions, idx] : s.completedPermissions,
+      error: ok ? null : (txError ?? 'Permission failed'),
+    }))
+  }, [state.permissions, send])
 
-  const executeNextTransaction = useCallback(async () => {
-    const idx = state.transactionsCompleted
-    if (idx >= state.transactions.length) return
-    setState((s) => ({ ...s, executingTransaction: true, error: null }))
+  const executeNextTransaction = useCallback(async (idx: number) => {
+    if (idx < 0 || idx >= state.transactions.length) return
+    setState((s) => ({ ...s, executingTransactionIdx: idx, error: null }))
     const { ok, error: txError } = await send(state.transactions[idx])
-    if (ok) {
-      setState((s) => ({ ...s, executingTransaction: false, transactionsCompleted: s.transactionsCompleted + 1 }))
-    } else {
-      setState((s) => ({ ...s, executingTransaction: false, error: txError ?? 'Transaction failed' }))
-    }
-  }, [state.transactionsCompleted, state.transactions, send])
+    setState((s) => ({
+      ...s,
+      executingTransactionIdx: null,
+      completedTransactions: ok && !s.completedTransactions.includes(idx) ? [...s.completedTransactions, idx] : s.completedTransactions,
+      error: ok ? null : (txError ?? 'Transaction failed'),
+    }))
+  }, [state.transactions, send])
 
   const executeQuote = useCallback(async (operation: TradingOperation) => {
     if (state.selectedIndex === null) return
@@ -343,15 +343,15 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
   }, [state.selectedIndex, state.quotes, send])
 
   const dismissSuccess = useCallback(() => {
-    setState((s) => ({ ...s, txSuccess: null, quotes: [], permissions: [], transactions: [], permissionsCompleted: 0, transactionsCompleted: 0, selectedIndex: null }))
+    setState((s) => ({ ...s, txSuccess: null, quotes: [], permissions: [], transactions: [], completedPermissions: [], completedTransactions: [], selectedIndex: null }))
   }, [])
 
   const reset = useCallback(() => {
     setState(initialState)
   }, [])
 
-  const allPermissionsDone = state.permissions.length === 0 || state.permissionsCompleted >= state.permissions.length
-  const allTransactionsDone = state.transactions.length === 0 || state.transactionsCompleted >= state.transactions.length
+  const allPermissionsDone = state.completedPermissions.length >= state.permissions.length
+  const allTransactionsDone = state.completedTransactions.length >= state.transactions.length
 
   return {
     ...state,
