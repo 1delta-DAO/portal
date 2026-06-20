@@ -7,6 +7,7 @@ import { computePoolMetrics, type SortKey } from './helpers'
 import { ExposureCell } from './ExposureCell'
 import { AssetPopover } from '../../shared/AssetPopover'
 import { RiskBadge } from '../../shared/RiskBadge'
+import { OracleBadge } from '../../shared/OracleBadge'
 import { buildPath } from '../../../../utils/routes'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { Logo } from '../../../common/Logo'
@@ -262,11 +263,16 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                     </div>
                   </td>
                   <td>
-                    {p.risk ? (
-                      <RiskBadge label={p.risk.label} breakdown={p.risk.breakdown} />
-                    ) : (
-                      <span className="text-xs text-base-content/40">—</span>
-                    )}
+                    <div className="flex flex-col items-start gap-1">
+                      {p.risk ? (
+                        <RiskBadge label={p.risk.label} breakdown={p.risk.breakdown} />
+                      ) : (
+                        <span className="text-xs text-base-content/40">—</span>
+                      )}
+                      {p.oracleInfo && p.oracleInfo.feeds.length > 0 && (
+                        <OracleBadge oracleInfo={p.oracleInfo} size="sm" />
+                      )}
+                    </div>
                   </td>
                   <td>
                     <ExposureCell exposures={p.exposures} chainTokens={chainTokens} />
@@ -422,6 +428,9 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                 <span>Liq: {abbreviateUsd(totalLiquidityUSD)}</span>
                 {p.risk && (
                   <RiskBadge label={p.risk.label} breakdown={p.risk.breakdown} size="sm" />
+                )}
+                {p.oracleInfo && p.oracleInfo.feeds.length > 0 && (
+                  <OracleBadge oracleInfo={p.oracleInfo} size="sm" />
                 )}
               </div>
             </div>

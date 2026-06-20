@@ -43,6 +43,50 @@ export interface PoolUnderlyingInfo {
   oraclePrice: PoolOraclePrice
 }
 
+/** Oracle risk band, ordered low→high. */
+export type OracleBand = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+
+/**
+ * One oracle feed classification for a market, from the risk-data pipeline.
+ * Distinct from `risk.breakdown[oracle]` (price-staleness): this describes
+ * whether the feed prices the *intended* asset/numeraire. `score` is 0–100.
+ */
+export interface PoolOracleFeed {
+  /** Priced asset symbol (the reported numerator). */
+  asset: string | null
+  /** Oracle / feed / adapter address (lowercased). */
+  oracle: string | null
+  /** Oracle type: `chainlink`, `redstone`, `composite`, `constant`, … */
+  provider: string | null
+  /** Decoded reported pair, e.g. "ETH / USD"; null/"UNKNOWN" when undecoded. */
+  priceDescription: string | null
+  /** What the feed *should* report, "<asset> / <numeraire>". null for Morpho. */
+  intendedPair: string | null
+  /** Does the source price the intended asset? null = unverifiable. */
+  correctOracle: boolean | null
+  /** Denominated in the right numeraire? null = unknown (always null for Morpho). */
+  denominatorMatch: boolean | null
+  /** Hardcoded/constant price feed. */
+  fixedRate: boolean
+  /** Risk score 0–100. */
+  score: number
+  band: OracleBand
+  /** e.g. `wrong-asset`, `cross-numeraire`, `undecoded-source`, `fixed-rate`. */
+  flags: string[]
+}
+
+/**
+ * Top-level oracle classification for a market. A market can have several
+ * feeds (Compound comets price each asset; Fluid prices each side), so `feeds`
+ * is an array; `worstScore`/`worstBand` summarize the riskiest feed. `null`
+ * when the market has no oracle classification.
+ */
+export interface PoolOracleInfo {
+  feeds: PoolOracleFeed[]
+  worstScore: number
+  worstBand: OracleBand
+}
+
 export interface LenderInfo {
   key: string
   name: string
@@ -104,6 +148,11 @@ export interface PoolEntry {
   rewards: unknown | null
   underlyingInfo: PoolUnderlyingInfo
   risk: PoolRisk | null
+  /**
+   * Oracle feed-correctness classification (top-level, sibling of `risk`).
+   * `null`/absent ⇒ no oracle data for this market. See {@link PoolOracleInfo}.
+   */
+  oracleInfo: PoolOracleInfo | null
   /**
    * Brokered (Lista) rate card — termId/durationDays/apr serialized as strings.
    * `null`/absent ⇒ not brokered; `[]` ⇒ the broker pruned the menu (treat as

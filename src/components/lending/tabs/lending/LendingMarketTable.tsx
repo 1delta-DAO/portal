@@ -10,6 +10,7 @@ import {
 import { type SortKey, LtvBadge } from '../../dashboard'
 import { AssetPopover } from '../../shared/AssetPopover'
 import { RiskBadge } from '../../shared/RiskBadge'
+import { OracleBadge } from '../../shared/OracleBadge'
 import { BrokeredAprCell } from '../../shared/BrokeredAprCell'
 import { useTablePagination } from '../../../../hooks/useTablePagination'
 import { SortableHeader } from '../../../common/SortableHeader'
@@ -222,11 +223,16 @@ export const LendingMarketTable: React.FC<Props> = ({
                     </div>
                   </td>
                   <td>
-                    {pool.risk ? (
-                      <RiskBadge label={pool.risk.label} breakdown={pool.risk.breakdown} />
-                    ) : (
-                      <span className="text-xs text-base-content/40">—</span>
-                    )}
+                    <div className="flex flex-col items-start gap-1">
+                      {pool.risk ? (
+                        <RiskBadge label={pool.risk.label} breakdown={pool.risk.breakdown} />
+                      ) : (
+                        <span className="text-xs text-base-content/40">—</span>
+                      )}
+                      {pool.oracleInfo && pool.oracleInfo.feeds.length > 0 && (
+                        <OracleBadge oracleInfo={pool.oracleInfo} size="sm" />
+                      )}
+                    </div>
                   </td>
                 </tr>
               )
@@ -420,10 +426,17 @@ const MobilePoolCards: React.FC<{
                 </span>
               </div>
 
-              {pool.risk && (
+              {(pool.risk || (pool.oracleInfo && pool.oracleInfo.feeds.length > 0)) && (
                 <div className="col-span-2 flex items-center justify-between gap-2 min-w-0 pt-1 border-t border-base-300/50">
                   <span className="text-base-content/50">Risk</span>
-                  <RiskBadge label={pool.risk.label} breakdown={pool.risk.breakdown} size="sm" />
+                  <span className="flex items-center gap-3">
+                    {pool.risk && (
+                      <RiskBadge label={pool.risk.label} breakdown={pool.risk.breakdown} size="sm" />
+                    )}
+                    {pool.oracleInfo && pool.oracleInfo.feeds.length > 0 && (
+                      <OracleBadge oracleInfo={pool.oracleInfo} size="sm" />
+                    )}
+                  </span>
                 </div>
               )}
             </div>

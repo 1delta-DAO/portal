@@ -1,5 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import type { PoolRiskBreakdown, PoolRisk, PoolTerm, LenderInfo } from './useFlattenedPools'
+import type {
+  PoolRiskBreakdown,
+  PoolRisk,
+  PoolTerm,
+  LenderInfo,
+  PoolOracleInfo,
+} from './useFlattenedPools'
 import { BACKEND_BASE_URL } from '../../config/backend'
 
 const endpointLendingLatest = `${BACKEND_BASE_URL}/v1/data/lending/latest`
@@ -83,6 +89,8 @@ interface RawMarket {
     prices: Record<string, unknown> | null
   }
   risk?: PoolRisk | null
+  /** Oracle feed-correctness classification (top-level on /lending/latest markets). */
+  oracleInfo?: PoolOracleInfo | null
   params?: any
 }
 
@@ -151,6 +159,8 @@ export interface PoolDataItem {
   oraclePrice?: number
   oraclePriceUSD?: number
   risk?: PoolRisk | null
+  /** Oracle feed-correctness classification (top-level, sibling of `risk`). */
+  oracleInfo?: PoolOracleInfo | null
   params?: any
   /**
    * Brokered (Lista) rate card. Non-empty ⇒ fixed-term-only borrowing; offer
@@ -240,6 +250,7 @@ function rawMarketToPoolDataItem(raw: RawMarket): PoolDataItem {
     oraclePrice: info.oraclePrice?.oraclePrice ?? undefined,
     oraclePriceUSD: info.oraclePrice?.oraclePriceUsd ?? undefined,
     risk: raw.risk ?? null,
+    oracleInfo: raw.oracleInfo ?? null,
     params: raw.params,
     // Coerce the string-serialized rate card into clean numbers.
     terms: raw.terms
