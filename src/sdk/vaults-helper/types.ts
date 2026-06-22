@@ -16,6 +16,7 @@ export type VaultProvider =
   | 'lst'
   | 'savings'
   | 'lagoon'
+  | 'upshift'
   | 'hypercore'
   | 'gmx'
 
@@ -29,6 +30,7 @@ export const VAULT_PROVIDERS: VaultProvider[] = [
   'lst',
   'savings',
   'lagoon',
+  'upshift',
   'hypercore',
   'gmx',
 ]

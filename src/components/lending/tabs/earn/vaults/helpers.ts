@@ -19,6 +19,7 @@ export const PROVIDER_LABELS: Record<VaultProvider, string> = {
   lst: 'Liquid Staking',
   savings: 'Savings',
   lagoon: 'Lagoon',
+  upshift: 'Upshift',
   hypercore: 'HyperCore',
   gmx: 'GMX',
 }
