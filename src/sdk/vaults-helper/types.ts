@@ -221,8 +221,9 @@ export interface VaultEntry {
   /**
    * All-in supply APR as a *percent* (e.g. 5.2 means 5.2%) — base lending yield
    * + incentive rewards (the backend's `totalRate`). Fluid/Gearbox/Silo
-   * populate this; Morpho usually fills it in via its own API; Euler-Earn
-   * currently always returns 0. UI should treat 0 as "unknown" for euler-earn.
+   * populate this; Morpho usually fills it in via its own API. A `0` here means
+   * the rate is unknown/unpopulated (historically every Euler Earn vault,
+   * though many now report real rates) — UI should treat 0 as "unknown".
    */
   supplyRate?: number
   /**

@@ -203,10 +203,12 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
     }
 
     if (Number.isFinite(minSupplyRatePct) && minSupplyRatePct > 0) {
-      // Skip euler-earn's always-0 rate so the filter doesn't accidentally hide
-      // every Euler vault. Same accommodation the table uses to label the rate.
+      // Keep vaults whose rate the backend didn't expose (rendered as "—") so a
+      // min-APR filter doesn't hide unknown-rate vaults; apply the threshold to
+      // everything that does report a rate — including Euler Earn vaults, which
+      // now populate real rates rather than always returning 0.
       arr = arr.filter(
-        (v) => v.provider === 'euler-earn' || baseApr(v) >= minSupplyRatePct
+        (v) => !isSupplyRateMeaningful(v) || baseApr(v) >= minSupplyRatePct
       )
     }
 

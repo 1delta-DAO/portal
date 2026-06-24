@@ -33,10 +33,14 @@ export const PROVIDER_LOGOS: Partial<Record<VaultProvider, string>> = {
   gearbox: 'https://raw.githubusercontent.com/1delta-DAO/asset-list-config/main/lender-info/gearbox-v3/logo.svg',
 }
 
-/** APR helper — Euler Earn always returns 0 from /v1/data/vaults today. */
+/**
+ * Whether the backend exposed a usable APR. A `0` rate means "unknown / not
+ * populated" (some vaults — historically every Euler Earn vault, though many
+ * now report real rates — return 0), so we render those as "—" rather than a
+ * misleading 0.00%. Don't blanket-exclude by provider: a positive rate is
+ * meaningful no matter who reports it.
+ */
 export function isSupplyRateMeaningful(entry: VaultEntry): boolean {
-  if (entry.provider === 'euler-earn') return false
-  // Meaningful when the backend exposed any positive rate — base or all-in.
   return (entry.baseRate ?? 0) > 0 || (entry.supplyRate ?? 0) > 0
 }
 
