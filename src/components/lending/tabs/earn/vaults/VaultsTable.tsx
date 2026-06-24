@@ -7,9 +7,13 @@ import type { VaultEntry } from '../../../../../sdk/vaults-helper'
 import {
   PROVIDER_LABELS,
   PROVIDER_LOGOS,
+  baseApr,
   formatSupplyRate,
   hasLiquidity,
+  hasRewardsApr,
   isSupplyRateMeaningful,
+  rewardsApr,
+  totalApr,
   liquidityNative,
   liquidityUsd,
   tvlNative,
@@ -111,14 +115,18 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
         <table className="table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden">
           <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
             <tr>
-              <th className="w-[22%] cursor-pointer" onClick={() => onToggleSort('name')}>
+              <th className="w-[21%] cursor-pointer" onClick={() => onToggleSort('name')}>
                 Vault{sortIndicator('name')}
               </th>
               <th className="w-[12%] cursor-pointer" onClick={() => onToggleSort('provider')}>
                 Provider{sortIndicator('provider')}
               </th>
-              <th className="w-[11%]">Underlying</th>
-              <th className="w-[9%] cursor-pointer text-right" onClick={() => onToggleSort('supplyRate')}>
+              <th className="w-[10%]">Underlying</th>
+              <th
+                className="w-[11%] cursor-pointer text-right"
+                onClick={() => onToggleSort('supplyRate')}
+                title="Base lending yield (real APR), excluding incentives"
+              >
                 APR{sortIndicator('supplyRate')}
               </th>
               <th className="w-[12%] text-right" title="Price per share">
@@ -198,14 +206,28 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                     </div>
                   </td>
                   <td className="text-right">
-                    <span
-                      className={`text-xs font-semibold ${
-                        isSupplyRateMeaningful(v) ? 'text-success' : 'text-base-content/40'
-                      }`}
-                      title={isSupplyRateMeaningful(v) ? `${v.supplyRate}%` : 'APR not exposed by this provider'}
-                    >
-                      {formatSupplyRate(v)}
-                    </span>
+                    <div className="flex flex-col items-end leading-tight">
+                      <span
+                        className={`text-xs font-semibold ${
+                          isSupplyRateMeaningful(v) ? 'text-success' : 'text-base-content/40'
+                        }`}
+                        title={
+                          isSupplyRateMeaningful(v)
+                            ? `${baseApr(v).toFixed(2)}% base lending yield (real APR)`
+                            : 'APR not exposed by this provider'
+                        }
+                      >
+                        {formatSupplyRate(v)}
+                      </span>
+                      {hasRewardsApr(v) && (
+                        <span
+                          className="text-[10px] text-base-content/40 whitespace-nowrap"
+                          title={`+${rewardsApr(v).toFixed(2)}% incentives — ${totalApr(v).toFixed(2)}% total APR`}
+                        >
+                          +{rewardsApr(v).toFixed(2)}%
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="text-right">
                     {v.sharePriceUsd != null || v.sharePrice != null ? (
@@ -345,7 +367,7 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                     </span>
                   </div>
                 </div>
-                <div className="text-right shrink-0">
+                <div className="text-right shrink-0 leading-tight">
                   <div
                     className={`font-bold text-sm ${
                       isSupplyRateMeaningful(v) ? 'text-success' : 'text-base-content/40'
@@ -353,7 +375,16 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                   >
                     {formatSupplyRate(v)}
                   </div>
-                  <span className="text-[10px] text-base-content/50 block">Supply APR</span>
+                  {hasRewardsApr(v) ? (
+                    <span
+                      className="text-[10px] text-base-content/40 block whitespace-nowrap"
+                      title={`${totalApr(v).toFixed(2)}% total APR incl. incentives`}
+                    >
+                      +{rewardsApr(v).toFixed(2)}% rewards
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-base-content/50 block">Supply APR</span>
+                  )}
                 </div>
               </div>
               <div className="flex items-center justify-between mt-2 text-xs text-base-content/70 gap-2">

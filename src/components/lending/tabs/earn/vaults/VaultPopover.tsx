@@ -1,6 +1,13 @@
 import React from 'react'
 import type { VaultEntry } from '../../../../../sdk/vaults-helper'
-import { PROVIDER_LABELS, formatSupplyRate, isSupplyRateMeaningful } from './helpers'
+import {
+  PROVIDER_LABELS,
+  formatSupplyRate,
+  hasRewardsApr,
+  isSupplyRateMeaningful,
+  rewardsApr,
+  totalApr,
+} from './helpers'
 import { abbreviateUsd } from '../../../../../utils/format'
 import { PortalPopover, PopoverField, CopyRow } from '../../../../common/PortalPopover'
 
@@ -30,6 +37,7 @@ export const VaultPopover: React.FC<VaultPopoverProps> = ({
   const logo = vault.logoURI ?? underlyingLogo
   const sym = vault.symbol || vault.name
   const apr = isSupplyRateMeaningful(vault) ? formatSupplyRate(vault) : null
+  const showAprBreakdown = hasRewardsApr(vault)
 
   return (
     <PortalPopover
@@ -46,7 +54,24 @@ export const VaultPopover: React.FC<VaultPopoverProps> = ({
       {vault.yieldProfile && <PopoverField label="Profile" value={vault.yieldProfile} capitalize />}
       {vault.denomination && <PopoverField label="Denom." value={vault.denomination} capitalize />}
       {chainId && <PopoverField label="Chain" value={chainId} />}
-      {apr && <PopoverField label="APR" value={<span className="text-success">{apr}</span>} />}
+      {apr && (
+        <PopoverField
+          label="Supply APR"
+          value={<span className="font-semibold text-success">{apr}</span>}
+        />
+      )}
+      {showAprBreakdown && (
+        <>
+          <PopoverField
+            label="Rewards"
+            value={<span className="text-base-content/50">+{rewardsApr(vault).toFixed(2)}%</span>}
+          />
+          <PopoverField
+            label="Total APR"
+            value={<span className="text-base-content/50">{totalApr(vault).toFixed(2)}%</span>}
+          />
+        </>
+      )}
       {(vault.sharePriceUsd != null || vault.sharePrice != null) && (
         <div className="flex items-start gap-2">
           <span className="text-base-content/50 shrink-0 w-16">Share px</span>

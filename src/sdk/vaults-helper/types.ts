@@ -219,11 +219,25 @@ export interface VaultEntry {
   /** Price per share in USD (e.g. 1.0144). */
   sharePriceUsd?: number
   /**
-   * Supply APR as a *percent* (e.g. 5.2 means 5.2%). Fluid/Gearbox/Silo
+   * All-in supply APR as a *percent* (e.g. 5.2 means 5.2%) — base lending yield
+   * + incentive rewards (the backend's `totalRate`). Fluid/Gearbox/Silo
    * populate this; Morpho usually fills it in via its own API; Euler-Earn
    * currently always returns 0. UI should treat 0 as "unknown" for euler-earn.
    */
   supplyRate?: number
+  /**
+   * Base lending yield as a *percent* — the underlying-denominated "real yield"
+   * before incentives (the backend's `depositRate`). Absent when a provider
+   * doesn't split its rate out; callers should fall back to {@link supplyRate}.
+   */
+  baseRate?: number
+  /**
+   * Incentive/rewards APR as a *percent* — the token-incentive slice on top of
+   * {@link baseRate} (the backend's `rewardsRate`). `supplyRate ≈ baseRate +
+   * rewardsRate`. Break this out so users don't mistake incentives for real
+   * yield.
+   */
+  rewardsRate?: number
   /** Vault management fee, percent. */
   fee?: number
   /** Curator label (provider-specific shape — see `extras` for raw). */

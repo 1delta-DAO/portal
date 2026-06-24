@@ -28,6 +28,7 @@ import type { TokenBalance } from '../../../../../hooks/lending/useTokenBalances
 import {
   PROVIDER_LABELS,
   PROVIDER_LOGOS,
+  baseApr,
   formatSupplyRate,
   isSupplyRateMeaningful,
 } from './helpers'
@@ -627,7 +628,9 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
           {tab === 'Deposit' && selected && isSupplyRateMeaningful(selected) && (() => {
             const amt = parseAmount(amount)
             const px = selected.underlyingPriceUsd ?? userPosition?.priceUSD ?? 0
-            const apr = selected.supplyRate ?? 0
+            // Project off the real (base) yield — incentive-inflated totals
+            // would wildly overstate expected earnings.
+            const apr = baseApr(selected)
             const monthly = amt > 0 && px > 0 && apr > 0 ? (amt * px * (apr / 100)) / 12 : 0
             if (monthly <= 0) return null
             return (

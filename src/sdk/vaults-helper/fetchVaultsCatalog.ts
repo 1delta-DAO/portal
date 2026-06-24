@@ -125,8 +125,12 @@ function normalizeVault(v: RawVault): VaultEntry | null {
     underlyingPriceUsd: toNumber(price.priceUsd),
     sharePrice: toNumber(v.sharePrice),
     sharePriceUsd: toNumber(v.sharePriceUsd),
-    // `totalRate` is the depositor's all-in APR (deposit + rewards).
+    // `totalRate` is the depositor's all-in APR (deposit + rewards); keep the
+    // base lending yield and incentive slice separate so the UI can show the
+    // "real yield" distinct from incentives.
     supplyRate: toNumber(rates.totalRate),
+    baseRate: toNumber(rates.depositRate),
+    rewardsRate: toNumber(rates.rewardsRate),
     fee: toNumber(rates.fee),
     curator: deriveCurator(provider, v),
     // Resolved icon — vaultInfo first, then the underlying asset's logo.

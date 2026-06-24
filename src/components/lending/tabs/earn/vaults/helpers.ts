@@ -36,12 +36,50 @@ export const PROVIDER_LOGOS: Partial<Record<VaultProvider, string>> = {
 /** APR helper — Euler Earn always returns 0 from /v1/data/vaults today. */
 export function isSupplyRateMeaningful(entry: VaultEntry): boolean {
   if (entry.provider === 'euler-earn') return false
-  return typeof entry.supplyRate === 'number' && entry.supplyRate > 0
+  // Meaningful when the backend exposed any positive rate — base or all-in.
+  return (entry.baseRate ?? 0) > 0 || (entry.supplyRate ?? 0) > 0
 }
 
+/**
+ * Base lending yield — the underlying-denominated "real yield" before
+ * incentives (the backend's `depositRate`). This is the headline APR: token
+ * incentives can inflate `totalRate` to wildly misleading values (e.g. a vault
+ * earning ~9% really can report a 132% "total"), so we never lead with it.
+ * Falls back to the all-in `supplyRate` for providers that don't split it out.
+ */
+export function baseApr(entry: VaultEntry): number {
+  return typeof entry.baseRate === 'number' ? entry.baseRate : entry.supplyRate ?? 0
+}
+
+/** All-in APR (base lending yield + incentives) — the backend's `totalRate`. */
+export function totalApr(entry: VaultEntry): number {
+  if (typeof entry.supplyRate === 'number') return entry.supplyRate
+  return baseApr(entry) + rewardsApr(entry)
+}
+
+/** Incentive/rewards APR layered on top of {@link baseApr}. */
+export function rewardsApr(entry: VaultEntry): number {
+  if (typeof entry.rewardsRate === 'number') return entry.rewardsRate
+  // Derive from the gap when a provider gives a total but no explicit split.
+  const gap = (entry.supplyRate ?? 0) - baseApr(entry)
+  return gap > 0 ? gap : 0
+}
+
+/**
+ * The headline APR string — the *real* (base) supply yield, excluding
+ * incentives. Returns "—" when no rate is exposed.
+ */
 export function formatSupplyRate(entry: VaultEntry): string {
   if (!isSupplyRateMeaningful(entry)) return '—'
-  return `${(entry.supplyRate ?? 0).toFixed(2)}%`
+  return `${baseApr(entry).toFixed(2)}%`
+}
+
+/**
+ * True when incentives add a non-trivial slice on top of the base yield, so the
+ * UI should surface the rewards/total as a secondary, de-emphasized figure.
+ */
+export function hasRewardsApr(entry: VaultEntry): boolean {
+  return isSupplyRateMeaningful(entry) && rewardsApr(entry) > 0.01
 }
 
 /**
@@ -141,7 +179,8 @@ export function compareVaults(a: VaultEntry, b: VaultEntry, key: VaultSortKey): 
     case 'provider':
       return a.provider.localeCompare(b.provider)
     case 'supplyRate':
-      return (a.supplyRate ?? 0) - (b.supplyRate ?? 0)
+      // Rank by the real (base) yield, not the incentive-inflated total.
+      return baseApr(a) - baseApr(b)
     case 'totalAssetsUsd':
       return (a.totalAssetsUsd ?? 0) - (b.totalAssetsUsd ?? 0)
     case 'totalAssets': {

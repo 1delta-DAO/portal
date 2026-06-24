@@ -20,6 +20,7 @@ import { UserVaultsTable } from './UserVaultsTable'
 import { PendingWithdrawals } from './PendingWithdrawals'
 import {
   PROVIDER_LABELS,
+  baseApr,
   compareVaults,
   hasTvl,
   isSupplyRateMeaningful,
@@ -205,7 +206,7 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
       // Skip euler-earn's always-0 rate so the filter doesn't accidentally hide
       // every Euler vault. Same accommodation the table uses to label the rate.
       arr = arr.filter(
-        (v) => v.provider === 'euler-earn' || (v.supplyRate ?? 0) >= minSupplyRatePct
+        (v) => v.provider === 'euler-earn' || baseApr(v) >= minSupplyRatePct
       )
     }
 
