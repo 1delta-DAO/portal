@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry, UserSubAccount } from '../../../hooks/lending/useUserData'
 import type { PoolSide } from '../tabs/trading/types'
@@ -15,6 +15,7 @@ import {
   loanRatePct,
   hasEarlyRepayPenalty,
 } from './brokeredLoans'
+import { RefinanceModal } from './RefinanceModal'
 
 /** Total debt of a position in token units — variable + stable (brokered fixed
  *  debt sits in the stable slot). */
@@ -276,8 +277,29 @@ function PositionSection({
             const isSelected = selectedPoolMarketUid === pool.marketUid
             const loans = !isDeposits ? loansByMarket?.get(pool.marketUid) : undefined
 
+            // Brokered (fixed-term) debt positions report `variableBorrowRate: 0`
+            // — the underlying Moolah borrow runs at 0% and the broker accrues
+            // interest itself — so the market rate would render a misleading
+            // "0.00% APR" for a position that actually carries fixed-rate loans.
+            // Show the debt-weighted blend of the position's own fixed-loan rates
+            // instead. (Flex loans expose no rate, so they're left out of the blend.)
+            const brokeredBorrowApr = (() => {
+              if (isDeposits || !loans || loans.length === 0) return null
+              let weight = 0
+              let weighted = 0
+              for (const loan of loans) {
+                const rate = loanRatePct(loan)
+                const debt = Number(loanDebtString(loan))
+                if (rate == null || !(debt > 0)) continue
+                weight += debt
+                weighted += rate * debt
+              }
+              return weight > 0 ? weighted / weight : null
+            })()
+
             const positionApr =
-              (isDeposits ? pool.depositRate : pool.variableBorrowRate) +
+              (brokeredBorrowApr ??
+                (isDeposits ? pool.depositRate : pool.variableBorrowRate)) +
               (pool.intrinsicYield ?? 0)
             const sharePct = totalUsd > 0 ? (usd / totalUsd) * 100 : 0
             const barPct = maxUsd > 0 ? Math.max(2, (usd / maxUsd) * 100) : 0
@@ -398,6 +420,9 @@ function PositionSection({
               {loans && loans.length > 0 && (
                 <LoanBreakdown
                   loans={loans}
+                  pool={pool}
+                  account={account}
+                  chainId={chainId}
                   symbol={pool.asset.symbol}
                   marketVariableRate={pool.variableBorrowRate + (pool.intrinsicYield ?? 0)}
                 />
@@ -420,13 +445,27 @@ function PositionSection({
 
 function LoanBreakdown({
   loans,
+  pool,
+  account,
+  chainId,
   symbol,
   marketVariableRate,
 }: {
   loans: UserPositionEntry[]
+  pool: PoolDataItem
+  account: string
+  chainId: string
   symbol: string
   marketVariableRate: number
 }) {
+  // The loan currently open in the refinance / roll-over modal, if any.
+  const [refinancing, setRefinancing] = useState<UserPositionEntry | null>(null)
+
+  // Refinance moves debt into a *fixed* term, so it needs the market's rate
+  // card and a connected wallet. Hidden otherwise (e.g. spy mode without an
+  // address, or a market that exposes no terms).
+  const canRefinance = !!account && (pool.terms?.length ?? 0) > 0
+
   return (
     <div className="bg-base-200/40 px-3 py-1.5 pl-6 space-y-1">
       {loans.map((loan) => {
@@ -462,10 +501,34 @@ function LoanBreakdown({
               <span className="text-base-content/50 w-16 text-right">
                 {mat.isFlex ? '—' : mat.isPast ? 'frozen' : `in ${mat.label}`}
               </span>
+              {canRefinance && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs h-5 min-h-0 px-1.5 text-[10px] text-primary hover:bg-primary/10"
+                  onClick={() => setRefinancing(loan)}
+                  title={
+                    loan.term?.isDynamic
+                      ? 'Refinance this floating debt into a fixed term'
+                      : 'Roll this loan over into a new term'
+                  }
+                >
+                  ↻ {loan.term?.isDynamic ? 'Refinance' : 'Roll'}
+                </button>
+              )}
             </span>
           </div>
         )
       })}
+
+      {refinancing && (
+        <RefinanceModal
+          pool={pool}
+          loan={refinancing}
+          account={account}
+          chainId={chainId}
+          onClose={() => setRefinancing(null)}
+        />
+      )}
     </div>
   )
 }

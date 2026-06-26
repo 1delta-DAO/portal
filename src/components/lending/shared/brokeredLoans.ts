@@ -6,6 +6,7 @@
  * alongside the aggregate-debt and collateral rows. These helpers operate on a
  * single per-loan `UserPositionEntry`.
  */
+import { parseUnits, formatUnits } from 'viem'
 import type { UserPositionEntry } from '../../../hooks/lending/useUserData'
 import { addAmountStrings } from '../actions/format'
 
@@ -77,6 +78,31 @@ export function maturityDisplay(
   const mins = Math.floor((remaining % 3600) / 60)
   const label = days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
   return { label, isPast: false, isFlex: false }
+}
+
+/**
+ * Default amount to pre-fill a refinance / roll-over with: the full close
+ * amount (debt + early-repay penalty) plus a small over-fund buffer.
+ *
+ * A full close repays the source loan to zero — but the displayed debt is a
+ * snapshot, so a sliver more interest accrues before the tx lands. Without a
+ * buffer the repay can leave sub-`minLoan` interest dust on the source and
+ * revert `REMAIN_BORROW_TOO_LOW`. The broker refunds any excess (swept back),
+ * so over-funding by a hair is free. See loop-refinance OpenAPI sizing notes.
+ */
+export function defaultRefinanceAmountString(
+  pos: UserPositionEntry,
+  decimals: number
+): string {
+  const close = closeNowAmountString(pos)
+  try {
+    const wei = parseUnits(close as `${number}`, decimals)
+    // +0.1% buffer to cover in-flight interest on a full close.
+    const buffered = wei + wei / 1000n
+    return formatUnits(buffered, decimals)
+  } catch {
+    return close
+  }
 }
 
 /** Borrow rate to show for a loan: the fixed `apr`, or null for flex (use market rate). */
