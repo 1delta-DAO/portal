@@ -93,6 +93,12 @@ interface RawOptimizerPair {
   borrowAprShort?: string | number
   rewardAprLong?: string | number
   rewardAprShort?: string | number
+  /** Intrinsic (native/staking) yield of each side's asset, percent units. The
+   *  EFFECTIVE rate is `depositAprLong + intrinsicYieldLong` (collateral) and
+   *  `borrowAprShort + intrinsicYieldShort` (debt) — see the optimizer's
+   *  `minDepositApr` / `maxBorrowRate` filter semantics. */
+  intrinsicYieldLong?: string | number
+  intrinsicYieldShort?: string | number
   aprBase?: string | number
   aprTotal?: string | number
   totalDepositsUsdLong?: string | number
@@ -168,6 +174,13 @@ export interface OptimizerPairRow {
   borrowAprShort: number
   rewardAprLong: number
   rewardAprShort: number
+  /** Intrinsic (native/staking) yield of each side as a fraction. */
+  intrinsicYieldLong: number
+  intrinsicYieldShort: number
+  /** Effective rates = lending rate + intrinsic yield (what the UI should show
+   *  and what the position's net APR should be computed from). */
+  depositAprEffective: number
+  borrowAprEffective: number
   aprBase: number
   aprTotal: number
   /** Loan-to-value as a fraction. */
@@ -242,6 +255,13 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
     borrowAprShort: numOr0(raw.borrowAprShort) / 100,
     rewardAprLong: numOr0(raw.rewardAprLong) / 100,
     rewardAprShort: numOr0(raw.rewardAprShort) / 100,
+    intrinsicYieldLong: numOr0(raw.intrinsicYieldLong) / 100,
+    intrinsicYieldShort: numOr0(raw.intrinsicYieldShort) / 100,
+    // Effective = lending rate + intrinsic (staking/native) yield. This is the
+    // rate the user actually earns (deposit) / pays (borrow) and what the net
+    // position APR must be derived from.
+    depositAprEffective: (numOr0(raw.depositAprLong) + numOr0(raw.intrinsicYieldLong)) / 100,
+    borrowAprEffective: (numOr0(raw.borrowAprShort) + numOr0(raw.intrinsicYieldShort)) / 100,
     aprBase: numOr0(raw.aprBase) / 100,
     aprTotal: numOr0(raw.aprTotal) / 100,
     // LTV / utilizations are already fractions.

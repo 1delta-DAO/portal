@@ -36,8 +36,15 @@ export interface MigrateParams {
    * a same-asset move so the whole position is carried across.
    */
   isMaxIn?: boolean
-  /** Per-position id where the lender needs one (Fluid NFT id). Defaults to 0. */
+  /**
+   * Per-position id where the lender needs one (Fluid NFT id, Euler sub-account).
+   * Sent as the SOURCE side's id (`accountIdFrom`) — a Fluid source's NFT must be
+   * respected for the custody transfer. Defaults to 0. Use `accountIdTo` for a
+   * target that needs its own position id.
+   */
   accountId?: string
+  /** Explicit target-side position id (Fluid NFT on the target). Defaults to 0. */
+  accountIdTo?: string
   /**
    * Lista fixed-term broker source only: the loan `posId` to repay (or
    * `type(uint128).max` for the flex/dynamic position). Required when the
@@ -91,7 +98,10 @@ export async function fetchMigrate(params: MigrateParams): Promise<MigrateResult
     qs.set('account', params.operator)
     qs.set('debtAmount', params.debtAmount)
     if (params.isMaxIn !== undefined) qs.set('isMaxIn', String(params.isMaxIn))
-    if (params.accountId != null) qs.set('accountId', params.accountId)
+    // Send the source position id as `accountIdFrom` so it can never leak onto
+    // the target leg (a Fluid source NFT must not become the target's NFT id).
+    if (params.accountId != null) qs.set('accountIdFrom', params.accountId)
+    if (params.accountIdTo != null) qs.set('accountIdTo', params.accountIdTo)
     if (params.loanId != null) qs.set('loanId', params.loanId)
     if (params.irModeFrom != null) qs.set('irModeFrom', String(params.irModeFrom))
     if (params.irModeTo != null) qs.set('irModeTo', String(params.irModeTo))

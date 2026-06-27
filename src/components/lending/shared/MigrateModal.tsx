@@ -229,6 +229,16 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
     if (debtUsd <= 0 || collateralUsd <= 0 || row.liquidationThreshold <= 0) return null
     return (collateralUsd * row.liquidationThreshold) / debtUsd
   }
+  // Net position APR for THIS migrated position (not the optimizer's max-leverage
+  // `aprTotal`): the equity-weighted earn-minus-pay using EFFECTIVE rates (lending
+  // rate + intrinsic/staking yield). net = (depEff·col − borEff·debt) / equity.
+  const targetNetApr = (row: OptimizerPairRow): number | null => {
+    const equityUsd = collateralUsd - debtUsd
+    if (equityUsd <= 0) return row.depositAprEffective - row.borrowAprEffective
+    return (
+      (row.depositAprEffective * collateralUsd - row.borrowAprEffective * debtUsd) / equityUsd
+    )
+  }
 
   const [selected, setSelected] = useState<OptimizerPairRow | null>(null)
 
@@ -281,10 +291,10 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
       isMaxIn: true,
       accountId,
       loanId: debt.loanId,
-      // Pass the pair's rates + liquidation threshold so the endpoint returns the
-      // resulting net APR and health factor.
-      depositApr: row.depositAprLong,
-      borrowApr: row.borrowAprShort,
+      // Pass the EFFECTIVE rates (lending + intrinsic/staking yield) + liquidation
+      // threshold so the endpoint's resulting net APR respects intrinsic yields.
+      depositApr: row.depositAprEffective,
+      borrowApr: row.borrowAprEffective,
       liqThreshold: row.liquidationThreshold,
       collateralPriceUsd: source.collateralPriceUsd,
       debtPriceUsd: source.debtPriceUsd,
@@ -485,16 +495,33 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                           </span>
                         )}
                         <span
-                          className="font-mono tabular-nums text-base-content/60"
-                          title="Borrow rate (debt)"
+                          className="flex flex-col items-end leading-tight font-mono tabular-nums"
+                          title={
+                            `Deposit APR ${(row.depositAprEffective * 100).toFixed(2)}% ` +
+                            `(lending ${(row.depositAprLong * 100).toFixed(2)}% + intrinsic ${(row.intrinsicYieldLong * 100).toFixed(2)}%)\n` +
+                            `Borrow APR ${(row.borrowAprEffective * 100).toFixed(2)}% ` +
+                            `(lending ${(row.borrowAprShort * 100).toFixed(2)}% + intrinsic ${(row.intrinsicYieldShort * 100).toFixed(2)}%)\n` +
+                            `Net = equity-weighted earn − pay on this position`
+                          }
                         >
-                          {(row.borrowAprShort * 100).toFixed(2)}%
-                        </span>
-                        <span
-                          className="font-mono tabular-nums text-success"
-                          title="Net loop APR at max leverage"
-                        >
-                          {(row.aprTotal * 100).toFixed(2)}%
+                          <span className="text-success">
+                            <span className="text-base-content/40">D</span>{' '}
+                            {(row.depositAprEffective * 100).toFixed(2)}%
+                          </span>
+                          <span className="text-base-content/60">
+                            <span className="text-base-content/40">B</span>{' '}
+                            {(row.borrowAprEffective * 100).toFixed(2)}%
+                          </span>
+                          {targetNetApr(row) != null && (
+                            <span
+                              className={
+                                targetNetApr(row)! >= 0 ? 'text-success font-semibold' : 'text-error font-semibold'
+                              }
+                            >
+                              <span className="text-base-content/40">Net</span>{' '}
+                              {(targetNetApr(row)! * 100).toFixed(2)}%
+                            </span>
+                          )}
                         </span>
                       </span>
                     </button>
@@ -545,9 +572,31 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                     </span>
                   </div>
                 )}
+                {position.apr?.deposit != null && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-base-content/60" title="Collateral yield incl. intrinsic (staking) yield">
+                      Deposit APR
+                    </span>
+                    <span className="font-mono tabular-nums text-success">
+                      {(position.apr.deposit * 100).toFixed(2)}%
+                    </span>
+                  </div>
+                )}
+                {position.apr?.borrow != null && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-base-content/60" title="Debt cost incl. intrinsic yield of the borrowed asset">
+                      Borrow APR
+                    </span>
+                    <span className="font-mono tabular-nums text-base-content/80">
+                      {(position.apr.borrow * 100).toFixed(2)}%
+                    </span>
+                  </div>
+                )}
                 {position.apr?.net != null && (
                   <div className="flex items-center justify-between">
-                    <span className="text-base-content/60">Net APR</span>
+                    <span className="text-base-content/60" title="Equity-weighted net APR (deposit earn − borrow pay)">
+                      Net APR
+                    </span>
                     <span
                       className={`font-mono tabular-nums font-semibold ${position.apr.net >= 0 ? 'text-success' : 'text-error'}`}
                     >
