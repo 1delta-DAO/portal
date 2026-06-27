@@ -16,6 +16,7 @@ import {
   hasEarlyRepayPenalty,
 } from './brokeredLoans'
 import { RefinanceModal } from './RefinanceModal'
+import { MigrateModal, type MigrateSource } from './MigrateModal'
 
 /** Total debt of a position in token units — variable + stable (brokered fixed
  *  debt sits in the stable slot). */
@@ -72,6 +73,57 @@ export function YourPositions({
   selectedPoolMarketUid,
   onPoolSelect,
 }: YourPositionsProps) {
+  const [migrating, setMigrating] = useState(false)
+
+  // Migrate moves ONE collateral + ONE debt leg to another lender/market. Offer
+  // it only for the simple single-collateral / single-debt shape (the route's
+  // scope) and only when the viewer is the owner (needs to sign).
+  const collateralLegs = activePositions.filter(
+    ({ position }) => Number(position.deposits) > 0
+  )
+  const debtLegs = activePositions.filter(({ position }) => debtNative(position) > 0)
+  // Brokered (Lista) source: the migrate's single repay targets ONE loan by its
+  // posId. Support only the single-loan case — a multi-loan brokered position
+  // can't be moved in one transaction. Non-brokered markets have no loans here.
+  const debtLoans = debtLegs[0] ? loansByMarket?.get(debtLegs[0].pool.marketUid) : undefined
+  const brokeredOk = !debtLoans || debtLoans.length <= 1
+  const sourceLoan = debtLoans && debtLoans.length === 1 ? debtLoans[0] : undefined
+  const migrateSource: MigrateSource | null =
+    account &&
+    selectedSubAccountId &&
+    collateralLegs.length === 1 &&
+    debtLegs.length === 1 &&
+    brokeredOk
+      ? {
+          account,
+          chainId,
+          accountId: selectedSubAccountId,
+          currentHealth: summary?.health,
+          collateralPriceUsd: collateralLegs[0].pool.oraclePriceUSD,
+          debtPriceUsd: debtLegs[0].pool.oraclePriceUSD,
+          lenderKey: collateralLegs[0].pool.marketUid.split(':')[0],
+          collateral: {
+            marketUid: collateralLegs[0].pool.marketUid,
+            address: collateralLegs[0].pool.underlying.toLowerCase(),
+            symbol: collateralLegs[0].pool.asset.symbol,
+            logoURI: collateralLegs[0].pool.asset.logoURI,
+            decimals: collateralLegs[0].pool.asset.decimals,
+            amount: Number(collateralLegs[0].position.deposits),
+          },
+          debt: {
+            marketUid: debtLegs[0].pool.marketUid,
+            address: debtLegs[0].pool.underlying.toLowerCase(),
+            symbol: debtLegs[0].pool.asset.symbol,
+            logoURI: debtLegs[0].pool.asset.logoURI,
+            decimals: debtLegs[0].pool.asset.decimals,
+            amount: sourceLoan
+              ? Number(loanDebtString(sourceLoan))
+              : debtNative(debtLegs[0].position),
+            loanId: sourceLoan?.term?.loanId,
+          },
+        }
+      : null
+
   return (
     <div className="rounded-box border border-base-300 p-3 sm:p-4 space-y-3">
       <h3 className="text-sm font-semibold">Your Positions</h3>
@@ -146,7 +198,21 @@ export function YourPositions({
               <HealthBadge health={summary.health} />
             </div>
           )}
+          {migrateSource && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs h-6 min-h-0 px-2 text-primary hover:bg-primary/10 ml-auto"
+              onClick={() => setMigrating(true)}
+              title={`Migrate this ${migrateSource.collateral.symbol}/${migrateSource.debt.symbol} position to another lender`}
+            >
+              ⇄ Migrate
+            </button>
+          )}
         </div>
+      )}
+
+      {migrating && migrateSource && (
+        <MigrateModal source={migrateSource} onClose={() => setMigrating(false)} />
       )}
 
       {/* Position rows — split by collateral & debt */}

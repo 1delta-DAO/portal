@@ -115,6 +115,11 @@ interface RawOptimizerPair {
   // Legacy snake_case fallbacks (older deployments).
   max_debt_amount?: string | number | null
   min_collateral_amount?: string | number | null
+  // Risk scoring (per-dimension breakdown + max token score).
+  risk?: {
+    maxTokenScore?: number
+    breakdown?: { category: string; score: number; label: string }[]
+  }
   [extra: string]: unknown
 }
 
@@ -167,7 +172,13 @@ export interface OptimizerPairRow {
   aprTotal: number
   /** Loan-to-value as a fraction. */
   ltv: number
+  /** Collateral liquidation threshold as a fraction (drives the health factor). */
+  liquidationThreshold: number
   maxLeverage: number
+  /** Overall risk score (worst dimension, 0–5+ where higher = riskier). */
+  riskScore: number
+  /** Per-dimension risk breakdown (config / chain / lender / token) for tooltips. */
+  riskBreakdown: { category: string; score: number; label: string }[]
   /** Utilizations as fractions. */
   utilizationLong: number
   utilizationShort: number
@@ -235,7 +246,15 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
     aprTotal: numOr0(raw.aprTotal) / 100,
     // LTV / utilizations are already fractions.
     ltv: numOr0(raw.ltv),
+    liquidationThreshold: numOr0(raw.collateralFactorLong),
     maxLeverage: numOr0(raw.maxLeverage),
+    // Overall risk = the worst (highest) dimension score; fall back to the token score.
+    riskScore: Math.max(
+      0,
+      ...(raw.risk?.breakdown?.map((b) => numOr0(b.score)) ?? []),
+      numOr0(raw.risk?.maxTokenScore),
+    ),
+    riskBreakdown: raw.risk?.breakdown ?? [],
     utilizationLong: numOr0(raw.utilizationLong),
     utilizationShort: numOr0(raw.utilizationShort),
     totalDepositsUsdLong: numOr0(raw.totalDepositsUsdLong),

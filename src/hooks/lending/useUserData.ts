@@ -301,7 +301,19 @@ function transformUserDataEntry(raw: RawLenderUserDataEntry): LenderUserDataEntr
 import { BACKEND_BASE_URL } from '../../config/backend'
 
 const endpointUserData = `${BACKEND_BASE_URL}/v1/data/lending/user-positions`
+
+// Global override: when true, every chain fetches via RPC instead of the API.
 const USE_RPC_FETCH = false
+
+// Per-chain override: these chains always fetch user positions locally via RPC,
+// regardless of USE_RPC_FETCH. Used for chains the API does not (yet) serve well.
+//   1329 = SEI Network, 1868 = SONEIUM
+const FORCE_RPC_FETCH_CHAINS = new Set<string>(['1329', '1868'])
+
+/** Whether to fetch user positions via RPC (vs the API) for a given chain. */
+function shouldUseRpcFetch(chainId: string): boolean {
+  return USE_RPC_FETCH || FORCE_RPC_FETCH_CHAINS.has(chainId)
+}
 
 // ============================================================================
 // Hook
@@ -328,7 +340,7 @@ export function useUserData(params: {
     queryKey: ['userData', chainId, account, lendersKey],
     enabled,
     queryFn: async () => {
-      if (USE_RPC_FETCH) {
+      if (shouldUseRpcFetch(chainId)) {
         const result = await fetchUserDataViaRpc(chainId, account!, lenders)
         return {
           raw: result.data.map(transformUserDataEntry),
