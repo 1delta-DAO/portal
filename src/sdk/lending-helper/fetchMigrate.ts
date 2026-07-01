@@ -55,6 +55,9 @@ export interface MigrateParams {
   irModeFrom?: number
   /** Aave interest mode of the target debt (borrow). 2 = variable (default). */
   irModeTo?: number
+  /** Swap-leg slippage as a fraction (0.005 = 0.5%). Only used when a leg is
+   *  converted via an aggregator swap. Defaults server-side to 0.5%. */
+  slippage?: number
   /** Target collateral deposit APR as a fraction (0.05 = 5%) — drives `result.apr.net`. */
   depositApr?: number
   /** Target debt borrow APR as a fraction (0.05 = 5%). */
@@ -67,6 +70,27 @@ export interface MigrateParams {
   debtPriceUsd?: number
   /** Source collateral amount in wei (display hint so the result shows collateral for non-Aave sources). */
   collateralAmountHint?: string
+  /** Authoritative TARGET collateral decimals (pool metadata) — the swap target's when the collateral converts, else the source's. Overrides the worker token list for the display USD. */
+  collateralDecimals?: number
+  /** Authoritative TARGET debt decimals (pool metadata) — the swap target's when the debt converts, else the source's. */
+  debtDecimals?: number
+  /** SOURCE debt decimals, for the from-leg display when the debt is converted. Defaults to `debtDecimals`. */
+  sourceDebtDecimals?: number
+}
+
+/** One aggregator route in the swap quote-sources overview (display only). */
+export interface MigrateSwapCandidate {
+  aggregator: string
+  amountIn: number
+  amountOut: number
+  amountInUsd?: number
+  amountOutUsd?: number
+  priceImpactUsd?: number
+  priceImpactPct?: number
+  inSymbol?: string
+  outSymbol?: string
+  inLogoURI?: string
+  outLogoURI?: string
 }
 
 /** Resulting-position summary returned in `data.result` (see worker `migrateResult`). */
@@ -78,6 +102,12 @@ export interface MigratePositionResult {
   collateralDust?: any
   apr?: { deposit: number; borrow: number; net: number }
   healthFactor?: number
+  /** Aggregator quote-sources for the converted leg (present only for a swap). */
+  swap?: {
+    leg: 'collateral' | 'debt'
+    best?: string
+    quotes: MigrateSwapCandidate[]
+  }
 }
 
 export interface MigrateResult {
@@ -111,6 +141,10 @@ export async function fetchMigrate(params: MigrateParams): Promise<MigrateResult
     if (params.collateralPriceUsd != null) qs.set('collateralPriceUsd', String(params.collateralPriceUsd))
     if (params.debtPriceUsd != null) qs.set('debtPriceUsd', String(params.debtPriceUsd))
     if (params.collateralAmountHint != null) qs.set('collateralAmountHint', params.collateralAmountHint)
+    if (params.collateralDecimals != null) qs.set('collateralDecimals', String(params.collateralDecimals))
+    if (params.debtDecimals != null) qs.set('debtDecimals', String(params.debtDecimals))
+    if (params.sourceDebtDecimals != null) qs.set('sourceDebtDecimals', String(params.sourceDebtDecimals))
+    if (params.slippage != null) qs.set('slippage', String(params.slippage))
 
     const res = await fetch(`${BACKEND_BASE_URL}/v1/actions/loop/migrate?${qs}`)
 

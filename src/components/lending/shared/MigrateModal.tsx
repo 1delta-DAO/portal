@@ -4,6 +4,7 @@ import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransact
 import {
   useOptimizerPairs,
   type OptimizerPairRow,
+  type OptimizerAssetRef,
 } from '../../../hooks/lending/useOptimizerPairs'
 import { useLenders } from '../../../hooks/lending/usePoolData'
 import {
@@ -17,6 +18,8 @@ import { Logo } from '../../common/Logo'
 // Canonical wrapped-native ERC20 per chain. Used only to find WBNB-style targets
 // when migrating a NATIVE debt (the on-behalf borrow can't be delegated for the
 // native asset, so the target must be the wrapped form). Keyed by chainId string.
+const NATIVE_SENTINEL = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+
 const WRAPPED_NATIVE_BY_CHAIN: Record<string, string> = {
   '1': '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', // WETH
   '10': '0x4200000000000000000000000000000000000006', // WETH (Optimism)
@@ -41,6 +44,17 @@ function legValue(leg?: { amount?: string; amountUsd?: number; decimals?: number
     return `${n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : 4 })} ${leg.symbol ?? ''}`.trim()
   }
   return '—'
+}
+
+/** Compact token amount for swap-route rows: keeps precision when small. */
+function fmtAmt(v: number): string {
+  if (!Number.isFinite(v) || v === 0) return '0'
+  const abs = Math.abs(v)
+  if (abs < 0.0001) return '<0.0001'
+  if (abs < 1) return v.toFixed(4)
+  if (abs < 1_000) return v.toFixed(2)
+  if (abs < 1_000_000) return `${(v / 1_000).toFixed(2)}K`
+  return `${(v / 1_000_000).toFixed(2)}M`
 }
 
 /** Risk label/color from the overall score (worst dimension, ~0–5+). */
@@ -150,14 +164,77 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
   }, [lenderSummaries])
   const lenderName = (key?: string) => (key ? (lenderInfo[key]?.name ?? key) : '')
 
-  // A native debt (e.g. a Venus vBNB borrow) migrates into another lender's
-  // WRAPPED-native debt market (WBNB) — on-behalf borrowing can't be delegated
-  // for the native asset, so the target must be the wrapped form. Search the
-  // optimizer by the wrapped-native address so those targets surface; the source
-  // market (`debt.marketUid`) stays the native one — the builder bridges them.
-  const debtSearchAddress = isNativeSentinel(debt.address)
-    ? WRAPPED_NATIVE_BY_CHAIN[chainId] ?? debt.address
-    : debt.address
+  // Native ↔ wrapped-native are interchangeable across lenders: some markets use
+  // the native sentinel (e.g. Fluid ETH vaults), others the wrapped ERC20 (Aave
+  // WETH). So when the position's asset is EITHER form, search for BOTH so markets
+  // on either side surface — the builder bridges them by wrapping/unwrapping.
+  const wrappedNative = WRAPPED_NATIVE_BY_CHAIN[chainId]?.toLowerCase()
+  const withNativeCounterpart = (addr: string): string[] => {
+    const a = addr.toLowerCase()
+    if (isNativeSentinel(a) && wrappedNative) return [addr, wrappedNative]
+    if (wrappedNative && a === wrappedNative) return [addr, NATIVE_SENTINEL]
+    return [addr]
+  }
+  const collateralSearch = withNativeCounterpart(collateral.address)
+  const debtSearch = withNativeCounterpart(debt.address)
+
+  // Exact-address match against a search list — the optimizer's asset filter can
+  // group/partial-match, so we re-filter client-side to the intended addresses.
+  const matchesAsset = (addr: string | undefined, list: string[]) =>
+    !!addr && list.some((s) => s.toLowerCase() === addr.toLowerCase())
+
+  // ── Optional asset CONVERSION (swap leg) ──────────────────────────────────
+  // The migrate can convert ONE leg via an aggregator swap. The user toggles it
+  // on, picks WHICH leg (collateral or debt) to convert, then a target asset. The
+  // target-asset options are OPTIMIZER-DERIVED: assets that actually have
+  // qualifying markets for the fixed (non-converted) leg — so every choice yields
+  // results. The chosen target asset then drives the main search for that leg.
+  const [swapEnabled, setSwapEnabled] = useState(false)
+  const [swapLeg, setSwapLeg] = useState<'collateral' | 'debt'>('collateral')
+  const [swapTarget, setSwapTarget] = useState<string | null>(null)
+
+  // Derive the pickable target assets: query the optimizer with only the FIXED
+  // (non-converted) leg constrained, then collect the distinct assets on the
+  // converted side (excluding the source asset — that's the no-swap case).
+  const { rows: swapOptionRows } = useOptimizerPairs(
+    {
+      chainId,
+      collaterals: swapLeg === 'debt' ? collateralSearch : undefined,
+      debts: swapLeg === 'collateral' ? debtSearch : undefined,
+      sortBy: 'aprTotal',
+      sortDir: 'DESC',
+      count: 100,
+      maxRiskScore: 100,
+    },
+    swapEnabled,
+  )
+  const swapAssetOptions = useMemo(() => {
+    const sourceAddr = (swapLeg === 'collateral' ? collateral.address : debt.address).toLowerCase()
+    // The FIXED (non-converted) leg must match the source asset exactly, so we
+    // only collect target assets from markets that actually pair with the source.
+    const fixedList = swapLeg === 'collateral' ? debtSearch : collateralSearch
+    const seen = new Map<string, OptimizerAssetRef>()
+    for (const r of swapOptionRows) {
+      const fixedAddr = swapLeg === 'collateral' ? r.debt.address : r.collateral.address
+      if (!matchesAsset(fixedAddr, fixedList)) continue
+      const a = swapLeg === 'collateral' ? r.collateral : r.debt
+      const addr = a.address?.toLowerCase()
+      if (addr && addr !== sourceAddr && !seen.has(addr)) seen.set(addr, a)
+    }
+    return [...seen.values()]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [swapOptionRows, swapLeg, collateral.address, debt.address, chainId])
+
+  const swapTargetAsset = swapAssetOptions.find(
+    (a) => a.address.toLowerCase() === swapTarget?.toLowerCase(),
+  )
+
+  // The converted leg searches by the picked target asset; the fixed leg keeps
+  // its native-aware search. No swap (or no target picked yet) → same-asset.
+  const activeCollateralSearch =
+    swapEnabled && swapLeg === 'collateral' && swapTarget ? [swapTarget] : collateralSearch
+  const activeDebtSearch =
+    swapEnabled && swapLeg === 'debt' && swapTarget ? [swapTarget] : debtSearch
 
   // Qualifying targets: same collateral + same debt underlying, best APR first.
   // Migration moves an EXISTING position, so we don't apply the optimizer's
@@ -166,8 +243,8 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
   // instead so the user can judge it.
   const { rows, isLoading, error: pairsError } = useOptimizerPairs({
     chainId,
-    collaterals: [collateral.address],
-    debts: [debtSearchAddress],
+    collaterals: activeCollateralSearch,
+    debts: activeDebtSearch,
     sortBy: 'aprTotal',
     sortDir: 'DESC',
     count: 25,
@@ -182,20 +259,47 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
     const k = key.toUpperCase()
     return k.startsWith('EULER') || k.startsWith('DOLOMITE')
   }
-  const targets = useMemo(
-    () =>
-      rows.filter(
-        (r) =>
-          !(
-            r.marketLongUid === collateral.marketUid &&
-            r.marketShortUid === debt.marketUid
-          ) &&
-          !!r.marketLongUid &&
-          !!r.marketShortUid &&
-          !isUnsupportedTarget(r.lenderKey),
-      ),
-    [rows, collateral.marketUid, debt.marketUid],
+  // Re-filter client-side to EXACTLY the intended assets: the source (native ⇄
+  // wrapped forms) on the fixed leg, and the picked target on the converted leg.
+  // Then drop targets whose debt market can't supply the borrow: a migrate must
+  // borrow the whole debt on the target, so a market with less available borrow
+  // liquidity than the migrated debt would revert. `borrowLiquidityShort` is the
+  // available borrow liquidity in USD (falls back to the debt pool liquidity).
+  // Rows with UNKNOWN (0) liquidity are kept — we don't over-hide on data gaps.
+  const { targets, lowLiquidity } = useMemo(() => {
+    const requiredBorrowUsd = (debt.amount ?? 0) * (source.debtPriceUsd ?? 0)
+    const base = rows.filter(
+      (r) =>
+        !(
+          r.marketLongUid === collateral.marketUid &&
+          r.marketShortUid === debt.marketUid
+        ) &&
+        !!r.marketLongUid &&
+        !!r.marketShortUid &&
+        !isUnsupportedTarget(r.lenderKey) &&
+        matchesAsset(r.collateral.address, activeCollateralSearch) &&
+        matchesAsset(r.debt.address, activeDebtSearch),
+    )
+    if (requiredBorrowUsd <= 0) return { targets: base, lowLiquidity: [] as OptimizerPairRow[] }
+    const targets: OptimizerPairRow[] = []
+    const lowLiquidity: OptimizerPairRow[] = []
+    for (const r of base) {
+      const liq = r.borrowLiquidityShort || r.totalLiquidityUsdShort
+      if (liq > 0 && liq < requiredBorrowUsd) lowLiquidity.push(r)
+      else targets.push(r)
+    }
+    return { targets, lowLiquidity }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, collateral.marketUid, debt.marketUid, swapEnabled, swapLeg, swapTarget, collateral.address, debt.address, chainId, debt.amount, source.debtPriceUsd])
+  const hiddenForLiquidity = lowLiquidity.length
+  const [showLowLiquidity, setShowLowLiquidity] = useState(false)
+  const lowLiquiditySet = useMemo(
+    () => new Set(lowLiquidity.map((r) => `${r.marketLongUid}|${r.marketShortUid}`)),
+    [lowLiquidity],
   )
+  const rowKey = (r: OptimizerPairRow) => `${r.marketLongUid}|${r.marketShortUid}`
+  // The low-liquidity markets are appended only when the user opts to reveal them.
+  const shownTargets = showLowLiquidity ? [...targets, ...lowLiquidity] : targets
 
   // Per-market lenders (Euler vaults, Morpho markets, Aave e-modes) offer several
   // configs for the same asset pair, so one lender name appears on multiple rows.
@@ -296,8 +400,30 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
       depositApr: row.depositAprEffective,
       borrowApr: row.borrowAprEffective,
       liqThreshold: row.liquidationThreshold,
-      collateralPriceUsd: source.collateralPriceUsd,
-      debtPriceUsd: source.debtPriceUsd,
+      // TARGET-leg price/decimals — the swap target's for a converted leg, else
+      // the source's. Pins the result USD conversion (the worker token list can
+      // carry a wrong decimals for a target token, e.g. a Spark/Morpho market, and
+      // mis-scale the display USD). For a swapped leg the worker uses the trade's
+      // actual output/input amount valued at THIS target price.
+      collateralPriceUsd:
+        swapEnabled && swapLeg === 'collateral' && swapTargetAsset
+          ? swapTargetAsset.priceUsd
+          : source.collateralPriceUsd,
+      debtPriceUsd:
+        swapEnabled && swapLeg === 'debt' && swapTargetAsset
+          ? swapTargetAsset.priceUsd
+          : source.debtPriceUsd,
+      collateralDecimals:
+        swapEnabled && swapLeg === 'collateral' && swapTargetAsset
+          ? swapTargetAsset.decimals
+          : collateral.decimals,
+      debtDecimals:
+        swapEnabled && swapLeg === 'debt' && swapTargetAsset
+          ? swapTargetAsset.decimals
+          : debt.decimals,
+      sourceDebtDecimals: debt.decimals,
+      // Swap-leg slippage (only used server-side when a leg is converted).
+      slippage: swapEnabled && swapTarget ? 0.005 : undefined,
       // Display hint so the result shows the collateral for non-Aave sources
       // (where the worker can't read the deposited amount).
       collateralAmountHint:
@@ -353,7 +479,10 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
 
   return (
     <div className="modal modal-open" onClick={onClose}>
-      <div className="modal-box max-w-md" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-box max-w-md max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           type="button"
           className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
@@ -417,10 +546,102 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
               </div>
             </div>
 
+            {/* Optional asset conversion (swap leg) */}
+            <div className="rounded-lg border border-base-300 px-2.5 py-2 space-y-2">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-xs text-base-content/70">Convert an asset (swap one leg)</span>
+                <input
+                  type="checkbox"
+                  className="toggle toggle-sm"
+                  checked={swapEnabled}
+                  onChange={(e) => {
+                    setSwapEnabled(e.target.checked)
+                    setSwapTarget(null)
+                    setSelected(null)
+                  }}
+                />
+              </label>
+              {swapEnabled && (
+                <div className="space-y-2">
+                  <div className="join w-full">
+                    {(['collateral', 'debt'] as const).map((leg) => (
+                      <button
+                        key={leg}
+                        type="button"
+                        className={`btn btn-xs join-item flex-1 ${swapLeg === leg ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => {
+                          setSwapLeg(leg)
+                          setSwapTarget(null)
+                          setSelected(null)
+                        }}
+                      >
+                        {leg === 'collateral' ? `Collateral (${collateral.symbol})` : `Debt (${debt.symbol})`}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="text-[10px] uppercase tracking-wide text-base-content/50 px-0.5">
+                    Convert {swapLeg} to
+                  </div>
+                  {swapAssetOptions.length === 0 ? (
+                    <span className="text-[10px] text-base-content/40 px-0.5">
+                      No convertible {swapLeg} assets pair with your {swapLeg === 'collateral' ? debt.symbol : collateral.symbol}.
+                    </span>
+                  ) : (
+                    <div className="max-h-44 overflow-y-auto rounded-lg border border-base-300 divide-y divide-base-300/60">
+                      {swapAssetOptions.map((a) => {
+                        const isSel = swapTarget?.toLowerCase() === a.address.toLowerCase()
+                        return (
+                          <button
+                            key={a.address}
+                            type="button"
+                            className={`flex items-center gap-2 w-full px-2 py-1.5 text-left text-xs transition-colors ${
+                              isSel ? 'bg-primary/15 ring-1 ring-primary ring-inset' : 'hover:bg-base-200'
+                            }`}
+                            onClick={() => {
+                              setSwapTarget(isSel ? null : a.address)
+                              setSelected(null)
+                            }}
+                          >
+                            <Logo
+                              src={a.logoURI}
+                              alt={a.symbol ?? a.address}
+                              fallbackText={a.symbol ?? '?'}
+                              className="rounded-full object-contain w-5 h-5 shrink-0 token-logo"
+                            />
+                            <div className="flex flex-col min-w-0 flex-1 leading-tight">
+                              <span className="font-medium truncate">
+                                {a.symbol ?? `${a.address.slice(0, 6)}…${a.address.slice(-4)}`}
+                              </span>
+                              {a.name && (
+                                <span className="text-[10px] text-base-content/50 truncate" title={a.name}>
+                                  {a.name}
+                                </span>
+                              )}
+                            </div>
+                            {a.priceUsd != null && a.priceUsd > 0 && (
+                              <span className="shrink-0 text-[10px] text-base-content/50 font-mono tabular-nums">
+                                ${a.priceUsd.toLocaleString(undefined, { maximumFractionDigits: a.priceUsd < 1 ? 4 : 2 })}
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {swapTarget == null && swapAssetOptions.length > 0 && (
+                    <span className="text-[10px] text-base-content/40 px-0.5">
+                      Pick a target {swapLeg} asset to see qualifying markets.
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Target picker */}
             <div className="space-y-1.5">
               <span className="text-xs text-base-content/60 px-1">
-                Migrate to {collateral.symbol} / {debt.symbol} on
+                Migrate to {swapEnabled && swapLeg === 'collateral' && swapTargetAsset ? swapTargetAsset.symbol : collateral.symbol} /{' '}
+                {swapEnabled && swapLeg === 'debt' && swapTargetAsset ? swapTargetAsset.symbol : debt.symbol} on
               </span>
 
               {isLoading && (
@@ -436,22 +657,41 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                 </div>
               )}
 
-              {!isLoading && targets.length === 0 && (
+              {!isLoading && shownTargets.length === 0 && (
                 <div className="text-[11px] text-base-content/50 px-1">
                   {rows.length === 0
                     ? // The optimizer returned nothing for the whole chain — almost
                       // always a coverage gap (e.g. Polygon isn't indexed yet) rather
                       // than a missing pair.
                       'No migration targets are indexed for this chain yet.'
-                    : `No other market offers this ${collateral.symbol}/${debt.symbol} pair.`}
+                    : hiddenForLiquidity > 0
+                      ? `No target market has enough borrow liquidity for this ${debt.symbol} debt (${hiddenForLiquidity} hidden with insufficient liquidity).`
+                      : `No other market offers this ${collateral.symbol}/${debt.symbol} pair.`}
+                </div>
+              )}
+
+              {!isLoading && hiddenForLiquidity > 0 && (
+                <div className="flex items-center justify-between gap-2 px-1 text-[10px] text-base-content/40">
+                  <span>
+                    {hiddenForLiquidity} market{hiddenForLiquidity === 1 ? '' : 's'} hidden —
+                    insufficient borrow liquidity for this {debt.symbol} debt.
+                  </span>
+                  <button
+                    type="button"
+                    className="shrink-0 font-medium text-primary/80 hover:text-primary"
+                    onClick={() => setShowLowLiquidity((v) => !v)}
+                  >
+                    {showLowLiquidity ? 'Hide' : 'Show'}
+                  </button>
                 </div>
               )}
 
               <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto">
-                {targets.map((row) => {
+                {shownTargets.map((row) => {
                   const active =
                     selected?.marketLongUid === row.marketLongUid &&
                     selected?.marketShortUid === row.marketShortUid
+                  const isLowLiq = lowLiquiditySet.has(rowKey(row))
                   return (
                     <button
                       key={`${row.lenderKey}-${row.marketLongUid}-${row.marketShortUid}`}
@@ -480,6 +720,14 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                         )}
                       </span>
                       <span className="flex items-center gap-2 shrink-0 text-xs">
+                        {isLowLiq && (
+                          <span
+                            className="badge badge-xs border-0 bg-warning/20 text-warning"
+                            title={`Borrow liquidity ($${(row.borrowLiquidityShort || row.totalLiquidityUsdShort).toLocaleString(undefined, { maximumFractionDigits: 0 })}) is below the migrated debt — the borrow may revert.`}
+                          >
+                            low liq
+                          </span>
+                        )}
                         <span
                           className={`badge badge-xs border-0 ${riskBadgeClass(row.riskScore)}`}
                           title={riskTooltip(row.riskBreakdown)}
@@ -631,6 +879,69 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                       </span>
                     </div>
                   )}
+              </div>
+            )}
+
+            {/* Swap quote sources (converted leg) — overview like the loop UI */}
+            {position?.swap && position.swap.quotes.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between px-0.5">
+                  <span className="text-xs text-base-content/60">
+                    Swap routes · converting {position.swap.leg}
+                  </span>
+                  <span className="text-[10px] text-base-content/40">
+                    {position.swap.quotes.length} source
+                    {position.swap.quotes.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+                  {position.swap.quotes.map((q, i) => {
+                    const isBest = q.aggregator === position.swap!.best
+                    const impact = q.priceImpactUsd
+                    const impactPos = impact != null && impact >= 0
+                    return (
+                      <div
+                        key={`${q.aggregator}-${i}`}
+                        className={`rounded-lg border p-1.5 text-xs ${
+                          isBest
+                            ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                            : 'border-base-300 bg-base-200/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold text-sm truncate">{q.aggregator}</span>
+                          {isBest && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/15 px-1 py-0.5 rounded">
+                              Used
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-error font-semibold tabular-nums truncate">
+                            {fmtAmt(q.amountIn)} {q.inSymbol}
+                          </span>
+                          <span className="text-base-content/30">→</span>
+                          <span className="text-success font-semibold tabular-nums truncate">
+                            {fmtAmt(q.amountOut)} {q.outSymbol}
+                          </span>
+                        </div>
+                        {impact != null && (
+                          <div className="mt-1 pt-1 border-t border-base-300/60 text-[10px] flex items-baseline gap-1">
+                            <span className="text-base-content/50">Impact</span>
+                            <span
+                              className={`font-semibold tabular-nums ${impactPos ? 'text-success' : 'text-error'}`}
+                            >
+                              {impactPos ? '+' : ''}${Math.abs(impact).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                              {q.priceImpactPct != null && (
+                                <> ({impactPos ? '+' : ''}{(q.priceImpactPct * 100).toFixed(2)}%)</>
+                              )}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
 
