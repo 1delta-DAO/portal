@@ -215,10 +215,11 @@ export function TradingDashboard({
     maxRiskScore
   )
 
-  // Note: auto-selecting the first config is owned by ConfigMarketView, which
-  // guards it behind its own `userCleared` flag. Re-asserting a default here
-  // would re-open a config the moment the user collapses it (the empty
-  // selection is coerced to ''), causing a close→open flicker — so we don't.
+  // Note: choosing the default config (the user's active e-mode, else the top
+  // group) is owned by ConfigMarketView, which guards it behind its own
+  // `userTouched` flag. Re-asserting a default here would re-open a config the
+  // moment the user collapses it (the empty selection is coerced to ''),
+  // causing a close→open flicker — so we don't.
 
   // Reset config selection when lender changes
   React.useEffect(() => {

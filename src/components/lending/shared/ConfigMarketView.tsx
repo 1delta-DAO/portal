@@ -122,15 +122,18 @@ export const ConfigMarketView: React.FC<Props> = ({
 }) => {
   const [internalConfigId, setInternalConfigId] = useState<string | null>(null)
   const [configFilter, setConfigFilter] = useState('')
-  // Tracks whether the user explicitly cleared the selection (clicked the
-  // active row to collapse). When true, the auto-select effect stops
-  // re-asserting a default — so the collapsed state actually persists.
+  // Tracks whether the user has explicitly interacted with the config list —
+  // either selecting a different config or clicking the active row to collapse.
+  // While false, the selection deterministically tracks the preferred default
+  // (see below) as async data (e.g. the user's active e-mode) settles, so the
+  // initial choice never depends on load ordering. Once true, we stop
+  // re-asserting a default so the user's choice / collapsed state persists.
   // Reset on configGroups identity change so a lender switch gets a fresh
   // default selection.
-  const [userCleared, setUserCleared] = useState(false)
+  const [userTouched, setUserTouched] = useState(false)
 
   React.useEffect(() => {
-    setUserCleared(false)
+    setUserTouched(false)
   }, [configGroups])
 
   // Use controlled or internal state
@@ -144,11 +147,12 @@ export const ConfigMarketView: React.FC<Props> = ({
     }
   }
   const toggleConfig = (id: string) => {
+    // Any manual toggle — open a different config or collapse the active one —
+    // counts as user intent and freezes the auto-default from here on.
+    setUserTouched(true)
     if (id === selectedConfigId) {
-      setUserCleared(true)
       setSelectedConfigId(null)
     } else {
-      setUserCleared(false)
       setSelectedConfigId(id)
     }
   }
@@ -183,16 +187,34 @@ export const ConfigMarketView: React.FC<Props> = ({
   const configPagination = useTablePagination(sortedGroups, PAGE_SIZE, [configFilter])
   const { pagedItems: pagedGroups } = configPagination
 
-  // Auto-select first config — but only if the user hasn't explicitly cleared
-  // the selection (so the inline detail can actually be collapsed and stay
-  // collapsed). On lender switch, configGroups identity changes and
-  // userCleared resets, so a fresh default is picked.
-  React.useEffect(() => {
-    if (userCleared) return
-    if (sortedGroups.length > 0 && (!selectedConfigId || !sortedGroups.find((g) => g.configId === selectedConfigId))) {
-      setSelectedConfigId(sortedGroups[0].configId)
+  // The preferred default config: the user's enabled (active e-mode) config if
+  // it's present, otherwise the top group (active-first, then liquidity, per the
+  // sort above). Computed from settled inputs, so it's the same regardless of
+  // whether `userActiveCategory` arrived before or after the groups — no race
+  // between "enabled config" and "topmost".
+  const preferredConfigId = useMemo(() => {
+    if (sortedGroups.length === 0) return null
+    if (userActiveCategory != null) {
+      const active = sortedGroups.find((g) => g.category === userActiveCategory)
+      if (active) return active.configId
     }
-  }, [sortedGroups, selectedConfigId, userCleared])
+    return sortedGroups[0].configId
+  }, [sortedGroups, userActiveCategory])
+
+  // Drive the default selection. Until the user interacts, the selection tracks
+  // `preferredConfigId` and re-aligns as async data settles (so a late-loading
+  // active e-mode still wins). After the user interacts we leave their choice
+  // alone — except to recover if it vanishes (filtered out / lender data
+  // changed), which would otherwise leave nothing selectable.
+  React.useEffect(() => {
+    if (!preferredConfigId) return
+    const selectionValid = !!selectedConfigId && sortedGroups.some((g) => g.configId === selectedConfigId)
+    if (userTouched) {
+      if (selectedConfigId && !selectionValid) setSelectedConfigId(preferredConfigId)
+      return
+    }
+    if (selectedConfigId !== preferredConfigId) setSelectedConfigId(preferredConfigId)
+  }, [preferredConfigId, selectedConfigId, sortedGroups, userTouched])
 
   // Map marketUid → PoolDataItem for selection
   const poolMap = useMemo(() => {
