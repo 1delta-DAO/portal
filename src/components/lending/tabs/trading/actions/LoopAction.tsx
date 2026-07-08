@@ -27,12 +27,10 @@ function LoopRangeInfo({
   loopRange,
   loading,
   debtSymbol,
-  onSetMax,
 }: {
   loopRange: LoopRangeEntry | null
   loading: boolean
   debtSymbol: string
-  onSetMax: (amount: number) => void
 }) {
   if (loading) {
     return (
@@ -55,16 +53,7 @@ function LoopRangeInfo({
 
   return (
     <div className="rounded-lg border border-base-300 bg-base-200/40 px-2.5 py-2 space-y-1.5 text-xs">
-      <div className="flex items-center justify-between">
-        <span className="text-base-content/60 font-medium">Max Loop Size</span>
-        <button
-          type="button"
-          className="text-primary hover:underline cursor-pointer text-[10px] font-medium"
-          onClick={() => onSetMax(loopRange.amountIn)}
-        >
-          Use max
-        </button>
-      </div>
+      <div className="text-base-content/60 font-medium">Max Loop Size</div>
 
       {/* Best-case (target e-mode) */}
       <div className="flex items-center justify-between">
@@ -344,7 +333,6 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
   // Max amounts
   const debtPos = debtPool ? userPositions.get(debtPool.marketUid) : null
-  const maxBorrowableStr = debtPos ? String(debtPos.borrowable) : '0'
 
   // Pay wallet balance + overMax
   const payWalletBalance = selectedPayCurrency
@@ -394,7 +382,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
           subAccounts={subAccounts}
           selectedAccountId={accountId ?? null}
           onChange={onAccountIdChange}
-          allowCreate={allowCreateAccount || (subAccounts.length === 0 && lenderSupportsSubAccounts(selectedLender))}
+          allowCreate={allowCreateAccount || lenderSupportsSubAccounts(selectedLender)}
           chainId={chainId}
           lender={selectedLender}
           account={account}
@@ -472,9 +460,23 @@ export const LoopAction: React.FC<TradingActionProps> = ({
         )}
 
         <div className="form-control mt-1.5">
-          <div className="flex items-center justify-between mb-0.5">
-            <label className="label-text text-xs">Debt Amount</label>
-            <AmountQuickButtons maxAmount={maxBorrowableStr} onSelect={setDebtAmount} decimals={debtPool?.asset?.decimals} />
+          <div className="flex items-center justify-between gap-2 mb-0.5">
+            <label className="label-text text-xs whitespace-nowrap shrink-0">Amount</label>
+            <AmountQuickButtons
+              maxAmount={loopRange?.amountInStr ?? '0'}
+              onSelect={(v) => {
+                setDebtAmount(v)
+                reset()
+              }}
+              decimals={debtPool?.asset?.decimals}
+              presets={[
+                { label: '25%', fraction: 0.25 },
+                { label: '50%', fraction: 0.5 },
+                { label: '75%', fraction: 0.75 },
+                { label: '90%', fraction: 0.9 },
+                { label: 'Max', fraction: 1 },
+              ]}
+            />
           </div>
           <input
             type="text"
@@ -503,10 +505,6 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               loopRange={loopRange}
               loading={loopRangeLoading}
               debtSymbol={debtPool.asset.symbol}
-              onSetMax={(amount) => {
-                setDebtAmount(String(amount))
-                reset()
-              }}
             />
           </div>
         )}

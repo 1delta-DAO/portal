@@ -9,9 +9,11 @@ interface AmountQuickButtonsProps {
   onMax?: () => void
   /** Token decimals — clamps preset results to this precision. */
   decimals?: number
+  /** Override the default preset fractions (25/50/75/Max). */
+  presets?: { label: string; fraction: number }[]
 }
 
-const entries = [
+const defaultEntries = [
   { label: '25%', fraction: 0.25 },
   { label: '50%', fraction: 0.5 },
   { label: '75%', fraction: 0.75 },
@@ -23,7 +25,9 @@ export const AmountQuickButtons: React.FC<AmountQuickButtonsProps> = ({
   onSelect,
   onMax,
   decimals,
+  presets,
 }) => {
+  const entries = presets ?? defaultEntries
   const n = parseFloat(maxAmount)
   // Render the buttons unconditionally so they're always visible — when there's
   // nothing to scale (no wallet balance / no withdrawable / no borrowable),

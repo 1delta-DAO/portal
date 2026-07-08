@@ -215,12 +215,10 @@ export function TradingDashboard({
     maxRiskScore
   )
 
-  // Auto-select first config when config groups load
-  React.useEffect(() => {
-    if (configGroups && configGroups.length > 0 && !selectedConfigId) {
-      setSelectedConfigId(configGroups[0].configId)
-    }
-  }, [configGroups, selectedConfigId])
+  // Note: auto-selecting the first config is owned by ConfigMarketView, which
+  // guards it behind its own `userCleared` flag. Re-asserting a default here
+  // would re-open a config the moment the user collapses it (the empty
+  // selection is coerced to ''), causing a close→open flicker — so we don't.
 
   // Reset config selection when lender changes
   React.useEffect(() => {
