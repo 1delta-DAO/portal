@@ -13,6 +13,7 @@ export type VaultProvider =
   | 'lista'
   | 'silo'
   | 'euler-earn'
+  | 'aave-earn'
   | 'lst'
   | 'savings'
   | 'lagoon'
@@ -27,6 +28,7 @@ export const VAULT_PROVIDERS: VaultProvider[] = [
   'lista',
   'silo',
   'euler-earn',
+  'aave-earn',
   'lst',
   'savings',
   'lagoon',
@@ -73,7 +75,7 @@ export function vaultFamily(provider: VaultProvider): VaultFamily {
     case 'hypercore':
       return 'hypercore'
     default:
-      // morpho, fluid, silo, euler-earn, gearbox
+      // morpho, fluid, silo, euler-earn, aave-earn, gearbox
       return 'erc4626'
   }
 }

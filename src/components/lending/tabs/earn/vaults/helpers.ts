@@ -16,6 +16,7 @@ export const PROVIDER_LABELS: Record<VaultProvider, string> = {
   lista: 'Lista',
   silo: 'Silo',
   'euler-earn': 'Euler Earn',
+  'aave-earn': 'Aave Earn',
   lst: 'Liquid Staking',
   savings: 'Savings',
   lagoon: 'Lagoon',

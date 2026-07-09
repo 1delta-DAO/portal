@@ -171,6 +171,8 @@ function deriveCurator(provider: VaultProvider, v: RawVault): string | undefined
       return 'Fluid'
     case 'euler-earn':
       return 'Euler'
+    case 'aave-earn':
+      return 'Aave'
     default:
       return undefined
   }
