@@ -307,8 +307,8 @@ const USE_RPC_FETCH = false
 
 // Per-chain override: these chains always fetch user positions locally via RPC,
 // regardless of USE_RPC_FETCH. Used for chains the API does not (yet) serve well.
-//   1329 = SEI Network, 1868 = SONEIUM
-const FORCE_RPC_FETCH_CHAINS = new Set<string>(['1329', '1868'])
+//   1329 = SEI Network, 1868 = SONEIUM, 1672 = Pharos, 4663 = Robinhood Chain
+const FORCE_RPC_FETCH_CHAINS = new Set<string>(['1329', '1868', '1672', '4663'])
 
 /** Whether to fetch user positions via RPC (vs the API) for a given chain. */
 function shouldUseRpcFetch(chainId: string): boolean {
