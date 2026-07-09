@@ -84,6 +84,23 @@ export function formatTokenForInput(v: number | string): string {
 }
 
 /**
+ * Format a token amount to a fixed number of significant digits (default 6),
+ * without exponential notation or trailing zeros. Use for compact display of
+ * long-tailed amounts (e.g. a fixed-term loan's debt); pair it with a `title`
+ * carrying the exact value so precision is one hover away.
+ *
+ *   formatTokenSignificant("0.0020623857569709")  // "0.00206239"
+ */
+export function formatTokenSignificant(v: number | string, sig = 6): string {
+  const n = typeof v === 'string' ? parseFloat(v) : v
+  if (!Number.isFinite(n) || n === 0) return '0'
+  // toPrecision rounds to `sig` significant digits; Number() drops trailing
+  // zeros and any exponent it introduced for small magnitudes, then
+  // formatTokenForInput renders it plainly (no grouping, no exponent).
+  return formatTokenForInput(Number(n.toPrecision(sig)))
+}
+
+/**
  * Validate and sanitize a decimal amount input string.
  * Returns the cleaned string if valid, or null if invalid.
  * Allows: digits, a single decimal point, leading zero before decimal.

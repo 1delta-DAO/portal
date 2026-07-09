@@ -7,7 +7,7 @@ import { PoolSelectorDropdown } from '../PoolSelectorDropdown'
 import { SlippageInput } from '../SlippageInput'
 import { QuoteCard } from '../QuoteCard'
 import { AmountQuickButtons } from '../../../actions/AmountQuickButtons'
-import { formatTokenForInput, formatUsd, sanitizeAmountInput } from '../../../actions/format'
+import { formatTokenForInput, formatTokenSignificant, formatUsd, sanitizeAmountInput } from '../../../actions/format'
 import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes, buildSimulationBody } from '../useTradingQuotes'
 import { TradingTransactionSuccess } from '../TradingTransactionSuccess'
@@ -339,8 +339,11 @@ export const CloseAction: React.FC<TradingActionProps> = ({
                           </span>
                         )}
                       </span>
-                      <span className="text-xs font-mono tabular-nums text-error shrink-0">
-                        {formatTokenForInput(loanDebtString(loan))} {debtPool?.asset.symbol}
+                      <span
+                        className="text-xs font-mono tabular-nums text-error shrink-0"
+                        title={`${formatTokenForInput(loanDebtString(loan))} ${debtPool?.asset.symbol ?? ''}`}
+                      >
+                        {formatTokenSignificant(loanDebtString(loan))} {debtPool?.asset.symbol}
                       </span>
                     </button>
                   )
