@@ -18,7 +18,9 @@ export function getIndependentPublicClient(chainId: string): PublicClient | null
   const chain = evmChainWagmi.find((c) => String(c.id) === chainId)
   if (!chain) return null
 
-  const urls = LIST_OVERRIDES[chainId] ?? []
+  // Prefer curated LIST_OVERRIDES; fall back to the chain's own default RPC for
+  // chains the providers package doesn't cover yet (e.g. Robinhood / 4663).
+  const urls = LIST_OVERRIDES[chainId] ?? chain.rpcUrls.default.http ?? []
   if (urls.length === 0) return null
 
   const client = createPublicClient({

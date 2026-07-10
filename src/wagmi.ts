@@ -1,6 +1,7 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { http } from 'wagmi'
-import type { Chain } from 'viem'
+import { defineChain, type Chain } from 'viem'
+import { customChains } from '@1delta/providers'
 import {
   mainnet,
   optimism,
@@ -50,6 +51,35 @@ import {
   corn,
 } from 'viem/chains'
 
+// Chains not present in viem/chains. `@1delta/providers` ships some as
+// `customChains`; others (Robinhood) are defined locally until the package
+// includes them. Both must live in `evmChainWagmi` below, otherwise wagmi's
+// `switchChainAsync` rejects them and the chain can't be selected in the UI.
+const pharos = customChains.pharosMainnet as Chain
+
+// Robinhood Chain (4663) — Arbitrum-Orbit L2, native ETH. Not yet in
+// viem/chains or @1delta/providers' customChains.
+const robinhood = defineChain({
+  id: 4663,
+  name: 'Robinhood Chain',
+  nativeCurrency: { decimals: 18, name: 'Ether', symbol: 'ETH' },
+  rpcUrls: {
+    default: { http: ['https://rpc.mainnet.chain.robinhood.com'] },
+  },
+  blockExplorers: {
+    default: {
+      name: 'Robinhood Explorer',
+      url: 'https://explorer.mainnet.chain.robinhood.com',
+    },
+  },
+  contracts: {
+    multicall3: {
+      address: '0xcA11bde05977b3631167028862bE2a173976CA11',
+      blockCreated: 1,
+    },
+  },
+})
+
 export const evmChainWagmi: [Chain, ...Chain[]] = [
   mainnet,       // 1
   optimism,      // 10
@@ -75,10 +105,12 @@ export const evmChainWagmi: [Chain, ...Chain[]] = [
   lisk,          // 1135
   moonbeam,      // 1284
   sei,           // 1329
+  pharos,        // 1672
   soneium,       // 1868
   abstract,      // 2741
   morph,         // 2818
   megaeth,       // 4326
+  robinhood,     // 4663
   mantle,        // 5000
   kaia,          // 8217
   base,          // 8453
