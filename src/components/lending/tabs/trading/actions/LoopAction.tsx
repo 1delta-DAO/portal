@@ -341,6 +341,27 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   const payWalletStr = payWalletBalance?.balance ?? '0'
   const payOverMax = parseAmount(payWalletStr) > 0 && parseAmount(payAmount) > parseAmount(payWalletStr) + 1e-9
 
+  // USD value of the paid-in margin — used to correct the loop price impact so
+  // the margin isn't booked as a swap penalty. Prefer the wallet balance's
+  // implied unit price; fall back to the matching pool's oracle price. Left at
+  // 0 when unknown so no (possibly wrong) correction is applied.
+  const payAmountUSD = useMemo(() => {
+    const amt = parseAmount(payAmount)
+    if (!selectedPayCurrency || !(amt > 0)) return 0
+    const balNum = parseAmount(payWalletBalance?.balance ?? '0')
+    const balUSD = payWalletBalance?.balanceUSD
+    if (balUSD != null && balNum > 0) {
+      const price = balUSD / balNum
+      if (Number.isFinite(price) && price > 0) return price * amt
+    }
+    const addr = selectedPayCurrency.address.toLowerCase()
+    const match = [collateralPool, debtPool].find(
+      (p) => p?.asset?.address?.toLowerCase() === addr
+    )
+    if (match?.oraclePriceUSD != null) return match.oraclePriceUSD * amt
+    return 0
+  }, [selectedPayCurrency, payAmount, payWalletBalance, collateralPool, debtPool])
+
   const handleFetchQuotes = () => {
     if (!collateralPool || !debtPool) return
     fetchQuotes(
@@ -361,7 +382,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
         ...(accountId ? { accountId } : {}),
       },
       account,
-      activeSubAccount ? buildSimulationBody(activeSubAccount) : undefined
+      activeSubAccount ? buildSimulationBody(activeSubAccount) : undefined,
+      payAmountUSD
     )
   }
 

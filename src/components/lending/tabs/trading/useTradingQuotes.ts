@@ -87,9 +87,11 @@ function matchDeltaByAmount(
 }
 
 function normalizeQuotes(
-  _operation: TradingOperation,
+  operation: TradingOperation,
   rawQuotes: any[],
-  alternatives: Tx[] = []
+  alternatives: Tx[] = [],
+  /** USD value of the margin the user paid in (Loop zap). 0 when not a zap. */
+  marginUSD = 0
 ): TradingQuote[] {
   return rawQuotes.map((q, i) => {
     let aggregator = 'Unknown'
@@ -139,6 +141,19 @@ function normalizeQuotes(
     if (tradeAmountInUSD != null && tradeAmountOutUSD != null) {
       priceImpactUSD = tradeAmountOutUSD - tradeAmountInUSD
       if (tradeAmountInUSD > 0) priceImpactPct = priceImpactUSD / tradeAmountInUSD
+    }
+
+    // Loop: a raw out−in comparison of the swap legs mis-books the margin. When
+    // the user zaps in extra margin, that margin inflates the collateral the
+    // swap produces, so out−in reports the margin as a gain/penalty rather than
+    // the actual slippage. Measure the real cost from the position deltas:
+    //   (collateral gained − debt taken) − margin paid in
+    // = value the user contributed minus value that landed in the position,
+    // i.e. what the swap/fees cost them. Reduces to out−in when margin is 0.
+    if (operation === 'Loop' && positionCollateralUSD != null && positionDebtUSD != null) {
+      const netValue = positionCollateralUSD - positionDebtUSD - marginUSD
+      priceImpactUSD = netValue
+      priceImpactPct = positionCollateralUSD > 0 ? netValue / positionCollateralUSD : undefined
     }
 
     // Transaction data comes from actions.alternatives (matched by index),
@@ -224,7 +239,9 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
       operation: TradingOperation,
       params: Record<string, string | number | boolean | bigint>,
       account?: string,
-      body?: LoopRangeSimulationBody
+      body?: LoopRangeSimulationBody,
+      /** USD value of the margin paid in (Loop zap) — corrects price impact. */
+      marginUSD = 0
     ) => {
       setState((s) => ({
         ...s,
@@ -262,7 +279,7 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
           throw new Error(envelope.error?.message ?? 'API error')
         }
         const alternatives: Tx[] = envelope.actions?.alternatives ?? []
-        const quotes = normalizeQuotes(operation, envelope.data?.quotes ?? [], alternatives)
+        const quotes = normalizeQuotes(operation, envelope.data?.quotes ?? [], alternatives, marginUSD)
         // Permissions: check both envelope.actions and envelope.data (varies by lender)
         const permissions: Tx[] = envelope.actions?.permissions ?? envelope.data?.permissions ?? []
         // Transactions: collateral enable/disable (e.g. Compound V2 / Venus)

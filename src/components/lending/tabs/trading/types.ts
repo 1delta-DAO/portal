@@ -37,9 +37,12 @@ export interface TradingQuote {
   tradeAmountInUSD?: number
   /** USD value of the output leg of the swap (absolute). */
   tradeAmountOutUSD?: number
-  /** outUSD - inUSD (negative = swap costs the user). */
+  /** Value gained vs given up (negative = costs the user). For swaps this is
+   *  outUSD − inUSD; for Loop it's (collateral − debt − margin) so the zapped-in
+   *  margin isn't mistaken for a penalty. */
   priceImpactUSD?: number
-  /** priceImpactUSD / inUSD as a fraction (e.g. -0.044 for -4.4%). */
+  /** priceImpactUSD as a fraction of the trade size (inUSD for swaps, collateral
+   *  for Loop), e.g. -0.044 for -4.4%. */
   priceImpactPct?: number
   /** Resolved input asset metadata from the deltas (preferred over caller-supplied props). */
   inSymbol?: string
