@@ -7,7 +7,7 @@ import { formatTokenAmount, formatUsd, parseAmount } from './format'
 import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
-import { lenderSupportsSubAccounts } from './helpers'
+import { lenderSupportsSubAccounts, isMidnightMarket, maturityFromDurationDays } from './helpers'
 import { HealthFactorProjection } from './HealthFactorProjection'
 import { RateImpactIndicator } from './RateImpactIndicator'
 import { TransactionSuccess } from './TransactionSuccess'
@@ -50,6 +50,13 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   }, [pool?.marketUid, terms.length])
 
   const selectedTerm = terms.find((t) => t.termId === selectedTermId) ?? null
+
+  // Midnight markets carry a single fixed *calendar* maturity (vs Lista's rolling
+  // durations) — surface the absolute maturity date alongside the term.
+  const isMidnight = isMidnightMarket(pool?.marketUid)
+  const maturityMs = selectedTerm
+    ? maturityFromDurationDays(selectedTerm.durationDays)
+    : null
 
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
@@ -153,7 +160,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
                         : 'border-base-300 bg-base-200/50 hover:bg-base-200'
                     }`}
                   >
-                    <span className="text-xs font-semibold">{t.durationDays}-day</span>
+                    <span className="text-xs font-semibold">{Math.max(1, Math.round(t.durationDays))}-day</span>
                     <span className="text-[10px] font-mono tabular-nums text-warning">
                       {t.apr.toFixed(2)}%
                     </span>
@@ -165,6 +172,12 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
             <div className="text-xs text-base-content/50 px-1">
               Fixed-term borrowing is currently unavailable for this market.
             </div>
+          )}
+          {/* Fixed calendar maturity (Midnight) — a specific settlement date. */}
+          {isMidnight && maturityMs && (
+            <span className="text-[10px] text-base-content/50 px-1">
+              Fixed maturity · {new Date(maturityMs).toLocaleDateString()}
+            </span>
           )}
         </div>
       )}

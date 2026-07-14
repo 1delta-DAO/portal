@@ -220,23 +220,43 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       subAccount,
     })
 
+  // Tracks whether the native/wrapped default has been settled for the current
+  // pool — either because the auto-default below applied it or because the user
+  // manually picked a side. Once set, the auto-default stops running so it can't
+  // fight a manual selection.
+  const nativeDefaultSettledRef = useRef(false)
+
   // Reset when pool changes
   useEffect(() => {
     setAmount('')
     setUseNative(false)
+    nativeDefaultSettledRef.current = false
     resetState()
   }, [pool?.marketUid])
 
   // For wnative markets where the user holds the native token but no wrapped
   // balance (typical: CELO/ETH/MATIC sitting in the wallet, no WCELO/WETH/etc.),
   // default the toggle to "Pay with native" so the wallet balance display and
-  // the % quick-buttons immediately have something to scale from.
+  // the % quick-buttons immediately have something to scale from. This is a
+  // one-time default per pool: without the settled-ref guard it re-fired on
+  // every `useNative` change and snapped the toggle back to native the instant
+  // the user tried to switch to wrapped.
   useEffect(() => {
-    if (!canUseNative || useNative) return
+    if (!canUseNative || nativeDefaultSettledRef.current) return
     const wrappedBal = parseAmount(walletBalance?.balance ?? '0')
     const nativeBal = parseAmount(nativeBalance?.balance ?? '0')
+    // Wait for balances to land before committing the default; both zero
+    // usually means the balance query hasn't resolved yet.
+    if (wrappedBal === 0 && nativeBal === 0) return
     if (wrappedBal === 0 && nativeBal > 0) setUseNative(true)
-  }, [canUseNative, useNative, walletBalance, nativeBalance])
+    nativeDefaultSettledRef.current = true
+  }, [canUseNative, walletBalance, nativeBalance])
+
+  // Any manual pick settles the default so the auto-default won't override it.
+  const handleUseNativeChange = (next: boolean) => {
+    nativeDefaultSettledRef.current = true
+    setUseNative(next)
+  }
 
   const activeBal = canUseNative && useNative ? nativeBalance : walletBalance
   const walletAmountStr = activeBal?.balance ?? '0'
@@ -480,7 +500,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
           wrappedSymbol={pool!.asset.symbol}
           nativeToken={nativeToken}
           useNative={useNative}
-          onChange={setUseNative}
+          onChange={handleUseNativeChange}
           label="Pay with"
         />
       )}
