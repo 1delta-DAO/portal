@@ -16,7 +16,8 @@ import { RateImpactIndicator } from '../../../actions/RateImpactIndicator'
 import { Logo } from '../../../../common/Logo'
 import { SimulationIndicator } from '../../../actions/SimulationIndicator'
 import { SubAccountSelector } from '../../../actions/SubAccountSelector'
-import { lenderSupportsSubAccounts } from '../../../actions/helpers'
+import { lenderSupportsSubAccounts, fixedTermDetails } from '../../../actions/helpers'
+import { FixedTermDetailsRows } from '../../../shared/FixedTermDetails'
 import {
   fetchLoopRangeWithSimulation,
   fetchLoopRange,
@@ -331,6 +332,12 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   }, [debtPool?.marketUid, debtTerms.length])
   const selectedTerm = debtTerms.find((t) => t.termId === selectedTermId) ?? null
 
+  // Morpho Midnight debt markets carry offer details Lista lacks (fixed calendar
+  // maturity, fillable depth, continuous + settlement fees) — surface them under
+  // the term picker, same as the plain BorrowAction.
+  // Canonical fixed-term details for the debt market (Lista or Midnight).
+  const debtFtDetails = fixedTermDetails(debtPool)
+
   // Max amounts
   const debtPos = debtPool ? userPositions.get(debtPool.marketUid) : null
 
@@ -465,7 +472,12 @@ export const LoopAction: React.FC<TradingActionProps> = ({
                           : 'border-base-300 bg-base-200/50 hover:bg-base-200'
                       }`}
                     >
-                      <span className="text-xs font-semibold">{t.durationDays}-day</span>
+                      <span
+                        className="text-xs font-semibold"
+                        title={`${t.durationDays.toFixed(2)} days to maturity`}
+                      >
+                        {Math.max(1, Math.round(t.durationDays))}-day
+                      </span>
                       <span className="text-[10px] font-mono tabular-nums text-warning">
                         {t.apr.toFixed(2)}%
                       </span>
@@ -477,6 +489,16 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               <span className="text-[10px] text-base-content/50">
                 Fixed-term borrowing is currently unavailable for this market.
               </span>
+            )}
+            {/* Fixed-term details — maturity, market-level fees, and the
+                early-repayment policy. Unified across Lista and Midnight. */}
+            {debtFtDetails && (
+              <div className="space-y-0.5 text-[10px] text-base-content/60">
+                <FixedTermDetailsRows
+                  details={debtFtDetails}
+                  symbol={debtPool?.asset?.symbol}
+                />
+              </div>
             )}
           </div>
         )}

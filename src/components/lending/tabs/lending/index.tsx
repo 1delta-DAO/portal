@@ -11,7 +11,7 @@ import type {
 } from '../../../../hooks/lending/usePoolData'
 import { usePoolConfigData } from '../../../../hooks/lending/usePoolData'
 import { ConfigMarketView } from '../../shared/ConfigMarketView'
-import { RiskSelect } from '../../shared/RiskSelect'
+import { useRiskMode } from '../../../../contexts/RiskMode'
 import type {
   UserDataResult,
   UserPositionEntry,
@@ -100,18 +100,17 @@ export function LendingDashboard({
     'lending-dashboard',
     {
       viewMode: 'config',
-      maxRiskScore: 4,
       sortKey: 'totalDepositsUSD' as string,
       sortDir: 'desc' as string,
     },
     { chainId }
   )
+  // Risk ceiling is app-wide (next to the network selector), not a per-tab filter.
+  const { maxRiskScore } = useRiskMode()
   const viewMode = lf.viewMode as 'default' | 'config'
-  const maxRiskScore = lf.maxRiskScore
   const sortKey = lf.sortKey as SortKey
   const sortDir = lf.sortDir as 'asc' | 'desc'
   const setViewMode = (v: 'default' | 'config') => setLF('viewMode', v)
-  const setMaxRiskScore = (v: number) => setLF('maxRiskScore', v)
   const setSortKey = (v: SortKey) => setLF('sortKey', v)
   const setSortDir = (v: 'asc' | 'desc') => setLF('sortDir', v)
 
@@ -450,7 +449,6 @@ export function LendingDashboard({
               </button>
             </div>
 
-            <RiskSelect value={maxRiskScore} onChange={setMaxRiskScore} />
             <button
               type="button"
               className="btn btn-xs btn-ghost text-base-content/50"

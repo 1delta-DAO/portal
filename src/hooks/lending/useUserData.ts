@@ -64,6 +64,13 @@ export interface UserPositionEntry {
   stableBorrowRate?: string
   collateralEnabled: boolean
   claimableRewards: number
+  /**
+   * Morpho Midnight only: continuous fee accrued on a lender's supply position,
+   * in loan-token units. Already deducted from `deposits` (net = credit −
+   * pendingFee). Absent / 0 on every other lender and on markets with no
+   * continuous fee (the current live default).
+   */
+  pendingFee?: number | string
   withdrawable: number | string
   borrowable: number | string
   isAllowed?: boolean

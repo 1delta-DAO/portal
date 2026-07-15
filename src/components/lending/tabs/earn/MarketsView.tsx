@@ -10,6 +10,7 @@ import { MarketsTable } from './MarketsTable'
 import { DepositPanel } from './DepositPanel'
 import { useIsMobile } from '../../../../hooks/useIsMobile'
 import { usePersistedFilters } from '../../../../hooks/usePersistedFilters'
+import { useRiskMode } from '../../../../contexts/RiskMode'
 
 const HIGH_LIQUIDITY_CHAINS: ReadonlySet<string> = new Set([
   SupportedChainId.PLASMA_MAINNET,
@@ -130,6 +131,12 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   const setMaxLiquidityUsd = (v: string) => setFilter('maxLiquidityUsd', v)
   const setMaxRiskScore = (v: string) => setFilter('maxRiskScore', v)
 
+  // The app-wide risk ceiling (next to the network selector). Earn may override
+  // it *downwards* only — the effective max is clamped to the global cap so the
+  // tab can never surface more risk than the app config allows.
+  const { maxRiskScore: riskCap } = useRiskMode()
+  const effectiveMaxRisk = Math.min(parseInt(maxRiskScore, 10) || riskCap, riskCap)
+
   // Transient UI state (not persisted)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState<number>(1)
@@ -157,7 +164,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     count: serverCount,
   } = useFlattenedPools({
     chainId,
-    maxRiskScore: parseInt(maxRiskScore, 10) || 4,
+    maxRiskScore: effectiveMaxRisk,
     enabled: !!chainId,
   })
 
@@ -363,11 +370,9 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       })
     }
 
-    // Risk score is always enforced (safety floor) regardless of external filter.
-    const maxRisk = parseInt(maxRiskScore, 10)
-    if (!Number.isNaN(maxRisk)) {
-      result = result.filter((p) => (p.risk?.score ?? 0) <= maxRisk)
-    }
+    // Risk score is always enforced (safety floor) — the effective max already
+    // folds in the app-wide ceiling, so the override can only ever narrow it.
+    result = result.filter((p) => (p.risk?.score ?? 0) <= effectiveMaxRisk)
 
     // The remaining filters are value-floors meant to trim the universe of
     // pools when browsing freely. When the user has explicitly narrowed via
@@ -522,7 +527,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     maxDebtUsd,
     minLiquidityUsd,
     maxLiquidityUsd,
-    maxRiskScore,
+    effectiveMaxRisk,
     assetFilter,
     externalAssetFilter,
   ])
@@ -578,7 +583,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     maxDebtUsd,
     minLiquidityUsd,
     maxLiquidityUsd,
-    maxRiskScore,
+    effectiveMaxRisk,
     assetFilter,
     externalAssetFilter,
     chainId,
@@ -720,16 +725,21 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
 
         <div className="form-control">
           <label className="label py-0">
-            <span className="label-text text-xs">Max Risk (1-5)</span>
+            <span className="label-text text-xs">Max Risk (1-{riskCap})</span>
           </label>
           <input
             type="number"
             min={1}
-            max={5}
+            max={riskCap}
             className="input input-bordered input-xs"
-            placeholder="4"
-            value={maxRiskScore}
-            onChange={(e) => setMaxRiskScore(e.target.value)}
+            placeholder={String(riskCap)}
+            // Lower-only override: never allow a value above the app-wide cap.
+            value={effectiveMaxRisk}
+            onChange={(e) => {
+              const parsed = parseInt(e.target.value, 10)
+              if (Number.isNaN(parsed)) return setMaxRiskScore('')
+              setMaxRiskScore(String(Math.min(Math.max(parsed, 1), riskCap)))
+            }}
           />
         </div>
 

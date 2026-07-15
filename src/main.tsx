@@ -10,6 +10,7 @@ import { config } from './wagmi'
 import App from './App'
 import { ToastProvider } from './components/common/ToastHost'
 import { SpyModeProvider } from './contexts/SpyMode'
+import { RiskModeProvider } from './contexts/RiskMode'
 import { rainbowDaisyTheme } from './rainbowkitTheme'
 
 const client = new QueryClient()
@@ -21,9 +22,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <RainbowKitProvider theme={rainbowDaisyTheme}>
           <BrowserRouter>
             <SpyModeProvider>
-              <ToastProvider>
-                <App />
-              </ToastProvider>
+              <RiskModeProvider>
+                <ToastProvider>
+                  <App />
+                </ToastProvider>
+              </RiskModeProvider>
             </SpyModeProvider>
           </BrowserRouter>
         </RainbowKitProvider>

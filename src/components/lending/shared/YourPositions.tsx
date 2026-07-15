@@ -13,8 +13,9 @@ import {
   termLabel,
   maturityDisplay,
   loanRatePct,
-  hasEarlyRepayPenalty,
 } from './brokeredLoans'
+import { listaEarlyRepay, earlyRepayLabel } from './fixedTerm'
+import { isMidnightMarket } from '../actions/helpers'
 import { RefinanceModal } from './RefinanceModal'
 import { MigrateModal, type MigrateSource } from './MigrateModal'
 
@@ -493,6 +494,21 @@ function PositionSection({
                   marketVariableRate={pool.variableBorrowRate + (pool.intrinsicYield ?? 0)}
                 />
               )}
+              {/* Midnight lend positions accrue a continuous fee, already netted
+                  out of the shown (net) deposit balance. Surface it so the
+                  haircut is legible. 0 on markets with no continuous fee. */}
+              {isDeposits &&
+                isMidnightMarket(pool.marketUid) &&
+                Number(position.pendingFee ?? 0) > 0 && (
+                  <div className="bg-base-200/40 px-3 py-1.5 pl-6 flex justify-between gap-2 text-[10px] text-base-content/60">
+                    <span title="Continuous fee accrued on this lend position — already deducted from the net balance shown above.">
+                      Continuous fee accrued
+                    </span>
+                    <span className="tabular-nums">
+                      {formatTokenAmount(Number(position.pendingFee))} {pool.asset.symbol}
+                    </span>
+                  </div>
+                )}
               </React.Fragment>
             )
           })}
@@ -537,7 +553,7 @@ function LoanBreakdown({
       {loans.map((loan) => {
         const mat = maturityDisplay(loan)
         const ratePct = loanRatePct(loan)
-        const penalty = hasEarlyRepayPenalty(loan)
+        const earlyRepay = listaEarlyRepay(loan, symbol)
         return (
           <div
             key={`${loan.marketUid}|${loan.loanId}`}
@@ -551,10 +567,10 @@ function LoanBreakdown({
               {mat.isPast && (
                 <span className="badge badge-xs bg-warning/15 text-warning border-0">Matured</span>
               )}
-              {penalty && (
+              {earlyRepay.hasPenalty && (
                 <span
                   className="text-warning/70 cursor-help"
-                  title={`Early-repay penalty: ${formatTokenAmount(loan.term?.earlyRepayPenalty ?? '0')} ${symbol}`}
+                  title={`Early repayment: ${earlyRepayLabel(earlyRepay)}`}
                 >
                   ⚠ penalty
                 </span>

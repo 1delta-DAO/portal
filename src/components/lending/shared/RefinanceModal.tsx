@@ -294,7 +294,12 @@ export const RefinanceModal: React.FC<RefinanceModalProps> = ({
                         }`}
                       >
                         <span className="flex items-center gap-1.5 text-xs">
-                          <span className="font-semibold">{t.durationDays}-day</span>
+                          <span
+                            className="font-semibold"
+                            title={`${t.durationDays.toFixed(2)} days to maturity`}
+                          >
+                            {Math.max(1, Math.round(t.durationDays))}-day
+                          </span>
                           {isSource && (
                             <span className="text-[10px] text-base-content/40">(current)</span>
                           )}
@@ -391,9 +396,9 @@ export const RefinanceModal: React.FC<RefinanceModalProps> = ({
                 {executingMain ? (
                   <span className="loading loading-spinner loading-xs" />
                 ) : isDynamicSource ? (
-                  `Refinance to ${targetTerm ? `${targetTerm.durationDays}-day` : 'fixed'}`
+                  `Refinance to ${targetTerm ? `${Math.max(1, Math.round(targetTerm.durationDays))}-day` : 'fixed'}`
                 ) : (
-                  `Roll over to ${targetTerm ? `${targetTerm.durationDays}-day` : 'fixed'}`
+                  `Roll over to ${targetTerm ? `${Math.max(1, Math.round(targetTerm.durationDays))}-day` : 'fixed'}`
                 )}
               </button>
             )}

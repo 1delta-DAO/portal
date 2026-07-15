@@ -54,7 +54,12 @@ export const BrokeredAprCell: React.FC<{ terms?: PoolTerm[] | null }> = ({ terms
                   key={t.termId}
                   className="flex items-center justify-between gap-4 px-1 text-[11px]"
                 >
-                  <span className="text-base-content/70">{t.durationDays}-day</span>
+                  <span
+                    className="text-base-content/70"
+                    title={`${t.durationDays.toFixed(2)} days to maturity`}
+                  >
+                    {Math.max(1, Math.round(t.durationDays))}-day
+                  </span>
                   <span className="font-mono tabular-nums text-warning">{t.apr.toFixed(2)}%</span>
                 </div>
               ))}

@@ -7,7 +7,8 @@ import { formatTokenAmount, formatUsd, parseAmount } from './format'
 import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
-import { lenderSupportsSubAccounts, isMidnightMarket, maturityFromDurationDays } from './helpers'
+import { lenderSupportsSubAccounts, fixedTermDetails } from './helpers'
+import { FixedTermDetailsRows } from '../shared/FixedTermDetails'
 import { HealthFactorProjection } from './HealthFactorProjection'
 import { RateImpactIndicator } from './RateImpactIndicator'
 import { TransactionSuccess } from './TransactionSuccess'
@@ -51,12 +52,9 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
 
   const selectedTerm = terms.find((t) => t.termId === selectedTermId) ?? null
 
-  // Midnight markets carry a single fixed *calendar* maturity (vs Lista's rolling
-  // durations) — surface the absolute maturity date alongside the term.
-  const isMidnight = isMidnightMarket(pool?.marketUid)
-  const maturityMs = selectedTerm
-    ? maturityFromDurationDays(selectedTerm.durationDays)
-    : null
+  // Canonical fixed-term details (maturity / fees / early-repay), from the
+  // API's `params.market.fixedTerm` — same shape for Lista and Midnight.
+  const ftDetails = fixedTermDetails(pool)
 
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
@@ -160,7 +158,12 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
                         : 'border-base-300 bg-base-200/50 hover:bg-base-200'
                     }`}
                   >
-                    <span className="text-xs font-semibold">{Math.max(1, Math.round(t.durationDays))}-day</span>
+                    <span
+                      className="text-xs font-semibold"
+                      title={`${t.durationDays.toFixed(2)} days to maturity`}
+                    >
+                      {Math.max(1, Math.round(t.durationDays))}-day
+                    </span>
                     <span className="text-[10px] font-mono tabular-nums text-warning">
                       {t.apr.toFixed(2)}%
                     </span>
@@ -173,11 +176,15 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
               Fixed-term borrowing is currently unavailable for this market.
             </div>
           )}
-          {/* Fixed calendar maturity (Midnight) — a specific settlement date. */}
-          {isMidnight && maturityMs && (
-            <span className="text-[10px] text-base-content/50 px-1">
-              Fixed maturity · {new Date(maturityMs).toLocaleDateString()}
-            </span>
+          {/* Fixed-term details — maturity, any market-level fees, and the
+              early-repayment policy. Unified across Lista and Midnight. */}
+          {ftDetails && (
+            <div className="mt-1 space-y-0.5 px-1 text-[10px] text-base-content/60">
+              <FixedTermDetailsRows
+                details={ftDetails}
+                symbol={pool?.asset?.symbol}
+              />
+            </div>
           )}
         </div>
       )}

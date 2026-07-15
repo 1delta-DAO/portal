@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useSpyAccount } from '../../contexts/SpyMode'
+import { useRiskMode } from '../../contexts/RiskMode'
 import { useChains } from '../../hooks/useChains'
 import { ChainFilterSelect } from './shared/ChainFilter'
+import { RiskSelect } from './shared/RiskSelect'
 import { useUserData } from '../../hooks/lending/useUserData'
 import { useLendingLatest, useLenders } from '../../hooks/lending/usePoolData'
 import { useLendingBalances } from '../../hooks/lending/useLendingBalances'
@@ -20,6 +22,7 @@ export type SubTab = 'earn' | 'lending' | 'trading' | 'swap' | 'optimize'
 
 export function LenderTab() {
   const { address: account } = useSpyAccount()
+  const { maxRiskScore, setMaxRiskScore } = useRiskMode()
   const { chains, isLoading: isChainsLoading } = useChains()
   const navigate = useNavigate()
   const { tab: tabSlug, chainId: chainIdParam, lender: lenderParam } = useParams()
@@ -184,7 +187,8 @@ export function LenderTab() {
           </button>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end items-center gap-2">
+          <RiskSelect value={maxRiskScore} onChange={setMaxRiskScore} />
           <ChainFilterSelect chains={chains} value={selectedChain} onChange={setSelectedChain} />
         </div>
       </div>

@@ -1,3 +1,5 @@
+import type { FixedTermDetails } from '../shared/fixedTerm'
+
 /** Lenders that support multiple sub-accounts per user */
 const MULTI_ACCOUNT_LENDERS = new Set(['INIT', 'EULER_V2', 'DOLOMITE'])
 
@@ -24,15 +26,57 @@ export function isMidnightMarket(marketUidOrLender?: string | null): boolean {
   return marketUidOrLender.split(':')[0].startsWith('MORPHO_MIDNIGHT')
 }
 
+/** Minimal pool shape the fixed-term detail readout needs. */
+interface FixedTermPoolLike {
+  /** Order-book depth (loan-token units + USD) — meaningful for Midnight. */
+  totalLiquidity?: number
+  totalLiquidityUSD?: number
+  /**
+   * Canonical fixed-term descriptor. The pool item served by the data API is a
+   * FLAT shape (no `params`), so this is promoted to the top level next to
+   * `terms` — read it there (with a `params.market` fallback for any consumer
+   * that still nests it).
+   */
+  fixedTerm?: ApiFixedTerm
+  params?: any
+}
+
+/** The canonical fixed-term descriptor the API emits on the pool item. */
+interface ApiFixedTerm {
+  model?: 'lista' | 'midnight'
+  maturity?: number
+  fees?: { continuousFeeApr?: number; settlementFee?: number }
+  earlyRepay?: { kind?: 'none' | 'penalty' }
+}
+
 /**
- * Absolute maturity of a fixed-term product, as an epoch-ms timestamp, derived
- * from its (fractional) days-to-maturity. Midnight markets carry a single fixed
- * calendar maturity; Lista terms are rolling durations, so only surface this for
- * markets with a real fixed maturity (Midnight).
+ * Map a pool's canonical `fixedTerm` block (emitted by the API for BOTH Lista
+ * brokered and Morpho Midnight markets) into the shared {@link FixedTermDetails}
+ * render shape. One code path, no per-protocol branching. Returns `null` for
+ * markets that carry no fixed-term block.
  */
-export function maturityFromDurationDays(
-  durationDays: number,
-  nowMs: number = Date.now(),
-): number {
-  return nowMs + durationDays * 86_400_000
+export function fixedTermDetails(
+  pool?: FixedTermPoolLike | null,
+): FixedTermDetails | null {
+  const ft = (pool?.fixedTerm ?? pool?.params?.market?.fixedTerm) as
+    | ApiFixedTerm
+    | undefined
+  if (!ft) return null
+  const n = (v: unknown): number | undefined =>
+    v == null || Number.isNaN(Number(v)) ? undefined : Number(v)
+  const settlement = ft.fees?.settlementFee // fraction (0–1)
+  return {
+    maturityMs: ft.maturity != null ? ft.maturity * 1000 : undefined,
+    // Fillable depth is an order-book (Midnight) notion; Lista rates are
+    // term-based, so only surface it there.
+    availableAmount: ft.model === 'midnight' ? n(pool?.totalLiquidity) : undefined,
+    availableAmountUsd:
+      ft.model === 'midnight' ? n(pool?.totalLiquidityUSD) : undefined,
+    continuousFeeAprPct: n(ft.fees?.continuousFeeApr),
+    settlementFeePct: settlement != null ? Number(settlement) * 100 : undefined,
+    earlyRepay:
+      ft.earlyRepay?.kind === 'penalty'
+        ? { hasPenalty: true }
+        : { hasPenalty: false },
+  }
 }

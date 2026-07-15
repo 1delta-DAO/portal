@@ -10,7 +10,7 @@ import type {
 } from '../../../../hooks/lending/usePoolData'
 import { usePoolConfigData } from '../../../../hooks/lending/usePoolData'
 import { ConfigMarketView } from '../../shared/ConfigMarketView'
-import { RiskSelect } from '../../shared/RiskSelect'
+import { useRiskMode } from '../../../../contexts/RiskMode'
 import type {
   UserDataResult,
   UserPositionEntry,
@@ -102,15 +102,15 @@ export function TradingDashboard({
     resetToDefaults: resetTradingFilters,
   } = usePersistedFilters(
     'trading-dashboard',
-    { activeOperation: 'Loop' as string, viewMode: 'config', maxRiskScore: 4 },
+    { activeOperation: 'Loop' as string, viewMode: 'config' },
     { chainId }
   )
+  // Risk ceiling is app-wide (next to the network selector), not a per-tab filter.
+  const { maxRiskScore } = useRiskMode()
   const activeOperation = tf.activeOperation as TradingOperation
   const viewMode = tf.viewMode as 'default' | 'config'
-  const maxRiskScore = tf.maxRiskScore
   const setActiveOperation = (v: TradingOperation) => setTF('activeOperation', v)
   const setViewMode = (v: 'default' | 'config') => setTF('viewMode', v)
-  const setMaxRiskScore = (v: number) => setTF('maxRiskScore', v)
 
   // Transient UI state
   const [selectedPools, setSelectedPools] = useState<SelectedPool[]>([])
@@ -489,7 +489,6 @@ export function TradingDashboard({
               </button>
             </div>
 
-            <RiskSelect value={maxRiskScore} onChange={setMaxRiskScore} />
             <button
               type="button"
               className="btn btn-xs btn-ghost text-base-content/50"
