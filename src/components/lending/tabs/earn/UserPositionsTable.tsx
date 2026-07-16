@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { RawCurrency } from '../../../../types/currency'
 import type { LenderInfoMap } from '../../../../hooks/lending/usePoolData'
+import { buildPath } from '../../../../utils/routes'
 import { useSendLendingTransaction } from '../../../../hooks/useSendLendingTransaction'
 import type {
   UserDataResult,
@@ -35,6 +37,43 @@ function formatUsd(v: number) {
 /** Extract actual position objects from the positions array (INIT has a leading number) */
 function extractPositions(positions: (UserPositionEntry | number)[]): UserPositionEntry[] {
   return positions.filter((p): p is UserPositionEntry => typeof p === 'object' && p !== null)
+}
+
+/**
+ * Small "open in lending tab" affordance — mirrors the per-market link in
+ * {@link MarketsTable}. Deep-links to the lending dashboard scoped to this
+ * lender on its chain.
+ */
+const OpenLenderLink: React.FC<{ chainId: string; lender: string; name: string }> = ({
+  chainId,
+  lender,
+  name,
+}) => {
+  const navigate = useNavigate()
+  return (
+    <a
+      className="shrink-0 text-base-content/30 hover:text-primary transition-colors cursor-pointer"
+      title={`Open ${name} lending`}
+      onClick={(e) => {
+        e.stopPropagation()
+        navigate(buildPath('lending', chainId, lender))
+      }}
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M7 17L17 7" />
+        <path d="M7 7h10v10" />
+      </svg>
+    </a>
+  )
 }
 
 /** Filter active lender entries and sort by net worth */
@@ -389,6 +428,11 @@ const MobileLenderCard: React.FC<{
             <h3 className="font-semibold text-base">
               {entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
             </h3>
+            <OpenLenderLink
+              chainId={entry.chainId}
+              lender={entry.lender}
+              name={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
+            />
             {!hasSingleSub && (
               <span className="text-xs text-base-content/50">{subs.length} accounts</span>
             )}
@@ -653,9 +697,14 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                             fallbackText={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
                             className="w-4 h-4 rounded-full object-contain shrink-0"
                           />
-                          <span className="font-semibold text-sm truncate" title={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}>
+                          <span className="font-semibold text-sm truncate min-w-0" title={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}>
                             {entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
                           </span>
+                          <OpenLenderLink
+                            chainId={entry.chainId}
+                            lender={entry.lender}
+                            name={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
+                          />
                           {!hasSingleSub && (
                             <span className="text-xs text-base-content/50 shrink-0">
                               {subs.length} accounts

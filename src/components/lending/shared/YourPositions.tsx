@@ -364,8 +364,16 @@ function PositionSection({
               return weight > 0 ? weighted / weight : null
             })()
 
+            // Morpho Midnight reports `variableBorrowRate: 0` (zero-coupon /
+            // order-book — no on-chain rate); the real fixed rate is the API
+            // effective rate, already aggregated into `summary.borrowApr` /
+            // `depositApr` (= this section's `baseApr`). A Midnight position is
+            // single-asset per side, so the per-leg rate equals the section rate.
+            const midnightApr = isMidnightMarket(pool.marketUid) ? baseApr : null
+
             const positionApr =
               (brokeredBorrowApr ??
+                midnightApr ??
                 (isDeposits ? pool.depositRate : pool.variableBorrowRate)) +
               (pool.intrinsicYield ?? 0)
             const sharePct = totalUsd > 0 ? (usd / totalUsd) * 100 : 0
