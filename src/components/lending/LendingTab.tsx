@@ -6,7 +6,7 @@ import { useChains } from '../../hooks/useChains'
 import { ChainFilterSelect } from './shared/ChainFilter'
 import { RiskSelect } from './shared/RiskSelect'
 import { useUserData } from '../../hooks/lending/useUserData'
-import { useLendingLatest, useLenders } from '../../hooks/lending/usePoolData'
+import { useLendingLatest, useLenders, type LenderInfoMap } from '../../hooks/lending/usePoolData'
 import { useLendingBalances } from '../../hooks/lending/useLendingBalances'
 import { useTokenLists } from '../../hooks/useTokenLists'
 import { EarnTab } from './tabs/earn'
@@ -99,6 +99,17 @@ export function LenderTab() {
     lenderKeysToFetch,
     chainsReady
   )
+  // The heavy fetch above is scoped to the single active lender, so its
+  // lenderInfoMap has exactly one entry. The earn positions table renders
+  // names for EVERY lender the user holds — merge in the full-chain
+  // enumeration (summaries) so those lookups don't fall back to enum keys.
+  const fullLenderInfoMap = useMemo<LenderInfoMap>(() => {
+    const map: LenderInfoMap = {}
+    for (const s of lenderSummaries ?? []) {
+      if (s.lenderInfo?.key) map[s.lenderInfo.key] = s.lenderInfo
+    }
+    return { ...map, ...lenderInfoMap }
+  }, [lenderSummaries, lenderInfoMap])
   // Scope the user-positions fetch to a single lender on the lending/looping
   // tabs (the UI only ever shows one lender's data there). Earn aggregates
   // across all lenders, so it keeps the unfiltered fetch.
@@ -199,7 +210,7 @@ export function LenderTab() {
           chainId={effectiveChainId}
           tokens={tokens}
           userData={userData}
-          lenderInfoMap={lenderInfoMap}
+          lenderInfoMap={fullLenderInfoMap}
           lendingBalances={lendingBalances}
           isLendingBalancesLoading={isLendingBalancesLoading}
           lendingBalancesError={lendingBalancesError}
@@ -213,7 +224,7 @@ export function LenderTab() {
         <LendingDashboard
           lenderSummaries={lenderSummaries}
           lenderData={lenderData}
-          lenderInfoMap={lenderInfoMap}
+          lenderInfoMap={fullLenderInfoMap}
           userData={userData}
           chainId={effectiveChainId}
           account={account}
@@ -228,7 +239,7 @@ export function LenderTab() {
         <TradingDashboard
           lenderSummaries={lenderSummaries}
           lenderData={lenderData}
-          lenderInfoMap={lenderInfoMap}
+          lenderInfoMap={fullLenderInfoMap}
           userData={userData}
           chainId={effectiveChainId}
           account={account}

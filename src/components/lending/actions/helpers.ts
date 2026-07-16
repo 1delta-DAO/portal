@@ -28,6 +28,8 @@ export function isMidnightMarket(marketUidOrLender?: string | null): boolean {
 
 /** Minimal pool shape the fixed-term detail readout needs. */
 interface FixedTermPoolLike {
+  /** Market id — used to recognise a Midnight market before its `fixedTerm` block is served. */
+  marketUid?: string
   /** Order-book depth (loan-token units + USD) — meaningful for Midnight. */
   totalLiquidity?: number
   totalLiquidityUSD?: number
@@ -59,12 +61,27 @@ interface ApiFixedTerm {
 export function fixedTermDetails(
   pool?: FixedTermPoolLike | null,
 ): FixedTermDetails | null {
+  const n = (v: unknown): number | undefined =>
+    v == null || Number.isNaN(Number(v)) ? undefined : Number(v)
   const ft = (pool?.fixedTerm ?? pool?.params?.market?.fixedTerm) as
     | ApiFixedTerm
     | undefined
-  if (!ft) return null
-  const n = (v: unknown): number | undefined =>
-    v == null || Number.isNaN(Number(v)) ? undefined : Number(v)
+  if (!ft) {
+    // Pre-publish fallback: the canonical `fixedTerm` block (maturity / fees /
+    // provider) may not be served yet, but a Midnight market always carries an
+    // order-book depth (the offer size / fillable amount) we can surface now —
+    // plus the two facts that don't need the block: it's an order book with no
+    // early-repay penalty.
+    if (isMidnightMarket(pool?.marketUid)) {
+      return {
+        availableAmount: n(pool?.totalLiquidity),
+        availableAmountUsd: n(pool?.totalLiquidityUSD),
+        earlyRepay: { hasPenalty: false },
+        provider: { kind: 'orderbook' },
+      }
+    }
+    return null
+  }
   const settlement = ft.fees?.settlementFee // fraction (0–1)
   return {
     maturityMs: ft.maturity != null ? ft.maturity * 1000 : undefined,
