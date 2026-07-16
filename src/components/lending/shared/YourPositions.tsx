@@ -286,7 +286,30 @@ function PositionSection({
   const shareBarClass = isDeposits ? 'bg-success/40' : 'bg-error/40'
 
   const totalUsd = isDeposits ? summary?.deposits ?? 0 : summary?.debt ?? 0
-  const baseApr = isDeposits ? summary?.depositApr ?? 0 : summary?.borrowApr ?? 0
+  // Raw server rate — the Midnight per-position EFFECTIVE (locked) rate lands
+  // here via `summary.borrowApr`; it is 0 when the API was unavailable.
+  const rawBaseApr = isDeposits ? summary?.depositApr ?? 0 : summary?.borrowApr ?? 0
+  // Midnight debt carries no pool rate, so a total API outage would leave the
+  // header + legs at a misleading 0%. Fall back to the debt-weighted CURRENT
+  // market fixed rate (`pool.terms`, the "Fixed from X%") across the section's
+  // Midnight positions, so the header and every leg degrade together.
+  const midnightSectionBase = (() => {
+    if (isDeposits || rawBaseApr > 0) return null
+    let weight = 0
+    let weighted = 0
+    for (const { position, pool } of positions) {
+      if (!isMidnightMarket(pool.marketUid)) continue
+      const rate = pool.terms?.length
+        ? Math.min(...pool.terms.map((t) => t.apr))
+        : null
+      const debt = debtUsd(position)
+      if (rate == null || !(debt > 0)) continue
+      weight += debt
+      weighted += rate * debt
+    }
+    return weight > 0 ? weighted / weight : null
+  })()
+  const baseApr = midnightSectionBase ?? rawBaseApr
   const intrinsic = isDeposits
     ? summary?.intrinsicDepositApr ?? 0
     : summary?.intrinsicBorrowApr ?? 0
@@ -365,11 +388,21 @@ function PositionSection({
             })()
 
             // Morpho Midnight reports `variableBorrowRate: 0` (zero-coupon /
-            // order-book — no on-chain rate); the real fixed rate is the API
-            // effective rate, already aggregated into `summary.borrowApr` /
-            // `depositApr` (= this section's `baseApr`). A Midnight position is
-            // single-asset per side, so the per-leg rate equals the section rate.
-            const midnightApr = isMidnightMarket(pool.marketUid) ? baseApr : null
+            // order-book — no on-chain rate). Rate fallback chain, so a fixed-rate
+            // loan never shows a misleading 0%:
+            //   1. the per-position EFFECTIVE (locked) rate from the API, already
+            //      aggregated into `summary.borrowApr` (= this section's baseApr);
+            //   2. if the API was unavailable (rawBaseApr 0), THIS leg's own CURRENT
+            //      market fixed rate from `terms` (the YTM proxy — "Fixed from X%").
+            //      The section header blends these same per-leg rates, so they agree.
+            // Deposits stay at baseApr (Midnight collateral earns nothing).
+            const midnightApr = !isMidnightMarket(pool.marketUid)
+              ? null
+              : isDeposits || rawBaseApr > 0
+                ? baseApr
+                : pool.terms?.length
+                  ? Math.min(...pool.terms.map((t) => t.apr))
+                  : null
 
             const positionApr =
               (brokeredBorrowApr ??
