@@ -30,6 +30,29 @@ export function earlyRepayTone(e: EarlyRepay): string {
   return e.hasPenalty ? 'text-warning' : 'text-base-content/60'
 }
 
+/**
+ * Who fronts the fixed term. Consistent across lenders: Lista terms are offered
+ * by a single market broker contract (`broker`, with its address); Midnight
+ * terms are an aggregate of many signed maker offers (`orderbook`, no single
+ * provider — the concrete maker(s) are per-offer, known at borrow/quote time).
+ */
+export type FixedTermProvider = {
+  kind: 'broker' | 'orderbook'
+  address?: string
+}
+
+/** Short `0x1234…abcd` form for a provider contract address. */
+export function shortAddress(addr: string): string {
+  return addr.length > 12 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr
+}
+
+/** One consistent human label for a term provider across lenders. */
+export function providerLabel(p?: FixedTermProvider): string | null {
+  if (!p) return null
+  if (p.kind === 'orderbook') return 'Order book'
+  return p.address ? shortAddress(p.address) : 'Broker'
+}
+
 /** Early-repay policy for a concrete Lista brokered loan (per-loan penalty). */
 export function listaEarlyRepay(
   loan: UserPositionEntry,
@@ -61,4 +84,6 @@ export interface FixedTermDetails {
   settlementFeePct?: number
   /** Early-repayment policy. */
   earlyRepay: EarlyRepay
+  /** Who offers the term (Lista broker contract vs Midnight order book). */
+  provider?: FixedTermProvider
 }

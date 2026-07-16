@@ -1,5 +1,5 @@
 import type { FixedTermDetails } from './fixedTerm'
-import { earlyRepayLabel, earlyRepayTone } from './fixedTerm'
+import { earlyRepayLabel, earlyRepayTone, providerLabel } from './fixedTerm'
 import { formatUsd, formatTokenAmount } from '../../../utils/format'
 
 /**
@@ -27,6 +27,19 @@ export function FixedTermDetailsRows({
           <span>Fixed maturity</span>
           <span className="tabular-nums">
             {new Date(details.maturityMs).toLocaleDateString()}
+          </span>
+        </div>
+      )}
+      {providerLabel(details.provider) != null && (
+        <div className="flex justify-between gap-2">
+          <span title="Who offers this fixed term: Lista terms come from a single market broker; Midnight terms are filled from an order book of maker offers.">
+            Offered by
+          </span>
+          <span
+            className="tabular-nums"
+            title={details.provider?.address ?? undefined}
+          >
+            {providerLabel(details.provider)}
           </span>
         </div>
       )}

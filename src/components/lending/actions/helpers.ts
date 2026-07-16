@@ -47,6 +47,7 @@ interface ApiFixedTerm {
   maturity?: number
   fees?: { continuousFeeApr?: number; settlementFee?: number }
   earlyRepay?: { kind?: 'none' | 'penalty' }
+  provider?: { kind?: 'broker' | 'orderbook'; address?: string }
 }
 
 /**
@@ -78,5 +79,9 @@ export function fixedTermDetails(
       ft.earlyRepay?.kind === 'penalty'
         ? { hasPenalty: true }
         : { hasPenalty: false },
+    provider:
+      ft.provider?.kind === 'broker' || ft.provider?.kind === 'orderbook'
+        ? { kind: ft.provider.kind, address: ft.provider.address }
+        : undefined,
   }
 }
