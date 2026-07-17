@@ -207,6 +207,12 @@ export interface OptimizerPairRow {
   maxDebtAmountUsd?: number
   minCollateralAmount?: number
   minCollateralAmountUsd?: number
+  /**
+   * Days to maturity — set ONLY for synthetic fixed-term (Morpho Midnight) rows
+   * that are sourced outside `/pairs/optimize` (see MigrateModal). Drives the
+   * "Fixed · Nd" label; `borrowAprEffective` on these rows is the fixed rate.
+   */
+  maturityDays?: number
 }
 
 const num = (v: unknown): number => {

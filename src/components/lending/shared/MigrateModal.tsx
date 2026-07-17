@@ -6,7 +6,12 @@ import {
   type OptimizerPairRow,
   type OptimizerAssetRef,
 } from '../../../hooks/lending/useOptimizerPairs'
-import { useLenders } from '../../../hooks/lending/usePoolData'
+import {
+  useLenders,
+  useLendingLatest,
+  type PoolDataItem,
+} from '../../../hooks/lending/usePoolData'
+import { isMidnightMarket } from '../actions/helpers'
 import {
   fetchMigrate,
   type MigrateResult,
@@ -14,6 +19,98 @@ import {
 } from '../../../sdk/lending-helper/fetchMigrate'
 import { LenderBadge } from './LenderBadge'
 import { Logo } from '../../common/Logo'
+
+/**
+ * Build a synthetic optimizer-pair row for a Morpho Midnight market so it can be
+ * offered as a migrate TARGET. Midnight is a fixed-term / order-book lender and
+ * is intentionally absent from the variable-rate `/pairs/optimize` feed, but its
+ * full market data IS in `/lending/latest`. Each Midnight lender key groups its
+ * loan (borrowable) + collateral markets; we pair the loan matching the source
+ * DEBT asset with the collateral matching the source COLLATERAL asset. The
+ * "borrow APR" here is the FIXED rate (shown with the maturity), not a variable
+ * rate — matching how a Midnight debt leg renders elsewhere.
+ */
+function buildMidnightPairRow(
+  chainId: string,
+  lenderKey: string,
+  markets: PoolDataItem[],
+  colAddr: string,
+  debtAddr: string,
+): OptimizerPairRow | null {
+  const cfg0 = (m: PoolDataItem) => m.config?.['0']
+  const loan = markets.find(
+    (m) =>
+      m.asset?.address?.toLowerCase() === debtAddr &&
+      !!cfg0(m) &&
+      !cfg0(m)!.debtDisabled &&
+      m.borrowingEnabled !== false &&
+      !m.isFrozen,
+  )
+  const coll = markets.find(
+    (m) =>
+      m.asset?.address?.toLowerCase() === colAddr &&
+      !!cfg0(m) &&
+      !cfg0(m)!.collateralDisabled &&
+      (cfg0(m)!.borrowCollateralFactor ?? 0) > 0,
+  )
+  if (!loan || !coll) return null
+
+  const collCfg = cfg0(coll)!
+  const lltv = collCfg.collateralFactor || collCfg.borrowCollateralFactor || 0
+  // Fixed borrow rate as a FRACTION (the API serves a percent). Prefer the term
+  // card's apr; fall back to the market's variableBorrowRate mirror.
+  const ratePct = Number(loan.terms?.[0]?.apr ?? loan.variableBorrowRate ?? 0)
+  const borrowApr = ratePct / 100
+  const maxLev = lltv > 0 && lltv < 1 ? 1 / (1 - lltv) : 1
+  const maturityDays = loan.terms?.[0]?.durationDays
+    ? Number(loan.terms[0].durationDays)
+    : undefined
+
+  const ref = (m: PoolDataItem): OptimizerAssetRef => ({
+    chainId,
+    address: m.asset.address,
+    symbol: m.asset.symbol,
+    name: m.asset.name,
+    decimals: m.asset.decimals,
+    logoURI: m.asset.logoURI,
+    assetGroup: m.asset.assetGroup,
+    priceUsd: m.oraclePriceUSD ?? undefined,
+  })
+
+  return {
+    chainId,
+    lenderKey,
+    marketLongUid: coll.marketUid,
+    marketShortUid: loan.marketUid,
+    collateral: ref(coll),
+    debt: ref(loan),
+    depositAprLong: 0,
+    borrowAprShort: borrowApr,
+    rewardAprLong: 0,
+    rewardAprShort: 0,
+    intrinsicYieldLong: 0,
+    intrinsicYieldShort: 0,
+    depositAprEffective: 0,
+    borrowAprEffective: borrowApr,
+    aprBase: -borrowApr * (maxLev - 1),
+    aprTotal: -borrowApr * (maxLev - 1),
+    ltv: lltv,
+    liquidationThreshold: lltv,
+    maxLeverage: maxLev,
+    riskScore: 0,
+    riskBreakdown: [],
+    utilizationLong: 0,
+    utilizationShort: 0,
+    totalDepositsUsdLong: coll.totalDepositsUSD ?? 0,
+    totalDebtUsdLong: 0,
+    totalLiquidityUsdLong: coll.totalLiquidityUSD ?? 0,
+    totalDepositsUsdShort: loan.totalDepositsUSD ?? 0,
+    totalDebtUsdShort: loan.totalDebtUSD ?? 0,
+    totalLiquidityUsdShort: loan.totalLiquidityUSD ?? 0,
+    borrowLiquidityShort: loan.totalLiquidityUSD ?? 0,
+    maturityDays,
+  }
+}
 
 // Canonical wrapped-native ERC20 per chain. Used only to find WBNB-style targets
 // when migrating a NATIVE debt (the on-behalf borrow can't be delegated for the
@@ -155,13 +252,26 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
   // Human-readable lender names + logos (same source the optimizer table uses),
   // so we show "Aave V3" / "Neverland" instead of raw keys like AAVE_V3.
   const { lenders: lenderSummaries } = useLenders(chainId, true, 100)
+
+  // Morpho Midnight (fixed-term / order-book) markets are NOT in the optimizer
+  // pairs feed (that's a variable-rate surface) nor in `useLenders`, so migrate
+  // targets never included them. Their full market data + lender info live in
+  // `/lending/latest` — pull all Midnight markets on this chain and synthesize
+  // same-asset target rows (see the `targets` memo below).
+  const { lenderData: midnightLenderData, lenderInfoMap: midnightLenderInfo } =
+    useLendingLatest(chainId, ['MORPHO_MIDNIGHT'], true, 100)
+
   const lenderInfo = useMemo(() => {
     const map: Record<string, { name?: string; logoURI?: string }> = {}
     for (const s of lenderSummaries ?? []) {
       if (s.lenderInfo?.key) map[s.lenderInfo.key] = s.lenderInfo
     }
+    // Midnight lender infos (per-market keys) so their target badges show a name.
+    for (const [key, info] of Object.entries(midnightLenderInfo ?? {})) {
+      if (info) map[key] = info as { name?: string; logoURI?: string }
+    }
     return map
-  }, [lenderSummaries])
+  }, [lenderSummaries, midnightLenderInfo])
   const lenderName = (key?: string) => (key ? (lenderInfo[key]?.name ?? key) : '')
 
   // Native ↔ wrapped-native are interchangeable across lenders: some markets use
@@ -277,9 +387,34 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
         !!r.marketLongUid &&
         !!r.marketShortUid &&
         !isUnsupportedTarget(r.lenderKey) &&
+        // Drop the optimizer's Midnight rows — they leak in only via a raised
+        // risk cap and carry NO maturity + a 0% rate for empty-book maturities.
+        // We re-add richer Midnight targets (fixed rate + maturity) from
+        // `/lending/latest` below, so this avoids duplicate rows too.
+        !isMidnightMarket(r.marketShortUid) &&
         matchesAsset(r.collateral.address, activeCollateralSearch) &&
         matchesAsset(r.debt.address, activeDebtSearch),
     )
+    // Add synthetic Midnight fixed-term targets (same-asset only — a converted
+    // leg / swap migrate into an order-book market isn't wired). Each Midnight
+    // lender key pairs its loan (= source debt) with its collateral (= source
+    // collateral); skip the source market itself.
+    if (!swapEnabled && midnightLenderData) {
+      const colAddr = collateral.address.toLowerCase()
+      const debtAddr = debt.address.toLowerCase()
+      for (const [lk, mks] of Object.entries(midnightLenderData)) {
+        const row = buildMidnightPairRow(chainId, lk, mks, colAddr, debtAddr)
+        if (
+          row &&
+          !(
+            row.marketLongUid === collateral.marketUid &&
+            row.marketShortUid === debt.marketUid
+          )
+        ) {
+          base.push(row)
+        }
+      }
+    }
     if (requiredBorrowUsd <= 0) return { targets: base, lowLiquidity: [] as OptimizerPairRow[] }
     const targets: OptimizerPairRow[] = []
     const lowLiquidity: OptimizerPairRow[] = []
@@ -290,7 +425,7 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
     }
     return { targets, lowLiquidity }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, collateral.marketUid, debt.marketUid, swapEnabled, swapLeg, swapTarget, collateral.address, debt.address, chainId, debt.amount, source.debtPriceUsd])
+  }, [rows, midnightLenderData, collateral.marketUid, debt.marketUid, swapEnabled, swapLeg, swapTarget, collateral.address, debt.address, chainId, debt.amount, source.debtPriceUsd])
   const hiddenForLiquidity = lowLiquidity.length
   const [showLowLiquidity, setShowLowLiquidity] = useState(false)
   const lowLiquiditySet = useMemo(
@@ -716,6 +851,21 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                             title={`Config: ${row.marketShortUid}`}
                           >
                             {configTag(row)}
+                          </span>
+                        )}
+                        {isMidnightMarket(row.marketShortUid) && (
+                          <span
+                            className="badge badge-xs border-0 bg-primary/15 text-primary ml-1"
+                            title={
+                              row.maturityDays != null
+                                ? `Fixed-term (order book) · matures in ~${Math.round(row.maturityDays)} days`
+                                : 'Fixed-term (order book)'
+                            }
+                          >
+                            Fixed
+                            {row.maturityDays != null
+                              ? ` · ${Math.round(row.maturityDays)}d`
+                              : ''}
                           </span>
                         )}
                       </span>
