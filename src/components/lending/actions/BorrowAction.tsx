@@ -183,6 +183,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
               <FixedTermDetailsRows
                 details={ftDetails}
                 symbol={pool?.asset?.symbol}
+                lender={pool?.marketUid}
               />
             </div>
           )}

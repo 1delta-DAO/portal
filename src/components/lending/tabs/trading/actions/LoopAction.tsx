@@ -497,6 +497,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
                 <FixedTermDetailsRows
                   details={debtFtDetails}
                   symbol={debtPool?.asset?.symbol}
+                  lender={debtPool?.marketUid}
                 />
               </div>
             )}

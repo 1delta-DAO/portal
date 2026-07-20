@@ -1,6 +1,7 @@
 import type { FixedTermDetails } from './fixedTerm'
 import { earlyRepayLabel, earlyRepayTone, providerLabel } from './fixedTerm'
 import { formatUsd, formatTokenAmount } from '../../../utils/format'
+import { OfferLadder } from './OfferLadder'
 
 /**
  * Renders the fixed-term (Lista / Morpho Midnight) market facts as a stack of
@@ -16,10 +17,15 @@ import { formatUsd, formatTokenAmount } from '../../../utils/format'
 export function FixedTermDetailsRows({
   details,
   symbol,
+  lender,
 }: {
   details: FixedTermDetails
   symbol?: string
+  /** `MORPHO_MIDNIGHT_<id>:chain:asset` marketUid (or lender key) — enables the
+   *  live order-book ladder in place of the single "Available at this rate" row. */
+  lender?: string
 }) {
+  const chainId = lender?.split(':')[1]
   return (
     <>
       {details.maturityMs != null && (
@@ -43,17 +49,32 @@ export function FixedTermDetailsRows({
           </span>
         </div>
       )}
-      {details.availableAmount != null && details.availableAmount > 0 && (
-        <div className="flex justify-between gap-2">
-          <span>Available at this rate</span>
-          <span className="tabular-nums">
-            {formatTokenAmount(details.availableAmount)}
-            {symbol ? ` ${symbol}` : ''}
-            {details.availableAmountUsd != null
-              ? ` ($${formatUsd(details.availableAmountUsd)})`
-              : ''}
-          </span>
-        </div>
+      {details.provider?.kind === 'orderbook' && lender ? (
+        // Order-book markets (Midnight today) get the full live offer ladder
+        // (best-first, scrollable) instead of the single top-of-book depth line;
+        // brokers (Lista) keep the single line. Falls back to it while loading /
+        // if the live fetch is empty.
+        <OfferLadder
+          chainId={chainId}
+          lender={lender.split(':')[0]}
+          symbol={symbol}
+          fallbackAmount={details.availableAmount}
+          fallbackAmountUsd={details.availableAmountUsd}
+        />
+      ) : (
+        details.availableAmount != null &&
+        details.availableAmount > 0 && (
+          <div className="flex justify-between gap-2">
+            <span>Available at this rate</span>
+            <span className="tabular-nums">
+              {formatTokenAmount(details.availableAmount)}
+              {symbol ? ` ${symbol}` : ''}
+              {details.availableAmountUsd != null
+                ? ` ($${formatUsd(details.availableAmountUsd)})`
+                : ''}
+            </span>
+          </div>
+        )
       )}
       {details.continuousFeeAprPct != null && (
         <div className="flex justify-between gap-2">
