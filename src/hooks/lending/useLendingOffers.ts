@@ -15,6 +15,8 @@ export interface LendingOffer {
   units: string
   /** Running total size from the best offer through this one. */
   cumulativeAssets: number
+  /** Maker address(es) at this price level (one, or several at the same tick). */
+  makers?: string[]
 }
 
 /**

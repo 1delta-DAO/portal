@@ -18,12 +18,16 @@ export function FixedTermDetailsRows({
   details,
   symbol,
   lender,
+  onSelectOfferAmount,
 }: {
   details: FixedTermDetails
   symbol?: string
   /** `MORPHO_MIDNIGHT_<id>:chain:asset` marketUid (or lender key) — enables the
    *  live order-book ladder in place of the single "Available at this rate" row. */
   lender?: string
+  /** Tap-a-tile-to-fill for order-book markets — receives the cumulative depth
+   *  (loan-token units). Omit to render the ladder read-only. */
+  onSelectOfferAmount?: (tokens: number) => void
 }) {
   const chainId = lender?.split(':')[1]
   return (
@@ -60,6 +64,7 @@ export function FixedTermDetailsRows({
           symbol={symbol}
           fallbackAmount={details.availableAmount}
           fallbackAmountUsd={details.availableAmountUsd}
+          onSelectAmount={onSelectOfferAmount}
         />
       ) : (
         details.availableAmount != null &&

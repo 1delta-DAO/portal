@@ -184,6 +184,12 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
                 details={ftDetails}
                 symbol={pool?.asset?.symbol}
                 lender={pool?.marketUid}
+                onSelectOfferAmount={(tokens) => {
+                  // Tap an offer tile → borrow up to that tier's depth, capped at
+                  // what the position can actually borrow.
+                  const cap = parseAmount(borrowableStr)
+                  setAmount(String(cap > 0 ? Math.min(tokens, cap) : tokens))
+                }}
               />
             </div>
           )}
