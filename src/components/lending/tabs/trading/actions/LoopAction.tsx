@@ -8,7 +8,12 @@ import { PoolSelectorDropdown } from '../PoolSelectorDropdown'
 import { SlippageInput } from '../SlippageInput'
 import { QuoteCard } from '../QuoteCard'
 import { AmountQuickButtons } from '../../../actions/AmountQuickButtons'
-import { formatTokenAmount, formatUsd, parseAmount, sanitizeAmountInput } from '../../../actions/format'
+import {
+  formatTokenAmount,
+  formatUsd,
+  parseAmount,
+  sanitizeAmountInput,
+} from '../../../actions/format'
 import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes, buildSimulationBody } from '../useTradingQuotes'
 import { TradingTransactionSuccess } from '../TradingTransactionSuccess'
@@ -18,6 +23,7 @@ import { SimulationIndicator } from '../../../actions/SimulationIndicator'
 import { SubAccountSelector } from '../../../actions/SubAccountSelector'
 import { lenderSupportsSubAccounts, fixedTermDetails } from '../../../actions/helpers'
 import { FixedTermDetailsRows } from '../../../shared/FixedTermDetails'
+import { MidnightOrderBook } from '../../../shared/MidnightOrderBook'
 import {
   fetchLoopRangeWithSimulation,
   fetchLoopRange,
@@ -128,9 +134,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   const [collateralPool, setCollateralPool] = useState<PoolDataItem | null>(
     initialSelection?.collateralPool ?? null
   )
-  const [debtPool, setDebtPool] = useState<PoolDataItem | null>(
-    initialSelection?.debtPool ?? null
-  )
+  const [debtPool, setDebtPool] = useState<PoolDataItem | null>(initialSelection?.debtPool ?? null)
 
   // Amounts — pre-fill the pay amount when the optimizer hands one through.
   const [debtAmount, setDebtAmount] = useState('')
@@ -203,7 +207,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   // Notify parent of pool selections for table highlighting
   useEffect(() => {
     const selections: SelectedPool[] = []
-    if (collateralPool) selections.push({ pool: collateralPool, role: 'output', side: 'collateral' })
+    if (collateralPool)
+      selections.push({ pool: collateralPool, role: 'output', side: 'collateral' })
     if (debtPool) selections.push({ pool: debtPool, role: 'input', side: 'borrowable' })
     onPoolSelectionChange(selections)
   }, [collateralPool, debtPool, onPoolSelectionChange])
@@ -324,7 +329,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   // Brokered (Lista) debt markets borrow at a fixed term — pick one from the
   // rate card; variable borrow isn't offered through the app. (BROKERED_MARKETS.md §6)
   const debtTerms = debtPool?.terms ?? []
-  const isDebtBrokered = !!debtPool && (debtPool.variableBorrowDisabled === true || debtTerms.length > 0)
+  const isDebtBrokered =
+    !!debtPool && (debtPool.variableBorrowDisabled === true || debtTerms.length > 0)
   const [selectedTermId, setSelectedTermId] = useState<number | null>(null)
   useEffect(() => {
     setSelectedTermId(debtTerms.length > 0 ? debtTerms[0].termId : null)
@@ -337,6 +343,11 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   // the term picker, same as the plain BorrowAction.
   // Canonical fixed-term details for the debt market (Lista or Midnight).
   const debtFtDetails = fixedTermDetails(debtPool)
+  // Order-book (Midnight) debt: the borrow leg is filled by TAKING bid offers.
+  // The loop only ever takes (no maker offers here), so we surface the same
+  // two-sided book as the plain Borrow tab — tap-to-fill, multi-select — sized
+  // straight into the debt Amount, but WITHOUT the Make side.
+  const debtIsOrderBook = debtFtDetails?.provider?.kind === 'orderbook'
 
   // Max amounts
   const debtPos = debtPool ? userPositions.get(debtPool.marketUid) : null
@@ -346,7 +357,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     ? (walletBalances.get(selectedPayCurrency.address.toLowerCase()) ?? null)
     : null
   const payWalletStr = payWalletBalance?.balance ?? '0'
-  const payOverMax = parseAmount(payWalletStr) > 0 && parseAmount(payAmount) > parseAmount(payWalletStr) + 1e-9
+  const payOverMax =
+    parseAmount(payWalletStr) > 0 && parseAmount(payAmount) > parseAmount(payWalletStr) + 1e-9
 
   // USD value of the paid-in margin — used to correct the loop price impact so
   // the margin isn't booked as a swap penalty. Prefer the wallet balance's
@@ -362,9 +374,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
       if (Number.isFinite(price) && price > 0) return price * amt
     }
     const addr = selectedPayCurrency.address.toLowerCase()
-    const match = [collateralPool, debtPool].find(
-      (p) => p?.asset?.address?.toLowerCase() === addr
-    )
+    const match = [collateralPool, debtPool].find((p) => p?.asset?.address?.toLowerCase() === addr)
     if (match?.oraclePriceUSD != null) return match.oraclePriceUSD * amt
     return 0
   }, [selectedPayCurrency, payAmount, payWalletBalance, collateralPool, debtPool])
@@ -400,13 +410,21 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     !!collateralPool && !!debtPool && !!debtAmount && (!isDebtBrokered || selectedTerm != null)
 
   if (txSuccess) {
-    return <TradingTransactionSuccess operation={txSuccess.operation} hash={txSuccess.hash} onDismiss={dismissSuccess} />
+    return (
+      <TradingTransactionSuccess
+        operation={txSuccess.operation}
+        hash={txSuccess.hash}
+        onDismiss={dismissSuccess}
+      />
+    )
   }
 
   return (
     <div className="space-y-3">
       {/* Sub-account */}
-      {(subAccounts.length > 0 || allowCreateAccount || lenderSupportsSubAccounts(selectedLender)) && (
+      {(subAccounts.length > 0 ||
+        allowCreateAccount ||
+        lenderSupportsSubAccounts(selectedLender)) && (
         <SubAccountSelector
           subAccounts={subAccounts}
           selectedAccountId={accountId ?? null}
@@ -493,12 +511,30 @@ export const LoopAction: React.FC<TradingActionProps> = ({
             {/* Fixed-term details — maturity, market-level fees, and the
                 early-repayment policy. Unified across Lista and Midnight. */}
             {debtFtDetails && (
-              <div className="space-y-0.5 text-[10px] text-base-content/60">
+              <div className="space-y-1.5 text-[10px] text-base-content/60">
                 <FixedTermDetailsRows
                   details={debtFtDetails}
                   symbol={debtPool?.asset?.symbol}
                   lender={debtPool?.marketUid}
+                  hideLadder={debtIsOrderBook}
                 />
+                {/* Order-book debt: TAKE-only two-sided book, multi-select into
+                    the debt Amount (capped at the loop's max borrowable). No Make
+                    side — loops can only take existing offers. */}
+                {debtIsOrderBook && (
+                  <MidnightOrderBook
+                    chainId={debtPool?.marketUid?.split(':')[1]}
+                    lender={debtPool?.marketUid?.split(':')[0]}
+                    symbol={debtPool?.asset?.symbol}
+                    fillSide="bids"
+                    amountTokens={parseAmount(debtAmount)}
+                    onSelectAmount={(tokens) => {
+                      const cap = parseAmount(loopRange?.amountInStr ?? '0')
+                      setDebtAmount(String(cap > 0 ? Math.min(tokens, cap) : tokens))
+                      reset()
+                    }}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -590,7 +626,9 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               })}
             </div>
           ) : (
-            <span className="text-xs text-base-content/50">Select collateral & debt pools first</span>
+            <span className="text-xs text-base-content/50">
+              Select collateral & debt pools first
+            </span>
           )}
         </div>
 
@@ -602,9 +640,29 @@ export const LoopAction: React.FC<TradingActionProps> = ({
                 <span className="text-base-content/60 flex items-center gap-1">
                   Wallet balance:
                   {refetchBalances && (
-                    <button type="button" className="text-base-content/30 hover:text-base-content/60 transition-colors" onClick={refetchBalances} title="Refresh balance">
-                      {isBalancesFetching ? <span className="loading loading-spinner w-2.5 h-2.5" /> : (
-                        <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>
+                    <button
+                      type="button"
+                      className="text-base-content/30 hover:text-base-content/60 transition-colors"
+                      onClick={refetchBalances}
+                      title="Refresh balance"
+                    >
+                      {isBalancesFetching ? (
+                        <span className="loading loading-spinner w-2.5 h-2.5" />
+                      ) : (
+                        <svg
+                          className="w-2.5 h-2.5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M21 2v6h-6" />
+                          <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                          <path d="M3 22v-6h6" />
+                          <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                        </svg>
                       )}
                     </button>
                   )}
@@ -620,7 +678,11 @@ export const LoopAction: React.FC<TradingActionProps> = ({
             <div className="flex items-center justify-between mb-0.5">
               <label className="label-text text-xs">Pay Amount</label>
               {payWalletBalance ? (
-                <AmountQuickButtons maxAmount={payWalletStr} onSelect={setPayAmount} decimals={selectedPayCurrency.decimals} />
+                <AmountQuickButtons
+                  maxAmount={payWalletStr}
+                  onSelect={setPayAmount}
+                  decimals={selectedPayCurrency.decimals}
+                />
               ) : null}
             </div>
             <input
@@ -691,7 +753,9 @@ export const LoopAction: React.FC<TradingActionProps> = ({
       <RateImpactIndicator
         rateImpact={rateImpact}
         marketLabels={{
-          ...(collateralPool ? { [collateralPool.marketUid]: `${collateralPool.asset.symbol} (Collateral)` } : {}),
+          ...(collateralPool
+            ? { [collateralPool.marketUid]: `${collateralPool.asset.symbol} (Collateral)` }
+            : {}),
           ...(debtPool ? { [debtPool.marketUid]: `${debtPool.asset.symbol} (Debt)` } : {}),
         }}
       />
@@ -750,7 +814,11 @@ export const LoopAction: React.FC<TradingActionProps> = ({
             disabled={executingQuote}
             onClick={() => executeQuote('Loop')}
           >
-            {executingQuote ? <span className="loading loading-spinner loading-xs" /> : 'Execute Loop'}
+            {executingQuote ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              'Execute Loop'
+            )}
           </button>
         </div>
       )}

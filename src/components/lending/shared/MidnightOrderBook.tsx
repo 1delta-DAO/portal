@@ -60,6 +60,20 @@ export function MidnightOrderBook({
   const consumed = new Set(eff.consumedTicks)
   const boundaryTick = eff.consumedTicks[eff.consumedTicks.length - 1]
 
+  // Shown rows (nearest the mid) + their DISPLAY order per side (asks render
+  // best-at-the-bottom, so reversed). The selected offers form a CONTIGUOUS run
+  // in display order — track its top/bottom tick so the whole run draws as ONE
+  // box (continuous border) instead of a stack of per-row rings.
+  const asksShown = asks.slice(0, maxPerSide)
+  const bidsShown = bids.slice(0, maxPerSide)
+  const asksDisplayed = asksShown.slice().reverse()
+  const bidsDisplayed = bidsShown
+  const fillDisplayed =
+    fillSide === 'asks' ? asksDisplayed : fillSide === 'bids' ? bidsDisplayed : []
+  const selectedInDisplay = fillDisplayed.filter((o) => consumed.has(o.tick))
+  const runTopTick = selectedInDisplay[0]?.tick
+  const runBottomTick = selectedInDisplay[selectedInDisplay.length - 1]?.tick
+
   if (!isLoading && asks.length === 0 && bids.length === 0) {
     return (
       <div className="text-[10px] text-base-content/40 px-1 py-1">
@@ -110,6 +124,10 @@ export function MidnightOrderBook({
     const isFillable = fillSide === side && !!onSelectAmount
     const active = fillSide === side && consumed.has(o.tick)
     const isBoundary = o.tick === boundaryTick
+    // Continuous-run box: only the first/last selected row (in display order) get
+    // the rounded top/bottom + horizontal edge; middle rows keep just the sides.
+    const isRunTop = active && o.tick === runTopTick
+    const isRunBottom = active && o.tick === runBottomTick
     const tone = side === 'asks' ? 'success' : 'error'
 
     const onClick = () => {
@@ -139,9 +157,15 @@ export function MidnightOrderBook({
               )}${symbol ? ` ${symbol}` : ''}${active && isBoundary ? ' (tap to deselect)' : ''}\n`
             : '') + sizeTitle(o)
         }
-        className={`relative grid grid-cols-[1fr_auto] items-center gap-2 px-1.5 py-0.5 rounded overflow-hidden w-full text-left ${
+        className={`relative grid grid-cols-[1fr_auto] items-center gap-2 px-1.5 py-0.5 overflow-hidden w-full text-left ${
           isFillable ? 'cursor-pointer hover:brightness-125' : 'cursor-default'
-        } ${active ? 'ring-1 ring-primary' : ''}`}
+        } ${
+          active
+            ? `bg-primary/10 border-x border-primary ${isRunTop ? 'border-t rounded-t-md' : ''} ${
+                isRunBottom ? 'border-b rounded-b-md' : ''
+              }`
+            : 'rounded'
+        }`}
       >
         {/* Depth bar (cumulative), anchored left, colored by side. */}
         <span
@@ -193,10 +217,6 @@ export function MidnightOrderBook({
       </div>
     ) : null
 
-  // Nearest-the-mid rows: asks best-first then reversed (best at the bottom,
-  // touching the mid); bids best-first (best at the top, touching the mid).
-  const asksShown = asks.slice(0, maxPerSide)
-  const bidsShown = bids.slice(0, maxPerSide)
   const asksHidden = asks.length - asksShown.length
   const bidsHidden = bids.length - bidsShown.length
   // For asks, a top-of-block marker (rate better than every shown ask) should sit
@@ -214,17 +234,14 @@ export function MidnightOrderBook({
       </div>
 
       {/* Asks (lend / supply) — best at the bottom, adjacent to the mid. */}
-      <div className="flex flex-col gap-px p-1">
-        <div className="px-1.5 text-[9px] text-success/70 flex justify-between">
+      <div className="flex flex-col gap-0 p-1">
+        <div className="px-1.5 pb-0.5 text-[9px] text-success/70 flex justify-between">
           <span>▲ lend offers (supply)</span>
           {asksHidden > 0 && <span className="text-base-content/30">+{asksHidden} deeper</span>}
         </div>
         {renderMarker('asks')}
-        {asksShown
-          .slice()
-          .reverse()
-          .map((o) => renderRow(o, 'asks'))}
-        {asksShown.length === 0 && (
+        {asksDisplayed.map((o) => renderRow(o, 'asks'))}
+        {asksDisplayed.length === 0 && (
           <div className="px-1.5 py-0.5 text-[10px] text-base-content/30">no lend offers</div>
         )}
       </div>
@@ -244,14 +261,14 @@ export function MidnightOrderBook({
       </div>
 
       {/* Bids (borrow / demand) — best at the top, adjacent to the mid. */}
-      <div className="flex flex-col gap-px p-1">
-        <div className="px-1.5 text-[9px] text-error/70 flex justify-between">
+      <div className="flex flex-col gap-0 p-1">
+        <div className="px-1.5 pb-0.5 text-[9px] text-error/70 flex justify-between">
           <span>▼ borrow offers (demand)</span>
           {bidsHidden > 0 && <span className="text-base-content/30">+{bidsHidden} deeper</span>}
         </div>
-        {bidsShown.map((o) => renderRow(o, 'bids'))}
+        {bidsDisplayed.map((o) => renderRow(o, 'bids'))}
         {renderMarker('bids')}
-        {bidsShown.length === 0 && (
+        {bidsDisplayed.length === 0 && (
           <div className="px-1.5 py-0.5 text-[10px] text-base-content/30">no borrow offers</div>
         )}
       </div>

@@ -683,9 +683,13 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
             fillSide="asks"
             amountTokens={amountNum}
             onSelectAmount={(tokens) => {
-              // Tap an offer → lend up to that tier's cumulative depth, capped at wallet.
-              const cap = parseAmount(walletAmountStr)
-              setAmount(String(cap > 0 ? Math.min(tokens, cap) : tokens))
+              // Tap an offer → select up to that tier's cumulative depth. Do NOT
+              // clamp to the wallet here: when the wallet is smaller than every
+              // offer's depth, a min() collapses every tap to the same wallet-sized
+              // value and the selection appears frozen. The `overMax` guard below
+              // still blocks executing more than the wallet holds — exactly as it
+              // does for a typed amount, so tap and type behave identically.
+              setAmount(String(tokens))
             }}
           />
         </div>
