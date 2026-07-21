@@ -18,16 +18,26 @@ export function FixedTermDetailsRows({
   details,
   symbol,
   lender,
+  side = 'borrow',
   onSelectOfferAmount,
+  amountTokens,
+  hideLadder = false,
 }: {
   details: FixedTermDetails
   symbol?: string
   /** `MORPHO_MIDNIGHT_<id>:chain:asset` marketUid (or lender key) — enables the
    *  live order-book ladder in place of the single "Available at this rate" row. */
   lender?: string
+  /** Which side of the order book to show: `borrow` (bids) or `lend` (asks). */
+  side?: 'borrow' | 'lend'
   /** Tap-a-tile-to-fill for order-book markets — receives the cumulative depth
    *  (loan-token units). Omit to render the ladder read-only. */
   onSelectOfferAmount?: (tokens: number) => void
+  /** Current borrow/lend amount (loan-token units) — highlights the offers it fills. */
+  amountTokens?: number
+  /** Suppress the embedded offer ladder / "available" line — used when a fuller
+   *  order-book view (e.g. {@link MidnightOrderBook}) is rendered alongside. */
+  hideLadder?: boolean
 }) {
   const chainId = lender?.split(':')[1]
   return (
@@ -35,9 +45,7 @@ export function FixedTermDetailsRows({
       {details.maturityMs != null && (
         <div className="flex justify-between gap-2">
           <span>Fixed maturity</span>
-          <span className="tabular-nums">
-            {new Date(details.maturityMs).toLocaleDateString()}
-          </span>
+          <span className="tabular-nums">{new Date(details.maturityMs).toLocaleDateString()}</span>
         </div>
       )}
       {providerLabel(details.provider) != null && (
@@ -45,15 +53,12 @@ export function FixedTermDetailsRows({
           <span title="Who offers this fixed term: Lista terms come from a single market broker; Midnight terms are filled from an order book of maker offers.">
             Offered by
           </span>
-          <span
-            className="tabular-nums"
-            title={details.provider?.address ?? undefined}
-          >
+          <span className="tabular-nums" title={details.provider?.address ?? undefined}>
             {providerLabel(details.provider)}
           </span>
         </div>
       )}
-      {details.provider?.kind === 'orderbook' && lender ? (
+      {hideLadder ? null : details.provider?.kind === 'orderbook' && lender ? (
         // Order-book markets (Midnight today) get the full live offer ladder
         // (best-first, scrollable) instead of the single top-of-book depth line;
         // brokers (Lista) keep the single line. Falls back to it while loading /
@@ -62,9 +67,11 @@ export function FixedTermDetailsRows({
           chainId={chainId}
           lender={lender.split(':')[0]}
           symbol={symbol}
+          side={side}
           fallbackAmount={details.availableAmount}
           fallbackAmountUsd={details.availableAmountUsd}
           onSelectAmount={onSelectOfferAmount}
+          amountTokens={amountTokens}
         />
       ) : (
         details.availableAmount != null &&
@@ -86,9 +93,7 @@ export function FixedTermDetailsRows({
           <span title="Ongoing fee accrued to lenders while the position is open. Deducted continuously from the lender's redeemable balance.">
             Continuous fee
           </span>
-          <span className="tabular-nums">
-            {details.continuousFeeAprPct.toFixed(2)}%/yr
-          </span>
+          <span className="tabular-nums">{details.continuousFeeAprPct.toFixed(2)}%/yr</span>
         </div>
       )}
       {details.settlementFeePct != null && (
@@ -96,9 +101,7 @@ export function FixedTermDetailsRows({
           <span title="One-off fee taken at settlement, scaled by time to maturity.">
             Settlement fee
           </span>
-          <span className="tabular-nums">
-            {details.settlementFeePct.toFixed(2)}%
-          </span>
+          <span className="tabular-nums">{details.settlementFeePct.toFixed(2)}%</span>
         </div>
       )}
       <div className="flex justify-between gap-2">

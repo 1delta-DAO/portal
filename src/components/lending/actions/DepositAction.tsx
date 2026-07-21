@@ -9,7 +9,11 @@ import { formatTokenAmount, formatUsd, parseAmount } from './format'
 import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
-import { lenderSupportsSubAccounts } from './helpers'
+import { lenderSupportsSubAccounts, fixedTermDetails } from './helpers'
+import { FixedTermDetailsRows } from '../shared/FixedTermDetails'
+import { MidnightOrderBook } from '../shared/MidnightOrderBook'
+import { useLendingOffers, computeEffectiveBorrow } from '../../../hooks/lending/useLendingOffers'
+import { MakeOfferPanel, TakeMakeToggle } from '../shared/MakeOfferPanel'
 import { HealthFactorProjection } from './HealthFactorProjection'
 import { RateImpactIndicator } from './RateImpactIndicator'
 import { TransactionSuccess } from './TransactionSuccess'
@@ -34,6 +38,8 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
 }) => {
   const [amount, setAmount] = useState('')
   const [useNative, setUseNative] = useState(false)
+  // Take (fill existing offers) vs Make (post your own limit offer) — order books only.
+  const [obMode, setObMode] = useState<'take' | 'make'>('take')
 
   const hasSubAccounts = lenderSupportsSubAccounts(lenderKey)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(accountId ?? null)
@@ -43,9 +49,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   const [receiverOverride, setReceiverOverride] = useState<string | null>(null)
   const [receiverDraft, setReceiverDraft] = useState('')
   const [editingReceiver, setEditingReceiver] = useState(false)
-  const effectiveReceiver = allowCustomReceiver && receiverOverride
-    ? receiverOverride
-    : account
+  const effectiveReceiver = allowCustomReceiver && receiverOverride ? receiverOverride : account
 
   // Sync with parent's accountId when it changes — but only while we're
   // depositing to the operator. Once the user overrides the receiver, the
@@ -67,9 +71,8 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   const receiverLenderEntry = useMemo(() => {
     if (!receiverDataQuery.userData?.raw) return null
     return (
-      receiverDataQuery.userData.raw.find(
-        (e) => e.lender === lenderKey && e.chainId === chainId
-      ) ?? null
+      receiverDataQuery.userData.raw.find((e) => e.lender === lenderKey && e.chainId === chainId) ??
+      null
     )
   }, [receiverDataQuery.userData, lenderKey, chainId])
   const receiverSubAccounts = receiverLenderEntry?.data ?? []
@@ -104,8 +107,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   // The list shown in the SubAccountSelector — receiver's when an override
   // is active, otherwise the parent's prop (Lending tab) falling back to our
   // own scoped fetch (Earn tab).
-  const operatorSubs =
-    subAccounts && subAccounts.length > 0 ? subAccounts : operatorFallbackSubs
+  const operatorSubs = subAccounts && subAccounts.length > 0 ? subAccounts : operatorFallbackSubs
   const effectiveSubAccounts =
     allowCustomReceiver && receiverOverride ? receiverSubAccounts : operatorSubs
 
@@ -172,7 +174,12 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       if (selectedAccountId && sub.accountId !== selectedAccountId) continue
       for (const pos of sub.positions) {
         // Aggregate row only — skip per-loan brokered rows that share marketUid.
-        if (typeof pos === 'object' && pos !== null && !pos.term && pos.marketUid === pool.marketUid) {
+        if (
+          typeof pos === 'object' &&
+          pos !== null &&
+          !pos.term &&
+          pos.marketUid === pool.marketUid
+        ) {
           return pos
         }
       }
@@ -191,7 +198,12 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       if (selectedAccountId && sub.accountId !== selectedAccountId) continue
       for (const pos of sub.positions) {
         // Aggregate row only — skip per-loan brokered rows that share marketUid.
-        if (typeof pos === 'object' && pos !== null && !pos.term && pos.marketUid === pool.marketUid) {
+        if (
+          typeof pos === 'object' &&
+          pos !== null &&
+          !pos.term &&
+          pos.marketUid === pool.marketUid
+        ) {
           return pos
         }
       }
@@ -206,19 +218,35 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
 
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
-  const { result, simulation, rateImpact, loading, executingPermission, executingMain, permissions, hasPermissions, permissionsCompleted, allPermissionsDone, error, txSuccess, executeNextPermission, executeMain, resetState, dismissSuccess } =
-    useActionExecution({
-      actionType: 'Deposit',
-      pool,
-      account,
-      receiver: effectiveReceiver,
-      amount,
-      isAll: false,
-      payAsset: canUseNative && useNative ? zeroAddress : undefined,
-      accountId: hasSubAccounts ? selectedAccountId ?? undefined : undefined,
-      chainId,
-      subAccount,
-    })
+  const {
+    result,
+    simulation,
+    rateImpact,
+    loading,
+    executingPermission,
+    executingMain,
+    permissions,
+    hasPermissions,
+    permissionsCompleted,
+    allPermissionsDone,
+    error,
+    txSuccess,
+    executeNextPermission,
+    executeMain,
+    resetState,
+    dismissSuccess,
+  } = useActionExecution({
+    actionType: 'Deposit',
+    pool,
+    account,
+    receiver: effectiveReceiver,
+    amount,
+    isAll: false,
+    payAsset: canUseNative && useNative ? zeroAddress : undefined,
+    accountId: hasSubAccounts ? (selectedAccountId ?? undefined) : undefined,
+    chainId,
+    subAccount,
+  })
 
   // Tracks whether the native/wrapped default has been settled for the current
   // pool — either because the auto-default below applied it or because the user
@@ -260,7 +288,8 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
 
   const activeBal = canUseNative && useNative ? nativeBalance : walletBalance
   const walletAmountStr = activeBal?.balance ?? '0'
-  const overMax = parseAmount(walletAmountStr) > 0 && parseAmount(amount) > parseAmount(walletAmountStr) + 1e-9
+  const overMax =
+    parseAmount(walletAmountStr) > 0 && parseAmount(amount) > parseAmount(walletAmountStr) + 1e-9
 
   // Estimated monthly earnings: depositRate is in percent units (e.g. 5 = 5% APR).
   // Prefer the simulation's projected deposit rate (post-tx) when the backend
@@ -268,10 +297,28 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   // appreciably, so the post-tx APR is the more honest forecast. Fall back to
   // the pool's current rate, and likewise to oraclePriceUSD for the price.
   const effectivePriceUsd = priceUsd ?? pool?.oraclePriceUSD ?? 0
-  const projectedAprPct = rateImpact?.find((e) => e.marketUid === pool?.marketUid)
-    ?.depositRate?.projected
-  const aprPct = projectedAprPct ?? pool?.depositRate ?? 0
+  const projectedAprPct = rateImpact?.find((e) => e.marketUid === pool?.marketUid)?.depositRate
+    ?.projected
   const amountNum = parseAmount(amount)
+  // Order-book (Midnight) LEND: supplying the loan token buys credit units by
+  // taking maker SELL offers (asks). The rate you earn is the size-weighted blend
+  // across the offers this deposit fills — surface that instead of the ~0
+  // `depositRate` an order-book market carries. Gate on the LOAN leg only (the
+  // borrowable one); the collateral-deposit leg keeps the plain deposit view.
+  // (react-query dedupes this fetch with the lend ladder rendered below.)
+  const ftDetails = fixedTermDetails(pool)
+  const isLoanOrderBook =
+    ftDetails?.provider?.kind === 'orderbook' && !(pool?.config as any)?.['0']?.debtDisabled
+  const { offers: lendOffers } = useLendingOffers({
+    chainId: pool?.marketUid?.split(':')[1],
+    lender: pool?.marketUid?.split(':')[0],
+    side: 'lend',
+    minAssetsUsd: 1,
+  })
+  const effectiveLend = computeEffectiveBorrow(lendOffers, amountNum)
+  const topDepositAprPct = projectedAprPct ?? pool?.depositRate ?? 0
+  const aprPct =
+    isLoanOrderBook && effectiveLend.aprPct != null ? effectiveLend.aprPct : topDepositAprPct
   const monthlyEarnUsd =
     amountNum > 0 && effectivePriceUsd > 0 && aprPct > 0
       ? (amountNum * effectivePriceUsd * (aprPct / 100)) / 12
@@ -284,13 +331,35 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
         amount={txSuccess.amount}
         symbol={txSuccess.symbol}
         hash={txSuccess.hash}
-        onDismiss={() => { dismissSuccess(); setAmount('') }}
+        onDismiss={() => {
+          dismissSuccess()
+          setAmount('')
+        }}
       />
+    )
+  }
+
+  // Order-book MAKE mode: post your own limit lend offer instead of taking.
+  if (isLoanOrderBook && obMode === 'make') {
+    return (
+      <div className="space-y-3">
+        <TakeMakeToggle value={obMode} onChange={setObMode} />
+        <MakeOfferPanel
+          chainId={pool?.marketUid?.split(':')[1] ?? chainId}
+          lender={pool!.marketUid.split(':')[0]}
+          side="lend"
+          symbol={pool?.asset?.symbol}
+          decimals={pool?.asset?.decimals}
+          account={account}
+          maturityMs={ftDetails?.maturityMs}
+        />
+      </div>
     )
   }
 
   return (
     <div className="space-y-3">
+      {isLoanOrderBook && <TakeMakeToggle value={obMode} onChange={setObMode} />}
       {/* Custom receiver row — surfaces the address that will own the deposit
           (shares accrue here). Defaults to the operator; integrators can paste
           a different address to preview the flow and inspect the receiver's
@@ -431,7 +500,10 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
         <>
           {receiverDataQuery.error ? (
             <div className="rounded-lg border border-error/30 bg-error/10 px-2 py-1.5 text-[11px] flex items-center justify-between gap-2">
-              <span className="text-error truncate" title={(receiverDataQuery.error as Error).message}>
+              <span
+                className="text-error truncate"
+                title={(receiverDataQuery.error as Error).message}
+              >
                 Couldn't load receiver data: {(receiverDataQuery.error as Error).message}
               </span>
               <button
@@ -459,8 +531,12 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
         <>
           {operatorDataQuery.error ? (
             <div className="rounded-lg border border-error/30 bg-error/10 px-2 py-1.5 text-[11px] flex items-center justify-between gap-2">
-              <span className="text-error truncate" title={(operatorDataQuery.error as Error).message}>
-                Couldn't load your accounts on this lender: {(operatorDataQuery.error as Error).message}
+              <span
+                className="text-error truncate"
+                title={(operatorDataQuery.error as Error).message}
+              >
+                Couldn't load your accounts on this lender:{' '}
+                {(operatorDataQuery.error as Error).message}
               </span>
               <button
                 type="button"
@@ -521,15 +597,28 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
                 {isBalancesFetching ? (
                   <span className="loading loading-spinner w-2.5 h-2.5" />
                 ) : (
-                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                  <svg
+                    className="w-2.5 h-2.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 2v6h-6" />
+                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                    <path d="M3 22v-6h6" />
+                    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
                   </svg>
                 )}
               </button>
             )}
           </span>
           {activeBal ? (
-            <span className={`font-medium ${parseAmount(walletAmountStr) === 0 ? 'text-base-content/40' : ''}`}>
+            <span
+              className={`font-medium ${parseAmount(walletAmountStr) === 0 ? 'text-base-content/40' : ''}`}
+            >
               {formatTokenAmount(activeBal.balance)} (${formatUsd(activeBal.balanceUSD)})
             </span>
           ) : isBalancesFetching ? (
@@ -558,10 +647,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       ) : allowCustomReceiver && receiverOverride && receiverDataQuery.error ? (
         <div className="text-xs flex justify-between px-1">
           <span className="text-base-content/60">Receiver deposits:</span>
-          <span
-            className="text-error/80"
-            title={(receiverDataQuery.error as Error).message}
-          >
+          <span className="text-error/80" title={(receiverDataQuery.error as Error).message}>
             unavailable
           </span>
         </div>
@@ -571,10 +657,39 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
             {allowCustomReceiver && receiverOverride ? 'Receiver deposits:' : 'Current deposits:'}
           </span>
           <span className="text-success font-medium">
-            {formatTokenAmount(displayPosition.deposits)} (${formatUsd(displayPosition.depositsUSD)})
+            {formatTokenAmount(displayPosition.deposits)} (${formatUsd(displayPosition.depositsUSD)}
+            )
           </span>
         </div>
       ) : null}
+
+      {/* Order-book (Midnight) LEND: the fixed-term facts + the full two-sided
+          order book. Depositing = LEND = TAKE the ask (supply) side, so those
+          rows are tap-to-fill; the bid (demand) side shows competing lend makers.
+          Loan leg only (the collateral-deposit leg keeps the plain view). */}
+      {isLoanOrderBook && ftDetails && (
+        <div className="mt-1 space-y-1.5 px-1 text-[10px] text-base-content/60">
+          <FixedTermDetailsRows
+            details={ftDetails}
+            symbol={pool?.asset?.symbol}
+            lender={pool?.marketUid}
+            side="lend"
+            hideLadder
+          />
+          <MidnightOrderBook
+            chainId={pool?.marketUid?.split(':')[1]}
+            lender={pool?.marketUid?.split(':')[0]}
+            symbol={pool?.asset?.symbol}
+            fillSide="asks"
+            amountTokens={amountNum}
+            onSelectAmount={(tokens) => {
+              // Tap an offer → lend up to that tier's cumulative depth, capped at wallet.
+              const cap = parseAmount(walletAmountStr)
+              setAmount(String(cap > 0 ? Math.min(tokens, cap) : tokens))
+            }}
+          />
+        </div>
+      )}
 
       {/* Amount input */}
       <AmountInput
@@ -619,7 +734,9 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
 
       {result && !overMax && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">
-          <span className="text-xs text-base-content/60">Approvals ({permissionsCompleted}/{permissions.length})</span>
+          <span className="text-xs text-base-content/60">
+            Approvals ({permissionsCompleted}/{permissions.length})
+          </span>
           {permissions.map((perm, i) => {
             const done = i < permissionsCompleted
             const isCurrent = i === permissionsCompleted
@@ -633,7 +750,9 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
                 title={perm.description || `Approval ${i + 1}`}
               >
                 <span className="truncate max-w-full">
-                  {done ? `\u2713 ${perm.description || `Approval ${i + 1}`}` : isCurrent && executingPermission ? (
+                  {done ? (
+                    `\u2713 ${perm.description || `Approval ${i + 1}`}`
+                  ) : isCurrent && executingPermission ? (
                     <span className="loading loading-spinner loading-xs" />
                   ) : (
                     perm.description || `Approval ${i + 1}`
@@ -652,7 +771,11 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
           disabled={executingMain}
           onClick={executeMain}
         >
-          {executingMain ? <span className="loading loading-spinner loading-xs" /> : 'Execute Deposit'}
+          {executingMain ? (
+            <span className="loading loading-spinner loading-xs" />
+          ) : (
+            'Execute Deposit'
+          )}
         </button>
       )}
     </div>
