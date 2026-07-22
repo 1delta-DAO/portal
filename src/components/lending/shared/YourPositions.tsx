@@ -8,14 +8,9 @@ import { EModeBadge } from './EModeAnalysisModal'
 import { CollateralToggle } from '../tabs/earn/UserPositionsTable'
 import { HealthBadge } from '../../common/HealthBadge'
 import { EmptyState } from '../../common/EmptyState'
-import {
-  loanDebtString,
-  termLabel,
-  maturityDisplay,
-  loanRatePct,
-} from './brokeredLoans'
+import { loanDebtString, termLabel, maturityDisplay, loanRatePct } from './brokeredLoans'
 import { listaEarlyRepay, earlyRepayLabel } from './fixedTerm'
-import { isMidnightMarket } from '../actions/helpers'
+import { isMidnightMarket, fixedTermDetails } from '../actions/helpers'
 import { RefinanceModal } from './RefinanceModal'
 import { MigrateModal, type MigrateSource } from './MigrateModal'
 
@@ -79,9 +74,7 @@ export function YourPositions({
   // Migrate moves ONE collateral + ONE debt leg to another lender/market. Offer
   // it only for the simple single-collateral / single-debt shape (the route's
   // scope) and only when the viewer is the owner (needs to sign).
-  const collateralLegs = activePositions.filter(
-    ({ position }) => Number(position.deposits) > 0
-  )
+  const collateralLegs = activePositions.filter(({ position }) => Number(position.deposits) > 0)
   const debtLegs = activePositions.filter(({ position }) => debtNative(position) > 0)
   // Brokered (Lista) source: the migrate's single repay targets ONE loan by its
   // posId. Support only the single-loan case — a multi-loan brokered position
@@ -154,7 +147,10 @@ export function YourPositions({
               onClick={() => onSubAccountChange(sub.accountId)}
             >
               <span className="font-semibold">#{i + 1}</span>
-              <span className="text-base-content/70" title={`Deposits: $${formatUsd(sub.balanceData.deposits)} | Debt: $${formatUsd(sub.balanceData.debt)} | NAV: $${formatUsd(sub.balanceData.nav)}`}>
+              <span
+                className="text-base-content/70"
+                title={`Deposits: $${formatUsd(sub.balanceData.deposits)} | Debt: $${formatUsd(sub.balanceData.debt)} | NAV: $${formatUsd(sub.balanceData.nav)}`}
+              >
                 NAV: <span className="font-medium">{abbreviateUsd(sub.balanceData.nav)}</span>
               </span>
               {sub.health != null && <HealthBadge health={sub.health} size="xs" />}
@@ -174,7 +170,9 @@ export function YourPositions({
       {/* Summary stats for selected sub-account */}
       {summary && (
         <div className="flex gap-4 items-center text-xs flex-wrap">
-          <span title={`Deposits: $${formatUsd(summary.deposits)} | Debt: $${formatUsd(summary.debt)} | NAV: $${formatUsd(summary.nav)}`}>
+          <span
+            title={`Deposits: $${formatUsd(summary.deposits)} | Debt: $${formatUsd(summary.debt)} | NAV: $${formatUsd(summary.nav)}`}
+          >
             Net: <span className="font-semibold">${formatUsd(summary.nav)}</span>
           </span>
           <div className="flex items-center gap-1">
@@ -285,10 +283,10 @@ function PositionSection({
   const accentBar = isDeposits ? 'bg-success/60' : 'bg-error/60'
   const shareBarClass = isDeposits ? 'bg-success/40' : 'bg-error/40'
 
-  const totalUsd = isDeposits ? summary?.deposits ?? 0 : summary?.debt ?? 0
+  const totalUsd = isDeposits ? (summary?.deposits ?? 0) : (summary?.debt ?? 0)
   // Raw server rate — the Midnight per-position EFFECTIVE (locked) rate lands
   // here via `summary.borrowApr`; it is 0 when the API was unavailable.
-  const rawBaseApr = isDeposits ? summary?.depositApr ?? 0 : summary?.borrowApr ?? 0
+  const rawBaseApr = isDeposits ? (summary?.depositApr ?? 0) : (summary?.borrowApr ?? 0)
   // Midnight debt carries no pool rate, so a total API outage would leave the
   // header + legs at a misleading 0%. Fall back to the debt-weighted CURRENT
   // market fixed rate (`pool.terms`, the "Fixed from X%") across the section's
@@ -299,9 +297,7 @@ function PositionSection({
     let weighted = 0
     for (const { position, pool } of positions) {
       if (!isMidnightMarket(pool.marketUid)) continue
-      const rate = pool.terms?.length
-        ? Math.min(...pool.terms.map((t) => t.apr))
-        : null
+      const rate = pool.terms?.length ? Math.min(...pool.terms.map((t) => t.apr)) : null
       const debt = debtUsd(position)
       if (rate == null || !(debt > 0)) continue
       weight += debt
@@ -311,8 +307,8 @@ function PositionSection({
   })()
   const baseApr = midnightSectionBase ?? rawBaseApr
   const intrinsic = isDeposits
-    ? summary?.intrinsicDepositApr ?? 0
-    : summary?.intrinsicBorrowApr ?? 0
+    ? (summary?.intrinsicDepositApr ?? 0)
+    : (summary?.intrinsicBorrowApr ?? 0)
   const totalApr = baseApr + intrinsic
   const intrinsicPillClass = isDeposits
     ? 'bg-success/15 text-success'
@@ -414,142 +410,185 @@ function PositionSection({
 
             return (
               <React.Fragment key={pool.marketUid}>
-              <div
-                className={`grid grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:grid-cols-[minmax(140px,1.4fr)_72px_minmax(80px,1fr)_96px_140px_40px] items-center gap-x-3 px-3 py-1 pl-4 transition-colors ${
-                  onPoolSelect ? 'cursor-pointer' : ''
-                } ${
-                  isSelected ? 'bg-primary/10 ring-1 ring-primary ring-inset' : 'hover:bg-base-200/60'
-                }`}
-                onClick={() =>
-                  onPoolSelect?.(pool, isDeposits ? 'collateral' : 'borrowable')
-                }
-              >
-                {/* Asset (logo + symbol + price sub-text) */}
-                <div className="flex items-center min-w-0">
-                  <AssetPopover
-                    address={pool.underlying}
-                    name={pool.asset.name}
-                    symbol={pool.asset.symbol}
-                    logoURI={pool.asset.logoURI}
-                    marketUid={pool.marketUid}
-                    marketName={pool.name}
-                    currentDepositRate={pool.depositRate + (pool.intrinsicYield ?? 0)}
-                    currentBorrowRate={pool.variableBorrowRate + (pool.intrinsicYield ?? 0)}
-                    oraclePriceUsd={pool.oraclePriceUSD}
-                    chainId={pool.asset.chainId}
-                  >
-                    <div className="flex flex-col min-w-0 leading-tight">
-                      <span className="text-sm font-medium truncate">{pool.asset.symbol}</span>
-                      <span className="text-[10px] font-mono tabular-nums flex items-center gap-1.5 min-w-0">
-                        {/* APR shown inline only on mobile — desktop has a dedicated column */}
-                        <span
-                          className={`sm:hidden ${accentText}`}
-                          title={`${isDeposits ? 'Deposit' : 'Borrow'} rate: ${positionApr.toFixed(4)}%`}
-                        >
-                          {positionApr.toFixed(2)}%
-                          <span className="text-base-content/50 ml-0.5 font-sans">APR</span>
-                        </span>
-                        {pool.oraclePriceUSD != null && (
-                          <>
-                            <span className="sm:hidden text-base-content/30">·</span>
-                            <span className="text-base-content/50 truncate">
-                              ${pool.oraclePriceUSD < 1
-                                ? pool.oraclePriceUSD.toPrecision(4)
-                                : pool.oraclePriceUSD.toLocaleString(undefined, {
-                                    maximumFractionDigits: 2,
-                                  })}
-                            </span>
-                          </>
-                        )}
-                      </span>
-                    </div>
-                  </AssetPopover>
-                </div>
-
-                {/* APR — visually separated from the bar by a right divider */}
                 <div
-                  className="hidden sm:flex flex-col items-start justify-center leading-tight pr-3 border-r border-base-300/60"
-                  title={`${isDeposits ? 'Deposit' : 'Borrow'} rate: ${positionApr.toFixed(4)}%`}
+                  className={`grid grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:grid-cols-[minmax(140px,1.4fr)_72px_minmax(80px,1fr)_96px_140px_40px] items-center gap-x-3 px-3 py-1 pl-4 transition-colors ${
+                    onPoolSelect ? 'cursor-pointer' : ''
+                  } ${
+                    isSelected
+                      ? 'bg-primary/10 ring-1 ring-primary ring-inset'
+                      : 'hover:bg-base-200/60'
+                  }`}
+                  onClick={() => onPoolSelect?.(pool, isDeposits ? 'collateral' : 'borrowable')}
                 >
-                  <span className={`text-xs font-medium tabular-nums ${accentText}`}>
-                    {positionApr.toFixed(2)}%
-                  </span>
-                  <span className="text-[9px] uppercase tracking-wide text-base-content/40">
-                    APR
-                  </span>
-                </div>
-
-                {/* Share bar — visualizes this position's share of the section total */}
-                <div
-                  className="hidden sm:flex items-center gap-2 min-w-0"
-                  title={`${sharePct.toFixed(2)}% of ${isDeposits ? 'deposits' : 'debt'}`}
-                >
-                  <div className="flex-1 h-1.5 rounded-full bg-base-300/60 overflow-hidden">
-                    <div
-                      className={`h-full ${shareBarClass} rounded-full transition-all`}
-                      style={{ width: `${barPct}%` }}
-                    />
-                  </div>
-                  <span className="shrink-0 text-[10px] font-mono tabular-nums text-base-content/50 w-10 text-right">
-                    {sharePct >= 10 ? sharePct.toFixed(0) : sharePct.toFixed(1)}%
-                    <span className="text-base-content/30 ml-0.5">sh</span>
-                  </span>
-                </div>
-
-                {/* USD value */}
-                <span
-                  className={`text-right text-sm font-semibold font-mono tabular-nums ${accentText}`}
-                  title={`$${formatUsd(usd)}`}
-                >
-                  {abbreviateUsd(usd)}
-                </span>
-
-                {/* Native amount */}
-                <span
-                  className="hidden sm:inline text-right text-xs font-mono tabular-nums text-base-content/60 truncate"
-                  title={`${native.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${pool.asset.symbol}`}
-                >
-                  {formatTokenAmount(native)}
-                  <span className="text-base-content/40 ml-1">{pool.asset.symbol}</span>
-                </span>
-
-                {/* Collateral toggle (deposits only) */}
-                <div className="flex justify-end">
-                  {isDeposits && account && (
-                    <CollateralToggle
+                  {/* Asset (logo + symbol + price sub-text) */}
+                  <div className="flex items-center min-w-0">
+                    <AssetPopover
+                      address={pool.underlying}
+                      name={pool.asset.name}
+                      symbol={pool.asset.symbol}
+                      logoURI={pool.asset.logoURI}
                       marketUid={pool.marketUid}
-                      enabled={position.collateralEnabled}
-                      account={account}
-                      chainId={chainId}
-                    />
-                  )}
+                      marketName={pool.name}
+                      currentDepositRate={pool.depositRate + (pool.intrinsicYield ?? 0)}
+                      currentBorrowRate={pool.variableBorrowRate + (pool.intrinsicYield ?? 0)}
+                      oraclePriceUsd={pool.oraclePriceUSD}
+                      chainId={pool.asset.chainId}
+                    >
+                      <div className="flex flex-col min-w-0 leading-tight">
+                        <span className="text-sm font-medium truncate">{pool.asset.symbol}</span>
+                        <span className="text-[10px] font-mono tabular-nums flex items-center gap-1.5 min-w-0">
+                          {/* APR shown inline only on mobile — desktop has a dedicated column */}
+                          <span
+                            className={`sm:hidden ${accentText}`}
+                            title={`${isDeposits ? 'Deposit' : 'Borrow'} rate: ${positionApr.toFixed(4)}%`}
+                          >
+                            {positionApr.toFixed(2)}%
+                            <span className="text-base-content/50 ml-0.5 font-sans">APR</span>
+                          </span>
+                          {pool.oraclePriceUSD != null && (
+                            <>
+                              <span className="sm:hidden text-base-content/30">·</span>
+                              <span className="text-base-content/50 truncate">
+                                $
+                                {pool.oraclePriceUSD < 1
+                                  ? pool.oraclePriceUSD.toPrecision(4)
+                                  : pool.oraclePriceUSD.toLocaleString(undefined, {
+                                      maximumFractionDigits: 2,
+                                    })}
+                              </span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    </AssetPopover>
+                  </div>
+
+                  {/* APR — visually separated from the bar by a right divider */}
+                  <div
+                    className="hidden sm:flex flex-col items-start justify-center leading-tight pr-3 border-r border-base-300/60"
+                    title={`${isDeposits ? 'Deposit' : 'Borrow'} rate: ${positionApr.toFixed(4)}%`}
+                  >
+                    <span className={`text-xs font-medium tabular-nums ${accentText}`}>
+                      {positionApr.toFixed(2)}%
+                    </span>
+                    <span className="text-[9px] uppercase tracking-wide text-base-content/40">
+                      APR
+                    </span>
+                  </div>
+
+                  {/* Share bar — visualizes this position's share of the section total */}
+                  <div
+                    className="hidden sm:flex items-center gap-2 min-w-0"
+                    title={`${sharePct.toFixed(2)}% of ${isDeposits ? 'deposits' : 'debt'}`}
+                  >
+                    <div className="flex-1 h-1.5 rounded-full bg-base-300/60 overflow-hidden">
+                      <div
+                        className={`h-full ${shareBarClass} rounded-full transition-all`}
+                        style={{ width: `${barPct}%` }}
+                      />
+                    </div>
+                    <span className="shrink-0 text-[10px] font-mono tabular-nums text-base-content/50 w-10 text-right">
+                      {sharePct >= 10 ? sharePct.toFixed(0) : sharePct.toFixed(1)}%
+                      <span className="text-base-content/30 ml-0.5">sh</span>
+                    </span>
+                  </div>
+
+                  {/* USD value */}
+                  <span
+                    className={`text-right text-sm font-semibold font-mono tabular-nums ${accentText}`}
+                    title={`$${formatUsd(usd)}`}
+                  >
+                    {abbreviateUsd(usd)}
+                  </span>
+
+                  {/* Native amount */}
+                  <span
+                    className="hidden sm:inline text-right text-xs font-mono tabular-nums text-base-content/60 truncate"
+                    title={`${native.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${pool.asset.symbol}`}
+                  >
+                    {formatTokenAmount(native)}
+                    <span className="text-base-content/40 ml-1">{pool.asset.symbol}</span>
+                  </span>
+
+                  {/* Collateral toggle (deposits only) */}
+                  <div className="flex justify-end">
+                    {isDeposits && account && (
+                      <CollateralToggle
+                        marketUid={pool.marketUid}
+                        enabled={position.collateralEnabled}
+                        account={account}
+                        chainId={chainId}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-              {loans && loans.length > 0 && (
-                <LoanBreakdown
-                  loans={loans}
-                  pool={pool}
-                  account={account}
-                  chainId={chainId}
-                  symbol={pool.asset.symbol}
-                  marketVariableRate={pool.variableBorrowRate + (pool.intrinsicYield ?? 0)}
-                />
-              )}
-              {/* Midnight lend positions accrue a continuous fee, already netted
+                {loans && loans.length > 0 && (
+                  <LoanBreakdown
+                    loans={loans}
+                    pool={pool}
+                    account={account}
+                    chainId={chainId}
+                    symbol={pool.asset.symbol}
+                    marketVariableRate={pool.variableBorrowRate + (pool.intrinsicYield ?? 0)}
+                  />
+                )}
+                {/* Midnight lend positions accrue a continuous fee, already netted
                   out of the shown (net) deposit balance. Surface it so the
                   haircut is legible. 0 on markets with no continuous fee. */}
-              {isDeposits &&
-                isMidnightMarket(pool.marketUid) &&
-                Number(position.pendingFee ?? 0) > 0 && (
-                  <div className="bg-base-200/40 px-3 py-1.5 pl-6 flex justify-between gap-2 text-[10px] text-base-content/60">
-                    <span title="Continuous fee accrued on this lend position — already deducted from the net balance shown above.">
-                      Continuous fee accrued
-                    </span>
-                    <span className="tabular-nums">
-                      {formatTokenAmount(Number(position.pendingFee))} {pool.asset.symbol}
-                    </span>
-                  </div>
-                )}
+                {isDeposits &&
+                  isMidnightMarket(pool.marketUid) &&
+                  Number(position.pendingFee ?? 0) > 0 && (
+                    <div className="bg-base-200/40 px-3 py-1.5 pl-6 flex justify-between gap-2 text-[10px] text-base-content/60">
+                      <span title="Continuous fee accrued on this lend position — already deducted from the net balance shown above.">
+                        Continuous fee accrued
+                      </span>
+                      <span className="tabular-nums">
+                        {formatTokenAmount(Number(position.pendingFee))} {pool.asset.symbol}
+                      </span>
+                    </div>
+                  )}
+                {/* Midnight BORROW positions are fixed-term & fixed-maturity: the
+                  debt is a static face value due at a fixed date, and PAST
+                  maturity it can be liquidated regardless of collateral health.
+                  This product is new, so surface the deadline + repay guidance
+                  right on the position. */}
+                {!isDeposits &&
+                  isMidnightMarket(pool.marketUid) &&
+                  (() => {
+                    const maturityMs = fixedTermDetails(pool)?.maturityMs
+                    const now = Date.now()
+                    const matured = maturityMs != null && maturityMs <= now
+                    const daysLeft = maturityMs != null ? (maturityMs - now) / 86_400_000 : null
+                    const soon = daysLeft != null && daysLeft > 0 && daysLeft <= 3
+                    const tone = matured
+                      ? 'border-error/40 bg-error/10 text-error'
+                      : soon
+                        ? 'border-warning/40 bg-warning/10 text-warning'
+                        : 'border-base-300 bg-base-200/40 text-base-content/70'
+                    return (
+                      <div
+                        className={`mx-3 mb-1 ml-6 rounded-md border px-2.5 py-1.5 text-[10px] leading-snug ${tone}`}
+                      >
+                        <div className="flex items-center justify-between gap-2 font-medium">
+                          <span>Fixed-term loan{matured ? ' · in default' : ''}</span>
+                          {maturityMs != null && (
+                            <span className="tabular-nums">
+                              {matured ? 'Matured ' : 'Repay by '}
+                              {new Date(maturityMs).toLocaleDateString()}
+                              {!matured && daysLeft != null && daysLeft >= 0
+                                ? ` (${daysLeft < 1 ? '<1' : Math.floor(daysLeft)}d)`
+                                : ''}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-0.5 text-base-content/60">
+                          {matured
+                            ? 'Past maturity this loan is in default and can be liquidated regardless of collateral health — repay the debt to close the position.'
+                            : 'Repay before maturity to avoid default liquidation: once the maturity date passes, the loan can be liquidated even if well-collateralised. The debt is a fixed amount — no interest accrual and no early-repay penalty — so repay the exact debt to close.'}
+                        </div>
+                      </div>
+                    )
+                  })()}
               </React.Fragment>
             )
           })}
@@ -603,7 +642,9 @@ function LoanBreakdown({
             <span className="flex items-center gap-1.5 min-w-0">
               <span className="font-medium text-base-content/80">{termLabel(loan)}</span>
               <span className="font-mono tabular-nums text-warning">
-                {ratePct != null ? `${ratePct.toFixed(2)}%` : `${marketVariableRate.toFixed(2)}% var`}
+                {ratePct != null
+                  ? `${ratePct.toFixed(2)}%`
+                  : `${marketVariableRate.toFixed(2)}% var`}
               </span>
               {mat.isPast && (
                 <span className="badge badge-xs bg-warning/15 text-warning border-0">Matured</span>

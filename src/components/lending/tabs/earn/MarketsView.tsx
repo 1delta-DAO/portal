@@ -73,6 +73,8 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       minLiquidityUsd: '',
       maxLiquidityUsd: '',
       maxRiskScore: '4',
+      // Fixed-rate / order-book earn markets (Midnight) are hidden by default.
+      showFixedTerm: false,
     }),
     [chainId]
   )
@@ -106,6 +108,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   const minLiquidityUsd = f.minLiquidityUsd
   const maxLiquidityUsd = f.maxLiquidityUsd
   const maxRiskScore = f.maxRiskScore
+  const showFixedTerm = !!f.showFixedTerm
 
   // Setters (wrap setFilter for each)
   const setSelectedLender = (v: string) => setFilter('selectedLender', v)
@@ -130,6 +133,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   const setMinLiquidityUsd = (v: string) => setFilter('minLiquidityUsd', v)
   const setMaxLiquidityUsd = (v: string) => setFilter('maxLiquidityUsd', v)
   const setMaxRiskScore = (v: string) => setFilter('maxRiskScore', v)
+  const setShowFixedTerm = (v: boolean) => setFilter('showFixedTerm', v)
 
   // The app-wide risk ceiling (next to the network selector). Earn may override
   // it *downwards* only — the effective max is clamped to the global cap so the
@@ -166,6 +170,8 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     chainId,
     maxRiskScore: effectiveMaxRisk,
     enabled: !!chainId,
+    // Opt in to fixed-rate / order-book earn markets (Midnight), hidden by default.
+    filters: useMemo(() => ({ includeFixedTerm: showFixedTerm }), [showFixedTerm]),
   })
 
   const { data: chainTokens } = useTokenLists(chainId)
@@ -350,6 +356,13 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     const isDepositOnly = (p: PoolEntry) =>
       p.flags?.borrowingEnabled === false && p.flags?.depositsEnabled !== false
 
+    // Order-book / fixed-rate earn markets (Midnight) have structurally 0
+    // utilization (yield is an order book, not a pool rate), so the util/APR
+    // floors — written for two-sided variable pools — would wrongly hide them
+    // even after the user opts in via the Fixed-rate switch. Exempt them too.
+    const isFloorExempt = (p: PoolEntry) =>
+      isDepositOnly(p) || !!p.lenderKey?.startsWith('MORPHO_MIDNIGHT')
+
     // --- numeric range helpers ---
     const applyMinMax = (
       arr: PoolEntry[],
@@ -385,7 +398,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       const maxU = parseFloat(maxUtilPct)
       if (!Number.isNaN(minU) || !Number.isNaN(maxU)) {
         result = result.filter((p) => {
-          if (isDepositOnly(p)) return true
+          if (isFloorExempt(p)) return true
           const u = computePoolMetrics(p).utilization * 100
           if (!Number.isNaN(minU) && u < minU) return false
           if (!Number.isNaN(maxU) && u > maxU) return false
@@ -399,7 +412,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       const maxApr = parseFloat(maxAprPct)
       if (!Number.isNaN(minApr) || !Number.isNaN(maxApr)) {
         result = result.filter((p) => {
-          if (isDepositOnly(p)) return true
+          if (isFloorExempt(p)) return true
           const apr = computePoolMetrics(p).apr
           if (!Number.isNaN(minApr) && apr < minApr) return false
           if (!Number.isNaN(maxApr) && apr > maxApr) return false
@@ -423,7 +436,12 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
         (p) => parseFloat(p.totalDeposits) || 0
       )
       // Native debt
-      result = applyMinMax(result, minDebtNative, maxDebtNative, (p) => parseFloat(p.totalDebt) || 0)
+      result = applyMinMax(
+        result,
+        minDebtNative,
+        maxDebtNative,
+        (p) => parseFloat(p.totalDebt) || 0
+      )
       // Native liquidity
       result = applyMinMax(
         result,
@@ -745,6 +763,14 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
 
         {/* Reset + Extended filters toggle */}
         <div className="relative flex items-end gap-1" ref={extendedRef}>
+          <button
+            type="button"
+            className={`btn btn-xs ${showFixedTerm ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setShowFixedTerm(!showFixedTerm)}
+            title="Show fixed-rate / order-book earn markets (Morpho Midnight). Hidden by default — their yield comes from an order book, not a pool rate."
+          >
+            Fixed-rate
+          </button>
           <button
             type="button"
             className="btn btn-xs btn-ghost text-base-content/50"

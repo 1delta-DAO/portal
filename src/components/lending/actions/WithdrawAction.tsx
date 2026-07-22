@@ -7,7 +7,8 @@ import { formatTokenAmount, formatUsd, parseAmount } from './format'
 import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
-import { lenderSupportsSubAccounts } from './helpers'
+import { lenderSupportsSubAccounts, fixedTermDetails } from './helpers'
+import { SellEarlyPanel } from '../shared/SellEarlyPanel'
 import { HealthFactorProjection } from './HealthFactorProjection'
 import { RateImpactIndicator } from './RateImpactIndicator'
 import { TransactionSuccess } from './TransactionSuccess'
@@ -28,6 +29,8 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
   const [amount, setAmount] = useState('')
   const [isAll, setIsAll] = useState(false)
   const [useNative, setUseNative] = useState(false)
+  // Redeem (settled units, at/after maturity) vs Sell-early (into the book).
+  const [exitMode, setExitMode] = useState<'redeem' | 'sell'>('redeem')
 
   const hasSubAccounts = lenderSupportsSubAccounts(lenderKey)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(accountId ?? null)
@@ -77,15 +80,24 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
 
   const withdrawableStr = String(userPosition?.withdrawable ?? '0')
   const depositsStr = String(userPosition?.deposits ?? '0')
-  const overMax = !isAll && parseAmount(withdrawableStr) > 0 && parseAmount(amount) > parseAmount(withdrawableStr) + 1e-9
+
+  // Midnight loan-token (order-book) lender position — offer an early-exit SELL
+  // (into the book) alongside the plain Redeem (settled units at maturity).
+  const ftDetails = fixedTermDetails(pool)
+  const isLoanOrderBook =
+    ftDetails?.provider?.kind === 'orderbook' && !(pool?.config as any)?.['0']?.debtDisabled
+  const overMax =
+    !isAll &&
+    parseAmount(withdrawableStr) > 0 &&
+    parseAmount(amount) > parseAmount(withdrawableStr) + 1e-9
 
   // Estimated earnings forfeited by withdrawing this amount. depositRate is
   // in percent units. Prefer the simulation's projected deposit rate (post-tx)
   // when available — withdrawing typically raises utilization and the rate.
   // Fall back to the pool's current rate and to oraclePriceUSD.
   const effectivePriceUsd = priceUsd ?? pool?.oraclePriceUSD ?? 0
-  const projectedAprPct = rateImpact?.find((e) => e.marketUid === pool?.marketUid)
-    ?.depositRate?.projected
+  const projectedAprPct = rateImpact?.find((e) => e.marketUid === pool?.marketUid)?.depositRate
+    ?.projected
   const aprPct = projectedAprPct ?? pool?.depositRate ?? 0
   const amountNum = parseAmount(amount)
   const monthlyForfeitedUsd =
@@ -122,8 +134,28 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
     )
   }
 
+  // Early-exit SELL mode: sell the position into the book instead of redeeming.
+  if (isLoanOrderBook && exitMode === 'sell') {
+    return (
+      <div className="space-y-3">
+        <ExitToggle value={exitMode} onChange={setExitMode} />
+        <SellEarlyPanel
+          chainId={pool?.marketUid?.split(':')[1] ?? chainId}
+          lender={pool!.marketUid.split(':')[0]}
+          symbol={pool?.asset?.symbol}
+          decimals={pool?.asset?.decimals}
+          account={account}
+          maturityMs={ftDetails?.maturityMs}
+          maxAmount={withdrawableStr}
+          onSold={() => resetState()}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-3">
+      {isLoanOrderBook && <ExitToggle value={exitMode} onChange={setExitMode} />}
       {/* Sub-account selector */}
       {hasSubAccounts && (
         <SubAccountSelector
@@ -163,7 +195,9 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
         decimals={pool?.asset?.decimals}
         onMaxClick={handleMaxClick}
         disabled={!pool}
-        error={overMax ? `Exceeds withdrawable balance (${formatTokenAmount(withdrawableStr)}).` : null}
+        error={
+          overMax ? `Exceeds withdrawable balance (${formatTokenAmount(withdrawableStr)}).` : null
+        }
       />
 
       {/* Estimated earnings forfeited by this withdrawal. */}
@@ -242,6 +276,47 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
           )}
         </button>
       )}
+    </div>
+  )
+}
+
+/** Redeem (settled units / at maturity) vs Sell-early (into the book). */
+function ExitToggle({
+  value,
+  onChange,
+}: {
+  value: 'redeem' | 'sell'
+  onChange: (v: 'redeem' | 'sell') => void
+}) {
+  const opts: { v: 'redeem' | 'sell'; label: string; title: string }[] = [
+    {
+      v: 'redeem',
+      label: 'Redeem',
+      title: 'Withdraw settled units 1:1 (at/after maturity)',
+    },
+    {
+      v: 'sell',
+      label: 'Sell early',
+      title: 'Exit before maturity by selling your units into the book',
+    },
+  ]
+  return (
+    <div className="flex rounded-lg border border-base-300 p-0.5 text-xs">
+      {opts.map((o) => (
+        <button
+          key={o.v}
+          type="button"
+          onClick={() => onChange(o.v)}
+          title={o.title}
+          className={`flex-1 rounded-md py-1 transition-colors ${
+            value === o.v
+              ? 'bg-primary/15 text-primary font-medium'
+              : 'text-base-content/60 hover:text-base-content'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   )
 }

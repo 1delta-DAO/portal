@@ -234,3 +234,47 @@ export function useMidnightCancelOffer(chainId: string, account?: string) {
 
   return { cancel, cancelling }
 }
+
+/**
+ * Early-exit SELL — sell held credit units into the book before maturity (take
+ * bids). `amountUnits` = face units to sell (loan-token face value; settle 1:1).
+ * You receive loan token now at market price (a discount to face).
+ */
+export function useMidnightSell(chainId: string, account?: string) {
+  const { send } = useSendLendingTransaction({ chainId, account })
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const sell = useCallback(
+    async (lender: string, amountUnits: bigint): Promise<{ ok: boolean; hash?: string }> => {
+      if (!account) return { ok: false }
+      setPending(true)
+      setError(null)
+      try {
+        const sp = new URLSearchParams({
+          chainId,
+          lender,
+          amount: amountUnits.toString(),
+          account,
+        })
+        const res = await fetch(`${BACKEND_BASE_URL}/v1/actions/midnight/sell?${sp}`)
+        const json: any = await res.json()
+        const tx = json?.actions?.transactions?.[0]
+        if (!res.ok || !tx) {
+          throw new Error(json?.error?.message ?? `Sell failed (${res.status})`)
+        }
+        const r = await send(tx)
+        if (!r.ok) throw new Error(r.error ?? 'Sell failed')
+        return { ok: true, hash: r.hash }
+      } catch (e: any) {
+        setError(e?.shortMessage ?? e?.message ?? 'Sell failed')
+        return { ok: false }
+      } finally {
+        setPending(false)
+      }
+    },
+    [chainId, account, send]
+  )
+
+  return { sell, pending, error }
+}

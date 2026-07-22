@@ -231,6 +231,9 @@ export interface PoolsFilters {
   lender?: string
   underlyings?: string[]
   assetGroups?: string[]
+  /** Include fixed-rate / order-book earn markets (Morpho Midnight), hidden by
+   *  default because their yield lives in an order book, not a pool rate. */
+  includeFixedTerm?: boolean
   minYield?: number
   maxYield?: number
   minUtil?: number
@@ -305,6 +308,7 @@ function buildPoolsUrl(
     }
     if (filters.sortBy) url.searchParams.set('sortBy', filters.sortBy)
     if (filters.sortDir) url.searchParams.set('sortDir', String(filters.sortDir).toUpperCase())
+    if (filters.includeFixedTerm) url.searchParams.set('includeFixedTerm', 'true')
   }
 
   return url.toString()
@@ -346,14 +350,7 @@ export function useFlattenedPools(params: {
 
   const { data, isLoading, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage, error } =
     useInfiniteQuery<PoolsApiResponse>({
-      queryKey: [
-        'flattenedPools',
-        chainId ?? '',
-        lender ?? '',
-        maxRiskScore,
-        pageSize,
-        filtersKey,
-      ],
+      queryKey: ['flattenedPools', chainId ?? '', lender ?? '', maxRiskScore, pageSize, filtersKey],
       enabled,
       initialPageParam: 0 as number,
       queryFn: async ({ pageParam }) => {
