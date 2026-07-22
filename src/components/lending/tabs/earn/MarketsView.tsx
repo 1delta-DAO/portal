@@ -767,9 +767,9 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
             type="button"
             className={`btn btn-xs ${showFixedTerm ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => setShowFixedTerm(!showFixedTerm)}
-            title="Show fixed-rate / order-book earn markets (Morpho Midnight). Hidden by default — their yield comes from an order book, not a pool rate."
+            title="Also list fixed-rate / order-book earn markets (Morpho Midnight) alongside the variable pools. They're hidden by default because their yield comes from an order book, not a pool rate."
           >
-            Fixed-rate
+            {showFixedTerm ? '✓ Fixed-rate included' : 'Include fixed-rate'}
           </button>
           <button
             type="button"
