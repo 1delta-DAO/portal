@@ -736,7 +736,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
         </>
       )}
 
-      {result && !overMax && hasPermissions && !allPermissionsDone && (
+      {result && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">
           <span className="text-xs text-base-content/60">
             Approvals ({permissionsCompleted}/{permissions.length})
@@ -768,7 +768,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      {result && !overMax && (!hasPermissions || allPermissionsDone) && (
+      {result && (!hasPermissions || allPermissionsDone) && (
         <button
           type="button"
           className="btn btn-success btn-sm w-full"

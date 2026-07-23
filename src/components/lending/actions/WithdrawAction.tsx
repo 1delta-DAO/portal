@@ -86,9 +86,13 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
   const ftDetails = fixedTermDetails(pool)
   const isLoanOrderBook =
     ftDetails?.provider?.kind === 'orderbook' && !(pool?.config as any)?.['0']?.debtDisabled
+  // Warn whenever the typed amount exceeds what's withdrawable — including the
+  // fully-collateralized case where withdrawable is exactly 0 (deposits back an
+  // open borrow). Gate on `userPosition` (not `withdrawable > 0`) so we don't
+  // flash the warning before the position loads.
   const overMax =
     !isAll &&
-    parseAmount(withdrawableStr) > 0 &&
+    !!userPosition &&
     parseAmount(amount) > parseAmount(withdrawableStr) + 1e-9
 
   // Estimated earnings forfeited by withdrawing this amount. depositRate is
@@ -230,7 +234,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
         </>
       )}
 
-      {result && !overMax && hasPermissions && !allPermissionsDone && (
+      {result && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">
           <span className="text-xs text-base-content/60">
             Approvals ({permissionsCompleted}/{permissions.length})
@@ -262,7 +266,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      {result && !overMax && (!hasPermissions || allPermissionsDone) && (
+      {result && (!hasPermissions || allPermissionsDone) && (
         <button
           type="button"
           className="btn btn-success btn-sm w-full"

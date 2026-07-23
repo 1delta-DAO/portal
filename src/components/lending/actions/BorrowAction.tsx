@@ -244,6 +244,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
                 lender={pool?.marketUid}
                 amountTokens={amountNum}
                 hideLadder={isOrderBook}
+                termId={selectedTermId ?? undefined}
                 onSelectOfferAmount={(tokens) => {
                   // Tap an offer tile → borrow up to that tier's depth, capped at
                   // what the position can actually borrow.
@@ -404,7 +405,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
       {/* Rate impact */}
       <RateImpactIndicator rateImpact={rateImpact} />
 
-      {result && !overMax && hasPermissions && !allPermissionsDone && (
+      {result && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">
           <span className="text-xs text-base-content/60">
             Approvals ({permissionsCompleted}/{permissions.length})
@@ -436,7 +437,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      {result && !overMax && (!hasPermissions || allPermissionsDone) && (
+      {result && (!hasPermissions || allPermissionsDone) && (
         <button
           type="button"
           className="btn btn-success btn-sm w-full"

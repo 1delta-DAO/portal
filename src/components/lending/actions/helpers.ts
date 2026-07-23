@@ -26,6 +26,12 @@ export function isMidnightMarket(marketUidOrLender?: string | null): boolean {
   return marketUidOrLender.split(':')[0].startsWith('MORPHO_MIDNIGHT')
 }
 
+/** True for Exactly per-market keys / marketUids (`EXACTLY_<MARKET_ADDR>…`). */
+export function isExactlyMarket(marketUidOrLender?: string | null): boolean {
+  if (!marketUidOrLender) return false
+  return marketUidOrLender.split(':')[0].startsWith('EXACTLY')
+}
+
 /** Minimal pool shape the fixed-term detail readout needs. */
 interface FixedTermPoolLike {
   /** Market id — used to recognise a Midnight market before its `fixedTerm` block is served. */
@@ -45,11 +51,19 @@ interface FixedTermPoolLike {
 
 /** The canonical fixed-term descriptor the API emits on the pool item. */
 interface ApiFixedTerm {
-  model?: 'lista' | 'midnight'
+  model?: 'lista' | 'midnight' | 'term' | 'exactly'
   maturity?: number
-  fees?: { continuousFeeApr?: number; settlementFee?: number }
-  earlyRepay?: { kind?: 'none' | 'penalty' }
-  provider?: { kind?: 'broker' | 'orderbook'; address?: string }
+  fees?: {
+    continuousFeeApr?: number
+    settlementFee?: number
+    /** Exactly: %/yr accruing per second on OVERDUE debt after maturity. */
+    latePenaltyApr?: number
+  }
+  earlyRepay?: { kind?: 'none' | 'penalty' | 'discount' }
+  provider?: {
+    kind?: 'broker' | 'orderbook' | 'auction' | 'pool'
+    address?: string
+  }
 }
 
 /**
@@ -85,19 +99,30 @@ export function fixedTermDetails(
   const settlement = ft.fees?.settlementFee // fraction (0–1)
   return {
     maturityMs: ft.maturity != null ? ft.maturity * 1000 : undefined,
-    // Fillable depth is an order-book (Midnight) notion; Lista rates are
-    // term-based, so only surface it there.
-    availableAmount: ft.model === 'midnight' ? n(pool?.totalLiquidity) : undefined,
+    // Fillable depth: order-book depth (Midnight/Term) or the fixed-pool
+    // borrowable cap (Exactly). Lista rates are term-based — no depth there.
+    availableAmount:
+      ft.model === 'midnight' || ft.model === 'term' || ft.model === 'exactly'
+        ? n(pool?.totalLiquidity)
+        : undefined,
     availableAmountUsd:
-      ft.model === 'midnight' ? n(pool?.totalLiquidityUSD) : undefined,
+      ft.model === 'midnight' || ft.model === 'term' || ft.model === 'exactly'
+        ? n(pool?.totalLiquidityUSD)
+        : undefined,
     continuousFeeAprPct: n(ft.fees?.continuousFeeApr),
     settlementFeePct: settlement != null ? Number(settlement) * 100 : undefined,
+    latePenaltyAprPct: n(ft.fees?.latePenaltyApr),
     earlyRepay:
       ft.earlyRepay?.kind === 'penalty'
         ? { hasPenalty: true }
-        : { hasPenalty: false },
+        : ft.earlyRepay?.kind === 'discount'
+          ? { hasPenalty: false, discount: true }
+          : { hasPenalty: false },
     provider:
-      ft.provider?.kind === 'broker' || ft.provider?.kind === 'orderbook'
+      ft.provider?.kind === 'broker' ||
+      ft.provider?.kind === 'orderbook' ||
+      ft.provider?.kind === 'auction' ||
+      ft.provider?.kind === 'pool'
         ? { kind: ft.provider.kind, address: ft.provider.address }
         : undefined,
   }

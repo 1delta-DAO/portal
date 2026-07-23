@@ -22,6 +22,7 @@ export function FixedTermDetailsRows({
   onSelectOfferAmount,
   amountTokens,
   hideLadder = false,
+  termId,
 }: {
   details: FixedTermDetails
   symbol?: string
@@ -38,6 +39,8 @@ export function FixedTermDetailsRows({
   /** Suppress the embedded offer ladder / "available" line — used when a fuller
    *  order-book view (e.g. {@link MidnightOrderBook}) is rendered alongside. */
   hideLadder?: boolean
+  /** Exactly: fixed-pool maturity to ladder (defaults to the nearest live pool). */
+  termId?: number
 }) {
   const chainId = lender?.split(':')[1]
   return (
@@ -58,7 +61,10 @@ export function FixedTermDetailsRows({
           </span>
         </div>
       )}
-      {hideLadder ? null : details.provider?.kind === 'orderbook' && lender ? (
+      {hideLadder ? null : (details.provider?.kind === 'orderbook' ||
+          details.provider?.kind === 'auction' ||
+          details.provider?.kind === 'pool') &&
+        lender ? (
         // Order-book markets (Midnight today) get the full live offer ladder
         // (best-first, scrollable) instead of the single top-of-book depth line;
         // brokers (Lista) keep the single line. Falls back to it while loading /
@@ -72,6 +78,7 @@ export function FixedTermDetailsRows({
           fallbackAmountUsd={details.availableAmountUsd}
           onSelectAmount={onSelectOfferAmount}
           amountTokens={amountTokens}
+          termId={termId}
         />
       ) : (
         details.availableAmount != null &&
@@ -104,8 +111,21 @@ export function FixedTermDetailsRows({
           <span className="tabular-nums">{details.settlementFeePct.toFixed(2)}%</span>
         </div>
       )}
+      {details.latePenaltyAprPct != null && details.latePenaltyAprPct > 0 && (
+        <div className="flex justify-between gap-2">
+          <span
+            className="text-warning"
+            title="Repaying AFTER maturity: the amount owed grows per second at this annualized rate until repaid — and the growing debt erodes your health factor toward liquidation."
+          >
+            Late repay penalty
+          </span>
+          <span className="tabular-nums text-warning">
+            {details.latePenaltyAprPct.toFixed(0)}%/yr
+          </span>
+        </div>
+      )}
       <div className="flex justify-between gap-2">
-        <span title="Repaying before maturity: Lista charges a per-loan penalty; Midnight has none (buy your debt units back on the order book at the current market price).">
+        <span title="Repaying before maturity: Lista charges a per-loan penalty; Midnight has none (buy debt units back at the market price); Exactly rebates unassigned earnings (a discount below face value).">
           Early repayment
         </span>
         <span className={`tabular-nums ${earlyRepayTone(details.earlyRepay)}`}>

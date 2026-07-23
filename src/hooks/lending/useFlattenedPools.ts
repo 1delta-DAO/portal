@@ -188,6 +188,11 @@ export interface PoolRiskBreakdown {
   baseAsset?: string | null
   /** Concentration risk: per-owner share of the pool (shares are fractions 0–1) */
   ownerDistribution?: PoolOwnerShare[] | null
+  /** Governance risk: coarse tier label (low/medium/high/unknown) */
+  tier?: string | null
+  /** Governance risk: who can upgrade/re-parametrize the market
+   *  (EOA, SAFE, TIMELOCK, GOVERNANCE, IMMUTABLE, FINALIZED, CUSTOM, UNKNOWN). */
+  ownerKind?: string | null
 }
 
 export interface PoolRisk {

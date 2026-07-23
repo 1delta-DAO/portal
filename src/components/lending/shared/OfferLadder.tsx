@@ -25,6 +25,7 @@ export function OfferLadder({
   fallbackAmountUsd,
   onSelectAmount,
   amountTokens,
+  termId,
 }: {
   chainId?: string
   lender?: string
@@ -38,21 +39,27 @@ export function OfferLadder({
   onSelectAmount?: (tokens: number) => void
   /** Current borrow/lend amount (loan-token units) — highlights the offers it consumes. */
   amountTokens?: number
+  /** Exactly: fixed-pool maturity to ladder (defaults to the nearest live pool). */
+  termId?: number
 }) {
-  const { offers, hasMore, isLoading } = useLendingOffers({
+  const { offers, pricing, hasMore, isLoading } = useLendingOffers({
     chainId,
     lender,
     side,
+    termId,
     // Drop sub-$1 dust so a tiny offer at a great tick can't head the list.
     minAssetsUsd: 1,
   })
+  // Uniform pricing (Exactly curve): a level's APR applies to the WHOLE amount
+  // at that cumulative size — tiles read "total → rate", not "lot → rate".
+  const isUniform = pricing === 'uniform'
   // Side-aware copy — a borrow PAYS deeper (worse=higher) offers, a lend EARNS
   // deeper (worse=lower-yield) ones. The fill/highlight math is identical.
   const isLend = side === 'lend'
   const verb = isLend ? 'Lend' : 'Borrow'
   // The offers the current amount fills, best-first — one source of truth for the
   // highlight, so tapping a tile AND typing an amount light up the same run.
-  const eff = computeEffectiveBorrow(offers, amountTokens ?? 0)
+  const eff = computeEffectiveBorrow(offers, amountTokens ?? 0, pricing)
   const consumed = new Set(eff.consumedTicks)
   const boundaryTick = eff.consumedTicks[eff.consumedTicks.length - 1]
 
@@ -96,12 +103,14 @@ export function OfferLadder({
       <div className="flex justify-between gap-2">
         <span
           title={
-            isLend
-              ? 'Live maker offers on the order book, best yield first. Your deposit fills these top-down; a larger deposit reaches deeper (lower-yield) offers.'
-              : 'Live maker offers on the order book, best rate first. Your borrow fills these top-down; a larger borrow reaches deeper (worse) offers.'
+            isUniform
+              ? `Points on the pool's rate curve. ONE rate applies to your WHOLE ${isLend ? 'deposit' : 'borrow'} at its final size — a ${isLend ? 'larger deposit dilutes the' : 'larger borrow pushes the'} rate for the entire amount.`
+              : isLend
+                ? 'Live maker offers on the order book, best yield first. Your deposit fills these top-down; a larger deposit reaches deeper (lower-yield) offers.'
+                : 'Live maker offers on the order book, best rate first. Your borrow fills these top-down; a larger borrow reaches deeper (worse) offers.'
           }
         >
-          Offers ({offers.length}
+          {isUniform ? 'Rate curve' : 'Offers'} ({offers.length}
           {hasMore ? '+' : ''})
         </span>
         <span className="text-base-content/40 text-[10px]">
@@ -125,11 +134,13 @@ export function OfferLadder({
               aria-pressed={active}
               onClick={() => onTileClick(i)}
               title={
-                (selectable
-                  ? `${verb} through this offer: ${sizeLabel(o.cumulativeAssets, null)} — ${
-                      isLend ? 'down to' : 'worst rate ≤'
-                    } ${o.aprPct.toFixed(2)}%${isLend ? ' yield' : ''}${hint}`
-                  : `Cumulative through here: ${sizeLabel(o.cumulativeAssets, null)}`) +
+                (isUniform
+                  ? `${verb} ${sizeLabel(o.cumulativeAssets, null)} total at ${o.aprPct.toFixed(2)}%${isLend ? ' yield' : ''} — the rate applies to the WHOLE amount${selectable ? hint : ''}`
+                  : selectable
+                    ? `${verb} through this offer: ${sizeLabel(o.cumulativeAssets, null)} — ${
+                        isLend ? 'down to' : 'worst rate ≤'
+                      } ${o.aprPct.toFixed(2)}%${isLend ? ' yield' : ''}${hint}`
+                    : `Cumulative through here: ${sizeLabel(o.cumulativeAssets, null)}`) +
                 makerLabel(o.makers)
               }
               className={`flex flex-col items-start px-2.5 py-1 rounded-lg border text-left transition-colors ${

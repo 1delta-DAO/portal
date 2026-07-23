@@ -7,7 +7,7 @@ import { formatTokenAmount, formatUsd, parseAmount, addAmountStrings, minAmountS
 import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
-import { lenderSupportsSubAccounts } from './helpers'
+import { isExactlyMarket, lenderSupportsSubAccounts } from './helpers'
 import { HealthFactorProjection } from './HealthFactorProjection'
 import { RateImpactIndicator } from './RateImpactIndicator'
 import { TransactionSuccess } from './TransactionSuccess'
@@ -61,6 +61,16 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
 
   const selectedLoan = brokeredLoans.find((l) => l.loanId === selectedLoanId) ?? null
 
+  // Exactly fixed loans repay by MATURITY (`termId`), not by loanId; a repay
+  // covering the full close-now amount goes through `isAll` so the worker
+  // reads the exact face on-chain (dust-free — early repays transfer LESS
+  // than face thanks to the discount).
+  const isExactlyLoan = isBrokered && isExactlyMarket(pool?.marketUid)
+  const exactlyFullClose =
+    isExactlyLoan &&
+    !!selectedLoan &&
+    compareAmountStrings(amount || '0', closeNowAmountString(selectedLoan)) >= 0
+
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
   const {
@@ -85,12 +95,15 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
     pool,
     account,
     amount,
-    // Brokered repay is always amount-based (close = debt + penalty, excess
-    // refunded) and targets a specific loanId — never the aggregate isAll path.
-    isAll: isBrokered ? false : isAll,
+    // Brokered (Lista) repay is always amount-based (close = debt + penalty,
+    // excess refunded) and targets a specific loanId. Exactly repays by
+    // maturity (`termId`) and full-closes via isAll (exact on-chain face read).
+    isAll: isBrokered ? (isExactlyLoan ? exactlyFullClose : false) : isAll,
     payAsset: canUseNative && useNative ? zeroAddress : undefined,
     accountId: hasSubAccounts ? (selectedAccountId ?? undefined) : undefined,
-    loanId: isBrokered ? (selectedLoanId ?? undefined) : undefined,
+    loanId:
+      isBrokered && !isExactlyLoan ? (selectedLoanId ?? undefined) : undefined,
+    termId: isExactlyLoan ? (selectedLoan?.term?.termId ?? undefined) : undefined,
     chainId,
     subAccount,
   })
@@ -128,7 +141,6 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   const overWallet = !isAll && hasBal && compareAmountStrings(amount || '0', activeBalStr) > 0
   // For brokered loans the ceiling is the full-close amount (debt + penalty).
   const overDebt = !isAll && hasDebt && compareAmountStrings(amount || '0', repayTargetStr) > 0
-  const overMax = overWallet || overDebt
 
   // Estimated monthly interest saved by this repayment. variableBorrowRate
   // is in percent units. Prefer the simulation's projected borrow rate
@@ -355,7 +367,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
       {/* Rate impact */}
       <RateImpactIndicator rateImpact={rateImpact} />
 
-      {result && !overMax && hasPermissions && !allPermissionsDone && (
+      {result && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">
           <span className="text-xs text-base-content/60">
             Approvals ({permissionsCompleted}/{permissions.length})
@@ -387,7 +399,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      {result && !overMax && (!hasPermissions || allPermissionsDone) && (
+      {result && (!hasPermissions || allPermissionsDone) && (
         <button
           type="button"
           className="btn btn-success btn-sm w-full"

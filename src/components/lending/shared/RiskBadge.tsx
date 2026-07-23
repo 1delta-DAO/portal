@@ -197,6 +197,29 @@ function riskTextColor(label: string): string {
   }
 }
 
+/** Human-readable phrasing for a governance owner kind. Returns null for kinds
+ *  that carry no useful detail (unknown/absent), so no line is rendered. */
+function governanceOwnerLabel(ownerKind: string): string | null {
+  switch (ownerKind.toUpperCase()) {
+    case 'EOA':
+      return 'a single EOA (can re-parametrize the market)'
+    case 'SAFE':
+      return 'a Safe multisig'
+    case 'TIMELOCK':
+      return 'a timelock'
+    case 'GOVERNANCE':
+      return 'on-chain governance'
+    case 'IMMUTABLE':
+      return 'immutable (no admin)'
+    case 'FINALIZED':
+      return 'finalized (admin renounced)'
+    case 'CUSTOM':
+      return 'a custom admin contract'
+    default:
+      return null
+  }
+}
+
 /** Body of the risk breakdown — shared between desktop popover and mobile modal. */
 const RiskBreakdownContent: React.FC<{ breakdown: PoolRiskBreakdown[] }> = ({ breakdown }) => {
   const curators = [...new Set(breakdown.flatMap((b) => b.curatorIds ?? []))]
@@ -219,6 +242,11 @@ const RiskBreakdownContent: React.FC<{ breakdown: PoolRiskBreakdown[] }> = ({ br
           )}
           {b.category === 'concentration' && b.ownerDistribution && b.ownerDistribution.length > 0 && (
             <OwnerDistributionChart distribution={b.ownerDistribution} />
+          )}
+          {b.category === 'governance' && b.ownerKind && governanceOwnerLabel(b.ownerKind) && (
+            <div className="text-[10px] text-base-content/50 mt-0.5 ml-0.5">
+              Controlled by {governanceOwnerLabel(b.ownerKind)}
+            </div>
           )}
         </div>
       ))}

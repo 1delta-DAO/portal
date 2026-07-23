@@ -73,7 +73,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       minLiquidityUsd: '',
       maxLiquidityUsd: '',
       maxRiskScore: '4',
-      // Fixed-rate / order-book earn markets (Midnight) are hidden by default.
+      // Fixed-rate earn markets (Midnight / Term / Exactly) are hidden by default.
       showFixedTerm: false,
     }),
     [chainId]
@@ -170,7 +170,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     chainId,
     maxRiskScore: effectiveMaxRisk,
     enabled: !!chainId,
-    // Opt in to fixed-rate / order-book earn markets (Midnight), hidden by default.
+    // Opt in to fixed-rate earn markets (Midnight / Term / Exactly), hidden by default.
     filters: useMemo(() => ({ includeFixedTerm: showFixedTerm }), [showFixedTerm]),
   })
 
@@ -356,12 +356,16 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     const isDepositOnly = (p: PoolEntry) =>
       p.flags?.borrowingEnabled === false && p.flags?.depositsEnabled !== false
 
-    // Order-book / fixed-rate earn markets (Midnight) have structurally 0
-    // utilization (yield is an order book, not a pool rate), so the util/APR
-    // floors — written for two-sided variable pools — would wrongly hide them
-    // even after the user opts in via the Fixed-rate switch. Exempt them too.
+    // Fixed-rate earn markets (Midnight order book, Term repo listings,
+    // Exactly fixed pools) have structurally low/zero pool utilization (the
+    // yield is a book or a fixed pool, not a variable pool rate), so the
+    // util/APR floors — written for two-sided variable pools — would wrongly
+    // hide them even after the user opts in via the Fixed-rate switch.
+    // Exempt every fixed-term family the API can serve.
+    const FIXED_TERM_PREFIXES = ['MORPHO_MIDNIGHT', 'TERM_FINANCE', 'EXACTLY']
     const isFloorExempt = (p: PoolEntry) =>
-      isDepositOnly(p) || !!p.lenderKey?.startsWith('MORPHO_MIDNIGHT')
+      isDepositOnly(p) ||
+      FIXED_TERM_PREFIXES.some((pre) => !!p.lenderKey?.startsWith(pre))
 
     // --- numeric range helpers ---
     const applyMinMax = (
@@ -767,7 +771,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
             type="button"
             className={`btn btn-xs ${showFixedTerm ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => setShowFixedTerm(!showFixedTerm)}
-            title="Also list fixed-rate / order-book earn markets (Morpho Midnight) alongside the variable pools. They're hidden by default because their yield comes from an order book, not a pool rate."
+            title="Also list fixed-rate earn markets (Morpho Midnight order book, Term Finance repo listings, Exactly fixed pools) alongside the variable pools. They're hidden by default because their yield is fixed-term, not a variable pool rate."
           >
             {showFixedTerm ? '✓ Fixed-rate included' : 'Include fixed-rate'}
           </button>

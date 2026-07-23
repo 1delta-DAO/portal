@@ -10,24 +10,27 @@ import { hasEarlyRepayPenalty } from './brokeredLoans'
 // module gives both a single shape + labelling so the UI renders them the same.
 // ---------------------------------------------------------------------------
 
-/** Early-repayment policy for a fixed-term position. */
+/** Early-repayment policy for a fixed-term position. `discount` = repaying
+ *  early costs LESS than face value (Exactly rebates the pool's unassigned
+ *  earnings) — the opposite of a penalty. */
 export type EarlyRepay =
-  | { hasPenalty: false }
+  | { hasPenalty: false; discount?: boolean }
   /** `amount` is in loan-token units (present for a concrete Lista loan). */
   | { hasPenalty: true; amount?: string; symbol?: string }
 
 /** One consistent human label for an early-repay policy across lenders. */
 export function earlyRepayLabel(e: EarlyRepay): string {
-  if (!e.hasPenalty) return 'No penalty'
+  if (!e.hasPenalty) return e.discount ? 'Discount — repay below face value' : 'No penalty'
   if (e.amount != null && Number(e.amount) > 0) {
     return `Penalty ${formatTokenAmount(e.amount)}${e.symbol ? ` ${e.symbol}` : ''}`
   }
   return 'Penalty applies'
 }
 
-/** Tailwind tone for the early-repay label — muted for "none", warn otherwise. */
+/** Tailwind tone: warn for a penalty, success for a discount, muted for none. */
 export function earlyRepayTone(e: EarlyRepay): string {
-  return e.hasPenalty ? 'text-warning' : 'text-base-content/60'
+  if (e.hasPenalty) return 'text-warning'
+  return e.discount ? 'text-success' : 'text-base-content/60'
 }
 
 /**
@@ -37,7 +40,7 @@ export function earlyRepayTone(e: EarlyRepay): string {
  * provider — the concrete maker(s) are per-offer, known at borrow/quote time).
  */
 export type FixedTermProvider = {
-  kind: 'broker' | 'orderbook'
+  kind: 'broker' | 'orderbook' | 'auction' | 'pool'
   address?: string
 }
 
@@ -50,6 +53,10 @@ export function shortAddress(addr: string): string {
 export function providerLabel(p?: FixedTermProvider): string | null {
   if (!p) return null
   if (p.kind === 'orderbook') return 'Order book'
+  // Term: primary sealed-bid auctions + continuous secondary listings.
+  if (p.kind === 'auction') return 'Auction + listings'
+  // Exactly: passive fixed pool priced by a utilization curve.
+  if (p.kind === 'pool') return 'Rate curve'
   return p.address ? shortAddress(p.address) : 'Broker'
 }
 
@@ -82,6 +89,9 @@ export interface FixedTermDetails {
   continuousFeeAprPct?: number
   /** Settlement fee %, at the current time-to-maturity (Midnight only). */
   settlementFeePct?: number
+  /** LATE-repay penalty, %/yr, accruing per second on overdue debt after
+   *  maturity until repaid (Exactly only). */
+  latePenaltyAprPct?: number
   /** Early-repayment policy. */
   earlyRepay: EarlyRepay
   /** Who offers the term (Lista broker contract vs Midnight order book). */
