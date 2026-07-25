@@ -15,6 +15,12 @@ interface LenderBadgeProps {
    */
   maxChars?: number
   className?: string
+  /**
+   * Drop the daisyUI `badge` chrome (background / border / padding) and render
+   * just the logo + label inline. Used where the badge sits in a dense table
+   * cell and the filled pill looks heavy (e.g. the optimizer results).
+   */
+  bare?: boolean
 }
 
 /**
@@ -28,16 +34,18 @@ export const LenderBadge: React.FC<LenderBadgeProps> = ({
   logoURI,
   maxChars = 14,
   className = '',
+  bare = false,
 }) => {
   const display = name ?? lenderKey
   const truncated = display.length > maxChars ? `${display.slice(0, maxChars - 1)}…` : display
   const tooltip = name ? `${name} (${lenderKey})` : lenderKey
 
+  const base = bare
+    ? 'inline-flex items-center gap-1 max-w-[140px]'
+    : 'inline-flex items-center gap-1 max-w-[140px] badge badge-ghost badge-sm'
+
   return (
-    <span
-      className={`inline-flex items-center gap-1 max-w-[140px] badge badge-ghost badge-sm ${className}`}
-      title={tooltip}
-    >
+    <span className={`${base} ${className}`} title={tooltip}>
       <Logo
         src={logoURI}
         alt={display}

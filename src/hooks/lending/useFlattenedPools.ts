@@ -193,6 +193,9 @@ export interface PoolRiskBreakdown {
   /** Governance risk: who can upgrade/re-parametrize the market
    *  (EOA, SAFE, TIMELOCK, GOVERNANCE, IMMUTABLE, FINALIZED, CUSTOM, UNKNOWN). */
   ownerKind?: string | null
+  /** Governance risk: multisig signer threshold / owner count when ownerKind is SAFE. */
+  signerThreshold?: number | null
+  signerCount?: number | null
 }
 
 export interface PoolRisk {

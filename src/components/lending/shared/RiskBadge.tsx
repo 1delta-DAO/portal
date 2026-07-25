@@ -198,13 +198,23 @@ function riskTextColor(label: string): string {
 }
 
 /** Human-readable phrasing for a governance owner kind. Returns null for kinds
- *  that carry no useful detail (unknown/absent), so no line is rendered. */
-function governanceOwnerLabel(ownerKind: string): string | null {
+ *  that carry no useful detail (unknown/absent), so no line is rendered. For a
+ *  SAFE with a known threshold/owner-count, folds in the "N-of-M" signer info. */
+function governanceOwnerLabel(
+  ownerKind: string,
+  signerThreshold?: number | null,
+  signerCount?: number | null,
+): string | null {
   switch (ownerKind.toUpperCase()) {
     case 'EOA':
       return 'a single EOA (can re-parametrize the market)'
-    case 'SAFE':
-      return 'a Safe multisig'
+    case 'SAFE': {
+      const nOfM =
+        typeof signerThreshold === 'number' && typeof signerCount === 'number' && signerCount > 0
+          ? `${signerThreshold}-of-${signerCount} `
+          : ''
+      return `a ${nOfM}Safe multisig`
+    }
     case 'TIMELOCK':
       return 'a timelock'
     case 'GOVERNANCE':
@@ -243,9 +253,9 @@ const RiskBreakdownContent: React.FC<{ breakdown: PoolRiskBreakdown[] }> = ({ br
           {b.category === 'concentration' && b.ownerDistribution && b.ownerDistribution.length > 0 && (
             <OwnerDistributionChart distribution={b.ownerDistribution} />
           )}
-          {b.category === 'governance' && b.ownerKind && governanceOwnerLabel(b.ownerKind) && (
+          {b.category === 'governance' && b.ownerKind && governanceOwnerLabel(b.ownerKind, b.signerThreshold, b.signerCount) && (
             <div className="text-[10px] text-base-content/50 mt-0.5 ml-0.5">
-              Controlled by {governanceOwnerLabel(b.ownerKind)}
+              Controlled by {governanceOwnerLabel(b.ownerKind, b.signerThreshold, b.signerCount)}
             </div>
           )}
         </div>

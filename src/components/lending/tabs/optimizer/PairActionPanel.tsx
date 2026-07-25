@@ -22,6 +22,7 @@ import {
   type UserPositionEntry,
 } from '../../../../hooks/lending/useUserData'
 import { formatUsd } from '../../../../utils/format'
+import { Logo } from '../../../common/Logo'
 import { OptimizerLoopPanel } from './OptimizerLoopPanel'
 import { DepthChart } from './DepthChart'
 import {
@@ -40,6 +41,10 @@ interface Props {
   row: OptimizerPairRow
   account?: string
   onClose: () => void
+  /** Human-readable lender name (e.g. "Euler V2"). Falls back to the raw key. */
+  lenderName?: string
+  /** Lender logo URL, shown next to the name in the header. */
+  lenderLogo?: string
 }
 
 const toRaw = (amt: string, decimals?: number): string => {
@@ -635,7 +640,8 @@ function CombinedForm({
 // Panel: operation tabs over a selected pair
 // ---------------------------------------------------------------------------
 
-export function PairActionPanel({ row, account, onClose }: Props) {
+export function PairActionPanel({ row, account, onClose, lenderName, lenderLogo }: Props) {
+  const displayLender = lenderName ?? row.lenderKey
   const [op, setOp] = useState<Op>('deposit-borrow')
 
   // Wallet balances for both legs (so either operation can show how much the
@@ -717,25 +723,49 @@ export function PairActionPanel({ row, account, onClose }: Props) {
 
   return (
     <div className="rounded-box border border-base-300 bg-base-100 p-3 space-y-3">
-      {/* Header: the selected pair */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-sm font-medium">
-            {row.collateral.logoURI && (
-              <img src={row.collateral.logoURI} alt="" className="w-5 h-5 rounded-full shrink-0" />
-            )}
-            <span className="truncate">{row.collateral.symbol}</span>
-            <span className="text-base-content/40">/</span>
-            {row.debt.logoURI && (
-              <img src={row.debt.logoURI} alt="" className="w-5 h-5 rounded-full shrink-0" />
-            )}
-            <span className="truncate">{row.debt.symbol}</span>
+      {/* Header: the selected pair + lender */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          {/* Overlapping collateral → debt token logos */}
+          <div className="flex items-center shrink-0">
+            <Logo
+              src={row.collateral.logoURI}
+              alt={row.collateral.symbol ?? ''}
+              fallbackText={row.collateral.symbol ?? '?'}
+              className="w-7 h-7 rounded-full ring-2 ring-base-100 relative z-10"
+            />
+            <Logo
+              src={row.debt.logoURI}
+              alt={row.debt.symbol ?? ''}
+              fallbackText={row.debt.symbol ?? '?'}
+              className="w-7 h-7 rounded-full ring-2 ring-base-100 -ml-2"
+            />
           </div>
-          <div className="text-[10px] text-base-content/50 truncate mt-0.5" title={row.lenderKey}>
-            {row.lenderKey}
+          <div className="min-w-0">
+            <div className="flex items-center gap-1 text-sm font-semibold">
+              <span className="truncate">{row.collateral.symbol}</span>
+              <span className="text-base-content/30 shrink-0">→</span>
+              <span className="truncate">{row.debt.symbol}</span>
+            </div>
+            <div className="flex items-center gap-1 mt-0.5 min-w-0" title={row.lenderKey}>
+              {lenderLogo && (
+                <Logo
+                  src={lenderLogo}
+                  alt={displayLender}
+                  fallbackText={displayLender}
+                  className="w-3.5 h-3.5 rounded-full shrink-0"
+                />
+              )}
+              <span className="text-[11px] text-base-content/60 truncate">{displayLender}</span>
+            </div>
           </div>
         </div>
-        <button type="button" className="btn btn-ghost btn-xs shrink-0" onClick={onClose}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-xs btn-circle shrink-0"
+          onClick={onClose}
+          aria-label="Close"
+        >
           ✕
         </button>
       </div>

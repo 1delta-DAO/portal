@@ -208,6 +208,7 @@ function PairCard({
           lenderKey={row.lenderKey}
           name={lenderInfoMap?.[row.lenderKey]?.name}
           logoURI={lenderInfoMap?.[row.lenderKey]?.logoURI}
+          bare
         />
         {row.maturityDays != null && (
           <span
@@ -322,6 +323,7 @@ export function OptimizerTable({
                       lenderKey={row.lenderKey}
                       name={lenderInfoMap?.[row.lenderKey]?.name}
                       logoURI={lenderInfoMap?.[row.lenderKey]?.logoURI}
+                      bare
                     />
                   </td>
                   <td className="text-right">

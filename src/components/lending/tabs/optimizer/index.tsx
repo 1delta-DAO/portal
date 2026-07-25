@@ -695,6 +695,8 @@ export function OptimizerTab({
               row={selectedRow}
               account={account}
               onClose={() => setSelectedRow(null)}
+              lenderName={lenderInfoMap[selectedRow.lenderKey]?.name}
+              lenderLogo={lenderInfoMap[selectedRow.lenderKey]?.logoURI}
             />
           </aside>
         )}
@@ -715,6 +717,8 @@ export function OptimizerTab({
               row={selectedRow}
               account={account}
               onClose={() => setSelectedRow(null)}
+              lenderName={lenderInfoMap[selectedRow.lenderKey]?.name}
+              lenderLogo={lenderInfoMap[selectedRow.lenderKey]?.logoURI}
             />
           </div>
         </div>
