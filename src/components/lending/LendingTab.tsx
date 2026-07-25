@@ -250,7 +250,9 @@ export function LenderTab() {
         />
       )}
 
-      {OPTIMIZER_ENABLED && activeTab === 'optimize' && <OptimizerTab chainId={effectiveChainId} />}
+      {OPTIMIZER_ENABLED && activeTab === 'optimize' && (
+        <OptimizerTab chainId={effectiveChainId} account={account} />
+      )}
 
       {activeTab === 'swap' && <SpotSwapPanel chainId={effectiveChainId} />}
     </div>

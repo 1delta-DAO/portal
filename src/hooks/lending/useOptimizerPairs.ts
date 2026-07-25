@@ -121,6 +121,10 @@ interface RawOptimizerPair {
   // Legacy snake_case fallbacks (older deployments).
   max_debt_amount?: string | number | null
   min_collateral_amount?: string | number | null
+  // Fixed-term (Midnight/Lista) rate card on the debt side. One entry per
+  // maturity, `apr` in percent units. Present when the short market is brokered/
+  // order-book (variable borrow rate is 0/meaningless — read the fixed rate here).
+  termsShort?: { termId?: string | number; durationDays?: string | number; apr?: string | number }[] | null
   // Risk scoring (per-dimension breakdown + max token score).
   risk?: {
     maxTokenScore?: number
@@ -248,6 +252,18 @@ function asAssetRef(info: RawAssetInfo | undefined, fallbackChainId: string): Op
 }
 
 function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
+  // Fixed-term (order-book) markets — Morpho Midnight — report their rate in
+  // `termsShort` (one entry per maturity) with variable_borrow_rate = 0. Use the
+  // term APR as the borrow rate so the row doesn't show a misleading 0%, and
+  // recompute the leveraged Net APR from it (the backend's aprTotal is derived
+  // off the 0 variable rate for these markets).
+  const fixedTerm = raw.termsShort?.find((t) => t && t.apr != null)
+  const borrowShortPct = fixedTerm ? numOr0(fixedTerm.apr) : numOr0(raw.borrowAprShort)
+  const maxLev = numOr0(raw.maxLeverage)
+  const depEff = (numOr0(raw.depositAprLong) + numOr0(raw.intrinsicYieldLong)) / 100
+  const borEff = (borrowShortPct + numOr0(raw.intrinsicYieldShort)) / 100
+  const aprTotalFrac =
+    fixedTerm && maxLev > 0 ? maxLev * depEff - (maxLev - 1) * borEff : numOr0(raw.aprTotal) / 100
   return {
     chainId: raw.chainId,
     lenderKey: raw.lender,
@@ -258,7 +274,7 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
     debt: asAssetRef(raw.underlyingInfoShort, raw.chainId),
     // APR fields are percent units in the API → convert to fractions.
     depositAprLong: numOr0(raw.depositAprLong) / 100,
-    borrowAprShort: numOr0(raw.borrowAprShort) / 100,
+    borrowAprShort: borrowShortPct / 100,
     rewardAprLong: numOr0(raw.rewardAprLong) / 100,
     rewardAprShort: numOr0(raw.rewardAprShort) / 100,
     intrinsicYieldLong: numOr0(raw.intrinsicYieldLong) / 100,
@@ -266,10 +282,10 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
     // Effective = lending rate + intrinsic (staking/native) yield. This is the
     // rate the user actually earns (deposit) / pays (borrow) and what the net
     // position APR must be derived from.
-    depositAprEffective: (numOr0(raw.depositAprLong) + numOr0(raw.intrinsicYieldLong)) / 100,
-    borrowAprEffective: (numOr0(raw.borrowAprShort) + numOr0(raw.intrinsicYieldShort)) / 100,
+    depositAprEffective: depEff,
+    borrowAprEffective: borEff,
     aprBase: numOr0(raw.aprBase) / 100,
-    aprTotal: numOr0(raw.aprTotal) / 100,
+    aprTotal: aprTotalFrac,
     // LTV / utilizations are already fractions.
     ltv: numOr0(raw.ltv),
     liquidationThreshold: numOr0(raw.collateralFactorLong),
@@ -294,6 +310,8 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
     maxDebtAmountUsd: optNum(raw.maxDebtAmountUsd),
     minCollateralAmount: optNum(raw.minCollateralAmount ?? raw.min_collateral_amount),
     minCollateralAmountUsd: optNum(raw.minCollateralAmountUsd),
+    // Fixed-term maturity (Midnight): drives the "Fixed · Nd" borrow-rate label.
+    maturityDays: fixedTerm ? optNum(fixedTerm.durationDays) : undefined,
   }
 }
 
