@@ -47,6 +47,7 @@ export type OptimizerSortKey =
   | 'utilizationLong'
   | 'utilizationShort'
   | 'borrowLiquidityShort'
+  | 'borrowLiquidityUsdShort'
 
 export interface OptimizerAssetRef {
   chainId: string
@@ -111,6 +112,7 @@ interface RawOptimizerPair {
   utilizationShort?: string | number
   depositableLong?: string | number | null
   borrowLiquidityShort?: string | number | null
+  borrowLiquidityUsdShort?: string | number | null
   underlyingInfoLong?: RawAssetInfo
   underlyingInfoShort?: RawAssetInfo
   // New (camelCase) amount-derived fields from /pairs/optimize.
@@ -124,7 +126,9 @@ interface RawOptimizerPair {
   // Fixed-term (Midnight/Lista) rate card on the debt side. One entry per
   // maturity, `apr` in percent units. Present when the short market is brokered/
   // order-book (variable borrow rate is 0/meaningless — read the fixed rate here).
-  termsShort?: { termId?: string | number; durationDays?: string | number; apr?: string | number }[] | null
+  termsShort?:
+    | { termId?: string | number; durationDays?: string | number; apr?: string | number }[]
+    | null
   // Risk scoring (per-dimension breakdown + max token score).
   risk?: {
     maxTokenScore?: number
@@ -205,12 +209,26 @@ export interface OptimizerPairRow {
   totalDepositsUsdShort: number
   totalDebtUsdShort: number
   totalLiquidityUsdShort: number
+  /** Available borrow liquidity on the debt side, in DEBT-TOKEN units (cap-adjusted).
+   *  NOT dollars — for a non-$1 debt asset (e.g. WBNB) this differs from USD by the
+   *  token price. Use `borrowLiquidityUsdShort` for any $ display or comparison. */
   borrowLiquidityShort: number
+  /** Available borrow liquidity on the debt side, in USD. This is the correct
+   *  dollar figure to show/compare against USD thresholds. */
+  borrowLiquidityUsdShort: number
   /** Optional amount-derived columns. */
   maxDebtAmount?: number
   maxDebtAmountUsd?: number
   minCollateralAmount?: number
   minCollateralAmountUsd?: number
+  /**
+   * Fixed-term broker rate card on the DEBT side (Lista) — one entry per
+   * maturity. Drives the borrow-term picker in the action panel; passing a
+   * `termId` routes the open through the atomic composer server-side.
+   */
+  termsShort?:
+    | { termId?: string | number; durationDays?: string | number; apr?: string | number }[]
+    | null
   /**
    * Days to maturity — set ONLY for synthetic fixed-term (Morpho Midnight) rows
    * that are sourced outside `/pairs/optimize` (see MigrateModal). Drives the
@@ -294,7 +312,7 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
     riskScore: Math.max(
       0,
       ...(raw.risk?.breakdown?.map((b) => numOr0(b.score)) ?? []),
-      numOr0(raw.risk?.maxTokenScore),
+      numOr0(raw.risk?.maxTokenScore)
     ),
     riskBreakdown: raw.risk?.breakdown ?? [],
     utilizationLong: numOr0(raw.utilizationLong),
@@ -306,10 +324,13 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
     totalDebtUsdShort: numOr0(raw.totalDebtUsdShort),
     totalLiquidityUsdShort: numOr0(raw.totalLiquidityUsdShort),
     borrowLiquidityShort: numOr0(raw.borrowLiquidityShort),
+    borrowLiquidityUsdShort: numOr0(raw.borrowLiquidityUsdShort),
     maxDebtAmount: optNum(raw.maxDebtAmount ?? raw.max_debt_amount),
     maxDebtAmountUsd: optNum(raw.maxDebtAmountUsd),
     minCollateralAmount: optNum(raw.minCollateralAmount ?? raw.min_collateral_amount),
     minCollateralAmountUsd: optNum(raw.minCollateralAmountUsd),
+    // Fixed-term broker rate card (Lista) — drives the borrow-term picker.
+    termsShort: raw.termsShort,
     // Fixed-term maturity (Midnight): drives the "Fixed · Nd" borrow-rate label.
     maturityDays: fixedTerm ? optNum(fixedTerm.durationDays) : undefined,
   }

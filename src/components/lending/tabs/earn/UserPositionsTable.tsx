@@ -26,6 +26,12 @@ interface UserLenderPositionsTableProps {
   isLoading: boolean
   error: any
   refetch: () => void
+  /**
+   * Hide the internal "Your Lending Positions" title + Refresh row. Used when
+   * an embedder (e.g. the Optimizer tab) already supplies its own section
+   * header/chrome around this table.
+   */
+  hideHeader?: boolean
 }
 
 function formatUsd(v: number) {
@@ -512,6 +518,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
   isLoading,
   error,
   refetch,
+  hideHeader,
 }) => {
   const { data: tokens } = useTokenLists(chainId)
   const summary = userData?.summary
@@ -564,12 +571,14 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
     return (
       <div className="w-full p-4 space-y-4">
         {/* Header */}
-        <div className="flex flex-col gap-2">
-          <h2 className="text-xl font-bold">Your Lending Positions</h2>
-          <button className="btn btn-xs self-start" onClick={refetch}>
-            Refresh
-          </button>
-        </div>
+        {!hideHeader && (
+          <div className="flex flex-col gap-2">
+            <h2 className="text-xl font-bold">Your Lending Positions</h2>
+            <button className="btn btn-xs self-start" onClick={refetch}>
+              Refresh
+            </button>
+          </div>
+        )}
 
         {/* Summary cards */}
         {summary && <MobileSummaryCard summary={summary} />}
@@ -601,14 +610,16 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
   return (
     <div className="w-full p-0 sm:p-4 space-y-3 sm:space-y-4">
       {/* Header */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h2 className="text-lg font-semibold">Your Lending Positions</h2>
-        <div className="flex flex-wrap gap-2 md:justify-end items-center">
-          <button className="btn btn-xs btn-ghost" onClick={refetch} title="Refresh balances">
-            Refresh
-          </button>
+      {!hideHeader && (
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-lg font-semibold">Your Lending Positions</h2>
+          <div className="flex flex-wrap gap-2 md:justify-end items-center">
+            <button className="btn btn-xs btn-ghost" onClick={refetch} title="Refresh balances">
+              Refresh
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Totals summary */}
       {summary && (

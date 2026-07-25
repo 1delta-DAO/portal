@@ -107,7 +107,10 @@ function buildMidnightPairRow(
     totalDepositsUsdShort: loan.totalDepositsUSD ?? 0,
     totalDebtUsdShort: loan.totalDebtUSD ?? 0,
     totalLiquidityUsdShort: loan.totalLiquidityUSD ?? 0,
-    borrowLiquidityShort: loan.totalLiquidityUSD ?? 0,
+    // Synthetic row: we don't have a separate cap-adjusted token amount, so the
+    // token field is left at 0 and the USD figure carries the pool liquidity.
+    borrowLiquidityShort: 0,
+    borrowLiquidityUsdShort: loan.totalLiquidityUSD ?? 0,
     maturityDays,
   }
 }
@@ -373,8 +376,10 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
   // wrapped forms) on the fixed leg, and the picked target on the converted leg.
   // Then drop targets whose debt market can't supply the borrow: a migrate must
   // borrow the whole debt on the target, so a market with less available borrow
-  // liquidity than the migrated debt would revert. `borrowLiquidityShort` is the
+  // liquidity than the migrated debt would revert. `borrowLiquidityUsdShort` is the
   // available borrow liquidity in USD (falls back to the debt pool liquidity).
+  // NB: `borrowLiquidityShort` is the debt-TOKEN amount, not USD — comparing it
+  // against `requiredBorrowUsd` mis-scales any non-$1 debt asset (e.g. WBNB).
   // Rows with UNKNOWN (0) liquidity are kept — we don't over-hide on data gaps.
   const { targets, lowLiquidity } = useMemo(() => {
     const requiredBorrowUsd = (debt.amount ?? 0) * (source.debtPriceUsd ?? 0)
@@ -419,7 +424,7 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
     const targets: OptimizerPairRow[] = []
     const lowLiquidity: OptimizerPairRow[] = []
     for (const r of base) {
-      const liq = r.borrowLiquidityShort || r.totalLiquidityUsdShort
+      const liq = r.borrowLiquidityUsdShort || r.totalLiquidityUsdShort
       if (liq > 0 && liq < requiredBorrowUsd) lowLiquidity.push(r)
       else targets.push(r)
     }
@@ -873,7 +878,7 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                         {isLowLiq && (
                           <span
                             className="badge badge-xs border-0 bg-warning/20 text-warning"
-                            title={`Borrow liquidity ($${(row.borrowLiquidityShort || row.totalLiquidityUsdShort).toLocaleString(undefined, { maximumFractionDigits: 0 })}) is below the migrated debt — the borrow may revert.`}
+                            title={`Borrow liquidity ($${(row.borrowLiquidityUsdShort || row.totalLiquidityUsdShort).toLocaleString(undefined, { maximumFractionDigits: 0 })}) is below the migrated debt — the borrow may revert.`}
                           >
                             low liq
                           </span>

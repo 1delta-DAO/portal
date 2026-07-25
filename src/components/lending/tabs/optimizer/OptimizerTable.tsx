@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { OptimizerPairRow } from '../../../../hooks/lending/useOptimizerPairs'
 import type { LenderInfo } from '../../../../hooks/lending/useFlattenedPools'
@@ -43,9 +44,21 @@ interface Props {
   selectedKey?: string
 }
 
-/** Stable identity of a pair row, independent of page-position index. */
+/**
+ * Stable identity of a pair row, independent of page-position index.
+ *
+ * Keyed on the collateral/debt *market* UIDs (not just the token addresses):
+ * a single lender can expose several markets for the same asset pair (e.g.
+ * multiple Euler V2 WETH/USDC vaults), which are identical on
+ * chain+lender+collateral+debt but distinct markets. Without the UIDs they
+ * share a key and selecting one highlights all of them. `eModeConfigId`
+ * further disambiguates the same market under different e-modes. Falls back to
+ * token addresses when a market UID is missing.
+ */
 export const pairKey = (row: OptimizerPairRow) =>
-  `${row.chainId}-${row.lenderKey}-${row.collateral.address}-${row.debt.address}`
+  `${row.chainId}-${row.lenderKey}-${row.marketLongUid ?? row.collateral.address}-${
+    row.marketShortUid ?? row.debt.address
+  }-${row.eModeConfigId ?? ''}`
 
 const fmtPct = (n: number | undefined) =>
   n == null || Number.isNaN(n) ? '–' : `${(n * 100).toFixed(2)}%`
@@ -107,6 +120,134 @@ function AssetCell({ asset }: { asset: OptimizerPairRow['collateral'] }) {
   )
 }
 
+/** Compact "collateral → debt" header used on the mobile card. */
+function AssetPair({ row }: { row: OptimizerPairRow }) {
+  const chip = (asset: OptimizerPairRow['collateral']) => (
+    <span className="inline-flex items-center gap-1 min-w-0">
+      <Logo
+        src={asset.logoURI}
+        alt={asset.symbol ?? asset.address}
+        fallbackText={asset.symbol ?? asset.address}
+        className="w-5 h-5 rounded-full shrink-0"
+      />
+      <span className="font-medium text-sm truncate">
+        {asset.symbol ?? asset.address.slice(0, 6)}
+      </span>
+    </span>
+  )
+  return (
+    <div className="flex items-center gap-1.5 min-w-0">
+      {chip(row.collateral)}
+      <span className="text-base-content/40 shrink-0">→</span>
+      {chip(row.debt)}
+    </div>
+  )
+}
+
+/** Labelled stat used inside the mobile card's grid. */
+function CardStat({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[10px] uppercase tracking-wide text-base-content/40">{label}</div>
+      <div className="truncate">{value}</div>
+    </div>
+  )
+}
+
+/**
+ * Mobile card for a single pair row. Mirrors the desktop table row (same
+ * click-to-open-panel and "Details" deep link) but stacks the columns so the
+ * data stays readable without a horizontally-scrolling table.
+ */
+function PairCard({
+  row,
+  showMaxDebt,
+  showMinCollateral,
+  lenderInfoMap,
+  selected,
+  onSelect,
+  onDetails,
+}: {
+  row: OptimizerPairRow
+  showMaxDebt?: boolean
+  showMinCollateral?: boolean
+  lenderInfoMap?: Record<string, LenderInfo>
+  selected: boolean
+  onSelect?: () => void
+  onDetails: () => void
+}) {
+  const maxDebt =
+    row.maxDebtAmount != null ? fmtTok(row.maxDebtAmount, row.debt.symbol) : fmtUsd(row.maxDebtAmountUsd)
+  const minColl =
+    row.minCollateralAmount != null
+      ? fmtTok(row.minCollateralAmount, row.collateral.symbol)
+      : fmtUsd(row.minCollateralAmountUsd)
+  return (
+    <li
+      className={`p-3 ${onSelect ? 'cursor-pointer active:bg-base-200' : ''} ${
+        selected ? 'bg-primary/10' : ''
+      }`}
+      onClick={onSelect}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <AssetPair row={row} />
+        <div className="text-right shrink-0 leading-tight">
+          <div className={`font-semibold ${row.aprTotal < 0 ? 'text-error' : 'text-success'}`}>
+            {fmtPct(row.aprTotal)}
+          </div>
+          <div className="text-[10px] text-base-content/50">
+            <span className="text-success">{fmtPct(row.depositAprLong)}</span>
+            {' / '}
+            <span className="text-error">{fmtPct(row.borrowAprShort)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <LenderBadge
+          lenderKey={row.lenderKey}
+          name={lenderInfoMap?.[row.lenderKey]?.name}
+          logoURI={lenderInfoMap?.[row.lenderKey]?.logoURI}
+        />
+        {row.maturityDays != null && (
+          <span
+            className="text-[10px] text-warning shrink-0"
+            title={`Fixed rate to maturity (~${Math.round(row.maturityDays)}d)`}
+          >
+            · fixed {Math.round(row.maturityDays)}d
+          </span>
+        )}
+      </div>
+
+      <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+        <CardStat label="LTV / Lev" value={`${fmtPct(row.ltv)} · ${fmtLev(row.maxLeverage)}`} />
+        <CardStat label="Util." value={fmtPct(row.utilizationShort)} />
+        <CardStat
+          label="Borrow liq."
+          value={fmtUsd(row.borrowLiquidityUsdShort || row.totalLiquidityUsdShort)}
+        />
+        {showMaxDebt && <CardStat label="Max debt" value={maxDebt} />}
+        {showMinCollateral && <CardStat label="Min collateral" value={minColl} />}
+      </div>
+
+      <div className="mt-2 flex justify-end">
+        <button
+          type="button"
+          className="btn btn-xs btn-ghost gap-1"
+          title={`Open ${row.collateral.symbol ?? 'this pair'} / ${row.debt.symbol ?? ''} in the lender tab`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onDetails()
+          }}
+        >
+          Details
+          <ExternalLinkIcon />
+        </button>
+      </div>
+    </li>
+  )
+}
+
 export function OptimizerTable({
   rows,
   showMaxDebt,
@@ -138,7 +279,10 @@ export function OptimizerTable({
 
   return (
     <div className="rounded-box border border-base-300 overflow-hidden">
-      <div className="overflow-x-auto">
+      {/* Desktop / tablet: full table. Hidden on mobile, where a wide,
+          horizontally-scrolling table traps vertical page scroll (an
+          `overflow-x-auto` box becomes a two-axis scroll container). */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="table table-sm">
           <thead>
             <tr>
@@ -214,7 +358,7 @@ export function OptimizerTable({
                   </td>
                   <td className="text-right">{fmtPct(row.utilizationShort)}</td>
                   <td className="text-right">
-                    {fmtUsd(row.borrowLiquidityShort || row.totalLiquidityUsdShort)}
+                    {fmtUsd(row.borrowLiquidityUsdShort || row.totalLiquidityUsdShort)}
                   </td>
                   {showMaxDebt && (
                     <AmountCell
@@ -250,6 +394,32 @@ export function OptimizerTable({
           </tbody>
         </table>
       </div>
+
+      {/* Mobile: stacked cards instead of the table. */}
+      <div className="md:hidden">
+        {rows.length === 0 ? (
+          <div className="p-6 text-center text-sm text-base-content/50">No pairs</div>
+        ) : (
+          <ul className="divide-y divide-base-300">
+            {rows.map((row, i) => {
+              const pk = pairKey(row)
+              return (
+                <PairCard
+                  key={`${pk}-${i}`}
+                  row={row}
+                  showMaxDebt={showMaxDebt}
+                  showMinCollateral={showMinCollateral}
+                  lenderInfoMap={lenderInfoMap}
+                  selected={selectedKey === pk}
+                  onSelect={onSelectPair ? () => onSelectPair(row) : undefined}
+                  onDetails={() => goLender(row)}
+                />
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
       {pagination && totalItems != null && (
         <TablePagination pagination={pagination} totalItems={totalItems} itemNoun="pairs" />
       )}

@@ -99,6 +99,12 @@ export interface DepositAndBorrowParams {
   accountId?: string
   /** E-mode / config id the collateral factor was computed against. */
   modeId?: string
+  /** Fixed-term broker id (Lista) — enables the atomic composer open; absent =
+   *  flex/dynamic borrow (falls back to the sequential path server-side). */
+  debtTermId?: number
+  /** Delivery currency for the borrowed debt (native sentinel → unwrap and
+   *  deliver native, e.g. borrow WBNB → receive BNB). */
+  receiveAsset?: string
   simulate?: boolean
 }
 
@@ -116,6 +122,8 @@ export async function fetchDepositAndBorrow(
   if (p.borrowMode) qs.set('borrowMode', p.borrowMode)
   if (p.accountId) qs.set('accountId', p.accountId)
   if (p.modeId) qs.set('modeId', p.modeId)
+  if (p.debtTermId != null) qs.set('debtTermId', String(p.debtTermId))
+  if (p.receiveAsset) qs.set('receiveAsset', p.receiveAsset)
   if (p.simulate) qs.set('simulate', 'true')
   return callCombined('deposit-and-borrow', qs)
 }

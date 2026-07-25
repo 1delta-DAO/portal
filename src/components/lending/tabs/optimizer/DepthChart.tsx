@@ -11,6 +11,12 @@ interface Props {
   symbol?: string
   /** USD price per token, for value labels. */
   price?: number
+  /**
+   * Click-to-pick: called with the TOKEN-unit size at the clicked x-position.
+   * When set, the chart becomes interactive (click anywhere on the curve to
+   * choose that amount). Used by the optimizer panel to set the borrow amount.
+   */
+  onPick?: (size: number) => void
 }
 
 const rateOf = (p: DepthGridPoint, side: 'borrow' | 'supply'): number =>
@@ -54,7 +60,14 @@ interface Hover {
   pxLeft: number // pixel offset within the svg box (for the HTML tooltip)
 }
 
-export function DepthChart({ marketUid, side = 'borrow', markerAmount = 0, symbol, price }: Props) {
+export function DepthChart({
+  marketUid,
+  side = 'borrow',
+  markerAmount = 0,
+  symbol,
+  price,
+  onPick,
+}: Props) {
   const { data, isLoading } = useMarketDepth([marketUid], side)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [hover, setHover] = useState<Hover | null>(null)
@@ -90,17 +103,31 @@ export function DepthChart({ marketUid, side = 'borrow', markerAmount = 0, symbo
   const accent = side === 'supply' ? 'text-success' : 'text-error'
   const label = side === 'supply' ? 'Supply depth' : 'Borrow depth'
 
-  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+  // Map a cursor clientX to a point on the plot (clamped to the plot area).
+  // Shared by hover (crosshair/tooltip) and click-to-pick.
+  const pointFromClientX = (clientX: number) => {
     const svg = svgRef.current
-    if (!svg || !geom) return
+    if (!svg || !geom) return null
     const rect = svg.getBoundingClientRect()
-    if (rect.width === 0) return
-    const rawVbX = ((e.clientX - rect.left) / rect.width) * W
+    if (rect.width === 0) return null
+    const rawVbX = ((clientX - rect.left) / rect.width) * W
     const vbX = Math.min(PAD_L + PLOT_W, Math.max(PAD_L, rawVbX))
     const size = ((vbX - PAD_L) / PLOT_W) * geom.maxX
-    const rate = rateAtSize(geom.pts, side, size)
+    return { vbX, size, rectWidth: rect.width }
+  }
+
+  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const p = pointFromClientX(e.clientX)
+    if (!p || !geom) return
+    const rate = rateAtSize(geom.pts, side, p.size)
     if (rate == null) return
-    setHover({ vbX, size, rate, pxLeft: (vbX / W) * rect.width })
+    setHover({ vbX: p.vbX, size: p.size, rate, pxLeft: (p.vbX / W) * p.rectWidth })
+  }
+
+  const onClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!onPick) return
+    const p = pointFromClientX(e.clientX)
+    if (p) onPick(p.size)
   }
 
   return (
@@ -139,10 +166,11 @@ export function DepthChart({ marketUid, side = 'borrow', markerAmount = 0, symbo
               ref={svgRef}
               viewBox={`0 0 ${W} ${H}`}
               className="w-full h-auto block cursor-crosshair"
-              role="img"
-              aria-label={`${label} curve`}
+              role={onPick ? 'button' : 'img'}
+              aria-label={onPick ? `${label} curve — click to set amount` : `${label} curve`}
               onMouseMove={onMove}
               onMouseLeave={() => setHover(null)}
+              onClick={onClick}
             >
               {/* baseline gridline (min rate) */}
               <line

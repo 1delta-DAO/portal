@@ -56,6 +56,13 @@ const gt0 = (s: string): boolean => {
 const fmtBal = (s?: string): string =>
   Number(s ?? '0').toLocaleString(undefined, { maximumFractionDigits: 6 })
 
+/**
+ * Format a chart-picked token size into a clean input string: up to 6 decimals
+ * with trailing zeros trimmed (e.g. 78000 → "78000", 0.1234560 → "0.123456").
+ */
+const pickToAmount = (size: number): string =>
+  Number.isFinite(size) && size > 0 ? String(Number(size.toFixed(6))) : ''
+
 // Minimal `RawCurrency` view over an optimizer asset ref so we can reuse the
 // shared `isWNative` symbol/flag check for the native-vs-wrapped toggle.
 const asCurrency = (t: OptimizerAssetRef): RawCurrency => ({
@@ -127,11 +134,13 @@ function CombinedForm({
   const secondaryLabel = isOpen ? 'Borrow' : 'Withdraw collateral'
 
   // Native/wrapped handling. The primary leg is *paid in* (deposit or repay),
-  // so it maps to `payAsset`; on withdraw-repay the secondary leg is *delivered*
-  // (the withdrawn collateral), so it maps to `receiveAsset`. Borrow (the
-  // deposit-borrow secondary) has no native-delivery option in the API.
+  // so it maps to `payAsset`. The secondary leg is *delivered* — the borrowed
+  // debt (deposit-borrow) or the withdrawn collateral (withdraw-repay) — so a
+  // wrapped-native secondary can be unwrapped and delivered native via
+  // `receiveAsset` (e.g. borrow WBNB → receive BNB). The server gates which
+  // lenders can actually unwrap and returns a clear error otherwise.
   const primaryCanUseNative = !!nativeToken && isWNative(asCurrency(primaryToken))
-  const secondaryCanUseNative = !isOpen && !!nativeToken && isWNative(asCurrency(secondaryToken))
+  const secondaryCanUseNative = !!nativeToken && isWNative(asCurrency(secondaryToken))
 
   const [primary, setPrimary] = useState('')
   const [secondary, setSecondary] = useState('')
@@ -140,6 +149,18 @@ function CombinedForm({
   const [payNative, setPayNative] = useState(false)
   const [receiveNative, setReceiveNative] = useState(false)
   const payNativeSettledRef = useRef(false)
+
+  // Fixed-term broker (Lista) on the BORROW leg — `termsShort` carries one entry
+  // per maturity. Selecting a term routes the open through the ATOMIC composer
+  // server-side (`buildListaDepositAndBorrow`); omitting it falls back to the
+  // multi-step flex borrow. Only relevant when opening (deposit-and-borrow).
+  const debtTerms = useMemo(() => (isOpen ? (row.termsShort ?? []) : []), [isOpen, row.termsShort])
+  const isDebtBrokered = debtTerms.length > 0
+  const [termId, setTermId] = useState<string | null>(null)
+  // Auto-pick the first (shortest) term whenever the term set changes.
+  useEffect(() => {
+    setTermId(debtTerms.length > 0 ? String(debtTerms[0].termId ?? '') : null)
+  }, [debtTerms])
 
   // Wallet balances for the primary (paid) leg — native vs wrapped follows the
   // toggle so the max / balance row track the currency actually being spent.
@@ -271,8 +292,10 @@ function CombinedForm({
             collateralAmount: primaryRaw,
             borrowAmount: secondaryRaw,
             payAsset,
+            receiveAsset,
             modeId,
             accountId,
+            debtTermId: isDebtBrokered && termId != null ? Number(termId) : undefined,
             simulate: true,
           })
         : await fetchWithdrawAndRepay({
@@ -311,6 +334,8 @@ function CombinedForm({
     payAsset,
     receiveAsset,
     accountId,
+    termId,
+    isDebtBrokered,
     primaryToken.decimals,
     secondaryToken.decimals,
   ])
@@ -464,6 +489,47 @@ function CombinedForm({
         />
       </div>
 
+      {/* Fixed-term borrow picker (Lista broker) — shown for the borrow leg like
+          the regular Borrow / Loop tabs. Selecting a term enables the atomic
+          composer open; leaving it drives the multi-step flex borrow. */}
+      {isDebtBrokered && (
+        <div className="rounded-lg border border-warning/30 bg-warning/5 p-2 space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center rounded-md bg-warning/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide leading-none text-warning">
+              Fixed-term
+            </span>
+            <span className="text-[10px] text-base-content/60 leading-tight">
+              Borrow term · {secondaryToken.symbol}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {debtTerms.map((t) => {
+              const tid = String(t.termId ?? '')
+              const active = tid === termId
+              return (
+                <button
+                  key={tid}
+                  type="button"
+                  onClick={() => setTermId(tid)}
+                  className={`flex flex-col items-start px-2.5 py-1 rounded-lg border text-left transition-colors cursor-pointer ${
+                    active
+                      ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                      : 'border-base-300 bg-base-200/50 hover:bg-base-200'
+                  }`}
+                >
+                  <span className="text-xs font-semibold">
+                    {Math.max(1, Math.round(Number(t.durationDays ?? 0)))}-day
+                  </span>
+                  <span className="text-[10px] font-mono tabular-nums text-warning">
+                    {Number(t.apr ?? 0).toFixed(2)}%
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Secondary leg (max from the range endpoint) */}
       <div className="form-control">
         {secondaryCanUseNative && nativeToken && (
@@ -515,6 +581,7 @@ function CombinedForm({
           markerAmount={Number(dSecondary) || 0}
           symbol={secondaryToken.symbol}
           price={priceS}
+          onPick={(size) => setSecondary(pickToAmount(size))}
         />
       )}
 

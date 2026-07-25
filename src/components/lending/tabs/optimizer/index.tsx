@@ -7,17 +7,50 @@ import {
 } from '../../../../hooks/lending/useOptimizerPairs'
 import { useLenders } from '../../../../hooks/lending/usePoolData'
 import type { LenderInfo } from '../../../../hooks/lending/useFlattenedPools'
+import type { UserDataResult } from '../../../../hooks/lending/useUserData'
 import { useDebounce } from '../../../../hooks/useDebounce'
 import { useRiskMode } from '../../../../contexts/RiskMode'
 import { TokenMultiPicker } from './TokenMultiPicker'
 import { OptimizerTable, pairKey } from './OptimizerTable'
 import { PairActionPanel } from './PairActionPanel'
+import { UserLenderPositionsTable } from '../earn/UserPositionsTable'
 
 const PAGE_SIZE = 25
+
+/**
+ * True below Tailwind's `lg` (1024px) — where the action panel is a modal rather
+ * than a side column. We branch in JS (not just CSS `lg:hidden`) because daisyUI
+ * locks page scroll whenever a `.modal.modal-open` is present in the DOM via
+ * `:root:has(.modal-open)`, and `:has()` matches even a display:none element —
+ * so a CSS-hidden open modal on desktop would freeze the whole page.
+ */
+function useIsBelowLg() {
+  const query = '(max-width: 1023.98px)'
+  const [below, setBelow] = useState(
+    typeof window !== 'undefined' ? window.matchMedia(query).matches : false
+  )
+  useEffect(() => {
+    const mql = window.matchMedia(query)
+    const handler = (e: MediaQueryListEvent) => setBelow(e.matches)
+    mql.addEventListener('change', handler)
+    setBelow(mql.matches)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
+  return below
+}
 
 interface Props {
   chainId: string
   account?: string
+  /**
+   * User lending positions, threaded down from LenderTab (which already
+   * fetches all-lender positions on the optimize tab). Feeds the ported
+   * "Your lending positions" panel below.
+   */
+  userData?: UserDataResult
+  isUserDataLoading?: boolean
+  userDataError?: unknown
+  refetchUserData?: () => void
 }
 
 interface UiFilters {
@@ -147,10 +180,20 @@ function loadPersisted(chainId: string): Partial<PersistedOptimizerState> | null
   }
 }
 
-export function OptimizerTab({ chainId, account }: Props) {
+export function OptimizerTab({
+  chainId,
+  account,
+  userData,
+  isUserDataLoading,
+  userDataError,
+  refetchUserData,
+}: Props) {
   // App-wide risk ceiling (the global "Up to low/medium/high" selector), applied
   // to the optimizer query so it surfaces exactly the risk the user opted into.
   const { maxRiskScore } = useRiskMode()
+  // Below lg the action panel renders as a modal; at/above lg as a side column.
+  // Branching in JS keeps a scroll-locking `.modal-open` out of the desktop DOM.
+  const isBelowLg = useIsBelowLg()
   // The pair whose inline action panel (deposit-and-borrow / withdraw-and-repay
   // / loop) is open. Cleared when the user switches chains.
   const [selectedRow, setSelectedRow] = useState<OptimizerPairRow | null>(null)
@@ -353,6 +396,42 @@ export function OptimizerTab({ chainId, account }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Your existing lending positions, ported from the Earn tab. Shown above
+          the optimizer so current exposure is visible before opening a new
+          leveraged pair. Collapsible (open by default) so it never buries the
+          optimizer controls. Reuses the optimizer's own lender enumeration for
+          logos/names. */}
+      {account && (
+        <details open className="group rounded-box border border-base-300 bg-base-100">
+          <summary className="flex items-center justify-between cursor-pointer select-none list-none px-3 py-2 text-sm font-semibold">
+            <span>Your lending positions</span>
+            <svg
+              className="w-4 h-4 shrink-0 text-base-content/40 transition-transform group-open:rotate-90"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </summary>
+          <div className="border-t border-base-300">
+            <UserLenderPositionsTable
+              account={account}
+              chainId={chainId}
+              userData={userData}
+              lenderInfoMap={lenderInfoMap}
+              isLoading={!!isUserDataLoading}
+              error={userDataError}
+              refetch={refetchUserData ?? (() => {})}
+              hideHeader
+            />
+          </div>
+        </details>
+      )}
+
       {/* Collateral + Debt pickers, each with an optional amount. Specify one
           side to get its directional result (collateral → max debt, debt →
           min collateral); specify both to get both, over the dual filter. */}
@@ -405,7 +484,7 @@ export function OptimizerTab({ chainId, account }: Props) {
             <option value="depositAprLong">Deposit APR</option>
             <option value="borrowAprShort">Borrow APR</option>
             <option value="utilizationShort">Borrow utilization</option>
-            <option value="borrowLiquidityShort">Borrow liquidity</option>
+            <option value="borrowLiquidityUsdShort">Borrow liquidity</option>
             <option value="totalLiquidityUsdShort">Debt pool liquidity</option>
           </select>
         </label>
@@ -608,8 +687,10 @@ export function OptimizerTab({ chainId, account }: Props) {
             selectedKey={selectedRow ? pairKey(selectedRow) : undefined}
           />
         </div>
-        {selectedRow && (
-          <aside className="hidden lg:block w-80 shrink-0 sticky top-4">
+        {/* Desktop (≥lg): plain normal-flow side column. Gated in JS (not CSS)
+            so the modal below is NOT in the DOM here — see the modal note. */}
+        {selectedRow && !isBelowLg && (
+          <aside className="w-80 shrink-0 self-start">
             <PairActionPanel
               row={selectedRow}
               account={account}
@@ -619,11 +700,15 @@ export function OptimizerTab({ chainId, account }: Props) {
         )}
       </div>
 
-      {/* Mobile: the same panel as a modal */}
-      {selectedRow && (
-        <div className="lg:hidden modal modal-open" onClick={() => setSelectedRow(null)}>
+      {/* Mobile (<lg): the same panel as a modal.
+          MUST be JS-gated, not `lg:hidden`: daisyUI locks *page* scroll whenever
+          a `.modal.modal-open` exists in the DOM (`:root:has(.modal-open)`), and
+          `:has()` matches even a display:none element. A CSS-hidden open modal on
+          desktop therefore freezes the page — so we only render it below lg. */}
+      {selectedRow && isBelowLg && (
+        <div className="modal modal-open" onClick={() => setSelectedRow(null)}>
           <div
-            className="modal-box max-w-sm bg-transparent p-0 shadow-none"
+            className="modal-box max-w-sm bg-transparent p-0 shadow-none max-h-[calc(100dvh_-_2rem)] overflow-y-auto overscroll-contain"
             onClick={(e) => e.stopPropagation()}
           >
             <PairActionPanel
