@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useOptimizerPairs,
   type OptimizerFilters,
@@ -77,12 +77,16 @@ interface UiFilters {
 
 /** Selectable asset property flags (slugs match `assets.tags` on the backend). */
 const PROPERTY_TAGS: { slug: string; label: string }[] = [
-  { slug: 'rwa', label: 'RWA' },
-  { slug: 'pendle', label: 'Pendle' },
-  { slug: 'lst', label: 'LST' },
-  { slug: 'lrt', label: 'LRT' },
+  { slug: 'eth', label: 'ETH' },
+  { slug: 'btc', label: 'BTC' },
+  { slug: 'native', label: 'Native' },
+  { slug: 'wnative', label: 'wNative' },
   { slug: 'stablecoin', label: 'Stable' },
   { slug: 'savings', label: 'Savings' },
+  { slug: 'lst', label: 'LST' },
+  { slug: 'lrt', label: 'LRT' },
+  { slug: 'pendle', label: 'Pendle' },
+  { slug: 'rwa', label: 'RWA' },
 ]
 
 // Sensible defaults: the optimizer endpoint returns a long tail of tiny
@@ -164,6 +168,70 @@ function AmountInputRow({
         />
       </label>
     </label>
+  )
+}
+
+/**
+ * Compact labelled numeric filter with an operator (≥ / ≤) and an optional
+ * currency prefix / unit suffix. Used across the advanced-filter groups so every
+ * threshold reads consistently (e.g. "≥ 2000 $", "≤ 0.95").
+ */
+function RangeField({
+  label,
+  title,
+  op,
+  prefix,
+  suffix,
+  value,
+  placeholder,
+  step,
+  onChange,
+}: {
+  label: string
+  title?: string
+  op?: '≥' | '≤'
+  prefix?: string
+  suffix?: string
+  value: string
+  placeholder?: string
+  step?: string
+  onChange: (v: string) => void
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span
+        className="text-[10px] font-medium uppercase tracking-wide text-base-content/50"
+        title={title}
+      >
+        {label}
+      </span>
+      <label className="input input-bordered input-sm flex items-center gap-1">
+        {op && <span className="shrink-0 text-xs text-base-content/40">{op}</span>}
+        {prefix && <span className="shrink-0 text-xs text-base-content/40">{prefix}</span>}
+        <input
+          type="number"
+          className="grow min-w-0"
+          placeholder={placeholder}
+          step={step}
+          min={0}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        {suffix && <span className="shrink-0 text-xs text-base-content/40">{suffix}</span>}
+      </label>
+    </div>
+  )
+}
+
+/** Titled group wrapper for a set of advanced filters. */
+function FilterGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-base-content/40">
+        {title}
+      </div>
+      {children}
+    </div>
   )
 }
 
@@ -290,6 +358,38 @@ export function OptimizerTab({
       const next = cur.includes(slug) ? cur.filter((s) => s !== slug) : [...cur, slug]
       return { ...prev, [side]: next }
     })
+
+  const resetAll = () => {
+    setFilters(DEFAULT_FILTERS)
+    setCollaterals([])
+    setDebts([])
+    setCollateralAmount('')
+    setDebtAmount('')
+    setShowAdvanced(false)
+  }
+
+  // Count of advanced filters that differ from their defaults — drives the badge
+  // on the "Filters" button. The size floors have non-empty defaults, so we
+  // compare against DEFAULT_FILTERS rather than emptiness.
+  const activeAdvancedCount = useMemo(() => {
+    const keys: (keyof UiFilters)[] = [
+      'minApr',
+      'minLeverage',
+      'minLtv',
+      'maxBorrowRate',
+      'minLiquidityUsdLong',
+      'minBorrowLiquidityUsd',
+      'maxUtilizationShort',
+      'maxConfigRiskScore',
+      'excludeLenders',
+      'includeExpired',
+    ]
+    const changed = keys.reduce(
+      (acc, k) => acc + (String(filters[k]) !== String(DEFAULT_FILTERS[k]) ? 1 : 0),
+      0
+    )
+    return changed + filters.collateralTags.length + filters.debtTags.length
+  }, [filters])
 
   const debouncedCollateralAmount = useDebounce(collateralAmount, 300)
   const debouncedDebtAmount = useDebounce(debtAmount, 300)
@@ -431,7 +531,7 @@ export function OptimizerTab({
   )
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Your existing lending positions, ported from the Earn tab. Shown above
           the optimizer so current exposure is visible before opening a new
           leveraged pair. Collapsible (open by default) so it never buries the
@@ -468,11 +568,11 @@ export function OptimizerTab({
         </details>
       )}
 
-      {/* Collateral + Debt pickers, each with an optional amount. Specify one
-          side to get its directional result (collateral → max debt, debt →
-          min collateral); specify both to get both, over the dual filter. */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
+      {/* Collateral → Debt pickers, each in an accented side-card with an
+          optional amount. Specify one side for a directional result (collateral
+          → max debt, debt → min collateral); both for the dual filter. */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_1fr]">
+        <div className="space-y-2 rounded-lg border border-base-300 border-l-2 border-l-success/60 bg-base-200/20 p-3">
           <TokenMultiPicker
             chainId={chainId}
             selected={collaterals}
@@ -481,13 +581,30 @@ export function OptimizerTab({
             placeholder="Add collateral… (optional)"
           />
           <AmountInputRow
-            label="Collateral amount (optional)"
+            label="Amount (optional)"
             usd={collateralUsd}
             value={collateralAmount}
             onChange={setCollateralAmount}
           />
         </div>
-        <div className="space-y-2">
+        {/* Directional arrow (desktop only) */}
+        <div className="hidden items-center justify-center md:flex">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-base-300 bg-base-100 text-base-content/40">
+            <svg
+              className="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg>
+          </div>
+        </div>
+        <div className="space-y-2 rounded-lg border border-base-300 border-l-2 border-l-error/60 bg-base-200/20 p-3">
           <TokenMultiPicker
             chainId={chainId}
             selected={debts}
@@ -496,7 +613,7 @@ export function OptimizerTab({
             placeholder="Add debt… (optional)"
           />
           <AmountInputRow
-            label="Debt amount (optional)"
+            label="Amount (optional)"
             usd={debtUsd}
             value={debtAmount}
             onChange={setDebtAmount}
@@ -504,12 +621,14 @@ export function OptimizerTab({
         </div>
       </div>
 
-      {/* Sort */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <label className="form-control">
-          <span className="text-xs font-medium text-base-content/70 mb-1">Sort by</span>
+      {/* Toolbar: sort + direction, advanced-filters toggle, reset */}
+      <div className="flex flex-wrap items-center gap-2 rounded-box border border-base-300 bg-base-100 px-3 py-2">
+        <div className="flex items-center gap-1.5">
+          <span className="hidden text-[10px] font-medium uppercase tracking-wide text-base-content/40 sm:inline">
+            Sort
+          </span>
           <select
-            className="select select-bordered select-sm"
+            className="select select-bordered select-sm min-w-[9.5rem]"
             value={filters.sortBy}
             onChange={(e) => set('sortBy', e.target.value as OptimizerSortKey)}
           >
@@ -523,165 +642,186 @@ export function OptimizerTab({
             <option value="borrowLiquidityUsdShort">Borrow liquidity</option>
             <option value="totalLiquidityUsdShort">Debt pool liquidity</option>
           </select>
-        </label>
-        <label className="form-control">
-          <span className="text-xs font-medium text-base-content/70 mb-1">Order</span>
-          <select
-            className="select select-bordered select-sm"
-            value={filters.sortDir}
-            onChange={(e) => set('sortDir', e.target.value as 'ASC' | 'DESC')}
+          <button
+            type="button"
+            className="btn btn-sm btn-square btn-outline border-base-300"
+            title={
+              filters.sortDir === 'DESC'
+                ? 'Descending — click for ascending'
+                : 'Ascending — click for descending'
+            }
+            aria-label="Toggle sort direction"
+            onClick={() => set('sortDir', filters.sortDir === 'DESC' ? 'ASC' : 'DESC')}
           >
-            <option value="DESC">Descending</option>
-            <option value="ASC">Ascending</option>
-          </select>
-        </label>
-      </div>
+            <svg
+              className={`h-4 w-4 transition-transform ${
+                filters.sortDir === 'ASC' ? 'rotate-180' : ''
+              }`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <polyline points="19 12 12 19 5 12" />
+            </svg>
+          </button>
+        </div>
 
-      {/* Advanced filters */}
-      <div>
+        <div className="grow" />
+
         <button
           type="button"
-          className="btn btn-ghost btn-xs"
+          className={`btn btn-sm gap-1.5 ${showAdvanced ? 'btn-neutral' : 'btn-ghost'}`}
+          aria-expanded={showAdvanced}
           onClick={() => setShowAdvanced((v) => !v)}
         >
-          {showAdvanced ? '− Hide' : '+ Advanced'} filters
+          <svg
+            className="h-3.5 w-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="4" y1="21" x2="4" y2="14" />
+            <line x1="4" y1="10" x2="4" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12" y2="3" />
+            <line x1="20" y1="21" x2="20" y2="16" />
+            <line x1="20" y1="12" x2="20" y2="3" />
+            <line x1="1" y1="14" x2="7" y2="14" />
+            <line x1="9" y1="8" x2="15" y2="8" />
+            <line x1="17" y1="16" x2="23" y2="16" />
+          </svg>
+          Filters
+          {activeAdvancedCount > 0 && (
+            <span className="badge badge-primary badge-xs">{activeAdvancedCount}</span>
+          )}
         </button>
-        {showAdvanced && (
-          <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2">
-            <label className="form-control">
-              <span className="text-[10px] uppercase tracking-wide text-base-content/50">
-                Min APR
-              </span>
-              <input
-                type="number"
-                className="input input-bordered input-xs"
+
+        <button
+          type="button"
+          className="btn btn-sm btn-ghost text-base-content/50"
+          onClick={resetAll}
+          title="Reset all optimizer filters for this chain"
+        >
+          Reset
+        </button>
+      </div>
+
+      {/* Advanced filters — grouped, with operator/unit affixes for clarity. */}
+      {showAdvanced && (
+        <div className="space-y-4 rounded-box border border-base-300 bg-base-100 p-3 sm:p-4">
+          <FilterGroup title="Returns">
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+              <RangeField
+                label="Min APR"
+                op="≥"
+                suffix="%"
                 placeholder="0.00"
                 value={filters.minApr}
-                onChange={(e) => set('minApr', e.target.value)}
+                onChange={(v) => set('minApr', v)}
               />
-            </label>
-            <label className="form-control">
-              <span className="text-[10px] uppercase tracking-wide text-base-content/50">
-                Min leverage
-              </span>
-              <input
-                type="number"
-                className="input input-bordered input-xs"
+              <RangeField
+                label="Min leverage"
+                op="≥"
+                suffix="×"
                 placeholder="1.0"
                 value={filters.minLeverage}
-                onChange={(e) => set('minLeverage', e.target.value)}
+                onChange={(v) => set('minLeverage', v)}
               />
-            </label>
-            <label className="form-control">
-              <span className="text-[10px] uppercase tracking-wide text-base-content/50">
-                Min LTV
-              </span>
-              <input
-                type="number"
+              <RangeField
+                label="Min LTV"
+                op="≥"
                 step="0.01"
-                className="input input-bordered input-xs"
-                placeholder="0.00"
+                placeholder="0.80"
                 value={filters.minLtv}
-                onChange={(e) => set('minLtv', e.target.value)}
+                onChange={(v) => set('minLtv', v)}
               />
-            </label>
-            <label className="form-control">
-              <span className="text-[10px] uppercase tracking-wide text-base-content/50">
-                Max borrow rate
-              </span>
-              <input
-                type="number"
-                className="input input-bordered input-xs"
+              <RangeField
+                label="Max borrow rate"
+                op="≤"
+                suffix="%"
                 placeholder="0.00"
                 value={filters.maxBorrowRate}
-                onChange={(e) => set('maxBorrowRate', e.target.value)}
+                onChange={(v) => set('maxBorrowRate', v)}
               />
-            </label>
-            <label className="form-control">
-              <span
-                className="text-[10px] uppercase tracking-wide text-base-content/50"
+            </div>
+          </FilterGroup>
+
+          <FilterGroup title="Liquidity">
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+              <RangeField
+                label="Min collateral liq."
                 title="Minimum available liquidity on the collateral (long) side, USD"
-              >
-                Min collateral liq. USD
-              </span>
-              <input
-                type="number"
-                className="input input-bordered input-xs"
+                op="≥"
+                prefix="$"
                 placeholder="2000"
                 value={filters.minLiquidityUsdLong}
-                onChange={(e) => set('minLiquidityUsdLong', e.target.value)}
+                onChange={(v) => set('minLiquidityUsdLong', v)}
               />
-            </label>
-            <label className="form-control">
-              <span
-                className="text-[10px] uppercase tracking-wide text-base-content/50"
+              <RangeField
+                label="Min borrow liq."
                 title="Minimum available liquidity on the debt (short) side, USD"
-              >
-                Min borrow liq. USD
-              </span>
-              <input
-                type="number"
-                className="input input-bordered input-xs"
+                op="≥"
+                prefix="$"
                 placeholder="1800"
                 value={filters.minBorrowLiquidityUsd}
-                onChange={(e) => set('minBorrowLiquidityUsd', e.target.value)}
+                onChange={(v) => set('minBorrowLiquidityUsd', v)}
               />
-            </label>
-            <label className="form-control">
-              <span
-                className="text-[10px] uppercase tracking-wide text-base-content/50"
+              <RangeField
+                label="Max utilization"
                 title="Max debt-side utilization (0–1)"
-              >
-                Max util. (short)
-              </span>
-              <input
-                type="number"
+                op="≤"
                 step="0.01"
-                className="input input-bordered input-xs"
                 placeholder="0.95"
                 value={filters.maxUtilizationShort}
-                onChange={(e) => set('maxUtilizationShort', e.target.value)}
+                onChange={(v) => set('maxUtilizationShort', v)}
               />
-            </label>
-            <label className="form-control">
-              <span
-                className="text-[10px] uppercase tracking-wide text-base-content/50"
+            </div>
+          </FilterGroup>
+
+          <FilterGroup title="Risk & lenders">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <RangeField
+                label="Max config risk"
                 title="Max risk score allowed for the e-mode/config (lower = safer)"
-              >
-                Max config risk
-              </span>
-              <input
-                type="number"
-                className="input input-bordered input-xs"
+                op="≤"
                 placeholder="4"
                 value={filters.maxConfigRiskScore}
-                onChange={(e) => set('maxConfigRiskScore', e.target.value)}
+                onChange={(v) => set('maxConfigRiskScore', v)}
               />
-            </label>
-            <label className="form-control col-span-2 md:col-span-2">
-              <span
-                className="text-[10px] uppercase tracking-wide text-base-content/50"
-                title="Comma-separated lender keys to exclude (prefix-expanded server-side)"
-              >
-                Exclude lenders
-              </span>
-              <input
-                type="text"
-                className="input input-bordered input-xs"
-                placeholder="e.g. RADIANT_V2, MORPHO_BLUE"
-                value={filters.excludeLenders}
-                onChange={(e) => set('excludeLenders', e.target.value)}
-              />
-            </label>
-
-            {/* Asset property flags, per side. Chips toggle a tag on/off; the
-                backend AND-narrows the corresponding leg to assets carrying it. */}
-            {(['collateralTags', 'debtTags'] as const).map((side) => (
-              <div key={side} className="col-span-2 md:col-span-4">
-                <span className="text-[10px] uppercase tracking-wide text-base-content/50">
-                  {side === 'collateralTags' ? 'Collateral properties' : 'Debt properties'}
+              <div className="flex flex-col gap-1 sm:col-span-2">
+                <span
+                  className="text-[10px] font-medium uppercase tracking-wide text-base-content/50"
+                  title="Comma-separated lender keys to exclude (prefix-expanded server-side)"
+                >
+                  Exclude lenders
                 </span>
-                <div className="mt-1 flex flex-wrap gap-1">
+                <input
+                  type="text"
+                  className="input input-bordered input-sm w-full"
+                  placeholder="e.g. RADIANT_V2, MORPHO_BLUE"
+                  value={filters.excludeLenders}
+                  onChange={(e) => set('excludeLenders', e.target.value)}
+                />
+              </div>
+            </div>
+          </FilterGroup>
+
+          <FilterGroup title="Asset properties">
+            <div className="space-y-2">
+              {/* Chips toggle a tag on/off; the backend AND-narrows that leg to
+                  assets carrying it. */}
+              {(['collateralTags', 'debtTags'] as const).map((side) => (
+                <div key={side} className="flex flex-wrap items-center gap-1.5">
+                  <span className="w-16 shrink-0 text-[10px] font-medium uppercase tracking-wide text-base-content/50">
+                    {side === 'collateralTags' ? 'Collateral' : 'Debt'}
+                  </span>
                   {PROPERTY_TAGS.map((t) => {
                     const active = filters[side].includes(t.slug)
                     return (
@@ -697,55 +837,43 @@ export function OptimizerTab({
                     )
                   })}
                 </div>
-              </div>
-            ))}
-
-            {/* Expired Pendle PTs are hidden by default; opt back in here. */}
-            <label className="col-span-2 md:col-span-4 flex cursor-pointer items-center gap-2 mt-1">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-xs"
-                checked={filters.includeExpired}
-                onChange={(e) => set('includeExpired', e.target.checked)}
-              />
-              <span
-                className="text-[10px] uppercase tracking-wide text-base-content/50"
-                title="Expired Pendle PT markets are excluded by default"
-              >
-                Include expired PTs
-              </span>
-            </label>
-          </div>
-        )}
-      </div>
-
-      {/* Status line */}
-      <div className="flex items-center justify-between text-xs text-base-content/60">
-        <span>
-          {!hasAnyAssetFilter
-            ? 'Pick at least one collateral/debt asset or property to see results'
-            : isLoading
-              ? 'Loading pairs…'
-              : `${total} pairs`}
-        </span>
-        <div className="flex items-center gap-2">
-          {isFetching && !isLoading && <span className="loading loading-spinner loading-xs" />}
-          <button
-            type="button"
-            className="btn btn-ghost btn-xs text-base-content/50"
-            onClick={() => {
-              setFilters(DEFAULT_FILTERS)
-              setCollaterals([])
-              setDebts([])
-              setCollateralAmount('')
-              setDebtAmount('')
-              setShowAdvanced(false)
-            }}
-            title="Reset all optimizer filters for this chain"
-          >
-            Reset
-          </button>
+              ))}
+              {/* Expired Pendle PTs are hidden by default; opt back in here. */}
+              <label className="flex cursor-pointer items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-xs"
+                  checked={filters.includeExpired}
+                  onChange={(e) => set('includeExpired', e.target.checked)}
+                />
+                <span
+                  className="text-[10px] font-medium uppercase tracking-wide text-base-content/50"
+                  title="Expired Pendle PT markets are excluded by default"
+                >
+                  Include expired PTs
+                </span>
+              </label>
+            </div>
+          </FilterGroup>
         </div>
+      )}
+
+      {/* Results status line */}
+      <div className="flex items-center justify-between px-0.5 text-xs">
+        <span className="text-base-content/60">
+          {!hasAnyAssetFilter ? (
+            'Pick a collateral/debt asset or property to see results'
+          ) : isLoading ? (
+            'Loading pairs…'
+          ) : (
+            <>
+              <span className="font-semibold tabular-nums text-base-content">{total}</span> pairs
+            </>
+          )}
+        </span>
+        {isFetching && !isLoading && (
+          <span className="loading loading-spinner loading-xs text-base-content/40" />
+        )}
       </div>
 
       {error && <div className="alert alert-error text-sm py-2">{(error as Error).message}</div>}
