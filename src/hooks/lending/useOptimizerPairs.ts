@@ -58,6 +58,9 @@ export interface OptimizerAssetRef {
   logoURI?: string
   assetGroup?: string
   priceUsd?: number
+  /** This asset's own token-risk label (low/medium/high/unknown), from the
+   *  pair's per-side `tokenLong`/`tokenShort` risk dimension. */
+  riskLabel?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -288,8 +291,14 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
     marketLongUid: raw.marketLongUid,
     marketShortUid: raw.marketShortUid,
     eModeConfigId: raw.eModeConfigId != null ? String(raw.eModeConfigId) : undefined,
-    collateral: asAssetRef(raw.underlyingInfoLong, raw.chainId),
-    debt: asAssetRef(raw.underlyingInfoShort, raw.chainId),
+    collateral: {
+      ...asAssetRef(raw.underlyingInfoLong, raw.chainId),
+      riskLabel: raw.risk?.breakdown?.find((b) => b.category === 'tokenLong')?.label,
+    },
+    debt: {
+      ...asAssetRef(raw.underlyingInfoShort, raw.chainId),
+      riskLabel: raw.risk?.breakdown?.find((b) => b.category === 'tokenShort')?.label,
+    },
     // APR fields are percent units in the API → convert to fractions.
     depositAprLong: numOr0(raw.depositAprLong) / 100,
     borrowAprShort: borrowShortPct / 100,

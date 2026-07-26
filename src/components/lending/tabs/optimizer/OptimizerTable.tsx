@@ -8,6 +8,21 @@ import { TablePagination } from '../../../common/TablePagination'
 import { buildPath, OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'
 import { LenderBadge } from '../../shared/LenderBadge'
 import { Logo } from '../../../common/Logo'
+import { riskDotColor } from '../earn/helpers'
+
+/** Small colored dot for an asset's own token risk. Rendered only when the
+ *  backend actually scored the token (low/medium/high) — skipped for
+ *  unknown/absent to avoid implying an assessment we don't have. */
+function AssetRiskDot({ label }: { label?: string }) {
+  if (!label || label === 'unknown') return null
+  return (
+    <span
+      className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${riskDotColor(label)}`}
+      title={`Token risk: ${label}`}
+      aria-label={`Token risk: ${label}`}
+    />
+  )
+}
 
 interface OptimizerPaginationState {
   page: number
@@ -111,8 +126,9 @@ function AssetCell({ asset }: { asset: OptimizerPairRow['collateral'] }) {
         className="w-5 h-5 rounded-full shrink-0"
       />
       <div className="min-w-0">
-        <div className="font-medium text-sm truncate">
-          {asset.symbol ?? asset.address.slice(0, 6)}
+        <div className="font-medium text-sm flex items-center gap-1.5">
+          <span className="truncate">{asset.symbol ?? asset.address.slice(0, 6)}</span>
+          <AssetRiskDot label={asset.riskLabel} />
         </div>
         <div className="text-[10px] text-base-content/50 truncate">{asset.name}</div>
       </div>
@@ -133,6 +149,7 @@ function AssetPair({ row }: { row: OptimizerPairRow }) {
       <span className="font-medium text-sm truncate">
         {asset.symbol ?? asset.address.slice(0, 6)}
       </span>
+      <AssetRiskDot label={asset.riskLabel} />
     </span>
   )
   return (
