@@ -349,6 +349,19 @@ export interface OptimizerFilters {
   collateralGroups?: string[]
   debtGroups?: string[]
 
+  /** Property flags the collateral (long) asset must carry, e.g. ['rwa','pendle'].
+   *  AND-narrows on top of any collateral/collateralGroups selection. */
+  collateralTags?: string[]
+  /** Property flags the debt (short) asset must carry. Same semantics. */
+  debtTags?: string[]
+  /** Match mode for `collateralTags`: 'any' (default) or 'all'. */
+  collateralTagsMode?: 'any' | 'all'
+  /** Match mode for `debtTags`: 'any' (default) or 'all'. */
+  debtTagsMode?: 'any' | 'all'
+  /** Include pairs whose collateral or debt is an expired Pendle PT
+   *  (default: excluded). */
+  includeExpired?: boolean
+
   // At most one of these four. Token-unit forms require exactly one asset
   // on that side; USD forms work with multi-asset selections.
   collateralAmount?: number
@@ -400,6 +413,8 @@ function buildUrl(filters: OptimizerFilters): string {
   csv('debts', filters.debts)
   csv('collateralGroups', filters.collateralGroups)
   csv('debtGroups', filters.debtGroups)
+  csv('collateralTags', filters.collateralTags)
+  csv('debtTags', filters.debtTags)
   csv('lenders', filters.lenders)
   csv('excludeLenders', filters.excludeLenders)
 
@@ -431,6 +446,10 @@ function buildUrl(filters: OptimizerFilters): string {
   maybe('minBorrowLiquidityUsd', filters.minBorrowLiquidityUsd)
   maybe('minDepositsUsdLong', filters.minDepositsUsdLong)
   maybe('minDebtUsdShort', filters.minDebtUsdShort)
+  maybe('collateralTagsMode', filters.collateralTagsMode)
+  maybe('debtTagsMode', filters.debtTagsMode)
+  // Default (omitted) excludes expired PTs; only send the opt-in.
+  if (filters.includeExpired) params.set('includeExpired', 'true')
   maybe('maxRiskScore', filters.maxRiskScore)
   maybe('maxConfigRiskScore', filters.maxConfigRiskScore)
   maybe('maxTokenRiskScore', filters.maxTokenRiskScore)
@@ -449,7 +468,9 @@ export function useOptimizerPairs(filters: OptimizerFilters, enabled = true) {
     !!filters.collaterals?.length ||
     !!filters.debts?.length ||
     !!filters.collateralGroups?.length ||
-    !!filters.debtGroups?.length
+    !!filters.debtGroups?.length ||
+    !!filters.collateralTags?.length ||
+    !!filters.debtTags?.length
   const canQuery = enabled && hasAnyAssetFilter
   const url = canQuery ? buildUrl(filters) : ''
 

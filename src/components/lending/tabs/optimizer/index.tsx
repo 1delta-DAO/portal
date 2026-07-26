@@ -65,9 +65,25 @@ interface UiFilters {
   maxUtilizationShort: string
   maxConfigRiskScore: string
   excludeLenders: string
+  /** Property flags the collateral (long) asset must carry, e.g. ['pendle']. */
+  collateralTags: string[]
+  /** Property flags the debt (short) asset must carry. */
+  debtTags: string[]
+  /** Include pairs with an expired Pendle PT on either leg (default: excluded). */
+  includeExpired: boolean
   sortBy: OptimizerSortKey
   sortDir: 'ASC' | 'DESC'
 }
+
+/** Selectable asset property flags (slugs match `assets.tags` on the backend). */
+const PROPERTY_TAGS: { slug: string; label: string }[] = [
+  { slug: 'rwa', label: 'RWA' },
+  { slug: 'pendle', label: 'Pendle' },
+  { slug: 'lst', label: 'LST' },
+  { slug: 'lrt', label: 'LRT' },
+  { slug: 'stablecoin', label: 'Stable' },
+  { slug: 'savings', label: 'Savings' },
+]
 
 // Sensible defaults: the optimizer endpoint returns a long tail of tiny
 // markets where the short side has single-digit USD of borrow liquidity.
@@ -84,6 +100,9 @@ const DEFAULT_FILTERS: UiFilters = {
   maxUtilizationShort: '',
   maxConfigRiskScore: '',
   excludeLenders: '',
+  collateralTags: [],
+  debtTags: [],
+  includeExpired: false,
   sortBy: 'aprTotal',
   sortDir: 'DESC',
 }
@@ -265,6 +284,13 @@ export function OptimizerTab({
   const set = <K extends keyof UiFilters>(k: K, v: UiFilters[K]) =>
     setFilters((prev) => ({ ...prev, [k]: v }))
 
+  const toggleTag = (side: 'collateralTags' | 'debtTags', slug: string) =>
+    setFilters((prev) => {
+      const cur = prev[side]
+      const next = cur.includes(slug) ? cur.filter((s) => s !== slug) : [...cur, slug]
+      return { ...prev, [side]: next }
+    })
+
   const debouncedCollateralAmount = useDebounce(collateralAmount, 300)
   const debouncedDebtAmount = useDebounce(debtAmount, 300)
   const parsedCollateralAmount = parseNum(debouncedCollateralAmount)
@@ -312,6 +338,9 @@ export function OptimizerTab({
       ...debtAmt,
       chainId,
       excludeLenders: parseCsv(filters.excludeLenders),
+      collateralTags: filters.collateralTags.length ? filters.collateralTags : undefined,
+      debtTags: filters.debtTags.length ? filters.debtTags : undefined,
+      includeExpired: filters.includeExpired || undefined,
       minApr: parseNum(filters.minApr),
       minLeverage: parseNum(filters.minLeverage),
       minLtv: parseNum(filters.minLtv),
@@ -360,6 +389,9 @@ export function OptimizerTab({
     filters.maxUtilizationShort,
     filters.maxConfigRiskScore,
     filters.excludeLenders,
+    filters.collateralTags,
+    filters.debtTags,
+    filters.includeExpired,
     filters.sortBy,
     filters.sortDir,
     debouncedCollateralAmount,
@@ -368,7 +400,11 @@ export function OptimizerTab({
     debts,
   ])
 
-  const hasAnyAssetFilter = collaterals.length > 0 || debts.length > 0
+  const hasAnyAssetFilter =
+    collaterals.length > 0 ||
+    debts.length > 0 ||
+    filters.collateralTags.length > 0 ||
+    filters.debtTags.length > 0
   const { rows, total, isLoading, isFetching, error } = useOptimizerPairs(
     apiFilters,
     hasAnyAssetFilter
@@ -637,6 +673,48 @@ export function OptimizerTab({
                 onChange={(e) => set('excludeLenders', e.target.value)}
               />
             </label>
+
+            {/* Asset property flags, per side. Chips toggle a tag on/off; the
+                backend AND-narrows the corresponding leg to assets carrying it. */}
+            {(['collateralTags', 'debtTags'] as const).map((side) => (
+              <div key={side} className="col-span-2 md:col-span-4">
+                <span className="text-[10px] uppercase tracking-wide text-base-content/50">
+                  {side === 'collateralTags' ? 'Collateral properties' : 'Debt properties'}
+                </span>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {PROPERTY_TAGS.map((t) => {
+                    const active = filters[side].includes(t.slug)
+                    return (
+                      <button
+                        key={t.slug}
+                        type="button"
+                        aria-pressed={active}
+                        className={`btn btn-xs ${active ? 'btn-primary' : 'btn-outline btn-ghost'}`}
+                        onClick={() => toggleTag(side, t.slug)}
+                      >
+                        {t.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {/* Expired Pendle PTs are hidden by default; opt back in here. */}
+            <label className="col-span-2 md:col-span-4 flex cursor-pointer items-center gap-2 mt-1">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs"
+                checked={filters.includeExpired}
+                onChange={(e) => set('includeExpired', e.target.checked)}
+              />
+              <span
+                className="text-[10px] uppercase tracking-wide text-base-content/50"
+                title="Expired Pendle PT markets are excluded by default"
+              >
+                Include expired PTs
+              </span>
+            </label>
           </div>
         )}
       </div>
@@ -645,7 +723,7 @@ export function OptimizerTab({
       <div className="flex items-center justify-between text-xs text-base-content/60">
         <span>
           {!hasAnyAssetFilter
-            ? 'Pick at least one collateral or debt asset to see results'
+            ? 'Pick at least one collateral/debt asset or property to see results'
             : isLoading
               ? 'Loading pairs…'
               : `${total} pairs`}
