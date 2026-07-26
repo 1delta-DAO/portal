@@ -7,7 +7,7 @@ import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { TablePagination } from '../../../common/TablePagination'
 import { buildPath, OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'
 import { LenderBadge } from '../../shared/LenderBadge'
-import { Logo } from '../../../common/Logo'
+import { AssetPopover } from '../../shared/AssetPopover'
 import { riskDotColor } from '../earn/helpers'
 
 /** Small colored dot for an asset's own token risk. Rendered only when the
@@ -116,15 +116,44 @@ function AmountCell({ tok, usd, sym }: { tok?: number; usd?: number; sym?: strin
   )
 }
 
-function AssetCell({ asset }: { asset: OptimizerPairRow['collateral'] }) {
+/**
+ * Asset cell. Clicking the *logo* opens a detail popover (address / price /
+ * chain + market IRM); clicking the symbol/name falls through to the row's
+ * open-panel handler — so row selection stays the primary, obvious action and
+ * the popover is a small deliberate affordance on the icon. `marketUid` + the
+ * side's rate light up the "Mkt ID" and IRM rows.
+ */
+function AssetCell({
+  asset,
+  marketUid,
+  depositRate,
+  borrowRate,
+}: {
+  asset: OptimizerPairRow['collateral']
+  marketUid?: string
+  /** Deposit rate for this market, in PERCENT (collateral side only). */
+  depositRate?: number
+  /** Borrow rate for this market, in PERCENT (debt side only). */
+  borrowRate?: number
+}) {
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <Logo
-        src={asset.logoURI}
-        alt={asset.symbol ?? asset.address}
-        fallbackText={asset.symbol ?? asset.address}
-        className="w-5 h-5 rounded-full shrink-0"
-      />
+      {/* Logo-only popover trigger; stopPropagation so it doesn't also select
+          the row. The label beside it stays a row-select target. */}
+      <span className="shrink-0" onClick={(e) => e.stopPropagation()}>
+        <AssetPopover
+          address={asset.address}
+          name={asset.name ?? asset.symbol ?? ''}
+          symbol={asset.symbol ?? ''}
+          logoURI={asset.logoURI}
+          chainId={asset.chainId}
+          priceUsd={asset.priceUsd}
+          marketUid={marketUid}
+          marketName={asset.symbol}
+          currentDepositRate={depositRate}
+          currentBorrowRate={borrowRate}
+        />
+      </span>
       <div className="min-w-0">
         <div className="font-medium text-sm flex items-center gap-1.5">
           <span className="truncate">{asset.symbol ?? asset.address.slice(0, 6)}</span>
@@ -136,27 +165,42 @@ function AssetCell({ asset }: { asset: OptimizerPairRow['collateral'] }) {
   )
 }
 
-/** Compact "collateral → debt" header used on the mobile card. */
+/** Compact "collateral → debt" header used on the mobile card. Tapping a side's
+ *  logo opens the same asset detail popover as the desktop table; the symbol
+ *  next to it stays a card-select target (opens the action panel). */
 function AssetPair({ row }: { row: OptimizerPairRow }) {
-  const chip = (asset: OptimizerPairRow['collateral']) => (
+  const chip = (
+    asset: OptimizerPairRow['collateral'],
+    marketUid?: string,
+    depositRate?: number,
+    borrowRate?: number
+  ) => (
     <span className="inline-flex items-center gap-1 min-w-0">
-      <Logo
-        src={asset.logoURI}
-        alt={asset.symbol ?? asset.address}
-        fallbackText={asset.symbol ?? asset.address}
-        className="w-5 h-5 rounded-full shrink-0"
-      />
-      <span className="font-medium text-sm truncate">
-        {asset.symbol ?? asset.address.slice(0, 6)}
+      <span className="shrink-0" onClick={(e) => e.stopPropagation()}>
+        <AssetPopover
+          address={asset.address}
+          name={asset.name ?? asset.symbol ?? ''}
+          symbol={asset.symbol ?? ''}
+          logoURI={asset.logoURI}
+          chainId={asset.chainId}
+          priceUsd={asset.priceUsd}
+          marketUid={marketUid}
+          marketName={asset.symbol}
+          currentDepositRate={depositRate}
+          currentBorrowRate={borrowRate}
+        />
       </span>
-      <AssetRiskDot label={asset.riskLabel} />
+      <span className="font-medium text-sm truncate flex items-center gap-1">
+        {asset.symbol ?? asset.address.slice(0, 6)}
+        <AssetRiskDot label={asset.riskLabel} />
+      </span>
     </span>
   )
   return (
     <div className="flex items-center gap-1.5 min-w-0">
-      {chip(row.collateral)}
+      {chip(row.collateral, row.marketLongUid, row.depositAprEffective * 100)}
       <span className="text-base-content/40 shrink-0">→</span>
-      {chip(row.debt)}
+      {chip(row.debt, row.marketShortUid, undefined, row.borrowAprEffective * 100)}
     </div>
   )
 }
@@ -330,10 +374,18 @@ export function OptimizerTable({
                   onClick={onSelectPair ? () => onSelectPair(row) : undefined}
                 >
                   <td>
-                    <AssetCell asset={row.collateral} />
+                    <AssetCell
+                      asset={row.collateral}
+                      marketUid={row.marketLongUid}
+                      depositRate={row.depositAprEffective * 100}
+                    />
                   </td>
                   <td>
-                    <AssetCell asset={row.debt} />
+                    <AssetCell
+                      asset={row.debt}
+                      marketUid={row.marketShortUid}
+                      borrowRate={row.borrowAprEffective * 100}
+                    />
                   </td>
                   <td>
                     <LenderBadge
