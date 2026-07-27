@@ -199,6 +199,7 @@ function CombinedForm({
     setSecondaryMax('0')
     setResult(null)
     setBuildError(null)
+    setBuilding(false)
     setDone(false)
     setStep(0)
     setRunError(null)
@@ -279,6 +280,9 @@ function CombinedForm({
     if (!account || !collateralUid || !debtUid || !gt0(dPrimary) || !gt0(dSecondary)) {
       setResult(null)
       setBuildError(null)
+      // Clear any in-flight "Building…" state — e.g. after the amounts are
+      // reset on a position switch, or when a field is emptied.
+      setBuilding(false)
       return
     }
     let cancelled = false
