@@ -1,6 +1,7 @@
 import React from 'react'
 import { sanitizeAmountInput } from '../lending/actions/format'
 import { AmountQuickButtons } from '../lending/actions/AmountQuickButtons'
+import { UsdAmount } from './UsdAmount'
 
 interface AmountInputProps {
   /** Decimal string. Owned by the parent. */
@@ -34,6 +35,12 @@ interface AmountInputProps {
   placeholder?: string
   /** Token decimals — clamps preset results so e.g. USDC never shows 18 dp. */
   decimals?: number
+  /**
+   * USD equivalent of the current amount. When provided and non-zero it renders
+   * as a canonical {@link UsdAmount} chip at the bottom-right under the input —
+   * the single consistent spot for the dollar value across every action panel.
+   */
+  usdValue?: number
 }
 
 /**
@@ -51,6 +58,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({
   label = 'Amount',
   placeholder = '0.0',
   decimals,
+  usdValue,
 }) => (
   <>
     <div className="form-control">
@@ -63,18 +71,28 @@ export const AmountInput: React.FC<AmountInputProps> = ({
           decimals={decimals}
         />
       </div>
-      <input
-        type="text"
-        inputMode="decimal"
-        className={`input input-bordered input-sm w-full ${error ? 'input-error' : ''}`}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => {
-          const v = sanitizeAmountInput(e.target.value)
-          if (v !== null) onChange(v)
-        }}
-        disabled={disabled}
-      />
+      {/* The USD equivalent lives inside the field, right-aligned — the input
+          has ample empty space and it saves a row. `plain` drops the capsule
+          so it doesn't nest a chip inside the bordered box. */}
+      <label
+        className={`input input-bordered input-sm flex w-full items-center gap-2 ${error ? 'input-error' : ''}`}
+      >
+        <input
+          type="text"
+          inputMode="decimal"
+          className="grow"
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => {
+            const v = sanitizeAmountInput(e.target.value)
+            if (v !== null) onChange(v)
+          }}
+          disabled={disabled}
+        />
+        {usdValue != null && usdValue > 0 && (
+          <UsdAmount value={usdValue} plain className="shrink-0" />
+        )}
+      </label>
     </div>
     {error && <div className="text-[10px] text-error">{error}</div>}
   </>

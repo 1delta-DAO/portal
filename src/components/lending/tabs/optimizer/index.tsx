@@ -62,6 +62,9 @@ interface UiFilters {
   minLiquidityUsdLong: string
   /** Minimum *available* liquidity on the debt (short) side, USD. */
   minBorrowLiquidityUsd: string
+  /** Max utilization on the collateral (long / supply) side. */
+  maxUtilizationLong: string
+  /** Max utilization on the debt (short / borrow) side. */
   maxUtilizationShort: string
   maxConfigRiskScore: string
   excludeLenders: string
@@ -101,11 +104,15 @@ const DEFAULT_FILTERS: UiFilters = {
   maxBorrowRate: '',
   minLiquidityUsdLong: '2000',
   minBorrowLiquidityUsd: '1800',
+  maxUtilizationLong: '',
   maxUtilizationShort: '',
   maxConfigRiskScore: '',
   excludeLenders: '',
-  collateralTags: [],
-  debtTags: [],
+  // Sensible starting strategy: yield-bearing / stable collateral borrowing a
+  // stablecoin. Gives useful results on first load (and after Reset) without the
+  // user having to pick assets. Overridable — deselect the chips to widen.
+  collateralTags: ['stablecoin', 'savings', 'pendle'],
+  debtTags: ['stablecoin'],
   includeExpired: false,
   sortBy: 'aprTotal',
   sortDir: 'DESC',
@@ -127,33 +134,56 @@ const parseCsv = (v: string): string[] | undefined => {
 }
 
 /**
- * Optional per-side amount input. The unit follows the side's selection:
- * exactly one asset → token units, otherwise USD (works with any/empty count).
+ * Optional per-side amount input. Defaults to USD (works with any/empty asset
+ * selection); a USD / Tokens switcher lets the user enter token units, but only
+ * when exactly one asset is selected on that side (decimals are otherwise
+ * ambiguous), so `canToken` gates the Tokens option.
  */
 function AmountInputRow({
   label,
   usd,
+  canToken,
+  onUnitChange,
   value,
   onChange,
 }: {
   label: string
   usd: boolean
+  canToken: boolean
+  onUnitChange: (unit: 'usd' | 'token') => void
   value: string
   onChange: (v: string) => void
 }) {
   return (
     <label className="form-control">
-      <span className="text-xs font-medium text-base-content/70 mb-1 flex items-center justify-between">
+      <span className="text-xs font-medium text-base-content/70 mb-1 flex items-center justify-between gap-2">
         <span>{label}</span>
-        <span
-          className="text-[10px] uppercase tracking-wide text-base-content/40"
-          title={
-            usd
-              ? 'Multi-asset (or empty) selection — amount is in USD'
-              : 'Single-asset selection — amount is in token units'
-          }
-        >
-          {usd ? 'USD' : 'token units'}
+        {/* Unit switcher — USD is always available; Tokens needs a single asset. */}
+        <span className="inline-flex shrink-0 overflow-hidden rounded-md border border-base-300 text-[10px] font-semibold uppercase tracking-wide">
+          <button
+            type="button"
+            className={`px-2 py-0.5 transition-colors ${
+              usd ? 'bg-primary/15 text-primary' : 'text-base-content/50 hover:text-base-content'
+            }`}
+            onClick={() => onUnitChange('usd')}
+          >
+            USD
+          </button>
+          <button
+            type="button"
+            disabled={!canToken}
+            title={
+              canToken
+                ? 'Enter the amount in token units'
+                : 'Select exactly one asset to use token units'
+            }
+            className={`px-2 py-0.5 transition-colors ${
+              !usd ? 'bg-primary/15 text-primary' : 'text-base-content/50 hover:text-base-content'
+            } ${!canToken ? 'cursor-not-allowed opacity-40' : ''}`}
+            onClick={() => canToken && onUnitChange('token')}
+          >
+            Tokens
+          </button>
         </span>
       </span>
       <label className="input input-bordered input-sm flex items-center gap-1">
@@ -198,14 +228,14 @@ function RangeField({
   onChange: (v: string) => void
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1">
+    <div className="flex w-28 flex-col gap-1">
       <span
-        className="text-[10px] font-medium uppercase tracking-wide text-base-content/50"
-        title={title}
+        className="truncate text-[10px] font-medium uppercase tracking-wide text-base-content/50"
+        title={title ?? label}
       >
         {label}
       </span>
-      <label className="input input-bordered input-sm flex items-center gap-1">
+      <label className="input input-bordered input-sm flex items-center gap-1 pl-2 pr-2">
         {op && <span className="shrink-0 text-xs text-base-content/40">{op}</span>}
         {prefix && <span className="shrink-0 text-xs text-base-content/40">{prefix}</span>}
         <input
@@ -223,10 +253,11 @@ function RangeField({
   )
 }
 
-/** Titled group wrapper for a set of advanced filters. */
+/** Titled, padded section for a group of advanced filters (separated by
+ *  dividers from its siblings inside the filter card). */
 function FilterGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div>
+    <div className="p-3 sm:p-4">
       <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-base-content/40">
         {title}
       </div>
@@ -250,6 +281,9 @@ interface PersistedOptimizerState {
   debts: string[]
   collateralAmount: string
   debtAmount: string
+  /** Amount unit per side ('usd' default; 'token' only with a single asset). */
+  collateralUnit: 'usd' | 'token'
+  debtUnit: 'usd' | 'token'
   showAdvanced: boolean
 }
 
@@ -296,6 +330,10 @@ export function OptimizerTab({
   const [debts, setDebts] = useState<string[]>(() => initial?.debts ?? [])
   const [collateralAmount, setCollateralAmount] = useState(() => initial?.collateralAmount ?? '')
   const [debtAmount, setDebtAmount] = useState(() => initial?.debtAmount ?? '')
+  const [collateralUnit, setCollateralUnit] = useState<'usd' | 'token'>(
+    () => initial?.collateralUnit ?? 'usd'
+  )
+  const [debtUnit, setDebtUnit] = useState<'usd' | 'token'>(() => initial?.debtUnit ?? 'usd')
   const [showAdvanced, setShowAdvanced] = useState(() => initial?.showAdvanced ?? false)
 
   // Reload state when the user switches chains. Skip the very first render
@@ -311,6 +349,8 @@ export function OptimizerTab({
     setDebts(next?.debts ?? [])
     setCollateralAmount(next?.collateralAmount ?? '')
     setDebtAmount(next?.debtAmount ?? '')
+    setCollateralUnit(next?.collateralUnit ?? 'usd')
+    setDebtUnit(next?.debtUnit ?? 'usd')
     setShowAdvanced(next?.showAdvanced ?? false)
     setSelectedRow(null)
   }, [chainId])
@@ -325,6 +365,8 @@ export function OptimizerTab({
       debts,
       collateralAmount,
       debtAmount,
+      collateralUnit,
+      debtUnit,
       showAdvanced,
     }
     try {
@@ -332,7 +374,17 @@ export function OptimizerTab({
     } catch {
       /* localStorage may be disabled — ignore */
     }
-  }, [chainId, filters, collaterals, debts, collateralAmount, debtAmount, showAdvanced])
+  }, [
+    chainId,
+    filters,
+    collaterals,
+    debts,
+    collateralAmount,
+    debtAmount,
+    collateralUnit,
+    debtUnit,
+    showAdvanced,
+  ])
 
   // Server-side pagination. The optimizer endpoint supports `start`/`count`,
   // so we drive page navigation through query params rather than fetching
@@ -365,6 +417,8 @@ export function OptimizerTab({
     setDebts([])
     setCollateralAmount('')
     setDebtAmount('')
+    setCollateralUnit('usd')
+    setDebtUnit('usd')
     setShowAdvanced(false)
   }
 
@@ -377,31 +431,49 @@ export function OptimizerTab({
       'minLeverage',
       'minLtv',
       'maxBorrowRate',
-      'minLiquidityUsdLong',
-      'minBorrowLiquidityUsd',
-      'maxUtilizationShort',
       'maxConfigRiskScore',
       'excludeLenders',
       'includeExpired',
     ]
-    const changed = keys.reduce(
+    return keys.reduce(
       (acc, k) => acc + (String(filters[k]) !== String(DEFAULT_FILTERS[k]) ? 1 : 0),
       0
     )
-    return changed + filters.collateralTags.length + filters.debtTags.length
   }, [filters])
+
+  // Property chips for a side — rendered in each picker card (default view).
+  const propertyChips = (side: 'collateralTags' | 'debtTags') => (
+    <div className="flex flex-wrap items-center gap-1">
+      {PROPERTY_TAGS.map((t) => {
+        const active = filters[side].includes(t.slug)
+        return (
+          <button
+            key={t.slug}
+            type="button"
+            aria-pressed={active}
+            className={`btn btn-xs ${active ? 'btn-primary' : 'btn-outline btn-ghost'}`}
+            onClick={() => toggleTag(side, t.slug)}
+          >
+            {t.label}
+          </button>
+        )
+      })}
+    </div>
+  )
 
   const debouncedCollateralAmount = useDebounce(collateralAmount, 300)
   const debouncedDebtAmount = useDebounce(debtAmount, 300)
   const parsedCollateralAmount = parseNum(debouncedCollateralAmount)
   const parsedDebtAmount = parseNum(debouncedDebtAmount)
 
-  // Each side picks its amount unit independently. Token-unit amounts require
-  // *exactly one* asset on that side (decimals are otherwise ambiguous); USD
-  // works with any count. Single-asset → token units ("10 ETH"), multi-asset /
-  // empty → USD ("$10,000").
-  const collateralUsd = collaterals.length !== 1
-  const debtUsd = debts.length !== 1
+  // Each side defaults to USD and can switch to token units, but only when it
+  // holds *exactly one* asset (decimals are otherwise ambiguous). So the
+  // effective USD flag is: USD unless the user picked Tokens AND a single asset
+  // is selected. `canToken` drives whether the Tokens switch is enabled.
+  const collateralCanToken = collaterals.length === 1
+  const debtCanToken = debts.length === 1
+  const collateralUsd = !(collateralCanToken && collateralUnit === 'token')
+  const debtUsd = !(debtCanToken && debtUnit === 'token')
 
   // A computed column is shown once an amount is actually submitted on that
   // side: collateral amount → "Max debt", debt amount → "Min collateral".
@@ -447,6 +519,7 @@ export function OptimizerTab({
       maxBorrowRate: parseNum(filters.maxBorrowRate),
       minLiquidityUsdLong: parseNum(filters.minLiquidityUsdLong),
       minBorrowLiquidityUsd: parseNum(filters.minBorrowLiquidityUsd),
+      maxUtilizationLong: parseNum(filters.maxUtilizationLong),
       maxUtilizationShort: parseNum(filters.maxUtilizationShort),
       // App-wide risk ceiling (the global "Up to low/medium/high" selector).
       // The backend treats maxRiskScore as the config-risk cap; the manual
@@ -486,6 +559,7 @@ export function OptimizerTab({
     filters.maxBorrowRate,
     filters.minLiquidityUsdLong,
     filters.minBorrowLiquidityUsd,
+    filters.maxUtilizationLong,
     filters.maxUtilizationShort,
     filters.maxConfigRiskScore,
     filters.excludeLenders,
@@ -580,12 +654,40 @@ export function OptimizerTab({
             label="Collateral (supply)"
             placeholder="Add collateral… (optional)"
           />
+          <div>
+            <span className="text-[10px] font-medium uppercase tracking-wide text-base-content/40">
+              Properties
+            </span>
+            <div className="mt-1">{propertyChips('collateralTags')}</div>
+          </div>
           <AmountInputRow
             label="Amount (optional)"
             usd={collateralUsd}
+            canToken={collateralCanToken}
+            onUnitChange={setCollateralUnit}
             value={collateralAmount}
             onChange={setCollateralAmount}
           />
+          <div className="flex flex-wrap gap-x-3 gap-y-2 pt-2">
+            <RangeField
+              label="Min liquidity"
+              title="Minimum available liquidity on the collateral (supply) side, USD"
+              op="≥"
+              prefix="$"
+              placeholder="2000"
+              value={filters.minLiquidityUsdLong}
+              onChange={(v) => set('minLiquidityUsdLong', v)}
+            />
+            <RangeField
+              label="Max utilization"
+              title="Max collateral-side (supply) utilization (0–1)"
+              op="≤"
+              step="0.01"
+              placeholder="0.95"
+              value={filters.maxUtilizationLong}
+              onChange={(v) => set('maxUtilizationLong', v)}
+            />
+          </div>
         </div>
         {/* Directional arrow (desktop only) */}
         <div className="hidden items-center justify-center md:flex">
@@ -612,51 +714,104 @@ export function OptimizerTab({
             label="Debt (borrow)"
             placeholder="Add debt… (optional)"
           />
+          <div>
+            <span className="text-[10px] font-medium uppercase tracking-wide text-base-content/40">
+              Properties
+            </span>
+            <div className="mt-1">{propertyChips('debtTags')}</div>
+          </div>
           <AmountInputRow
             label="Amount (optional)"
             usd={debtUsd}
+            canToken={debtCanToken}
+            onUnitChange={setDebtUnit}
             value={debtAmount}
             onChange={setDebtAmount}
           />
+          <div className="flex flex-wrap gap-x-3 gap-y-2 pt-2">
+            <RangeField
+              label="Min liquidity"
+              title="Minimum available borrow liquidity on the debt (borrow) side, USD"
+              op="≥"
+              prefix="$"
+              placeholder="1800"
+              value={filters.minBorrowLiquidityUsd}
+              onChange={(v) => set('minBorrowLiquidityUsd', v)}
+            />
+            <RangeField
+              label="Max utilization"
+              title="Max debt-side (borrow) utilization (0–1)"
+              op="≤"
+              step="0.01"
+              placeholder="0.95"
+              value={filters.maxUtilizationShort}
+              onChange={(v) => set('maxUtilizationShort', v)}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Toolbar: sort + direction, advanced-filters toggle, reset */}
-      <div className="flex flex-wrap items-center gap-2 rounded-box border border-base-300 bg-base-100 px-3 py-2">
-        <div className="flex items-center gap-1.5">
-          <span className="hidden text-[10px] font-medium uppercase tracking-wide text-base-content/40 sm:inline">
-            Sort
-          </span>
-          <select
-            className="select select-bordered select-sm min-w-[9.5rem]"
-            value={filters.sortBy}
-            onChange={(e) => set('sortBy', e.target.value as OptimizerSortKey)}
-          >
-            <option value="aprTotal">Total APR</option>
-            <option value="aprBase">Base APR (no rewards)</option>
-            <option value="maxLeverage">Max leverage</option>
-            <option value="ltv">LTV</option>
-            <option value="depositAprLong">Deposit APR</option>
-            <option value="borrowAprShort">Borrow APR</option>
-            <option value="utilizationShort">Borrow utilization</option>
-            <option value="borrowLiquidityUsdShort">Borrow liquidity</option>
-            <option value="totalLiquidityUsdShort">Debt pool liquidity</option>
-          </select>
+      {/* Filter card: a toolbar (sort + direction, advanced toggle, reset) above
+          a collapsible, divider-separated advanced panel. */}
+      <div className="rounded-box border border-base-300 bg-base-100">
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+          <div className="flex items-center gap-1.5">
+            <span className="hidden text-[10px] font-medium uppercase tracking-wide text-base-content/40 sm:inline">
+              Sort
+            </span>
+            <select
+              className="select select-bordered select-sm min-w-[9.5rem]"
+              value={filters.sortBy}
+              onChange={(e) => set('sortBy', e.target.value as OptimizerSortKey)}
+            >
+              <option value="aprTotal">Total APR</option>
+              <option value="aprBase">Base APR (no rewards)</option>
+              <option value="maxLeverage">Max leverage</option>
+              <option value="ltv">LTV</option>
+              <option value="depositAprLong">Deposit APR</option>
+              <option value="borrowAprShort">Borrow APR</option>
+              <option value="utilizationShort">Borrow utilization</option>
+              <option value="borrowLiquidityUsdShort">Borrow liquidity</option>
+              <option value="totalLiquidityUsdShort">Debt pool liquidity</option>
+            </select>
+            <button
+              type="button"
+              className="btn btn-sm btn-square btn-outline border-base-300"
+              title={
+                filters.sortDir === 'DESC'
+                  ? 'Descending — click for ascending'
+                  : 'Ascending — click for descending'
+              }
+              aria-label="Toggle sort direction"
+              onClick={() => set('sortDir', filters.sortDir === 'DESC' ? 'ASC' : 'DESC')}
+            >
+              <svg
+                className={`h-4 w-4 transition-transform ${
+                  filters.sortDir === 'ASC' ? 'rotate-180' : ''
+                }`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <polyline points="19 12 12 19 5 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="grow" />
+
           <button
             type="button"
-            className="btn btn-sm btn-square btn-outline border-base-300"
-            title={
-              filters.sortDir === 'DESC'
-                ? 'Descending — click for ascending'
-                : 'Ascending — click for descending'
-            }
-            aria-label="Toggle sort direction"
-            onClick={() => set('sortDir', filters.sortDir === 'DESC' ? 'ASC' : 'DESC')}
+            className={`btn btn-sm gap-1.5 ${showAdvanced ? 'btn-neutral' : 'btn-ghost'}`}
+            aria-expanded={showAdvanced}
+            onClick={() => setShowAdvanced((v) => !v)}
           >
             <svg
-              className={`h-4 w-4 transition-transform ${
-                filters.sortDir === 'ASC' ? 'rotate-180' : ''
-              }`}
+              className="h-3.5 w-3.5"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -664,182 +819,101 @@ export function OptimizerTab({
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <polyline points="19 12 12 19 5 12" />
+              <line x1="4" y1="21" x2="4" y2="14" />
+              <line x1="4" y1="10" x2="4" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12" y2="3" />
+              <line x1="20" y1="21" x2="20" y2="16" />
+              <line x1="20" y1="12" x2="20" y2="3" />
+              <line x1="1" y1="14" x2="7" y2="14" />
+              <line x1="9" y1="8" x2="15" y2="8" />
+              <line x1="17" y1="16" x2="23" y2="16" />
             </svg>
+            Filters
+            {activeAdvancedCount > 0 && (
+              <span className="badge badge-primary badge-xs">{activeAdvancedCount}</span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost text-base-content/50"
+            onClick={resetAll}
+            title="Reset all optimizer filters for this chain"
+          >
+            Reset
           </button>
         </div>
 
-        <div className="grow" />
-
-        <button
-          type="button"
-          className={`btn btn-sm gap-1.5 ${showAdvanced ? 'btn-neutral' : 'btn-ghost'}`}
-          aria-expanded={showAdvanced}
-          onClick={() => setShowAdvanced((v) => !v)}
-        >
-          <svg
-            className="h-3.5 w-3.5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="4" y1="21" x2="4" y2="14" />
-            <line x1="4" y1="10" x2="4" y2="3" />
-            <line x1="12" y1="21" x2="12" y2="12" />
-            <line x1="12" y1="8" x2="12" y2="3" />
-            <line x1="20" y1="21" x2="20" y2="16" />
-            <line x1="20" y1="12" x2="20" y2="3" />
-            <line x1="1" y1="14" x2="7" y2="14" />
-            <line x1="9" y1="8" x2="15" y2="8" />
-            <line x1="17" y1="16" x2="23" y2="16" />
-          </svg>
-          Filters
-          {activeAdvancedCount > 0 && (
-            <span className="badge badge-primary badge-xs">{activeAdvancedCount}</span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          className="btn btn-sm btn-ghost text-base-content/50"
-          onClick={resetAll}
-          title="Reset all optimizer filters for this chain"
-        >
-          Reset
-        </button>
-      </div>
-
-      {/* Advanced filters — grouped, with operator/unit affixes for clarity. */}
-      {showAdvanced && (
-        <div className="space-y-4 rounded-box border border-base-300 bg-base-100 p-3 sm:p-4">
-          <FilterGroup title="Returns">
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-              <RangeField
-                label="Min APR"
-                op="≥"
-                suffix="%"
-                placeholder="0.00"
-                value={filters.minApr}
-                onChange={(v) => set('minApr', v)}
-              />
-              <RangeField
-                label="Min leverage"
-                op="≥"
-                suffix="×"
-                placeholder="1.0"
-                value={filters.minLeverage}
-                onChange={(v) => set('minLeverage', v)}
-              />
-              <RangeField
-                label="Min LTV"
-                op="≥"
-                step="0.01"
-                placeholder="0.80"
-                value={filters.minLtv}
-                onChange={(v) => set('minLtv', v)}
-              />
-              <RangeField
-                label="Max borrow rate"
-                op="≤"
-                suffix="%"
-                placeholder="0.00"
-                value={filters.maxBorrowRate}
-                onChange={(v) => set('maxBorrowRate', v)}
-              />
-            </div>
-          </FilterGroup>
-
-          <FilterGroup title="Liquidity">
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-              <RangeField
-                label="Min collateral liq."
-                title="Minimum available liquidity on the collateral (long) side, USD"
-                op="≥"
-                prefix="$"
-                placeholder="2000"
-                value={filters.minLiquidityUsdLong}
-                onChange={(v) => set('minLiquidityUsdLong', v)}
-              />
-              <RangeField
-                label="Min borrow liq."
-                title="Minimum available liquidity on the debt (short) side, USD"
-                op="≥"
-                prefix="$"
-                placeholder="1800"
-                value={filters.minBorrowLiquidityUsd}
-                onChange={(v) => set('minBorrowLiquidityUsd', v)}
-              />
-              <RangeField
-                label="Max utilization"
-                title="Max debt-side utilization (0–1)"
-                op="≤"
-                step="0.01"
-                placeholder="0.95"
-                value={filters.maxUtilizationShort}
-                onChange={(v) => set('maxUtilizationShort', v)}
-              />
-            </div>
-          </FilterGroup>
-
-          <FilterGroup title="Risk & lenders">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <RangeField
-                label="Max config risk"
-                title="Max risk score allowed for the e-mode/config (lower = safer)"
-                op="≤"
-                placeholder="4"
-                value={filters.maxConfigRiskScore}
-                onChange={(v) => set('maxConfigRiskScore', v)}
-              />
-              <div className="flex flex-col gap-1 sm:col-span-2">
-                <span
-                  className="text-[10px] font-medium uppercase tracking-wide text-base-content/50"
-                  title="Comma-separated lender keys to exclude (prefix-expanded server-side)"
-                >
-                  Exclude lenders
-                </span>
-                <input
-                  type="text"
-                  className="input input-bordered input-sm w-full"
-                  placeholder="e.g. RADIANT_V2, MORPHO_BLUE"
-                  value={filters.excludeLenders}
-                  onChange={(e) => set('excludeLenders', e.target.value)}
+        {/* Advanced filters — grouped & divider-separated; compact fixed-width
+            fields with operator/unit affixes for clarity. */}
+        {showAdvanced && (
+          <div className="divide-y divide-base-300 border-t border-base-300">
+            <FilterGroup title="Returns">
+              <div className="flex flex-wrap gap-x-3 gap-y-2">
+                <RangeField
+                  label="Min APR"
+                  op="≥"
+                  suffix="%"
+                  placeholder="0.00"
+                  value={filters.minApr}
+                  onChange={(v) => set('minApr', v)}
+                />
+                <RangeField
+                  label="Min leverage"
+                  op="≥"
+                  suffix="×"
+                  placeholder="1.0"
+                  value={filters.minLeverage}
+                  onChange={(v) => set('minLeverage', v)}
+                />
+                <RangeField
+                  label="Min LTV"
+                  op="≥"
+                  step="0.01"
+                  placeholder="0.80"
+                  value={filters.minLtv}
+                  onChange={(v) => set('minLtv', v)}
+                />
+                <RangeField
+                  label="Max borrow rate"
+                  op="≤"
+                  suffix="%"
+                  placeholder="0.00"
+                  value={filters.maxBorrowRate}
+                  onChange={(v) => set('maxBorrowRate', v)}
                 />
               </div>
-            </div>
-          </FilterGroup>
+            </FilterGroup>
 
-          <FilterGroup title="Asset properties">
-            <div className="space-y-2">
-              {/* Chips toggle a tag on/off; the backend AND-narrows that leg to
-                  assets carrying it. */}
-              {(['collateralTags', 'debtTags'] as const).map((side) => (
-                <div key={side} className="flex flex-wrap items-center gap-1.5">
-                  <span className="w-16 shrink-0 text-[10px] font-medium uppercase tracking-wide text-base-content/50">
-                    {side === 'collateralTags' ? 'Collateral' : 'Debt'}
+            <FilterGroup title="Risk & lenders">
+              <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+                <RangeField
+                  label="Max config risk"
+                  title="Max risk score allowed for the e-mode/config (lower = safer)"
+                  op="≤"
+                  placeholder="4"
+                  value={filters.maxConfigRiskScore}
+                  onChange={(v) => set('maxConfigRiskScore', v)}
+                />
+                <div className="flex min-w-[14rem] grow flex-col gap-1">
+                  <span
+                    className="text-[10px] font-medium uppercase tracking-wide text-base-content/50"
+                    title="Comma-separated lender keys to exclude (prefix-expanded server-side)"
+                  >
+                    Exclude lenders
                   </span>
-                  {PROPERTY_TAGS.map((t) => {
-                    const active = filters[side].includes(t.slug)
-                    return (
-                      <button
-                        key={t.slug}
-                        type="button"
-                        aria-pressed={active}
-                        className={`btn btn-xs ${active ? 'btn-primary' : 'btn-outline btn-ghost'}`}
-                        onClick={() => toggleTag(side, t.slug)}
-                      >
-                        {t.label}
-                      </button>
-                    )
-                  })}
+                  <input
+                    type="text"
+                    className="input input-bordered input-sm w-full"
+                    placeholder="e.g. RADIANT_V2, MORPHO_BLUE"
+                    value={filters.excludeLenders}
+                    onChange={(e) => set('excludeLenders', e.target.value)}
+                  />
                 </div>
-              ))}
+              </div>
               {/* Expired Pendle PTs are hidden by default; opt back in here. */}
-              <label className="flex cursor-pointer items-center gap-2 pt-1">
+              <label className="mt-2 flex cursor-pointer items-center gap-2">
                 <input
                   type="checkbox"
                   className="checkbox checkbox-xs"
@@ -853,10 +927,10 @@ export function OptimizerTab({
                   Include expired PTs
                 </span>
               </label>
-            </div>
-          </FilterGroup>
-        </div>
-      )}
+            </FilterGroup>
+          </div>
+        )}
+      </div>
 
       {/* Results status line */}
       <div className="flex items-center justify-between px-0.5 text-xs">

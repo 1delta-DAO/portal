@@ -95,6 +95,10 @@ interface RawOptimizerPair {
   ltv?: string | number
   depositAprLong?: string | number
   borrowAprShort?: string | number
+  /** One-time origination/mint fee on the debt side, PERCENT (Liquity CDPs).
+   *  Already folded into borrowAprShort/aprTotal by the backend; surfaced for a
+   *  "· fee X%" hint. */
+  originationFeeShort?: string | number | null
   rewardAprLong?: string | number
   rewardAprShort?: string | number
   /** Intrinsic (native/staking) yield of each side's asset, percent units. The
@@ -123,6 +127,18 @@ interface RawOptimizerPair {
   maxDebtAmountUsd?: string | number | null
   minCollateralAmount?: string | number | null
   minCollateralAmountUsd?: string | number | null
+  // Effective depth-aware APR at the supplied notional (percent units). Each leg
+  // is the headline rate with only its organic (IRM) component re-priced at the
+  // post-action utilization (intrinsic yield + rewards are size-invariant), so
+  // netAprAtAmount is comparable to aprTotal but at the position's actual
+  // size/leverage. Present when an amount is supplied; null/absent for non-curve
+  // lenders. Raw grids (borrowDepthShort/supplyDepthLong) only when depth=true.
+  // Typed here for the contract; not yet consumed by the UI.
+  borrowAprAtAmount?: string | number | null
+  depositAprAtAmount?: string | number | null
+  netAprAtAmount?: string | number | null
+  borrowDepthShort?: unknown
+  supplyDepthLong?: unknown
   // Legacy snake_case fallbacks (older deployments).
   max_debt_amount?: string | number | null
   min_collateral_amount?: string | number | null
@@ -130,7 +146,22 @@ interface RawOptimizerPair {
   // maturity, `apr` in percent units. Present when the short market is brokered/
   // order-book (variable borrow rate is 0/meaningless — read the fixed rate here).
   termsShort?:
-    | { termId?: string | number; durationDays?: string | number; apr?: string | number }[]
+    | {
+        termId?: string | number
+        durationDays?: string | number
+        /** Fixed borrow APR % for this term (0-notional / top-of-book). */
+        apr?: string | number
+        /** Size-weighted (VWAP) borrow APR % at the entered debt amount for
+         *  order-book terms (Midnight): the borrow ladder filled cheapest-first.
+         *  Present only with an amount + a ladder; prefer over `apr` when set. */
+        aprAtAmount?: string | number | null
+        /** Total loan-token depth in this term's book (max borrow at this maturity). */
+        fillable?: string | number | null
+        /** True when the amount exceeds `fillable` (book can't fully fund it). */
+        capped?: boolean
+        /** Raw order-book borrow ladder (only when depth=true). */
+        ladder?: unknown
+      }[]
     | null
   // Risk scoring (per-dimension breakdown + max token score).
   risk?: {
@@ -183,6 +214,10 @@ export interface OptimizerPairRow {
   /** APRs as fractions (0.05 = 5%). */
   depositAprLong: number
   borrowAprShort: number
+  /** One-time origination/mint fee (fraction, e.g. 0.005 = 0.5%) on the debt
+   *  side (Liquity CDPs). Already reflected in aprTotal / borrowAprEffective;
+   *  surfaced for a "· fee" label. */
+  originationFeeShort?: number
   rewardAprLong: number
   rewardAprShort: number
   /** Intrinsic (native/staking) yield of each side as a fraction. */
@@ -225,12 +260,36 @@ export interface OptimizerPairRow {
   minCollateralAmount?: number
   minCollateralAmountUsd?: number
   /**
+   * Effective depth-aware APR at the entered amount (fractions). Present only
+   * when an amount was supplied and the pair is a curve market. The `*AtAmount`
+   * legs re-price only their organic (IRM) component at the position size;
+   * `netAprAtAmount` is comparable to `aprTotal` but at the entered size/leverage.
+   */
+  depositAprAtAmount?: number
+  borrowAprAtAmount?: number
+  netAprAtAmount?: number
+  /**
    * Fixed-term broker rate card on the DEBT side (Lista) — one entry per
    * maturity. Drives the borrow-term picker in the action panel; passing a
    * `termId` routes the open through the atomic composer server-side.
    */
   termsShort?:
-    | { termId?: string | number; durationDays?: string | number; apr?: string | number }[]
+    | {
+        termId?: string | number
+        durationDays?: string | number
+        /** Fixed borrow APR % for this term (0-notional / top-of-book). */
+        apr?: string | number
+        /** Size-weighted (VWAP) borrow APR % at the entered debt amount for
+         *  order-book terms (Midnight): the borrow ladder filled cheapest-first.
+         *  Present only with an amount + a ladder; prefer over `apr` when set. */
+        aprAtAmount?: string | number | null
+        /** Total loan-token depth in this term's book (max borrow at this maturity). */
+        fillable?: string | number | null
+        /** True when the amount exceeds `fillable` (book can't fully fund it). */
+        capped?: boolean
+        /** Raw order-book borrow ladder (only when depth=true). */
+        ladder?: unknown
+      }[]
     | null
   /**
    * Days to maturity — set ONLY for synthetic fixed-term (Morpho Midnight) rows
@@ -258,6 +317,12 @@ const optNum = (v: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined
 }
 
+/** Percent (API) → fraction, preserving `undefined` when the value is absent. */
+const pctToFrac = (v: unknown): number | undefined => {
+  const n = optNum(v)
+  return n == null ? undefined : n / 100
+}
+
 function asAssetRef(info: RawAssetInfo | undefined, fallbackChainId: string): OptimizerAssetRef {
   const a = info?.asset
   return {
@@ -279,12 +344,23 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
   // recompute the leveraged Net APR from it (the backend's aprTotal is derived
   // off the 0 variable rate for these markets).
   const fixedTerm = raw.termsShort?.find((t) => t && t.apr != null)
+  // Headline uses the SPOT term rate (top-of-book / flat broker rate), so aprTotal
+  // stays the 0-notional net — consistent with variable markets. The size-weighted
+  // order-book rate feeds `netAprAtAmount` below (drives the "@ size" line).
   const borrowShortPct = fixedTerm ? numOr0(fixedTerm.apr) : numOr0(raw.borrowAprShort)
   const maxLev = numOr0(raw.maxLeverage)
   const depEff = (numOr0(raw.depositAprLong) + numOr0(raw.intrinsicYieldLong)) / 100
   const borEff = (borrowShortPct + numOr0(raw.intrinsicYieldShort)) / 100
   const aprTotalFrac =
     fixedTerm && maxLev > 0 ? maxLev * depEff - (maxLev - 1) * borEff : numOr0(raw.aprTotal) / 100
+  // "@ size" net APR: variable markets get it from the backend; fixed-term
+  // order-book markets (Midnight) have no IRM grid, so derive it here from the
+  // term's size-weighted VWAP rate (`aprAtAmount`) at the entered amount.
+  const netAprAtAmountFrac =
+    fixedTerm && fixedTerm.aprAtAmount != null && maxLev > 0
+      ? maxLev * depEff -
+        (maxLev - 1) * ((numOr0(fixedTerm.aprAtAmount) + numOr0(raw.intrinsicYieldShort)) / 100)
+      : pctToFrac(raw.netAprAtAmount)
   return {
     chainId: raw.chainId,
     lenderKey: raw.lender,
@@ -302,6 +378,7 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
     // APR fields are percent units in the API → convert to fractions.
     depositAprLong: numOr0(raw.depositAprLong) / 100,
     borrowAprShort: borrowShortPct / 100,
+    originationFeeShort: pctToFrac(raw.originationFeeShort),
     rewardAprLong: numOr0(raw.rewardAprLong) / 100,
     rewardAprShort: numOr0(raw.rewardAprShort) / 100,
     intrinsicYieldLong: numOr0(raw.intrinsicYieldLong) / 100,
@@ -338,6 +415,11 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
     maxDebtAmountUsd: optNum(raw.maxDebtAmountUsd),
     minCollateralAmount: optNum(raw.minCollateralAmount ?? raw.min_collateral_amount),
     minCollateralAmountUsd: optNum(raw.minCollateralAmountUsd),
+    // Depth-aware APR at the entered amount (percent → fraction). undefined when
+    // absent (no amount / non-curve lender) so the table shows it only then.
+    depositAprAtAmount: pctToFrac(raw.depositAprAtAmount),
+    borrowAprAtAmount: pctToFrac(raw.borrowAprAtAmount),
+    netAprAtAmount: netAprAtAmountFrac,
     // Fixed-term broker rate card (Lista) — drives the borrow-term picker.
     termsShort: raw.termsShort,
     // Fixed-term maturity (Midnight): drives the "Fixed · Nd" borrow-rate label.

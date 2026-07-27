@@ -2,12 +2,12 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { OptimizerPairRow } from '../../../../hooks/lending/useOptimizerPairs'
 import type { LenderInfo } from '../../../../hooks/lending/useFlattenedPools'
-import { abbreviateUsd } from '../../../../utils/format'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { TablePagination } from '../../../common/TablePagination'
 import { buildPath, OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'
 import { LenderBadge } from '../../shared/LenderBadge'
 import { AssetPopover } from '../../shared/AssetPopover'
+import { UsdAmount } from '../../../common/UsdAmount'
 import { riskDotColor } from '../earn/helpers'
 
 /** Small colored dot for an asset's own token risk. Rendered only when the
@@ -78,7 +78,6 @@ export const pairKey = (row: OptimizerPairRow) =>
 const fmtPct = (n: number | undefined) =>
   n == null || Number.isNaN(n) ? '–' : `${(n * 100).toFixed(2)}%`
 const fmtLev = (n: number | undefined) => (n == null || Number.isNaN(n) ? '–' : `${n.toFixed(2)}×`)
-const fmtUsd = (n: number | undefined) => (n == null ? '–' : abbreviateUsd(n))
 const fmtTok = (n: number | undefined, sym?: string) =>
   n == null
     ? '–'
@@ -107,9 +106,13 @@ function AmountCell({ tok, usd, sym }: { tok?: number; usd?: number; sym?: strin
   return (
     <td className="text-right">
       <div className="flex flex-col items-end leading-tight">
-        <span>{tok != null ? fmtTok(tok, sym) : fmtUsd(usd)}</span>
+        <span>
+          {tok != null ? fmtTok(tok, sym) : usd != null ? <UsdAmount value={usd} /> : '–'}
+        </span>
         {tok != null && usd != null && (
-          <span className="text-[10px] text-base-content/50">{fmtUsd(usd)}</span>
+          <span className="mt-0.5">
+            <UsdAmount value={usd} />
+          </span>
         )}
       </div>
     </td>
@@ -237,12 +240,22 @@ function PairCard({
   onSelect?: () => void
   onDetails: () => void
 }) {
-  const maxDebt =
-    row.maxDebtAmount != null ? fmtTok(row.maxDebtAmount, row.debt.symbol) : fmtUsd(row.maxDebtAmountUsd)
-  const minColl =
-    row.minCollateralAmount != null
-      ? fmtTok(row.minCollateralAmount, row.collateral.symbol)
-      : fmtUsd(row.minCollateralAmountUsd)
+  const maxDebt: ReactNode =
+    row.maxDebtAmount != null ? (
+      fmtTok(row.maxDebtAmount, row.debt.symbol)
+    ) : row.maxDebtAmountUsd != null ? (
+      <UsdAmount value={row.maxDebtAmountUsd} />
+    ) : (
+      '–'
+    )
+  const minColl: ReactNode =
+    row.minCollateralAmount != null ? (
+      fmtTok(row.minCollateralAmount, row.collateral.symbol)
+    ) : row.minCollateralAmountUsd != null ? (
+      <UsdAmount value={row.minCollateralAmountUsd} />
+    ) : (
+      '–'
+    )
   return (
     <li
       className={`p-3 ${onSelect ? 'cursor-pointer active:bg-base-200' : ''} ${
@@ -260,7 +273,20 @@ function PairCard({
             <span className="text-success">{fmtPct(row.depositAprLong)}</span>
             {' / '}
             <span className="text-error">{fmtPct(row.borrowAprShort)}</span>
+            {row.originationFeeShort ? (
+              <span
+                className="ml-1 text-warning"
+                title="This borrow cost is a one-time origination / mint fee paid UPFRONT when you open the position — not an ongoing rate. Shown amortized over 1 year (Net APR uses the same)."
+              >
+                · {fmtPct(row.originationFeeShort)} upfront fee
+              </span>
+            ) : null}
           </div>
+          {row.netAprAtAmount != null && (
+            <div className="text-[10px] text-info" title="Net APR at your entered amount">
+              @ size {fmtPct(row.netAprAtAmount)}
+            </div>
+          )}
         </div>
       </div>
 
@@ -286,7 +312,7 @@ function PairCard({
         <CardStat label="Util." value={fmtPct(row.utilizationShort)} />
         <CardStat
           label="Borrow liq."
-          value={fmtUsd(row.borrowLiquidityUsdShort || row.totalLiquidityUsdShort)}
+          value={<UsdAmount value={row.borrowLiquidityUsdShort || row.totalLiquidityUsdShort} />}
         />
         {showMaxDebt && <CardStat label="Max debt" value={maxDebt} />}
         {showMinCollateral && <CardStat label="Min collateral" value={minColl} />}
@@ -416,7 +442,23 @@ export function OptimizerTable({
                             · fixed {Math.round(row.maturityDays)}d
                           </span>
                         )}
+                        {row.originationFeeShort ? (
+                          <span
+                            className="ml-1 text-warning"
+                            title="This borrow cost is a one-time origination / mint fee paid UPFRONT when you open the position — not an ongoing rate. Shown amortized over 1 year (Net APR uses the same)."
+                          >
+                            · {fmtPct(row.originationFeeShort)} upfront fee
+                          </span>
+                        ) : null}
                       </span>
+                      {row.netAprAtAmount != null && (
+                        <span
+                          className="text-[10px] text-info"
+                          title="Net APR at your entered amount — the rate curves re-priced at the position size"
+                        >
+                          @ size {fmtPct(row.netAprAtAmount)}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="text-right">
@@ -429,7 +471,7 @@ export function OptimizerTable({
                   </td>
                   <td className="text-right">{fmtPct(row.utilizationShort)}</td>
                   <td className="text-right">
-                    {fmtUsd(row.borrowLiquidityUsdShort || row.totalLiquidityUsdShort)}
+                    <UsdAmount value={row.borrowLiquidityUsdShort || row.totalLiquidityUsdShort} />
                   </td>
                   {showMaxDebt && (
                     <AmountCell

@@ -21,7 +21,7 @@ import {
   type UserSubAccount,
   type UserPositionEntry,
 } from '../../../../hooks/lending/useUserData'
-import { formatUsd } from '../../../../utils/format'
+import { UsdAmount } from '../../../common/UsdAmount'
 import { Logo } from '../../../common/Logo'
 import { OptimizerLoopPanel } from './OptimizerLoopPanel'
 import { DepthChart } from './DepthChart'
@@ -426,14 +426,9 @@ function CombinedForm({
             />
           </div>
         )}
-        <span className="label-text text-xs mb-1 flex items-center justify-between">
-          <span>
-            {primaryLabel} ·{' '}
-            {(payNative && nativeToken ? nativeToken.symbol : primaryToken.symbol) ?? '—'}
-          </span>
-          {gt0(primary) && priceP > 0 && (
-            <span className="text-base-content/50">${formatUsd(Number(primary) * priceP)}</span>
-          )}
+        <span className="label-text text-xs mb-1 block">
+          {primaryLabel} ·{' '}
+          {(payNative && nativeToken ? nativeToken.symbol : primaryToken.symbol) ?? '—'}
         </span>
         {/* Wallet balance for the leg being spent — tap to fill the full amount. */}
         <div className="text-[10px] flex items-center justify-between px-0.5 mb-1 text-base-content/60">
@@ -470,12 +465,12 @@ function CombinedForm({
           {primaryBal ? (
             <button
               type="button"
-              className="font-medium hover:text-base-content transition-colors"
+              className="inline-flex items-center gap-1 font-medium hover:text-base-content transition-colors"
               onClick={() => setPrimary(primaryBal.balance)}
               title="Use full balance"
             >
-              {fmtBal(primaryBal.balance)}
-              {primaryBal.balanceUSD > 0 && ` ($${formatUsd(primaryBal.balanceUSD)})`}
+              <span>{fmtBal(primaryBal.balance)}</span>
+              {primaryBal.balanceUSD > 0 && <UsdAmount value={primaryBal.balanceUSD} />}
             </button>
           ) : isBalancesFetching ? (
             <span className="text-base-content/40">Loading…</span>
@@ -491,6 +486,7 @@ function CombinedForm({
           decimals={primaryToken.decimals}
           placeholder="0.0"
           error={primaryOverMax ? `Exceeds wallet balance (${fmtBal(primaryMax)})` : null}
+          usdValue={priceP > 0 ? Number(primary) * priceP : undefined}
         />
       </div>
 
@@ -569,12 +565,8 @@ function CombinedForm({
               ? `Exceeds max (${Number(secondaryMax).toLocaleString(undefined, { maximumFractionDigits: 6 })})`
               : null
           }
+          usdValue={priceS > 0 ? Number(secondary) * priceS : undefined}
         />
-        {gt0(secondary) && priceS > 0 && (
-          <span className="text-[10px] text-base-content/40 mt-0.5">
-            {formatUsd(Number(secondary) * priceS)}
-          </span>
-        )}
       </div>
 
       {/* Borrow-rate depth: how the debt market's rate climbs with the borrow
@@ -796,16 +788,18 @@ export function PairActionPanel({ row, account, onClose, lenderName, lenderLogo 
           {curDeposits > 0 && (
             <div className="flex items-center justify-between gap-2">
               <span className="text-base-content/60">Deposited {row.collateral.symbol}</span>
-              <span className="text-success font-medium whitespace-nowrap">
-                {fmtBal(String(curDeposits))} (${formatUsd(curDepositsUsd)})
+              <span className="inline-flex items-center gap-1 text-success font-medium whitespace-nowrap">
+                {fmtBal(String(curDeposits))}
+                <UsdAmount value={curDepositsUsd} />
               </span>
             </div>
           )}
           {curDebt > 0 && (
             <div className="flex items-center justify-between gap-2">
               <span className="text-base-content/60">Borrowed {row.debt.symbol}</span>
-              <span className="text-error font-medium whitespace-nowrap">
-                {fmtBal(String(curDebt))} (${formatUsd(curDebtUsd)})
+              <span className="inline-flex items-center gap-1 text-error font-medium whitespace-nowrap">
+                {fmtBal(String(curDebt))}
+                <UsdAmount value={curDebtUsd} />
               </span>
             </div>
           )}
