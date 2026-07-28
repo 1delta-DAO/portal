@@ -282,9 +282,25 @@ function PairCard({
               </span>
             ) : null}
           </div>
+          {Math.abs(row.aprTotal - row.aprBase) > 0.0002 && (
+            <div
+              className="text-[10px] text-base-content/50"
+              title="Net APR excluding rewards — the sustainable rate. Reward incentives are typically transient."
+            >
+              base{' '}
+              <span className={row.aprBase < 0 ? 'text-error' : 'text-success'}>
+                {fmtPct(row.aprBase)}
+              </span>
+              <span className="text-warning"> · +{fmtPct(row.aprTotal - row.aprBase)} rwd</span>
+            </div>
+          )}
           {row.netAprAtAmount != null && (
-            <div className="text-[10px] text-info" title="Net APR at your entered amount">
+            <div className="text-[10px] text-info" title="Net APR at your entered amount (incl. rewards)">
               @ size {fmtPct(row.netAprAtAmount)}
+              {row.netAprAtAmountBase != null &&
+                Math.abs(row.netAprAtAmountBase - row.netAprAtAmount) > 0.0002 && (
+                  <span className="text-base-content/50"> · base {fmtPct(row.netAprAtAmountBase)}</span>
+                )}
             </div>
           )}
         </div>
@@ -451,12 +467,31 @@ export function OptimizerTable({
                           </span>
                         ) : null}
                       </span>
+                      {Math.abs(row.aprTotal - row.aprBase) > 0.0002 && (
+                        <span
+                          className="text-[10px] text-base-content/50"
+                          title="Net APR excluding rewards — the sustainable rate. Reward incentives are typically transient."
+                        >
+                          base{' '}
+                          <span className={row.aprBase < 0 ? 'text-error' : 'text-success'}>
+                            {fmtPct(row.aprBase)}
+                          </span>
+                          <span className="text-warning"> · +{fmtPct(row.aprTotal - row.aprBase)} rwd</span>
+                        </span>
+                      )}
                       {row.netAprAtAmount != null && (
                         <span
                           className="text-[10px] text-info"
-                          title="Net APR at your entered amount — the rate curves re-priced at the position size"
+                          title="Net APR at your entered amount — the rate curves re-priced at the position size (incl. rewards)"
                         >
                           @ size {fmtPct(row.netAprAtAmount)}
+                          {row.netAprAtAmountBase != null &&
+                            Math.abs(row.netAprAtAmountBase - row.netAprAtAmount) > 0.0002 && (
+                              <span className="text-base-content/50">
+                                {' · base '}
+                                {fmtPct(row.netAprAtAmountBase)}
+                              </span>
+                            )}
                         </span>
                       )}
                     </div>

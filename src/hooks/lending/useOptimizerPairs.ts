@@ -268,6 +268,9 @@ export interface OptimizerPairRow {
   depositAprAtAmount?: number
   borrowAprAtAmount?: number
   netAprAtAmount?: number
+  /** Reward-free "@ size" net (fraction) — the sustainable rate; rewards are
+   *  transient. Reward contribution at size = netAprAtAmount − netAprAtAmountBase. */
+  netAprAtAmountBase?: number
   /**
    * Fixed-term broker rate card on the DEBT side (Lista) — one entry per
    * maturity. Drives the borrow-term picker in the action panel; passing a
@@ -361,6 +364,14 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
       ? maxLev * depEff -
         (maxLev - 1) * ((numOr0(fixedTerm.aprAtAmount) + numOr0(raw.intrinsicYieldShort)) / 100)
       : pctToFrac(raw.netAprAtAmount)
+  // Reward-free ("@ size") net — the sustainable rate (rewards are transient).
+  // Variable / CDP markets get it from the backend; fixed-term (order-book)
+  // markets carry no borrow reward, so strip the collateral reward from the term
+  // net (leveraged deposit reward = maxLev · rewardAprLong).
+  const netAprAtAmountBaseFrac =
+    fixedTerm && fixedTerm.aprAtAmount != null && maxLev > 0
+      ? (netAprAtAmountFrac ?? 0) - maxLev * (numOr0(raw.rewardAprLong) / 100)
+      : pctToFrac(raw.netAprAtAmountBase)
   return {
     chainId: raw.chainId,
     lenderKey: raw.lender,
@@ -420,6 +431,7 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
     depositAprAtAmount: pctToFrac(raw.depositAprAtAmount),
     borrowAprAtAmount: pctToFrac(raw.borrowAprAtAmount),
     netAprAtAmount: netAprAtAmountFrac,
+    netAprAtAmountBase: netAprAtAmountBaseFrac,
     // Fixed-term broker rate card (Lista) — drives the borrow-term picker.
     termsShort: raw.termsShort,
     // Fixed-term maturity (Midnight): drives the "Fixed · Nd" borrow-rate label.
