@@ -147,6 +147,12 @@ export interface PoolDataItem {
   stableBorrowRate: number
   intrinsicYield: number
   rewards: Record<string, unknown>
+  /** Summed deposit-side reward APR (percent) from incentive campaigns. */
+  depositRewardApr: number
+  /** Summed borrow-side reward APR (percent) — a rebate that lowers borrow cost. */
+  borrowRewardApr: number
+  /** Distinct reward sources (e.g. "merkle", "native") for tooltip display. */
+  rewardSources: string[]
   config: Record<string, PoolConfig>
   borrowCap: number
   supplyCap: number
@@ -238,6 +244,23 @@ function rawMarketToPoolDataItem(raw: RawMarket): PoolDataItem {
     stableBorrowRate: raw.stableBorrowRate,
     intrinsicYield: raw.intrinsicYield,
     rewards: raw.rewards ?? {},
+    // The API serialises rewards as an array of {asset,source,depositRate,
+    // variableBorrowRate,link}; sum each side and collect sources for display.
+    depositRewardApr: (Array.isArray(raw.rewards) ? raw.rewards : []).reduce(
+      (s: number, r: any) => s + (Number(r?.depositRate) || 0),
+      0,
+    ),
+    borrowRewardApr: (Array.isArray(raw.rewards) ? raw.rewards : []).reduce(
+      (s: number, r: any) => s + (Number(r?.variableBorrowRate) || 0),
+      0,
+    ),
+    rewardSources: Array.from(
+      new Set(
+        (Array.isArray(raw.rewards) ? raw.rewards : [])
+          .map((r: any) => r?.source)
+          .filter(Boolean),
+      ),
+    ) as string[],
     config: raw.config ?? {},
     borrowCap: raw.caps?.borrowCap ?? 0,
     supplyCap: raw.caps?.supplyCap ?? 0,

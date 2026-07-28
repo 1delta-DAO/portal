@@ -157,7 +157,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
           </thead>
           <tbody>
             {pools.map((p) => {
-              const { utilization, apr, borrowApr, intrinsicYield, price } = computePoolMetrics(p)
+              const { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr } = computePoolMetrics(p)
               const utilPct = utilization * 100
               const totalDepositsUSD = parseFloat(p.totalDepositsUsd) || 0
               const totalDebtUSD = parseFloat(p.totalDebtUsd) || 0
@@ -220,16 +220,26 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                     </div>
                   </td>
                   <td className="text-right">
-                    <div className="flex items-center justify-end gap-1 text-xs">
-                      <span className="font-semibold text-success">
-                        {(apr + intrinsicYield).toFixed(2)}%
-                      </span>
-                      {intrinsicYield > 0 && (
+                    <div className="flex flex-col items-end gap-0.5 text-xs">
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="font-semibold text-success">
+                          {(apr + intrinsicYield).toFixed(2)}%
+                        </span>
+                        {intrinsicYield > 0 && (
+                          <span
+                            className="badge badge-xs bg-success/15 text-success border-0 cursor-help whitespace-nowrap"
+                            title={`Base rate: ${apr.toFixed(2)}% + Intrinsic yield: ${intrinsicYield.toFixed(2)}%`}
+                          >
+                            +{intrinsicYield.toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                      {depositRewardApr > 0.005 && (
                         <span
-                          className="badge badge-xs bg-success/15 text-success border-0 cursor-help"
-                          title={`Base rate: ${apr.toFixed(2)}% + Intrinsic yield: ${intrinsicYield.toFixed(2)}%`}
+                          className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help whitespace-nowrap"
+                          title={`Reward incentive: +${depositRewardApr.toFixed(2)}% APR (transient)`}
                         >
-                          +{intrinsicYield.toFixed(1)}%
+                          +{depositRewardApr.toFixed(1)}% rwd
                         </span>
                       )}
                     </div>
@@ -333,7 +343,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
         )}
 
         {pools.map((p) => {
-          const { utilization, apr, borrowApr, intrinsicYield, price } = computePoolMetrics(p)
+          const { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr } = computePoolMetrics(p)
           const utilPct = utilization * 100
           const totalDepositsUSD = parseFloat(p.totalDepositsUsd) || 0
           const totalLiquidityUSD = parseFloat(p.totalLiquidityUsd) || 0
@@ -400,13 +410,23 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                     <span className="font-bold text-sm text-success">{depTotal.toFixed(2)}%</span>
                     {intrinsicYield > 0 && (
                       <span
-                        className="badge badge-xs bg-success/15 text-success border-0"
+                        className="badge badge-xs bg-success/15 text-success border-0 whitespace-nowrap"
                         title={`Base rate: ${apr.toFixed(2)}% + Intrinsic yield: ${intrinsicYield.toFixed(2)}%`}
                       >
                         +{intrinsicYield.toFixed(1)}%
                       </span>
                     )}
                   </div>
+                  {depositRewardApr > 0.005 && (
+                    <div className="flex justify-end mt-0.5">
+                      <span
+                        className="badge badge-xs bg-warning/15 text-warning border-0 whitespace-nowrap"
+                        title={`Reward incentive: +${depositRewardApr.toFixed(2)}% APR (transient)`}
+                      >
+                        +{depositRewardApr.toFixed(1)}% rwd
+                      </span>
+                    </div>
+                  )}
                   <span className="text-[10px] text-base-content/50 block">Deposit APR</span>
                 </div>
               </div>

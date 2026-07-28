@@ -780,11 +780,11 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                       </td>
                       <td>
                         {rowSide === 'collateral' ? (
-                          <AprCell rate={item.depositRate} iy={iy} color="success" />
+                          <AprCell rate={item.depositRate} iy={iy} color="success" reward={pool?.depositRewardApr} />
                         ) : isBrokered ? (
                           <BrokeredAprCell terms={pool?.terms} />
                         ) : (
-                          <AprCell rate={item.variableBorrowRate} iy={iy} color="warning" />
+                          <AprCell rate={item.variableBorrowRate} iy={iy} color="warning" reward={pool?.borrowRewardApr} />
                         )}
                       </td>
                       <td className="text-right">
@@ -897,7 +897,7 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                       {role && <RoleChip role={role} />}
                       {rowSide === 'collateral' ? (
                         <>
-                          <AprCell rate={item.depositRate} iy={iy} color="success" />
+                          <AprCell rate={item.depositRate} iy={iy} color="success" reward={pool?.depositRewardApr} align="end" />
                           <span className="text-[10px] text-base-content/50 block">
                             Deposit APR
                           </span>
@@ -911,7 +911,7 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                         </>
                       ) : (
                         <>
-                          <AprCell rate={item.variableBorrowRate} iy={iy} color="warning" />
+                          <AprCell rate={item.variableBorrowRate} iy={iy} color="warning" reward={pool?.borrowRewardApr} align="end" />
                           <span className="text-[10px] text-base-content/50 block">
                             Borrow APR
                           </span>
@@ -1070,23 +1070,45 @@ const AssetCell: React.FC<{ item: ConfigMarketItem; hasPosition: boolean; entity
   )
 }
 
-const AprCell: React.FC<{ rate: number; iy: number; color: 'success' | 'warning' }> = ({
-  rate,
-  iy,
-  color,
-}) => {
+const AprCell: React.FC<{
+  rate: number
+  iy: number
+  color: 'success' | 'warning'
+  reward?: number
+  align?: 'start' | 'end'
+}> = ({ rate, iy, color, reward = 0, align = 'start' }) => {
   const total = rate + iy
+  // A deposit-side reward adds to what you earn; a borrow-side reward is a
+  // rebate that lowers cost — show it in the opposite semantic colour.
+  const isBorrow = color === 'warning'
   return (
-    <div className="flex items-center gap-1">
-      <span className={`text-sm font-medium tabular-nums text-${color}`}>
-        {total.toFixed(2)}%
-      </span>
-      {iy > 0 && (
+    <div className={`flex flex-col gap-0.5 ${align === 'end' ? 'items-end' : 'items-start'}`}>
+      <div className="flex items-center gap-1">
+        <span className={`text-sm font-medium tabular-nums text-${color}`}>
+          {total.toFixed(2)}%
+        </span>
+        {iy > 0 && (
+          <span
+            className={`badge badge-xs bg-${color}/15 text-${color} border-0 cursor-help whitespace-nowrap`}
+            title={`Base rate: ${rate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}%`}
+          >
+            +{iy.toFixed(1)}%
+          </span>
+        )}
+      </div>
+      {reward > 0.005 && (
         <span
-          className={`badge badge-xs bg-${color}/15 text-${color} border-0 cursor-help`}
-          title={`Base rate: ${rate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}%`}
+          className={`badge badge-xs border-0 cursor-help whitespace-nowrap ${
+            isBorrow ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'
+          }`}
+          title={
+            isBorrow
+              ? `Borrow reward rebate: −${reward.toFixed(2)}% APR (lowers borrow cost, transient)`
+              : `Reward incentive: +${reward.toFixed(2)}% APR (transient)`
+          }
         >
-          +{iy.toFixed(1)}%
+          {isBorrow ? '−' : '+'}
+          {reward.toFixed(1)}% rwd
         </span>
       )}
     </div>

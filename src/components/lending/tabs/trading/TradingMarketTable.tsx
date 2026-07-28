@@ -167,16 +167,28 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                     </AssetPopover>
                   </td>
                   <td className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <span className="text-sm font-medium text-success">
-                        {depositTotal.toFixed(2)}%
-                      </span>
-                      {iy > 0 && (
+                    <div className="flex flex-col items-end gap-0.5">
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-sm font-medium text-success">
+                          {depositTotal.toFixed(2)}%
+                        </span>
+                        {iy > 0 && (
+                          <span
+                            className="badge badge-xs bg-success/15 text-success border-0 cursor-help whitespace-nowrap"
+                            title={`Base rate: ${pool.depositRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}%`}
+                          >
+                            +{iy.toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                      {pool.depositRewardApr > 0.005 && (
                         <span
-                          className="badge badge-xs bg-success/15 text-success border-0 cursor-help"
-                          title={`Base rate: ${pool.depositRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}%`}
+                          className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help whitespace-nowrap"
+                          title={`Reward incentive: +${pool.depositRewardApr.toFixed(2)}% APR (transient)${
+                            pool.rewardSources.length ? ` · ${pool.rewardSources.join(', ')}` : ''
+                          }`}
                         >
-                          +{iy.toFixed(1)}%
+                          +{pool.depositRewardApr.toFixed(1)}% rwd
                         </span>
                       )}
                     </div>
@@ -185,16 +197,26 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                     {isBrokered ? (
                       <BrokeredAprCell terms={pool.terms} />
                     ) : (
-                      <div className="flex items-center justify-end gap-1">
-                        <span className="text-sm font-medium text-warning">
-                          {borrowTotal.toFixed(2)}%
-                        </span>
-                        {iy > 0 && (
+                      <div className="flex flex-col items-end gap-0.5">
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-sm font-medium text-warning">
+                            {borrowTotal.toFixed(2)}%
+                          </span>
+                          {iy > 0 && (
+                            <span
+                              className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help whitespace-nowrap"
+                              title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}% (paid by borrower)`}
+                            >
+                              +{iy.toFixed(1)}%
+                            </span>
+                          )}
+                        </div>
+                        {pool.borrowRewardApr > 0.005 && (
                           <span
-                            className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help"
-                            title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}% (paid by borrower)`}
+                            className="badge badge-xs bg-success/15 text-success border-0 cursor-help whitespace-nowrap"
+                            title={`Borrow reward rebate: −${pool.borrowRewardApr.toFixed(2)}% APR (lowers borrow cost, transient)`}
                           >
-                            +{iy.toFixed(1)}%
+                            −{pool.borrowRewardApr.toFixed(1)}% rwd
                           </span>
                         )}
                       </div>
@@ -331,13 +353,25 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                     <span className="font-bold text-sm text-success">{mDepTotal.toFixed(2)}%</span>
                     {mIy > 0 && (
                       <span
-                        className="badge badge-xs bg-success/15 text-success border-0"
+                        className="badge badge-xs bg-success/15 text-success border-0 whitespace-nowrap"
                         title={`Base rate: ${pool.depositRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
                       >
                         +{mIy.toFixed(1)}%
                       </span>
                     )}
                   </div>
+                  {pool.depositRewardApr > 0.005 && (
+                    <div className="flex justify-end mt-0.5">
+                      <span
+                        className="badge badge-xs bg-warning/15 text-warning border-0 whitespace-nowrap"
+                        title={`Reward incentive: +${pool.depositRewardApr.toFixed(2)}% APR (transient)${
+                          pool.rewardSources.length ? ` · ${pool.rewardSources.join(', ')}` : ''
+                        }`}
+                      >
+                        +{pool.depositRewardApr.toFixed(1)}% rwd
+                      </span>
+                    </div>
+                  )}
                   <span className="text-[10px] text-base-content/50 block">Deposit APR</span>
                 </div>
               </div>
@@ -359,10 +393,18 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                     Borrow: <span className="text-warning font-medium">{mBorTotal.toFixed(2)}%</span>
                     {mIy > 0 && (
                       <span
-                        className="badge badge-xs bg-warning/15 text-warning border-0 ml-1"
+                        className="badge badge-xs bg-warning/15 text-warning border-0 ml-1 whitespace-nowrap"
                         title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
                       >
                         +{mIy.toFixed(1)}%
+                      </span>
+                    )}
+                    {pool.borrowRewardApr > 0.005 && (
+                      <span
+                        className="badge badge-xs bg-success/15 text-success border-0 ml-1 whitespace-nowrap"
+                        title={`Borrow reward rebate: −${pool.borrowRewardApr.toFixed(2)}% APR (lowers borrow cost, transient)`}
+                      >
+                        −{pool.borrowRewardApr.toFixed(1)}% rwd
                       </span>
                     )}
                   </span>

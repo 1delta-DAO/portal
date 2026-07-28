@@ -46,7 +46,17 @@ export function computePoolMetrics(pool: PoolEntry) {
   const intrinsicYield = parseFloat(pool.intrinsicYield ?? '') || 0
   const price = pool.underlyingInfo?.prices?.priceUsd ?? 0
 
-  return { utilization, apr, borrowApr, intrinsicYield, price }
+  // Incentive rewards — `rewards` is an array of {depositRate, variableBorrowRate,
+  // source, …}; sum each side. Deposit rewards boost earn APR; borrow rewards are
+  // a rebate.
+  const rewardsList = Array.isArray(pool.rewards) ? (pool.rewards as any[]) : []
+  const depositRewardApr = rewardsList.reduce((s, r) => s + (Number(r?.depositRate) || 0), 0)
+  const borrowRewardApr = rewardsList.reduce(
+    (s, r) => s + (Number(r?.variableBorrowRate) || 0),
+    0,
+  )
+
+  return { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr, borrowRewardApr }
 }
 
 /** Convert a PoolEntry (from /pools endpoint) into a PoolDataItem for action components */
@@ -79,6 +89,21 @@ export function poolEntryToPoolDataItem(entry: PoolEntry): PoolDataItem {
     stableBorrowRate: parseFloat(entry.stableBorrowRate) || 0,
     intrinsicYield: parseFloat(entry.intrinsicYield ?? '') || 0,
     rewards: {},
+    depositRewardApr: (Array.isArray((entry as any).rewards) ? (entry as any).rewards : []).reduce(
+      (s: number, r: any) => s + (Number(r?.depositRate) || 0),
+      0,
+    ),
+    borrowRewardApr: (Array.isArray((entry as any).rewards) ? (entry as any).rewards : []).reduce(
+      (s: number, r: any) => s + (Number(r?.variableBorrowRate) || 0),
+      0,
+    ),
+    rewardSources: Array.from(
+      new Set(
+        (Array.isArray((entry as any).rewards) ? (entry as any).rewards : [])
+          .map((r: any) => r?.source)
+          .filter(Boolean),
+      ),
+    ) as string[],
     config: {},
     borrowCap: 0,
     supplyCap: 0,
