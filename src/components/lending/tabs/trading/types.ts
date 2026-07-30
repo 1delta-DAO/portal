@@ -1,6 +1,37 @@
 import type { PoolDataItem } from '../../../../hooks/lending/usePoolData'
 import type { UserPositionEntry, UserSubAccount } from '../../../../hooks/lending/useUserData'
 import type { TokenBalance } from '../../../../hooks/lending/useTokenBalances'
+import type { RateImpactEntry } from '../../../../sdk/lending-helper/fetchLendingAction'
+
+/** Role of a market in the active operation — picks which rate to surface
+ *  on the quote card (debt → borrow APR, collateral → deposit APR). */
+/** One position delta of a quote, retained per leg (the flattened
+ *  positionCollateralUSD/positionDebtUSD pair loses same-role ops). */
+export interface QuotePositionDelta {
+  assetAddress?: string
+  symbol?: string
+  position: string
+  amountUSD: number
+}
+
+export interface QuoteMarketRole {
+  role: 'debt' | 'collateral'
+  symbol?: string
+  /** Underlying asset address — pairs this market's role with its quote delta. */
+  assetAddress?: string
+  /** Intrinsic (native/staking) yield of the market's asset, percent units.
+   *  Folded into the displayed rate — earned by depositors, paid by borrowers. */
+  intrinsicYield?: number
+  /** Side-appropriate reward APR (percent): deposit incentive for collateral
+   *  roles, borrow rebate for debt roles. Shown as a transient badge. */
+  rewardApr?: number
+  /** Current base deposit APR (percent) from pool data. Used to synthesize a
+   *  flat (no-shift) entry when the backend has no IRM item for this market —
+   *  e.g. Compound V3 Comet collateral, which has no rate curve at all. */
+  depositRatePct?: number
+  /** Current base borrow APR (percent) from pool data — same fallback role. */
+  borrowRatePct?: number
+}
 
 export type TradingOperation = 'Loop' | 'ColSwap' | 'DebtSwap' | 'Close'
 export type PoolRole = 'input' | 'output' | 'pay'
@@ -52,6 +83,10 @@ export interface TradingQuote {
   outLogoURI?: string
   positionCollateralUSD?: number
   positionDebtUSD?: number
+  /** All position deltas of this quote, one per leg. */
+  positionDeltas?: QuotePositionDelta[]
+  /** Per-quote projected rate impact (this quote's own trade amounts). */
+  rateImpact?: RateImpactEntry[]
   tx: Tx
 }
 

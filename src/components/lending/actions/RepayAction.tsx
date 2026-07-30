@@ -3,7 +3,14 @@ import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
-import { formatTokenAmount, formatUsd, parseAmount, addAmountStrings, minAmountString, compareAmountStrings } from './format'
+import {
+  formatTokenAmount,
+  formatUsd,
+  parseAmount,
+  addAmountStrings,
+  minAmountString,
+  compareAmountStrings,
+} from './format'
 import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
@@ -50,7 +57,8 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
 
   // Brokered (Lista) markets carry per-loan rows that must each be repaid by
   // their own `loanId` — no aggregate repay. Pick the loan to close. (Spec §3.)
-  const brokeredLoans = pool && subAccount ? loansForMarket(subAccount.positions, pool.marketUid) : []
+  const brokeredLoans =
+    pool && subAccount ? loansForMarket(subAccount.positions, pool.marketUid) : []
   const isBrokered = brokeredLoans.length > 0
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
 
@@ -101,8 +109,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
     isAll: isBrokered ? (isExactlyLoan ? exactlyFullClose : false) : isAll,
     payAsset: canUseNative && useNative ? zeroAddress : undefined,
     accountId: hasSubAccounts ? (selectedAccountId ?? undefined) : undefined,
-    loanId:
-      isBrokered && !isExactlyLoan ? (selectedLoanId ?? undefined) : undefined,
+    loanId: isBrokered && !isExactlyLoan ? (selectedLoanId ?? undefined) : undefined,
     termId: isExactlyLoan ? (selectedLoan?.term?.termId ?? undefined) : undefined,
     chainId,
     subAccount,
@@ -147,8 +154,8 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   // (post-tx) when available — repaying lowers utilization and therefore
   // the rate. Fall back to the pool's current rate and to oraclePriceUSD.
   const effectivePriceUsd = priceUsd ?? pool?.oraclePriceUSD ?? 0
-  const projectedBorrowAprPct = rateImpact?.find((e) => e.marketUid === pool?.marketUid)
-    ?.borrowRate?.projected
+  const projectedBorrowAprPct = rateImpact?.find((e) => e.marketUid === pool?.marketUid)?.borrowRate
+    ?.projected
   const borrowAprPct = projectedBorrowAprPct ?? pool?.variableBorrowRate ?? 0
   const amountNum = parseAmount(amount)
   const monthlySavedUsd =
@@ -274,9 +281,29 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
           <span className="text-base-content/60 flex items-center gap-1">
             Wallet balance:
             {refetchBalances && (
-              <button type="button" className="text-base-content/30 hover:text-base-content/60 transition-colors" onClick={refetchBalances} title="Refresh balance">
-                {isBalancesFetching ? <span className="loading loading-spinner w-2.5 h-2.5" /> : (
-                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>
+              <button
+                type="button"
+                className="text-base-content/30 hover:text-base-content/60 transition-colors"
+                onClick={refetchBalances}
+                title="Refresh balance"
+              >
+                {isBalancesFetching ? (
+                  <span className="loading loading-spinner w-2.5 h-2.5" />
+                ) : (
+                  <svg
+                    className="w-2.5 h-2.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 2v6h-6" />
+                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                    <path d="M3 22v-6h6" />
+                    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                  </svg>
                 )}
               </button>
             )}
@@ -310,7 +337,8 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
               <div className="text-xs flex justify-between px-1">
                 <span className="text-base-content/60">Early-repay penalty:</span>
                 <span className="text-warning font-medium">
-                  +{formatTokenAmount(selectedLoan.term?.earlyRepayPenalty ?? '0')} {pool?.asset.symbol}
+                  +{formatTokenAmount(selectedLoan.term?.earlyRepayPenalty ?? '0')}{' '}
+                  {pool?.asset.symbol}
                 </span>
               </div>
               <div className="text-xs flex justify-between px-1">
@@ -347,7 +375,9 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
           <span className="text-base-content/60 whitespace-nowrap">Saved / month</span>
           <span className="text-success font-medium whitespace-nowrap">
             ~${formatUsd(monthlySavedUsd)}
-            <span className="text-base-content/40 font-normal ml-1">({borrowAprPct.toFixed(2)}%)</span>
+            <span className="text-base-content/40 font-normal ml-1">
+              ({borrowAprPct.toFixed(2)}%)
+            </span>
           </span>
         </div>
       )}
@@ -365,7 +395,20 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
       <HealthFactorProjection simulation={simulation} />
 
       {/* Rate impact */}
-      <RateImpactIndicator rateImpact={rateImpact} />
+      <RateImpactIndicator
+        rateImpact={rateImpact}
+        marketYields={
+          pool
+            ? {
+                [pool.marketUid]: {
+                  intrinsicYield: pool.intrinsicYield,
+                  depositRewardApr: pool.depositRewardApr,
+                  borrowRewardApr: pool.borrowRewardApr,
+                },
+              }
+            : undefined
+        }
+      />
 
       {result && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">

@@ -244,6 +244,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   useEffect(() => {
     if (!collateralPool || !debtPool || !selectedLender || !chainId) {
       setLoopRange(null)
+      setLoopRangeLoading(false)
       return
     }
 
@@ -251,64 +252,72 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     setLoopRangeLoading(true)
 
     const run = async () => {
-      const payParams = selectedPayCurrency
-        ? {
-            payAsset: selectedPayCurrency.address,
-            ...(debouncedPayAmount
-              ? {
-                  payAmount: parseUnits(
-                    debouncedPayAmount,
-                    selectedPayCurrency.decimals
-                  ).toString(),
-                }
-              : {}),
-          }
-        : {}
+      try {
+        const payParams = selectedPayCurrency
+          ? {
+              payAsset: selectedPayCurrency.address,
+              ...(debouncedPayAmount
+                ? {
+                    payAmount: parseUnits(
+                      debouncedPayAmount,
+                      selectedPayCurrency.decimals
+                    ).toString(),
+                  }
+                : {}),
+            }
+          : {}
 
-      const filterParams = {
-        lender: selectedLender,
-        chainId,
-        marketUidIn: debtPool.marketUid,
-        marketUidOut: collateralPool.marketUid,
-        ...payParams,
-      }
+        const filterParams = {
+          lender: selectedLender,
+          chainId,
+          marketUidIn: debtPool.marketUid,
+          marketUidOut: collateralPool.marketUid,
+          ...payParams,
+        }
 
-      const result = activeSubAccount
-        ? await fetchLoopRangeWithSimulation({
-            ...filterParams,
-            body: {
-              balanceData: {
-                borrowDiscountedCollateral:
-                  activeSubAccount.balanceData.borrowDiscountedCollateral ?? 0,
-                collateral: activeSubAccount.balanceData.collateral,
-                debt: activeSubAccount.balanceData.debt,
-                adjustedDebt: activeSubAccount.balanceData.adjustedDebt ?? 0,
-                deposits: activeSubAccount.balanceData.deposits,
-                nav: activeSubAccount.balanceData.nav,
-                deposits24h: activeSubAccount.balanceData.deposits24h,
-                debt24h: activeSubAccount.balanceData.debt24h,
-                nav24h: activeSubAccount.balanceData.nav24h,
+        const result = activeSubAccount
+          ? await fetchLoopRangeWithSimulation({
+              ...filterParams,
+              body: {
+                balanceData: {
+                  borrowDiscountedCollateral:
+                    activeSubAccount.balanceData.borrowDiscountedCollateral ?? 0,
+                  collateral: activeSubAccount.balanceData.collateral,
+                  debt: activeSubAccount.balanceData.debt,
+                  adjustedDebt: activeSubAccount.balanceData.adjustedDebt ?? 0,
+                  deposits: activeSubAccount.balanceData.deposits,
+                  nav: activeSubAccount.balanceData.nav,
+                  deposits24h: activeSubAccount.balanceData.deposits24h,
+                  debt24h: activeSubAccount.balanceData.debt24h,
+                  nav24h: activeSubAccount.balanceData.nav24h,
+                },
+                aprData: activeSubAccount.aprData,
+                modeId: String(activeSubAccount.userConfig.selectedMode),
+                positions: activeSubAccount.positions.map((p) => ({
+                  marketUid: p.marketUid,
+                  deposits: String(p.deposits),
+                  depositsUSD: p.depositsUSD,
+                  debt: String(p.debt),
+                  debtUSD: p.debtUSD,
+                  debtStableUSD: p.debtStableUSD,
+                  collateralEnabled: p.collateralEnabled,
+                })),
               },
-              aprData: activeSubAccount.aprData,
-              modeId: String(activeSubAccount.userConfig.selectedMode),
-              positions: activeSubAccount.positions.map((p) => ({
-                marketUid: p.marketUid,
-                deposits: String(p.deposits),
-                depositsUSD: p.depositsUSD,
-                debt: String(p.debt),
-                debtUSD: p.debtUSD,
-                debtStableUSD: p.debtStableUSD,
-                collateralEnabled: p.collateralEnabled,
-              })),
-            },
-          })
-        : account
-          ? await fetchLoopRange({ ...filterParams, account })
-          : null
+            })
+          : account
+            ? await fetchLoopRange({ ...filterParams, account })
+            : null
 
-      if (cancelled || !result) return
-      setLoopRange(result.success && result.data?.length ? result.data[0] : null)
-      setLoopRangeLoading(false)
+        if (cancelled) return
+        setLoopRange(result?.success && result.data?.length ? result.data[0] : null)
+      } catch {
+        if (!cancelled) setLoopRange(null)
+      } finally {
+        // Always clear the spinner unless a newer fetch superseded this one.
+        // Covers the no-account / null-result and thrown-error paths that used
+        // to leave "Loading max loop size…" stuck forever.
+        if (!cancelled) setLoopRangeLoading(false)
+      }
     }
 
     run()
@@ -710,11 +719,13 @@ export const LoopAction: React.FC<TradingActionProps> = ({
       {/* Slippage */}
       <SlippageInput value={slippage} onChange={setSlippage} />
 
-      {/* Fetch quotes */}
+      {/* Fetch quotes. The wallet-balance warning (`payOverMax`) is advisory and
+          does NOT block quoting — the user can explore quotes and top up before
+          executing; the on-chain send is the real guardrail. */}
       <button
         type="button"
         className="btn btn-primary btn-sm w-full"
-        disabled={!canFetch || loading || payOverMax}
+        disabled={!canFetch || loading}
         onClick={handleFetchQuotes}
       >
         {loading ? 'Fetching quotes...' : 'Get Loop Quotes'}
@@ -743,28 +754,80 @@ export const LoopAction: React.FC<TradingActionProps> = ({
                 inSymbol={debtPool?.asset.symbol}
                 outSymbol={collateralPool?.asset.symbol}
                 bestPriceImpactUSD={bestImpact}
+                marketRoles={{
+                  ...(debtPool
+                    ? {
+                        [debtPool.marketUid]: {
+                          role: 'debt' as const,
+                          symbol: debtPool.asset.symbol,
+                          assetAddress: debtPool.asset.address,
+                          intrinsicYield: debtPool.intrinsicYield,
+                          rewardApr: debtPool.borrowRewardApr,
+                          // Brokered debt borrows at the selected fixed term's APR.
+                          borrowRatePct: selectedTerm?.apr ?? debtPool.variableBorrowRate,
+                          depositRatePct: debtPool.depositRate,
+                        },
+                      }
+                    : {}),
+                  ...(collateralPool
+                    ? {
+                        [collateralPool.marketUid]: {
+                          role: 'collateral' as const,
+                          symbol: collateralPool.asset.symbol,
+                          assetAddress: collateralPool.asset.address,
+                          intrinsicYield: collateralPool.intrinsicYield,
+                          rewardApr: collateralPool.depositRewardApr,
+                          depositRatePct: collateralPool.depositRate,
+                          borrowRatePct: collateralPool.variableBorrowRate,
+                        },
+                      }
+                    : {}),
+                }}
               />
             ))
           })()}
         </div>
       )}
 
-      {/* Rate impact */}
+      {/* Rate impact — the selected quote's own projection when available */}
       <RateImpactIndicator
-        rateImpact={rateImpact}
+        rateImpact={
+          (selectedIndex !== null ? quotes[selectedIndex]?.rateImpact : undefined) ?? rateImpact
+        }
         marketLabels={{
           ...(collateralPool
             ? { [collateralPool.marketUid]: `${collateralPool.asset.symbol} (Collateral)` }
             : {}),
           ...(debtPool ? { [debtPool.marketUid]: `${debtPool.asset.symbol} (Debt)` } : {}),
         }}
+        marketYields={{
+          ...(collateralPool
+            ? {
+                [collateralPool.marketUid]: {
+                  intrinsicYield: collateralPool.intrinsicYield,
+                  depositRewardApr: collateralPool.depositRewardApr,
+                  borrowRewardApr: collateralPool.borrowRewardApr,
+                },
+              }
+            : {}),
+          ...(debtPool
+            ? {
+                [debtPool.marketUid]: {
+                  intrinsicYield: debtPool.intrinsicYield,
+                  depositRewardApr: debtPool.depositRewardApr,
+                  borrowRewardApr: debtPool.borrowRewardApr,
+                },
+              }
+            : {}),
+        }}
       />
 
       {/* Position impact (health factor / borrow capacity) */}
       <SimulationIndicator simulation={simulation} />
 
-      {/* Permissions, transactions, and execute */}
-      {selectedIndex !== null && !payOverMax && (
+      {/* Permissions, transactions, and execute. Shown once a quote is selected;
+          the wallet-balance warning stays advisory (see the quotes button). */}
+      {selectedIndex !== null && (
         <div className="space-y-1.5">
           {permissions.map((tx, i) => {
             const done = completedPermissions.includes(i)

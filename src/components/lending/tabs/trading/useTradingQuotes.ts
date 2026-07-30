@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useSendLendingTransaction } from '../../../../hooks/useSendLendingTransaction'
-import type { TradingOperation, TradingQuote, Tx } from './types'
+import type { TradingOperation, TradingQuote, QuotePositionDelta, Tx } from './types'
 import type { RateImpactEntry } from '../../../../sdk/lending-helper/fetchLendingAction'
 import { BACKEND_BASE_URL } from '../../../../config/backend'
 import type { LoopRangeSimulationBody } from '../../../../sdk/lending-helper/fetchLoopRange'
@@ -45,6 +45,7 @@ interface QuoteDeltaItem {
   amountUSD: number
   position: string
   asset?: {
+    address?: string
     decimals?: number
     symbol?: string
     logoURI?: string
@@ -105,6 +106,7 @@ function normalizeQuotes(
     let outLogoURI: string | undefined
     let positionCollateralUSD: number | undefined
     let positionDebtUSD: number | undefined
+    let positionDeltas: QuotePositionDelta[] | undefined
 
     const deltas = q.deltas as QuoteDeltas | undefined
     if (deltas) {
@@ -117,6 +119,15 @@ function normalizeQuotes(
         if (d.position === 'collateral') positionCollateralUSD = d.amountUSD
         else if (d.position === 'debt') positionDebtUSD = d.amountUSD
       }
+
+      // Retain every leg — same-role ops (collateral swap / debt swap) have
+      // two deltas of the same position, which the pair above collapses.
+      positionDeltas = items.map((d) => ({
+        assetAddress: d.asset?.address,
+        symbol: d.asset?.symbol,
+        position: d.position,
+        amountUSD: d.amountUSD,
+      }))
 
       // Match each delta to the input / output side of the swap by native
       // magnitude. Each quote's `tradeInput` / `tradeOutput` are token-unit
@@ -174,6 +185,8 @@ function normalizeQuotes(
       outLogoURI,
       positionCollateralUSD,
       positionDebtUSD,
+      positionDeltas,
+      rateImpact: Array.isArray(q.rateImpact) ? q.rateImpact : undefined,
       tx,
     }
   })
@@ -279,11 +292,17 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
           throw new Error(envelope.error?.message ?? 'API error')
         }
         const alternatives: Tx[] = envelope.actions?.alternatives ?? []
-        const quotes = normalizeQuotes(operation, envelope.data?.quotes ?? [], alternatives, marginUSD)
+        const quotes = normalizeQuotes(
+          operation,
+          envelope.data?.quotes ?? [],
+          alternatives,
+          marginUSD
+        )
         // Permissions: check both envelope.actions and envelope.data (varies by lender)
         const permissions: Tx[] = envelope.actions?.permissions ?? envelope.data?.permissions ?? []
         // Transactions: collateral enable/disable (e.g. Compound V2 / Venus)
-        const transactions: Tx[] = envelope.actions?.transactions ?? envelope.data?.transactions ?? []
+        const transactions: Tx[] =
+          envelope.actions?.transactions ?? envelope.data?.transactions ?? []
 
         const rateImpact: RateImpactEntry[] | null = envelope.data?.rateImpact ?? null
 
@@ -323,44 +342,68 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
     setState((s) => ({ ...s, selectedIndex: index }))
   }, [])
 
-  const executeNextPermission = useCallback(async (idx: number) => {
-    if (idx < 0 || idx >= state.permissions.length) return
-    setState((s) => ({ ...s, executingPermissionIdx: idx, error: null }))
-    const { ok, error: txError } = await send(state.permissions[idx])
-    setState((s) => ({
-      ...s,
-      executingPermissionIdx: null,
-      completedPermissions: ok && !s.completedPermissions.includes(idx) ? [...s.completedPermissions, idx] : s.completedPermissions,
-      error: ok ? null : (txError ?? 'Permission failed'),
-    }))
-  }, [state.permissions, send])
+  const executeNextPermission = useCallback(
+    async (idx: number) => {
+      if (idx < 0 || idx >= state.permissions.length) return
+      setState((s) => ({ ...s, executingPermissionIdx: idx, error: null }))
+      const { ok, error: txError } = await send(state.permissions[idx])
+      setState((s) => ({
+        ...s,
+        executingPermissionIdx: null,
+        completedPermissions:
+          ok && !s.completedPermissions.includes(idx)
+            ? [...s.completedPermissions, idx]
+            : s.completedPermissions,
+        error: ok ? null : (txError ?? 'Permission failed'),
+      }))
+    },
+    [state.permissions, send]
+  )
 
-  const executeNextTransaction = useCallback(async (idx: number) => {
-    if (idx < 0 || idx >= state.transactions.length) return
-    setState((s) => ({ ...s, executingTransactionIdx: idx, error: null }))
-    const { ok, error: txError } = await send(state.transactions[idx])
-    setState((s) => ({
-      ...s,
-      executingTransactionIdx: null,
-      completedTransactions: ok && !s.completedTransactions.includes(idx) ? [...s.completedTransactions, idx] : s.completedTransactions,
-      error: ok ? null : (txError ?? 'Transaction failed'),
-    }))
-  }, [state.transactions, send])
+  const executeNextTransaction = useCallback(
+    async (idx: number) => {
+      if (idx < 0 || idx >= state.transactions.length) return
+      setState((s) => ({ ...s, executingTransactionIdx: idx, error: null }))
+      const { ok, error: txError } = await send(state.transactions[idx])
+      setState((s) => ({
+        ...s,
+        executingTransactionIdx: null,
+        completedTransactions:
+          ok && !s.completedTransactions.includes(idx)
+            ? [...s.completedTransactions, idx]
+            : s.completedTransactions,
+        error: ok ? null : (txError ?? 'Transaction failed'),
+      }))
+    },
+    [state.transactions, send]
+  )
 
-  const executeQuote = useCallback(async (operation: TradingOperation) => {
-    if (state.selectedIndex === null) return
-    setState((s) => ({ ...s, executingQuote: true, error: null }))
-    const quote = state.quotes[state.selectedIndex]
-    const { ok, error: txError, hash } = await send(quote.tx)
-    if (ok) {
-      setState((s) => ({ ...s, executingQuote: false, txSuccess: { operation, hash } }))
-    } else {
-      setState((s) => ({ ...s, executingQuote: false, error: txError ?? 'Execution failed' }))
-    }
-  }, [state.selectedIndex, state.quotes, send])
+  const executeQuote = useCallback(
+    async (operation: TradingOperation) => {
+      if (state.selectedIndex === null) return
+      setState((s) => ({ ...s, executingQuote: true, error: null }))
+      const quote = state.quotes[state.selectedIndex]
+      const { ok, error: txError, hash } = await send(quote.tx)
+      if (ok) {
+        setState((s) => ({ ...s, executingQuote: false, txSuccess: { operation, hash } }))
+      } else {
+        setState((s) => ({ ...s, executingQuote: false, error: txError ?? 'Execution failed' }))
+      }
+    },
+    [state.selectedIndex, state.quotes, send]
+  )
 
   const dismissSuccess = useCallback(() => {
-    setState((s) => ({ ...s, txSuccess: null, quotes: [], permissions: [], transactions: [], completedPermissions: [], completedTransactions: [], selectedIndex: null }))
+    setState((s) => ({
+      ...s,
+      txSuccess: null,
+      quotes: [],
+      permissions: [],
+      transactions: [],
+      completedPermissions: [],
+      completedTransactions: [],
+      selectedIndex: null,
+    }))
   }, [])
 
   const reset = useCallback(() => {

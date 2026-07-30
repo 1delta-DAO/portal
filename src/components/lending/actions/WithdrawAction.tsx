@@ -91,9 +91,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
   // open borrow). Gate on `userPosition` (not `withdrawable > 0`) so we don't
   // flash the warning before the position loads.
   const overMax =
-    !isAll &&
-    !!userPosition &&
-    parseAmount(amount) > parseAmount(withdrawableStr) + 1e-9
+    !isAll && !!userPosition && parseAmount(amount) > parseAmount(withdrawableStr) + 1e-9
 
   // Estimated earnings forfeited by withdrawing this amount. depositRate is
   // in percent units. Prefer the simulation's projected deposit rate (post-tx)
@@ -230,7 +228,20 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
           <HealthFactorProjection simulation={simulation} />
 
           {/* Rate impact */}
-          <RateImpactIndicator rateImpact={rateImpact} />
+          <RateImpactIndicator
+            rateImpact={rateImpact}
+            marketYields={
+              pool
+                ? {
+                    [pool.marketUid]: {
+                      intrinsicYield: pool.intrinsicYield,
+                      depositRewardApr: pool.depositRewardApr,
+                      borrowRewardApr: pool.borrowRewardApr,
+                    },
+                  }
+                : undefined
+            }
+          />
         </>
       )}
 

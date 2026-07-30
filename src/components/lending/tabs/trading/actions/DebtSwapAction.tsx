@@ -44,9 +44,23 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
   const [slippage, setSlippage] = useState('0.3')
 
   const {
-    quotes, permissions, transactions, rateImpact, simulation, selectedIndex, loading,
-    executingQuote, txSuccess, error,
-    fetchQuotes, selectQuote, executeNextPermission, executeNextTransaction, executeQuote, dismissSuccess, reset,
+    quotes,
+    permissions,
+    transactions,
+    rateImpact,
+    simulation,
+    selectedIndex,
+    loading,
+    executingQuote,
+    txSuccess,
+    error,
+    fetchQuotes,
+    selectQuote,
+    executeNextPermission,
+    executeNextTransaction,
+    executeQuote,
+    dismissSuccess,
+    reset,
   } = useTradingQuotes({ chainId, account })
 
   // Notify parent
@@ -170,23 +184,34 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
 
   const handleFetchQuotes = () => {
     if (!debtInPool || !debtOutPool || !exactPool) return
-    fetchQuotes('DebtSwap', {
-      marketUidIn: debtInPool.marketUid,
-      marketUidOut: debtOutPool.marketUid,
-      amount: parseUnits(exactAmount || '0', exactPool.asset.decimals).toString(),
-      slippage: (parseFloat(slippage) || 0.3) * 100,
-      irModeIn: LendingMode.VARIABLE,
-      irModeOut: LendingMode.VARIABLE,
-      tradeType,
-      usePendleMintRedeem: false,
-      ...(accountId ? { accountId } : {}),
-    }, account, activeSubAccount ? buildSimulationBody(activeSubAccount) : undefined)
+    fetchQuotes(
+      'DebtSwap',
+      {
+        marketUidIn: debtInPool.marketUid,
+        marketUidOut: debtOutPool.marketUid,
+        amount: parseUnits(exactAmount || '0', exactPool.asset.decimals).toString(),
+        slippage: (parseFloat(slippage) || 0.3) * 100,
+        irModeIn: LendingMode.VARIABLE,
+        irModeOut: LendingMode.VARIABLE,
+        tradeType,
+        usePendleMintRedeem: false,
+        ...(accountId ? { accountId } : {}),
+      },
+      account,
+      activeSubAccount ? buildSimulationBody(activeSubAccount) : undefined
+    )
   }
 
   const canFetch = !!debtInPool && !!debtOutPool && !!exactAmount
 
   if (txSuccess) {
-    return <TradingTransactionSuccess operation={txSuccess.operation} hash={txSuccess.hash} onDismiss={dismissSuccess} />
+    return (
+      <TradingTransactionSuccess
+        operation={txSuccess.operation}
+        hash={txSuccess.hash}
+        onDismiss={dismissSuccess}
+      />
+    )
   }
 
   return (
@@ -204,7 +229,9 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
       )}
 
       {/* Borrow (New Debt) + Input amount */}
-      <div className={`rounded-lg p-2 transition-colors ${activeField === 'input' ? 'ring-1 ring-primary bg-primary/5' : 'bg-base-200/30'}`}>
+      <div
+        className={`rounded-lg p-2 transition-colors ${activeField === 'input' ? 'ring-1 ring-primary bg-primary/5' : 'bg-base-200/30'}`}
+      >
         <PoolSelectorDropdown
           pools={borrowablePools}
           value={debtInPool}
@@ -218,7 +245,9 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
           <div className="flex items-center justify-between mb-0.5">
             <label className="label-text text-xs">
               Amount
-              {activeField === 'input' && <span className="text-primary ml-1 text-[10px] font-medium">(exact)</span>}
+              {activeField === 'input' && (
+                <span className="text-primary ml-1 text-[10px] font-medium">(exact)</span>
+              )}
             </label>
           </div>
           <input
@@ -232,7 +261,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
               if (activeField !== 'input') {
                 setActiveField('input')
                 setInputAmount(quotedInputAmount)
-                
+
                 reset()
               }
             }}
@@ -247,7 +276,9 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
       </div>
 
       {/* Repay (Existing Debt) + Output amount */}
-      <div className={`rounded-lg p-2 transition-colors ${activeField === 'output' ? 'ring-1 ring-primary bg-primary/5' : 'bg-base-200/30'}`}>
+      <div
+        className={`rounded-lg p-2 transition-colors ${activeField === 'output' ? 'ring-1 ring-primary bg-primary/5' : 'bg-base-200/30'}`}
+      >
         <PoolSelectorDropdown
           pools={borrowablePools}
           value={debtOutPool}
@@ -261,13 +292,21 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
           <div className="flex items-center justify-between mb-0.5">
             <label className="label-text text-xs">
               Amount
-              {activeField === 'output' && <span className="text-primary ml-1 text-[10px] font-medium">(exact)</span>}
+              {activeField === 'output' && (
+                <span className="text-primary ml-1 text-[10px] font-medium">(exact)</span>
+              )}
             </label>
             {activeField === 'output' && (
               <AmountQuickButtons
                 maxAmount={maxSwapStr}
-                onSelect={(v) => { setOutputAmount(v); reset() }}
-                onMax={() => { setOutputAmount(maxSwapStr); reset() }}
+                onSelect={(v) => {
+                  setOutputAmount(v)
+                  reset()
+                }}
+                onMax={() => {
+                  setOutputAmount(maxSwapStr)
+                  reset()
+                }}
                 decimals={debtOutPool?.asset?.decimals}
               />
             )}
@@ -283,7 +322,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
               if (activeField !== 'output') {
                 setActiveField('output')
                 setOutputAmount(quotedOutputAmount)
-                
+
                 reset()
               }
             }}
@@ -291,7 +330,7 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
               const v = sanitizeAmountInput(e.target.value)
               if (v === null) return
               setOutputAmount(v)
-              
+
               reset()
             }}
           />
@@ -341,6 +380,34 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
                 inSymbol={debtInPool?.asset.symbol}
                 outSymbol={debtOutPool?.asset.symbol}
                 bestPriceImpactUSD={bestImpact}
+                marketRoles={{
+                  ...(debtInPool
+                    ? {
+                        [debtInPool.marketUid]: {
+                          role: 'debt' as const,
+                          symbol: debtInPool.asset.symbol,
+                          assetAddress: debtInPool.asset.address,
+                          intrinsicYield: debtInPool.intrinsicYield,
+                          rewardApr: debtInPool.borrowRewardApr,
+                          borrowRatePct: debtInPool.variableBorrowRate,
+                          depositRatePct: debtInPool.depositRate,
+                        },
+                      }
+                    : {}),
+                  ...(debtOutPool
+                    ? {
+                        [debtOutPool.marketUid]: {
+                          role: 'debt' as const,
+                          symbol: debtOutPool.asset.symbol,
+                          assetAddress: debtOutPool.asset.address,
+                          intrinsicYield: debtOutPool.intrinsicYield,
+                          rewardApr: debtOutPool.borrowRewardApr,
+                          borrowRatePct: debtOutPool.variableBorrowRate,
+                          depositRatePct: debtOutPool.depositRate,
+                        },
+                      }
+                    : {}),
+                }}
               />
             ))
           })()}
@@ -349,10 +416,36 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
 
       {/* Rate impact */}
       <RateImpactIndicator
-        rateImpact={rateImpact}
+        rateImpact={
+          (selectedIndex !== null ? quotes[selectedIndex]?.rateImpact : undefined) ?? rateImpact
+        }
         marketLabels={{
-          ...(debtInPool ? { [debtInPool.marketUid]: `${debtInPool.asset.symbol} (New Debt)` } : {}),
-          ...(debtOutPool ? { [debtOutPool.marketUid]: `${debtOutPool.asset.symbol} (Repaid)` } : {}),
+          ...(debtInPool
+            ? { [debtInPool.marketUid]: `${debtInPool.asset.symbol} (New Debt)` }
+            : {}),
+          ...(debtOutPool
+            ? { [debtOutPool.marketUid]: `${debtOutPool.asset.symbol} (Repaid)` }
+            : {}),
+        }}
+        marketYields={{
+          ...(debtInPool
+            ? {
+                [debtInPool.marketUid]: {
+                  intrinsicYield: debtInPool.intrinsicYield,
+                  depositRewardApr: debtInPool.depositRewardApr,
+                  borrowRewardApr: debtInPool.borrowRewardApr,
+                },
+              }
+            : {}),
+          ...(debtOutPool
+            ? {
+                [debtOutPool.marketUid]: {
+                  intrinsicYield: debtOutPool.intrinsicYield,
+                  depositRewardApr: debtOutPool.depositRewardApr,
+                  borrowRewardApr: debtOutPool.borrowRewardApr,
+                },
+              }
+            : {}),
         }}
       />
 
@@ -362,17 +455,40 @@ export const DebtSwapAction: React.FC<TradingActionProps> = ({
       {selectedIndex !== null && (
         <div className="space-y-1.5">
           {permissions.map((tx, i) => (
-            <button key={`perm-${i}`} type="button" className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs" title={tx.description || 'Approve'} onClick={() => executeNextPermission(i)}>
+            <button
+              key={`perm-${i}`}
+              type="button"
+              className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs"
+              title={tx.description || 'Approve'}
+              onClick={() => executeNextPermission(i)}
+            >
               <span className="block truncate max-w-full">{tx.description || 'Approve'}</span>
             </button>
           ))}
           {transactions.map((tx, i) => (
-            <button key={`tx-${i}`} type="button" className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs" title={tx.description || 'Execute Setup Transaction'} onClick={() => executeNextTransaction(i)}>
-              <span className="block truncate max-w-full">{tx.description || 'Execute Setup Transaction'}</span>
+            <button
+              key={`tx-${i}`}
+              type="button"
+              className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs"
+              title={tx.description || 'Execute Setup Transaction'}
+              onClick={() => executeNextTransaction(i)}
+            >
+              <span className="block truncate max-w-full">
+                {tx.description || 'Execute Setup Transaction'}
+              </span>
             </button>
           ))}
-          <button type="button" className="btn btn-success btn-sm w-full" disabled={executingQuote} onClick={() => executeQuote('DebtSwap')}>
-            {executingQuote ? <span className="loading loading-spinner loading-xs" /> : 'Execute Debt Swap'}
+          <button
+            type="button"
+            className="btn btn-success btn-sm w-full"
+            disabled={executingQuote}
+            onClick={() => executeQuote('DebtSwap')}
+          >
+            {executingQuote ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              'Execute Debt Swap'
+            )}
           </button>
         </div>
       )}

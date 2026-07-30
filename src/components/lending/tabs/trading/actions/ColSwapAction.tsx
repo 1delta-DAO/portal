@@ -46,9 +46,23 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
   const [slippage, setSlippage] = useState('0.3')
 
   const {
-    quotes, permissions, transactions, rateImpact, simulation, selectedIndex, loading,
-    executingQuote, txSuccess, error,
-    fetchQuotes, selectQuote, executeNextPermission, executeNextTransaction, executeQuote, dismissSuccess, reset,
+    quotes,
+    permissions,
+    transactions,
+    rateImpact,
+    simulation,
+    selectedIndex,
+    loading,
+    executingQuote,
+    txSuccess,
+    error,
+    fetchQuotes,
+    selectQuote,
+    executeNextPermission,
+    executeNextTransaction,
+    executeQuote,
+    dismissSuccess,
+    reset,
   } = useTradingQuotes({ chainId, account })
 
   // Notify parent
@@ -173,24 +187,35 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
 
   const handleFetchQuotes = () => {
     if (!colInPool || !colOutPool || !exactPool) return
-    fetchQuotes('ColSwap', {
-      marketUidIn: colInPool.marketUid,
-      marketUidOut: colOutPool.marketUid,
-      amount: parseUnits(exactAmount || '0', exactPool.asset.decimals).toString(),
-      slippage: (parseFloat(slippage) || 0.3) * 100,
-      irModeIn: LendingMode.NONE,
-      irModeOut: LendingMode.NONE,
-      tradeType,
-      ...(activeField === 'input' && isAll ? { isAll: true } : {}),
-      usePendleMintRedeem: false,
-      ...(accountId ? { accountId } : {}),
-    }, account, activeSubAccount ? buildSimulationBody(activeSubAccount) : undefined)
+    fetchQuotes(
+      'ColSwap',
+      {
+        marketUidIn: colInPool.marketUid,
+        marketUidOut: colOutPool.marketUid,
+        amount: parseUnits(exactAmount || '0', exactPool.asset.decimals).toString(),
+        slippage: (parseFloat(slippage) || 0.3) * 100,
+        irModeIn: LendingMode.NONE,
+        irModeOut: LendingMode.NONE,
+        tradeType,
+        ...(activeField === 'input' && isAll ? { isAll: true } : {}),
+        usePendleMintRedeem: false,
+        ...(accountId ? { accountId } : {}),
+      },
+      account,
+      activeSubAccount ? buildSimulationBody(activeSubAccount) : undefined
+    )
   }
 
   const canFetch = !!colInPool && !!colOutPool && !!exactAmount
 
   if (txSuccess) {
-    return <TradingTransactionSuccess operation={txSuccess.operation} hash={txSuccess.hash} onDismiss={dismissSuccess} />
+    return (
+      <TradingTransactionSuccess
+        operation={txSuccess.operation}
+        hash={txSuccess.hash}
+        onDismiss={dismissSuccess}
+      />
+    )
   }
 
   return (
@@ -208,7 +233,9 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
       )}
 
       {/* Collateral In + Input amount */}
-      <div className={`rounded-lg p-2 transition-colors ${activeField === 'input' ? 'ring-1 ring-primary bg-primary/5' : 'bg-base-200/30'}`}>
+      <div
+        className={`rounded-lg p-2 transition-colors ${activeField === 'input' ? 'ring-1 ring-primary bg-primary/5' : 'bg-base-200/30'}`}
+      >
         <PoolSelectorDropdown
           pools={collateralPools}
           value={colInPool}
@@ -222,13 +249,23 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
           <div className="flex items-center justify-between mb-0.5">
             <label className="label-text text-xs">
               Amount
-              {activeField === 'input' && <span className="text-primary ml-1 text-[10px] font-medium">(exact)</span>}
+              {activeField === 'input' && (
+                <span className="text-primary ml-1 text-[10px] font-medium">(exact)</span>
+              )}
             </label>
             {activeField === 'input' && (
               <AmountQuickButtons
                 maxAmount={maxSwapStr}
-                onSelect={(v) => { setInputAmount(v); setIsMaxIn(false); reset() }}
-                onMax={() => { setInputAmount(maxSwapStr); setIsMaxIn(true); reset() }}
+                onSelect={(v) => {
+                  setInputAmount(v)
+                  setIsMaxIn(false)
+                  reset()
+                }}
+                onMax={() => {
+                  setInputAmount(maxSwapStr)
+                  setIsMaxIn(true)
+                  reset()
+                }}
                 decimals={colInPool?.asset?.decimals}
               />
             )}
@@ -271,7 +308,9 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
       </div>
 
       {/* Collateral Out + Output amount */}
-      <div className={`rounded-lg p-2 transition-colors ${activeField === 'output' ? 'ring-1 ring-primary bg-primary/5' : 'bg-base-200/30'}`}>
+      <div
+        className={`rounded-lg p-2 transition-colors ${activeField === 'output' ? 'ring-1 ring-primary bg-primary/5' : 'bg-base-200/30'}`}
+      >
         <PoolSelectorDropdown
           pools={collateralPools}
           value={colOutPool}
@@ -285,7 +324,9 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
           <div className="flex items-center justify-between mb-0.5">
             <label className="label-text text-xs">
               Amount
-              {activeField === 'output' && <span className="text-primary ml-1 text-[10px] font-medium">(exact)</span>}
+              {activeField === 'output' && (
+                <span className="text-primary ml-1 text-[10px] font-medium">(exact)</span>
+              )}
             </label>
           </div>
           <input
@@ -345,6 +386,34 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
                 inSymbol={colInPool?.asset.symbol}
                 outSymbol={colOutPool?.asset.symbol}
                 bestPriceImpactUSD={bestImpact}
+                marketRoles={{
+                  ...(colInPool
+                    ? {
+                        [colInPool.marketUid]: {
+                          role: 'collateral' as const,
+                          symbol: colInPool.asset.symbol,
+                          assetAddress: colInPool.asset.address,
+                          intrinsicYield: colInPool.intrinsicYield,
+                          rewardApr: colInPool.depositRewardApr,
+                          depositRatePct: colInPool.depositRate,
+                          borrowRatePct: colInPool.variableBorrowRate,
+                        },
+                      }
+                    : {}),
+                  ...(colOutPool
+                    ? {
+                        [colOutPool.marketUid]: {
+                          role: 'collateral' as const,
+                          symbol: colOutPool.asset.symbol,
+                          assetAddress: colOutPool.asset.address,
+                          intrinsicYield: colOutPool.intrinsicYield,
+                          rewardApr: colOutPool.depositRewardApr,
+                          depositRatePct: colOutPool.depositRate,
+                          borrowRatePct: colOutPool.variableBorrowRate,
+                        },
+                      }
+                    : {}),
+                }}
               />
             ))
           })()}
@@ -353,10 +422,34 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
 
       {/* Rate impact */}
       <RateImpactIndicator
-        rateImpact={rateImpact}
+        rateImpact={
+          (selectedIndex !== null ? quotes[selectedIndex]?.rateImpact : undefined) ?? rateImpact
+        }
         marketLabels={{
           ...(colInPool ? { [colInPool.marketUid]: `${colInPool.asset.symbol} (Swap From)` } : {}),
-          ...(colOutPool ? { [colOutPool.marketUid]: `${colOutPool.asset.symbol} (Swap Into)` } : {}),
+          ...(colOutPool
+            ? { [colOutPool.marketUid]: `${colOutPool.asset.symbol} (Swap Into)` }
+            : {}),
+        }}
+        marketYields={{
+          ...(colInPool
+            ? {
+                [colInPool.marketUid]: {
+                  intrinsicYield: colInPool.intrinsicYield,
+                  depositRewardApr: colInPool.depositRewardApr,
+                  borrowRewardApr: colInPool.borrowRewardApr,
+                },
+              }
+            : {}),
+          ...(colOutPool
+            ? {
+                [colOutPool.marketUid]: {
+                  intrinsicYield: colOutPool.intrinsicYield,
+                  depositRewardApr: colOutPool.depositRewardApr,
+                  borrowRewardApr: colOutPool.borrowRewardApr,
+                },
+              }
+            : {}),
         }}
       />
 
@@ -366,17 +459,40 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
       {selectedIndex !== null && (
         <div className="space-y-1.5">
           {permissions.map((tx, i) => (
-            <button key={`perm-${i}`} type="button" className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs" title={tx.description || 'Approve'} onClick={() => executeNextPermission(i)}>
+            <button
+              key={`perm-${i}`}
+              type="button"
+              className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs"
+              title={tx.description || 'Approve'}
+              onClick={() => executeNextPermission(i)}
+            >
               <span className="block truncate max-w-full">{tx.description || 'Approve'}</span>
             </button>
           ))}
           {transactions.map((tx, i) => (
-            <button key={`tx-${i}`} type="button" className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs" title={tx.description || 'Execute Setup Transaction'} onClick={() => executeNextTransaction(i)}>
-              <span className="block truncate max-w-full">{tx.description || 'Execute Setup Transaction'}</span>
+            <button
+              key={`tx-${i}`}
+              type="button"
+              className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs"
+              title={tx.description || 'Execute Setup Transaction'}
+              onClick={() => executeNextTransaction(i)}
+            >
+              <span className="block truncate max-w-full">
+                {tx.description || 'Execute Setup Transaction'}
+              </span>
             </button>
           ))}
-          <button type="button" className="btn btn-success btn-sm w-full" disabled={executingQuote} onClick={() => executeQuote('ColSwap')}>
-            {executingQuote ? <span className="loading loading-spinner loading-xs" /> : 'Execute Collateral Swap'}
+          <button
+            type="button"
+            className="btn btn-success btn-sm w-full"
+            disabled={executingQuote}
+            onClick={() => executeQuote('ColSwap')}
+          >
+            {executingQuote ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              'Execute Collateral Swap'
+            )}
           </button>
         </div>
       )}

@@ -403,7 +403,20 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
       <HealthFactorProjection simulation={simulation} />
 
       {/* Rate impact */}
-      <RateImpactIndicator rateImpact={rateImpact} />
+      <RateImpactIndicator
+        rateImpact={rateImpact}
+        marketYields={
+          pool
+            ? {
+                [pool.marketUid]: {
+                  intrinsicYield: pool.intrinsicYield,
+                  depositRewardApr: pool.depositRewardApr,
+                  borrowRewardApr: pool.borrowRewardApr,
+                },
+              }
+            : undefined
+        }
+      />
 
       {result && hasPermissions && !allPermissionsDone && (
         <div className="space-y-1">

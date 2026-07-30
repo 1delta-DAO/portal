@@ -7,7 +7,12 @@ import { PoolSelectorDropdown } from '../PoolSelectorDropdown'
 import { SlippageInput } from '../SlippageInput'
 import { QuoteCard } from '../QuoteCard'
 import { AmountQuickButtons } from '../../../actions/AmountQuickButtons'
-import { formatTokenForInput, formatTokenSignificant, formatUsd, sanitizeAmountInput } from '../../../actions/format'
+import {
+  formatTokenForInput,
+  formatTokenSignificant,
+  formatUsd,
+  sanitizeAmountInput,
+} from '../../../actions/format'
 import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes, buildSimulationBody } from '../useTradingQuotes'
 import { TradingTransactionSuccess } from '../TradingTransactionSuccess'
@@ -21,7 +26,12 @@ import {
   type LoopRangeEntry,
 } from '../../../../../sdk/lending-helper/fetchLoopRange'
 import { loansForMarket } from '../../../../../hooks/lending/useUserData'
-import { termLabel, loanDebtString, maturityDisplay, loanRatePct } from '../../../shared/brokeredLoans'
+import {
+  termLabel,
+  loanDebtString,
+  maturityDisplay,
+  loanRatePct,
+} from '../../../shared/brokeredLoans'
 
 export const CloseAction: React.FC<TradingActionProps> = ({
   collateralPools,
@@ -49,9 +59,23 @@ export const CloseAction: React.FC<TradingActionProps> = ({
   const [slippage, setSlippage] = useState('0.3')
 
   const {
-    quotes, permissions, transactions, rateImpact, simulation, selectedIndex, loading,
-    executingQuote, txSuccess, error,
-    fetchQuotes, selectQuote, executeNextPermission, executeNextTransaction, executeQuote, dismissSuccess, reset,
+    quotes,
+    permissions,
+    transactions,
+    rateImpact,
+    simulation,
+    selectedIndex,
+    loading,
+    executingQuote,
+    txSuccess,
+    error,
+    fetchQuotes,
+    selectQuote,
+    executeNextPermission,
+    executeNextTransaction,
+    executeQuote,
+    dismissSuccess,
+    reset,
   } = useTradingQuotes({ chainId, account })
 
   // Notify parent
@@ -92,7 +116,9 @@ export const CloseAction: React.FC<TradingActionProps> = ({
   // Brokered (Lista) debt: each fixed loan repays by its own loanId — pick which
   // one this close targets. (BROKERED_MARKETS.md §6)
   const brokeredLoans =
-    activeSubAccount && debtPool ? loansForMarket(activeSubAccount.positions, debtPool.marketUid) : []
+    activeSubAccount && debtPool
+      ? loansForMarket(activeSubAccount.positions, debtPool.marketUid)
+      : []
   const isDebtBrokered =
     !!debtPool && (debtPool.variableBorrowDisabled === true || brokeredLoans.length > 0)
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null)
@@ -186,26 +212,37 @@ export const CloseAction: React.FC<TradingActionProps> = ({
 
   const handleFetchQuotes = () => {
     if (!collateralPool || !debtPool || !exactPool) return
-    fetchQuotes('Close', {
-      marketUidIn: collateralPool.marketUid,
-      marketUidOut: debtPool.marketUid,
-      amount: parseUnits(exactAmount || '0', exactPool.asset.decimals).toString(),
-      slippage: (parseFloat(slippage) || 0.3) * 100,
-      irModeOut: LendingMode.VARIABLE,
-      tradeType,
-      ...(isAll ? { isAll: true } : {}),
-      // Brokered debt: repay the selected fixed loan by its loanId. (Docs §6)
-      ...(isDebtBrokered && selectedLoanId ? { loanId: selectedLoanId } : {}),
-      usePendleMintRedeem: false,
-      ...(accountId ? { accountId } : {}),
-    }, account, activeSubAccount ? buildSimulationBody(activeSubAccount) : undefined)
+    fetchQuotes(
+      'Close',
+      {
+        marketUidIn: collateralPool.marketUid,
+        marketUidOut: debtPool.marketUid,
+        amount: parseUnits(exactAmount || '0', exactPool.asset.decimals).toString(),
+        slippage: (parseFloat(slippage) || 0.3) * 100,
+        irModeOut: LendingMode.VARIABLE,
+        tradeType,
+        ...(isAll ? { isAll: true } : {}),
+        // Brokered debt: repay the selected fixed loan by its loanId. (Docs §6)
+        ...(isDebtBrokered && selectedLoanId ? { loanId: selectedLoanId } : {}),
+        usePendleMintRedeem: false,
+        ...(accountId ? { accountId } : {}),
+      },
+      account,
+      activeSubAccount ? buildSimulationBody(activeSubAccount) : undefined
+    )
   }
 
   const canFetch =
     !!collateralPool && !!debtPool && !!exactAmount && (!isDebtBrokered || selectedLoan != null)
 
   if (txSuccess) {
-    return <TradingTransactionSuccess operation={txSuccess.operation} hash={txSuccess.hash} onDismiss={dismissSuccess} />
+    return (
+      <TradingTransactionSuccess
+        operation={txSuccess.operation}
+        hash={txSuccess.hash}
+        onDismiss={dismissSuccess}
+      />
+    )
   }
 
   return (
@@ -223,7 +260,9 @@ export const CloseAction: React.FC<TradingActionProps> = ({
       )}
 
       {/* Collateral (Sell) + Input amount */}
-      <div className={`rounded-lg p-2 transition-colors ${activeField === 'input' ? 'ring-1 ring-primary bg-primary/5' : 'bg-base-200/30'}`}>
+      <div
+        className={`rounded-lg p-2 transition-colors ${activeField === 'input' ? 'ring-1 ring-primary bg-primary/5' : 'bg-base-200/30'}`}
+      >
         <PoolSelectorDropdown
           pools={collateralPools}
           value={collateralPool}
@@ -237,13 +276,23 @@ export const CloseAction: React.FC<TradingActionProps> = ({
           <div className="flex items-center justify-between mb-0.5">
             <label className="label-text text-xs">
               Amount
-              {activeField === 'input' && <span className="text-primary ml-1 text-[10px] font-medium">(exact)</span>}
+              {activeField === 'input' && (
+                <span className="text-primary ml-1 text-[10px] font-medium">(exact)</span>
+              )}
             </label>
             {activeField === 'input' && (
               <AmountQuickButtons
                 maxAmount={maxInputStr}
-                onSelect={(v) => { setInputAmount(v); setIsAll(false); reset() }}
-                onMax={() => { setInputAmount(maxInputStr); setIsAll(true); reset() }}
+                onSelect={(v) => {
+                  setInputAmount(v)
+                  setIsAll(false)
+                  reset()
+                }}
+                onMax={() => {
+                  setInputAmount(maxInputStr)
+                  setIsAll(true)
+                  reset()
+                }}
                 decimals={collateralPool?.asset?.decimals}
               />
             )}
@@ -286,7 +335,9 @@ export const CloseAction: React.FC<TradingActionProps> = ({
       </div>
 
       {/* Debt (Repay) + Output amount */}
-      <div className={`rounded-lg p-2 transition-colors ${activeField === 'output' ? 'ring-1 ring-primary bg-primary/5' : 'bg-base-200/30'}`}>
+      <div
+        className={`rounded-lg p-2 transition-colors ${activeField === 'output' ? 'ring-1 ring-primary bg-primary/5' : 'bg-base-200/30'}`}
+      >
         <PoolSelectorDropdown
           pools={borrowablePools}
           value={debtPool}
@@ -361,13 +412,22 @@ export const CloseAction: React.FC<TradingActionProps> = ({
           <div className="flex items-center justify-between mb-0.5">
             <label className="label-text text-xs">
               Amount
-              {activeField === 'output' && <span className="text-primary ml-1 text-[10px] font-medium">(exact)</span>}
+              {activeField === 'output' && (
+                <span className="text-primary ml-1 text-[10px] font-medium">(exact)</span>
+              )}
             </label>
             {activeField === 'output' && (
               <AmountQuickButtons
                 maxAmount={maxOutputStr}
-                onSelect={(v) => { setOutputAmount(v); setIsAll(false); reset() }}
-                onMax={() => { setOutputAmount(maxOutputStr); reset() }}
+                onSelect={(v) => {
+                  setOutputAmount(v)
+                  setIsAll(false)
+                  reset()
+                }}
+                onMax={() => {
+                  setOutputAmount(maxOutputStr)
+                  reset()
+                }}
                 decimals={debtPool?.asset?.decimals}
               />
             )}
@@ -396,17 +456,24 @@ export const CloseAction: React.FC<TradingActionProps> = ({
             }}
           />
           {/* Withdraw All — when in exact output mode with max selected, withdraw all collateral + repay max debt */}
-          {activeField === 'output' && outputAmount === maxOutputStr && parseFloat(maxOutputStr) > 0 && (
-            <label className="flex items-center gap-1.5 cursor-pointer mt-1">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-xs checkbox-primary"
-                checked={isAll}
-                onChange={(e) => { setIsAll(e.target.checked); reset() }}
-              />
-              <span className="text-[10px] text-base-content/70">Withdraw all collateral (repay debt, refund residual)</span>
-            </label>
-          )}
+          {activeField === 'output' &&
+            outputAmount === maxOutputStr &&
+            parseFloat(maxOutputStr) > 0 && (
+              <label className="flex items-center gap-1.5 cursor-pointer mt-1">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-xs checkbox-primary"
+                  checked={isAll}
+                  onChange={(e) => {
+                    setIsAll(e.target.checked)
+                    reset()
+                  }}
+                />
+                <span className="text-[10px] text-base-content/70">
+                  Withdraw all collateral (repay debt, refund residual)
+                </span>
+              </label>
+            )}
           {closeRangeLoading && (
             <span className="text-[10px] text-base-content/50 mt-0.5 flex items-center gap-1">
               <span className="loading loading-spinner loading-xs" /> Loading max...
@@ -453,6 +520,34 @@ export const CloseAction: React.FC<TradingActionProps> = ({
                 inSymbol={collateralPool?.asset.symbol}
                 outSymbol={debtPool?.asset.symbol}
                 bestPriceImpactUSD={bestImpact}
+                marketRoles={{
+                  ...(collateralPool
+                    ? {
+                        [collateralPool.marketUid]: {
+                          role: 'collateral' as const,
+                          symbol: collateralPool.asset.symbol,
+                          assetAddress: collateralPool.asset.address,
+                          intrinsicYield: collateralPool.intrinsicYield,
+                          rewardApr: collateralPool.depositRewardApr,
+                          depositRatePct: collateralPool.depositRate,
+                          borrowRatePct: collateralPool.variableBorrowRate,
+                        },
+                      }
+                    : {}),
+                  ...(debtPool
+                    ? {
+                        [debtPool.marketUid]: {
+                          role: 'debt' as const,
+                          symbol: debtPool.asset.symbol,
+                          assetAddress: debtPool.asset.address,
+                          intrinsicYield: debtPool.intrinsicYield,
+                          rewardApr: debtPool.borrowRewardApr,
+                          borrowRatePct: debtPool.variableBorrowRate,
+                          depositRatePct: debtPool.depositRate,
+                        },
+                      }
+                    : {}),
+                }}
               />
             ))
           })()}
@@ -461,10 +556,34 @@ export const CloseAction: React.FC<TradingActionProps> = ({
 
       {/* Rate impact */}
       <RateImpactIndicator
-        rateImpact={rateImpact}
+        rateImpact={
+          (selectedIndex !== null ? quotes[selectedIndex]?.rateImpact : undefined) ?? rateImpact
+        }
         marketLabels={{
-          ...(collateralPool ? { [collateralPool.marketUid]: `${collateralPool.asset.symbol} (Collateral)` } : {}),
+          ...(collateralPool
+            ? { [collateralPool.marketUid]: `${collateralPool.asset.symbol} (Collateral)` }
+            : {}),
           ...(debtPool ? { [debtPool.marketUid]: `${debtPool.asset.symbol} (Debt)` } : {}),
+        }}
+        marketYields={{
+          ...(collateralPool
+            ? {
+                [collateralPool.marketUid]: {
+                  intrinsicYield: collateralPool.intrinsicYield,
+                  depositRewardApr: collateralPool.depositRewardApr,
+                  borrowRewardApr: collateralPool.borrowRewardApr,
+                },
+              }
+            : {}),
+          ...(debtPool
+            ? {
+                [debtPool.marketUid]: {
+                  intrinsicYield: debtPool.intrinsicYield,
+                  depositRewardApr: debtPool.depositRewardApr,
+                  borrowRewardApr: debtPool.borrowRewardApr,
+                },
+              }
+            : {}),
         }}
       />
 
@@ -474,17 +593,40 @@ export const CloseAction: React.FC<TradingActionProps> = ({
       {selectedIndex !== null && (
         <div className="space-y-1.5">
           {permissions.map((tx, i) => (
-            <button key={`perm-${i}`} type="button" className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs" title={tx.description || 'Approve'} onClick={() => executeNextPermission(i)}>
+            <button
+              key={`perm-${i}`}
+              type="button"
+              className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs"
+              title={tx.description || 'Approve'}
+              onClick={() => executeNextPermission(i)}
+            >
               <span className="block truncate max-w-full">{tx.description || 'Approve'}</span>
             </button>
           ))}
           {transactions.map((tx, i) => (
-            <button key={`tx-${i}`} type="button" className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs" title={tx.description || 'Execute Setup Transaction'} onClick={() => executeNextTransaction(i)}>
-              <span className="block truncate max-w-full">{tx.description || 'Execute Setup Transaction'}</span>
+            <button
+              key={`tx-${i}`}
+              type="button"
+              className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs"
+              title={tx.description || 'Execute Setup Transaction'}
+              onClick={() => executeNextTransaction(i)}
+            >
+              <span className="block truncate max-w-full">
+                {tx.description || 'Execute Setup Transaction'}
+              </span>
             </button>
           ))}
-          <button type="button" className="btn btn-success btn-sm w-full" disabled={executingQuote} onClick={() => executeQuote('Close')}>
-            {executingQuote ? <span className="loading loading-spinner loading-xs" /> : 'Execute Close'}
+          <button
+            type="button"
+            className="btn btn-success btn-sm w-full"
+            disabled={executingQuote}
+            onClick={() => executeQuote('Close')}
+          >
+            {executingQuote ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              'Execute Close'
+            )}
           </button>
         </div>
       )}
