@@ -49,6 +49,12 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
     quotes,
     permissions,
     transactions,
+    completedPermissions,
+    completedTransactions,
+    executingPermissionIdx,
+    executingTransactionIdx,
+    allPermissionsDone,
+    allTransactionsDone,
     rateImpact,
     simulation,
     selectedIndex,
@@ -458,38 +464,67 @@ export const ColSwapAction: React.FC<TradingActionProps> = ({
 
       {selectedIndex !== null && (
         <div className="space-y-1.5">
-          {permissions.map((tx, i) => (
-            <button
-              key={`perm-${i}`}
-              type="button"
-              className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs"
-              title={tx.description || 'Approve'}
-              onClick={() => executeNextPermission(i)}
-            >
-              <span className="block truncate max-w-full">{tx.description || 'Approve'}</span>
-            </button>
-          ))}
-          {transactions.map((tx, i) => (
-            <button
-              key={`tx-${i}`}
-              type="button"
-              className="btn btn-outline btn-sm w-full h-auto min-h-8 py-1 text-xs"
-              title={tx.description || 'Execute Setup Transaction'}
-              onClick={() => executeNextTransaction(i)}
-            >
-              <span className="block truncate max-w-full">
-                {tx.description || 'Execute Setup Transaction'}
-              </span>
-            </button>
-          ))}
+          {permissions.map((tx, i) => {
+            const done = completedPermissions.includes(i)
+            const executing = executingPermissionIdx === i
+            const label = tx.description || 'Approve'
+            return (
+              <button
+                key={`perm-${i}`}
+                type="button"
+                className={`btn btn-sm w-full h-auto min-h-8 py-1 text-xs ${done ? 'btn-outline btn-success' : 'btn-outline'}`}
+                disabled={executing || executingPermissionIdx !== null}
+                title={label}
+                onClick={() => executeNextPermission(i)}
+              >
+                {executing ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <span className="block truncate max-w-full">{done ? `✓ ${label}` : label}</span>
+                )}
+              </button>
+            )
+          })}
+          {transactions.map((tx, i) => {
+            const done = completedTransactions.includes(i)
+            const executing = executingTransactionIdx === i
+            const label = tx.description || 'Execute Setup Transaction'
+            return (
+              <button
+                key={`tx-${i}`}
+                type="button"
+                className={`btn btn-sm w-full h-auto min-h-8 py-1 text-xs ${done ? 'btn-outline btn-success' : 'btn-outline'}`}
+                disabled={executing || executingTransactionIdx !== null}
+                title={label}
+                onClick={() => executeNextTransaction(i)}
+              >
+                {executing ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <span className="block truncate max-w-full">{done ? `✓ ${label}` : label}</span>
+                )}
+              </button>
+            )
+          })}
           <button
             type="button"
             className="btn btn-success btn-sm w-full"
-            disabled={executingQuote}
+            disabled={executingQuote || !allPermissionsDone || !allTransactionsDone}
+            title={
+              !allPermissionsDone
+                ? 'Complete the approval(s) above first'
+                : !allTransactionsDone
+                  ? 'Complete the setup transaction(s) above first'
+                  : undefined
+            }
             onClick={() => executeQuote('ColSwap')}
           >
             {executingQuote ? (
               <span className="loading loading-spinner loading-xs" />
+            ) : !allPermissionsDone ? (
+              'Approve first'
+            ) : !allTransactionsDone ? (
+              'Complete setup first'
             ) : (
               'Execute Collateral Swap'
             )}

@@ -179,3 +179,6 @@ pnpm format     # Prettier
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VITE_BACKEND_BASE_URL` | `https://portal.1delta.io` | Backend API base URL |
+| `VITE_WC_PROJECT_ID` | — | WalletConnect/Reown project id (mobile wallets) |
+| `VITE_OPTIMIZER_ENABLED` | off | `true` shows the Optimize tab |
+| `VITE_BRIDGE_UI_ENABLED` | off | `true` shows the Cross-Chain (bridge) tab — disabled by default while the bridge flow is on hold |

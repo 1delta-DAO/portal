@@ -14,11 +14,15 @@ import { LendingDashboard } from './tabs/lending'
 import { TradingDashboard } from './tabs/trading'
 import { OptimizerTab } from './tabs/optimizer'
 import { SpotSwapPanel } from '../swap/SpotSwapPanel'
+import { XChainSwapPanel } from '../swap/XChainSwapPanel'
 import { tabFromSlug, slugToLender, buildPath } from '../../utils/routes'
 
 const OPTIMIZER_ENABLED = import.meta.env.VITE_OPTIMIZER_ENABLED === 'true'
+// Bridge / cross-chain swap UI is opt-in and currently DISABLED — set
+// VITE_BRIDGE_UI_ENABLED=true in .env to bring the tab back.
+const BRIDGE_UI_ENABLED = import.meta.env.VITE_BRIDGE_UI_ENABLED === 'true'
 
-export type SubTab = 'earn' | 'lending' | 'trading' | 'swap' | 'optimize'
+export type SubTab = 'earn' | 'lending' | 'trading' | 'swap' | 'xswap' | 'optimize'
 
 export function LenderTab() {
   const { address: account } = useSpyAccount()
@@ -27,7 +31,10 @@ export function LenderTab() {
   const navigate = useNavigate()
   const { tab: tabSlug, chainId: chainIdParam, lender: lenderParam } = useParams()
 
-  const activeTab = tabFromSlug(tabSlug)
+  // Deep links to the disabled bridge tab fall back to the default tab
+  // instead of rendering an empty content area.
+  const rawTab = tabFromSlug(tabSlug)
+  const activeTab = !BRIDGE_UI_ENABLED && rawTab === 'xswap' ? 'earn' : rawTab
   const selectedChain = chainIdParam || localStorage.getItem('selectedChainId') || '1'
   const initialLender = lenderParam ? slugToLender(lenderParam) : ''
 
@@ -196,6 +203,17 @@ export function LenderTab() {
           >
             Swap
           </button>
+
+          {BRIDGE_UI_ENABLED && (
+            <button
+              type="button"
+              role="tab"
+              className={`tab tab-sm ${activeTab === 'xswap' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('xswap')}
+            >
+              Cross-Chain
+            </button>
+          )}
         </div>
 
         <div className="flex justify-end items-center gap-2">
@@ -262,6 +280,10 @@ export function LenderTab() {
       )}
 
       {activeTab === 'swap' && <SpotSwapPanel chainId={effectiveChainId} />}
+
+      {BRIDGE_UI_ENABLED && activeTab === 'xswap' && (
+        <XChainSwapPanel chainId={effectiveChainId} />
+      )}
     </div>
   )
 }

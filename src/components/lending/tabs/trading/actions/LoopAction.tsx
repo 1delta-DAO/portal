@@ -157,6 +157,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     completedTransactions,
     executingPermissionIdx,
     executingTransactionIdx,
+    allPermissionsDone,
+    allTransactionsDone,
     rateImpact,
     simulation,
     selectedIndex,
@@ -871,14 +873,29 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               </button>
             )
           })}
+          {/* The composer pulls the margin with `transferFrom`, so an approval
+              left pending reverts the whole loop ("transfer amount exceeds
+              allowance"). Approvals are sized to the exact pay amount and are
+              consumed by every loop, so this gate matters on each run. */}
           <button
             type="button"
             className="btn btn-success btn-sm w-full"
-            disabled={executingQuote}
+            disabled={executingQuote || !allPermissionsDone || !allTransactionsDone}
+            title={
+              !allPermissionsDone
+                ? 'Complete the approval(s) above first'
+                : !allTransactionsDone
+                  ? 'Complete the setup transaction(s) above first'
+                  : undefined
+            }
             onClick={() => executeQuote('Loop')}
           >
             {executingQuote ? (
               <span className="loading loading-spinner loading-xs" />
+            ) : !allPermissionsDone ? (
+              'Approve first'
+            ) : !allTransactionsDone ? (
+              'Complete setup first'
             ) : (
               'Execute Loop'
             )}

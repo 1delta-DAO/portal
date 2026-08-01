@@ -15,6 +15,8 @@ export interface SpotSwapTx {
   data: string
   value: string
   description?: string
+  /** ERC-20 approve spender (present on x-chain permission entries) */
+  spender?: string
 }
 
 interface SwapSuccess {
@@ -60,75 +62,72 @@ export function useSpotSwapQuote(params: { chainId: string; account?: string }) 
     txSuccess: null,
   })
 
-  const fetchQuote = useCallback(
-    async (swapParams: SpotSwapParams) => {
-      setState((s) => ({
-        ...s,
-        loading: true,
-        error: null,
-        quotes: [],
-        currencyIn: null,
-        currencyOut: null,
-        permissions: [],
-        selectedIndex: null,
+  const fetchQuote = useCallback(async (swapParams: SpotSwapParams) => {
+    setState((s) => ({
+      ...s,
+      loading: true,
+      error: null,
+      quotes: [],
+      currencyIn: null,
+      currencyOut: null,
+      permissions: [],
+      selectedIndex: null,
+    }))
+
+    try {
+      const qs = new URLSearchParams()
+      qs.set('chainId', swapParams.chainId)
+      qs.set('tokenIn', swapParams.tokenIn)
+      qs.set('tokenOut', swapParams.tokenOut)
+      qs.set('amount', swapParams.amount)
+      qs.set('slippage', String(swapParams.slippage))
+      qs.set('tradeType', String(swapParams.tradeType))
+
+      if (swapParams.account) qs.set('account', swapParams.account)
+      if (swapParams.receiver) qs.set('receiver', swapParams.receiver)
+      if (swapParams.usePendleMintRedeem) qs.set('usePendleMintRedeem', 'true')
+
+      const res = await fetch(`${BACKEND_BASE_URL}/v1/actions/swap/spot?${qs}`)
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(`HTTP ${res.status}: ${text || res.statusText}`)
+      }
+
+      const envelope = await res.json()
+      if (!envelope.success) {
+        throw new Error(envelope.error?.message ?? 'API error')
+      }
+
+      const data = envelope.data ?? {}
+      const rawQuotes: Array<{ aggregator: string; tradeInput: number; tradeOutput: number }> =
+        data.quotes ?? []
+      const alternatives: SpotSwapTx[] = envelope.actions?.alternatives ?? []
+
+      const quotes: SpotSwapQuote[] = rawQuotes.map((q, i) => ({
+        aggregator: q.aggregator ?? 'Unknown',
+        tradeInput: q.tradeInput ?? 0,
+        tradeOutput: q.tradeOutput ?? 0,
+        tx: alternatives[i] ?? { to: '', data: '', value: '0' },
       }))
 
-      try {
-        const qs = new URLSearchParams()
-        qs.set('chainId', swapParams.chainId)
-        qs.set('tokenIn', swapParams.tokenIn)
-        qs.set('tokenOut', swapParams.tokenOut)
-        qs.set('amount', swapParams.amount)
-        qs.set('slippage', String(swapParams.slippage))
-        qs.set('tradeType', String(swapParams.tradeType))
+      const permissions: SpotSwapTx[] = envelope.actions?.permissions ?? []
 
-        if (swapParams.account) qs.set('account', swapParams.account)
-        if (swapParams.receiver) qs.set('receiver', swapParams.receiver)
-        if (swapParams.usePendleMintRedeem) qs.set('usePendleMintRedeem', 'true')
+      setState((s) => ({
+        ...s,
+        quotes,
+        currencyIn: data.currencyIn ?? null,
+        currencyOut: data.currencyOut ?? null,
+        permissions,
+        selectedIndex: quotes.length > 0 ? 0 : null,
+        loading: false,
+      }))
 
-        const res = await fetch(`${BACKEND_BASE_URL}/v1/actions/swap/spot?${qs}`)
-        if (!res.ok) {
-          const text = await res.text().catch(() => '')
-          throw new Error(`HTTP ${res.status}: ${text || res.statusText}`)
-        }
-
-        const envelope = await res.json()
-        if (!envelope.success) {
-          throw new Error(envelope.error?.message ?? 'API error')
-        }
-
-        const data = envelope.data ?? {}
-        const rawQuotes: Array<{ aggregator: string; tradeInput: number; tradeOutput: number }> =
-          data.quotes ?? []
-        const alternatives: SpotSwapTx[] = envelope.actions?.alternatives ?? []
-
-        const quotes: SpotSwapQuote[] = rawQuotes.map((q, i) => ({
-          aggregator: q.aggregator ?? 'Unknown',
-          tradeInput: q.tradeInput ?? 0,
-          tradeOutput: q.tradeOutput ?? 0,
-          tx: alternatives[i] ?? { to: '', data: '', value: '0' },
-        }))
-
-        const permissions: SpotSwapTx[] = envelope.actions?.permissions ?? []
-
-        setState((s) => ({
-          ...s,
-          quotes,
-          currencyIn: data.currencyIn ?? null,
-          currencyOut: data.currencyOut ?? null,
-          permissions,
-          selectedIndex: quotes.length > 0 ? 0 : null,
-          loading: false,
-        }))
-
-        return { quotes, permissions }
-      } catch (e: any) {
-        setState((s) => ({ ...s, loading: false, error: e.message ?? 'Unknown error' }))
-        return null
-      }
-    },
-    []
-  )
+      return { quotes, permissions }
+    } catch (e: any) {
+      setState((s) => ({ ...s, loading: false, error: e.message ?? 'Unknown error' }))
+      return null
+    }
+  }, [])
 
   const selectQuote = useCallback((index: number) => {
     setState((s) => ({ ...s, selectedIndex: index }))

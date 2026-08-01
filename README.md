@@ -10,6 +10,8 @@ pnpm i && pnpm start
 
 Set `VITE_BACKEND_BASE_URL` in `.env` to override the default API endpoint. A `VITE_WC_PROJECT_ID` (WalletConnect/Reown) is required for mobile wallet connections.
 
+Feature flags (all default OFF): `VITE_OPTIMIZER_ENABLED=true` shows the Optimize tab; `VITE_BRIDGE_UI_ENABLED=true` shows the Cross-Chain (bridge) tab — currently disabled by default while the bridge flow is on hold.
+
 ## Backend API (for integrators)
 
 The UI talks to the 1delta backend at `https://portal.1delta.io`. The API reference is at [`https://portal.1delta.io/v1/docs`](https://portal.1delta.io/v1/docs).

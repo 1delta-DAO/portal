@@ -269,6 +269,35 @@ This approach offloads RPC load to the client while keeping parsing server-side.
 
 ---
 
+### `useXChainSwapQuote`
+
+Cross-chain swap quotes for the Cross-Chain tab (`XChainSwapPanel`).
+
+| Item        | Value                                                                    |
+| ----------- | ------------------------------------------------------------------------ |
+| **Endpoint**| `GET /v1/actions/swap/x-chain`                                           |
+| **Params**  | `fromChainId, toChainId, tokenIn, tokenOut, amount, slippage, account?, receiver?, order?` |
+| **Returns** | Bridge quotes (`bridge`, `tradeOutput`, `estimatedDuration`, `approvalTarget`) index-matched to `actions.alternatives` |
+
+Same-chain pairs fall back server-side to the spot meta-aggregator (`data.fallback === 'spot'`,
+rows carry `aggregator`). Approvals are **per bridge** — `permissionsForQuote(quote)` filters
+`actions.permissions` (labeled with the bridge name) to the selected quote; execute only that one.
+Transactions run on the **source** chain.
+
+---
+
+### `useXChainBalances`
+
+Multi-chain main-token balances via the prepare/parse mechanic (client-side RPC execution):
+
+1. `GET /v1/data/token/balances/rpc-call?chains=1,10,…&account=` — one prepared `eth_call` per chain; the server scopes each chain to its curated `mainTokens` (~50–70 per chain — full lists can hold tens of thousands of tokens and are never scanned)
+2. Execute per chain via `executeRpcCallsWithRetry` (RPC rotation; failed chains tolerated)
+3. `POST /v1/data/token/balances/parse` with `[{ chainId, result }]` — returns priced items per chain, plus `missingChains`
+
+Max 30 chains per request (server cap). Returns `{ chains: Record<chainId, items>, missingChains, totalUSD }`, non-zero only, USD-desc.
+
+---
+
 ## Slippage Convention
 
 All backend endpoints expect slippage in **basis points** (1 bp = 0.01%).

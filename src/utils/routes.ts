@@ -6,6 +6,7 @@ const SLUG_TO_TAB: Record<string, SubTab> = {
   lending: 'lending',
   loop: 'trading',
   swap: 'swap',
+  'x-chain': 'xswap',
   optimize: 'optimize',
 }
 
@@ -15,6 +16,7 @@ const TAB_TO_SLUG: Record<SubTab, string> = {
   lending: 'lending',
   trading: 'loop',
   swap: 'swap',
+  xswap: 'x-chain',
   optimize: 'optimize',
 }
 
