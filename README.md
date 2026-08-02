@@ -10,7 +10,7 @@ pnpm i && pnpm start
 
 Set `VITE_BACKEND_BASE_URL` in `.env` to override the default API endpoint. A `VITE_WC_PROJECT_ID` (WalletConnect/Reown) is required for mobile wallet connections.
 
-Feature flags (all default OFF): `VITE_OPTIMIZER_ENABLED=true` shows the Optimize tab; `VITE_BRIDGE_UI_ENABLED=true` shows the Cross-Chain (bridge) tab — currently disabled by default while the bridge flow is on hold.
+Feature flags: `VITE_OPTIMIZER_ENABLED=true` shows the Optimize tab (default OFF); `VITE_BRIDGE_UI_ENABLED=false` hides the Cross-Chain (bridge) tab, which is shown by default with a "Beta" pill.
 
 ## Backend API (for integrators)
 

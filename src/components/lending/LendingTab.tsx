@@ -16,11 +16,12 @@ import { OptimizerTab } from './tabs/optimizer'
 import { SpotSwapPanel } from '../swap/SpotSwapPanel'
 import { XChainSwapPanel } from '../swap/XChainSwapPanel'
 import { tabFromSlug, slugToLender, buildPath } from '../../utils/routes'
+import { Badge } from '../common/Badge'
 
 const OPTIMIZER_ENABLED = import.meta.env.VITE_OPTIMIZER_ENABLED === 'true'
-// Bridge / cross-chain swap UI is opt-in and currently DISABLED — set
-// VITE_BRIDGE_UI_ENABLED=true in .env to bring the tab back.
-const BRIDGE_UI_ENABLED = import.meta.env.VITE_BRIDGE_UI_ENABLED === 'true'
+// Bridge / cross-chain swap UI ships enabled but is still flagged Beta in the
+// tab bar — set VITE_BRIDGE_UI_ENABLED=false in .env to hide the tab again.
+const BRIDGE_UI_ENABLED = import.meta.env.VITE_BRIDGE_UI_ENABLED !== 'false'
 
 export type SubTab = 'earn' | 'lending' | 'trading' | 'swap' | 'xswap' | 'optimize'
 
@@ -208,10 +209,11 @@ export function LenderTab() {
             <button
               type="button"
               role="tab"
-              className={`tab tab-sm ${activeTab === 'xswap' ? 'tab-active' : ''}`}
+              className={`tab tab-sm gap-1.5 ${activeTab === 'xswap' ? 'tab-active' : ''}`}
               onClick={() => setActiveTab('xswap')}
             >
               Cross-Chain
+              <Badge tone="info">Beta</Badge>
             </button>
           )}
         </div>
