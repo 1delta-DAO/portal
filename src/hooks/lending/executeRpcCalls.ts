@@ -91,6 +91,73 @@ async function executeCall(
   throw lastError || new Error('RPC call failed after all retries')
 }
 
+/**
+ * Group prepared calls by the chain they target.
+ *
+ * The prepare endpoints return a flat `rpcCalls` array covering every
+ * requested chain (one entry per chain for balances, potentially many per
+ * chain for batched user positions), each tagged with its `chainId`. Legacy
+ * bare JSON-RPC entries carry no chain, so they fall back to `defaultChainId`.
+ */
+export function groupCallsByChain(
+  rpcCalls: RpcCall[],
+  defaultChainId: string
+): Map<string, RpcCall[]> {
+  const byChain = new Map<string, RpcCall[]>()
+  for (const call of rpcCalls) {
+    const chainId = isJsonRpcCall(call) ? defaultChainId : String(call.chainId ?? defaultChainId)
+    const existing = byChain.get(chainId)
+    if (existing) existing.push(call)
+    else byChain.set(chainId, [call])
+  }
+  return byChain
+}
+
+export interface MultiChainRpcResult {
+  rawResponses: RawRpcResponse[]
+  /** Chains whose RPCs all failed — their data is simply absent. */
+  missingChains: string[]
+}
+
+/**
+ * Execute prepared calls across several chains in parallel, tolerating
+ * per-chain failure.
+ *
+ * A single unreachable chain must not take down a multi-chain view, so each
+ * chain's batch is settled independently and failures are reported rather than
+ * thrown. Throws only when every chain failed, since an empty result would
+ * otherwise be indistinguishable from "this account holds nothing".
+ */
+export async function executeRpcCallsMultiChain(
+  rpcCalls: RpcCall[],
+  defaultChainId: string,
+  maxRetries = 5,
+  initialDelayMs = 1000
+): Promise<MultiChainRpcResult> {
+  const byChain = groupCallsByChain(rpcCalls, defaultChainId)
+
+  const settled = await Promise.allSettled(
+    [...byChain.entries()].map(async ([chainId, calls]) => ({
+      chainId,
+      responses: await executeRpcCallsWithRetry(chainId, calls, maxRetries, initialDelayMs),
+    }))
+  )
+
+  const rawResponses: RawRpcResponse[] = []
+  const missingChains: string[] = []
+  settled.forEach((s, i) => {
+    const chainId = [...byChain.keys()][i]
+    if (s.status === 'fulfilled') rawResponses.push(...s.value.responses)
+    else missingChains.push(chainId)
+  })
+
+  if (rawResponses.length === 0) {
+    throw new Error(`All chain RPCs failed (${missingChains.join(', ') || defaultChainId})`)
+  }
+
+  return { rawResponses, missingChains }
+}
+
 export async function executeRpcCallsWithRetry(
   chainId: string,
   rpcCalls: RpcCall[],

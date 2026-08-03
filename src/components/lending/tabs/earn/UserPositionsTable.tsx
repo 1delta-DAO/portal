@@ -10,7 +10,7 @@ import type {
   UserSubAccount,
   UserPositionEntry,
 } from '../../../../hooks/lending/useUserData'
-import { useTokenLists } from '../../../../hooks/useTokenLists'
+import { useTokenListsMultiChain } from '../../../../hooks/useTokenLists'
 import { abbreviateUsd } from '../../../../utils/format'
 import { fetchCollateralToggle } from '../../../../sdk/lending-helper/fetchLendingAction'
 import { useIsMobile } from '../../../../hooks/useIsMobile'
@@ -20,7 +20,11 @@ import { termLabel, loanRatePct, maturityDisplay } from '../../shared/brokeredLo
 
 interface UserLenderPositionsTableProps {
   account?: string
-  chainId: string
+  /**
+   * Chains the surrounding tab is browsing — used only to preload token
+   * metadata. Rows act on their own `entry.chainId`, never on this list.
+   */
+  chainIds: string[]
   userData?: UserDataResult
   lenderInfoMap?: LenderInfoMap
   isLoading: boolean
@@ -411,9 +415,12 @@ const MobileLenderCard: React.FC<{
   entry: LenderUserDataEntry
   tokens: Record<string, RawCurrency>
   account?: string
-  chainId: string
   lenderInfoMap?: LenderInfoMap
-}> = ({ entry, tokens, account, chainId, lenderInfoMap }) => {
+}> = ({ entry, tokens, account, lenderInfoMap }) => {
+  // Every action below targets THIS entry's chain. The list can mix chains, so
+  // taking the chain from the tab's selection would build transactions against
+  // whichever chain happened to be first.
+  const chainId = entry.chainId
   const subs = entry.data.filter(
     (sub) => extractPositions(sub.positions).length > 0 || sub.balanceData.nav !== 0
   )
@@ -512,7 +519,7 @@ const MobileLenderCard: React.FC<{
 
 export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> = ({
   account,
-  chainId,
+  chainIds,
   userData,
   lenderInfoMap,
   isLoading,
@@ -520,7 +527,9 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
   refetch,
   hideHeader,
 }) => {
-  const { data: tokens } = useTokenLists(chainId)
+  // Token metadata is per chain, and the position list can span chains, so
+  // rows look their assets up under their own `entry.chainId`.
+  const { data: tokensByChain } = useTokenListsMultiChain(chainIds)
   const summary = userData?.summary
   const lenderEntries = getActiveLenders(userData?.raw)
   const isMobile = useIsMobile()
@@ -589,9 +598,8 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
             <MobileLenderCard
               key={`${entry.chainId}-${entry.lender}`}
               entry={entry}
-              tokens={tokens}
+              tokens={tokensByChain[entry.chainId] ?? {}}
               account={account}
-              chainId={chainId}
               lenderInfoMap={lenderInfoMap}
             />
           ))}
@@ -749,9 +757,9 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                           <td className="align-middle">
                             <PositionsList
                               positions={collectSubAccountPositions(subs[0] ?? entry.data[0])}
-                              tokens={tokens}
+                              tokens={tokensByChain[entry.chainId] ?? {}}
                               account={account}
-                              chainId={chainId}
+                              chainId={entry.chainId}
                               fixedLoans={fixedLoansByMarket(subs[0] ?? entry.data[0])}
                             />
                           </td>
@@ -801,9 +809,9 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                             <td className="align-middle">
                               <PositionsList
                                 positions={positions}
-                                tokens={tokens}
+                                tokens={tokensByChain[entry.chainId] ?? {}}
                                 account={account}
-                                chainId={chainId}
+                                chainId={entry.chainId}
                                 fixedLoans={fixedLoansByMarket(sub)}
                               />
                             </td>

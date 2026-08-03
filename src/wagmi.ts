@@ -150,15 +150,36 @@ export const evmTransportsWagmi = Object.assign(
   })
 )
 
+/**
+ * INVARIANT: wagmi is a *wallet* layer here, never a data layer.
+ *
+ * Every piece of chain state the UI renders — pools, positions, balances,
+ * prices, rates — comes from the backend API (or, for the prepare/parse flows,
+ * from explicit one-shot eth_calls we issue ourselves). wagmi is only allowed
+ * to know about the connected account, sign, and switch networks when the user
+ * submits a transaction.
+ *
+ * Concretely that means:
+ *  - `pollingInterval` below disables the cyclic block watcher, so wagmi never
+ *    touches an RPC on a timer. Mainnet's viem default is eth.merkle.io, which
+ *    blocks browser CORS, so a timer here is a stream of console errors too.
+ *  - The app imports only `useAccount`, `useDisconnect`, `useSwitchChain` and
+ *    `useWalletClient` — connector state and signing. No `useBalance`,
+ *    `useReadContract`, `useBlockNumber` or ENS hooks. Adding one would put a
+ *    per-chain RPC read behind a render, which is exactly what the API exists
+ *    to avoid. Fetch through the backend instead.
+ *  - Selecting chains in the UI is a data filter: it rewrites the URL and
+ *    nothing else. The wallet's network is reconciled only at transaction
+ *    time, by `useSyncChain`, against the chain of the row being acted on.
+ *  - The connect button is hand-rolled (`components/connect/`) rather than
+ *    RainbowKit's `<ConnectButton>`, which would fetch an ENS name, avatar and
+ *    native balance on mount.
+ */
 export const config = getDefaultConfig({
   appName: 'Portal',
   projectId: (import.meta.env.VITE_WC_PROJECT_ID as string | undefined) ?? 'id',
   chains: evmChainWagmi,
   transports: evmTransportsWagmi,
   ssr: false,
-  // Effectively disable wagmi's cyclic block-watcher polling. We drive our own
-  // refetches via react-query in the relevant hooks; wagmi shouldn't be hitting
-  // chain RPCs on a timer (especially mainnet, whose default RPC is eth.merkle.io
-  // and returns CORS errors in the browser).
   pollingInterval: Number.MAX_SAFE_INTEGER,
 })

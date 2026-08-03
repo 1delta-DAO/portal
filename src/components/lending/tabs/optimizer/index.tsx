@@ -40,7 +40,11 @@ function useIsBelowLg() {
 }
 
 interface Props {
-  chainId: string
+  /**
+   * Chains to optimize across. With two or more the backend switches asset
+   * filters from token addresses to asset *groups* — see `apiFilters` below.
+   */
+  chainIds: string[]
   account?: string
   /**
    * User lending positions, threaded down from LenderTab (which already
@@ -287,11 +291,17 @@ interface PersistedOptimizerState {
   showAdvanced: boolean
 }
 
-const STORAGE_KEY = (chainId: string) => `optimizer:state:${chainId}`
+// Multi-chain selections share one bucket. The per-chain scoping above exists
+// because token addresses are chain-specific; in multi-chain mode the filters
+// hold asset *groups*, which are chain-agnostic — and a per-combination key
+// would wipe the user's filters every time they added or removed a chain.
+const MULTI_SCOPE = 'multi'
 
-function loadPersisted(chainId: string): Partial<PersistedOptimizerState> | null {
+const STORAGE_KEY = (scope: string) => `optimizer:state:${scope}`
+
+function loadPersisted(scope: string): Partial<PersistedOptimizerState> | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY(chainId))
+    const raw = localStorage.getItem(STORAGE_KEY(scope))
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (typeof parsed !== 'object' || parsed === null) return null
@@ -302,13 +312,18 @@ function loadPersisted(chainId: string): Partial<PersistedOptimizerState> | null
 }
 
 export function OptimizerTab({
-  chainId,
+  chainIds,
   account,
   userData,
   isUserDataLoading,
   userDataError,
   refetchUserData,
 }: Props) {
+  const isMultiChain = chainIds.length > 1
+  const primaryChainId = chainIds[0]
+  // Storage + reset key: one bucket per single chain, one shared bucket for
+  // every multi-chain selection.
+  const stateScope = isMultiChain ? MULTI_SCOPE : primaryChainId
   // App-wide risk ceiling (the global "Up to low/medium/high" selector), applied
   // to the optimizer query so it surfaces exactly the risk the user opted into.
   const { maxRiskScore } = useRiskMode()
@@ -318,10 +333,10 @@ export function OptimizerTab({
   // The pair whose inline action panel (deposit-and-borrow / withdraw-and-repay
   // / loop) is open. Cleared when the user switches chains.
   const [selectedRow, setSelectedRow] = useState<OptimizerPairRow | null>(null)
-  // Lazy initialisers read the persisted state for the *initial* chainId.
+  // Lazy initialisers read the persisted state for the *initial* scope.
   // The chain-change effect below resets state to whatever's stored for the
   // new chain when the user switches chains mid-session.
-  const initial = loadPersisted(chainId)
+  const initial = loadPersisted(stateScope)
   const [filters, setFilters] = useState<UiFilters>(() => ({
     ...DEFAULT_FILTERS,
     ...(initial?.filters ?? {}),
@@ -339,11 +354,11 @@ export function OptimizerTab({
   // Reload state when the user switches chains. Skip the very first render
   // (the lazy initialisers above already handled it) by tracking the last
   // chain we synced to in a ref.
-  const lastChainRef = useRef(chainId)
+  const lastChainRef = useRef(stateScope)
   useEffect(() => {
-    if (lastChainRef.current === chainId) return
-    lastChainRef.current = chainId
-    const next = loadPersisted(chainId)
+    if (lastChainRef.current === stateScope) return
+    lastChainRef.current = stateScope
+    const next = loadPersisted(stateScope)
     setFilters({ ...DEFAULT_FILTERS, ...(next?.filters ?? {}) })
     setCollaterals(next?.collaterals ?? [])
     setDebts(next?.debts ?? [])
@@ -353,9 +368,9 @@ export function OptimizerTab({
     setDebtUnit(next?.debtUnit ?? 'usd')
     setShowAdvanced(next?.showAdvanced ?? false)
     setSelectedRow(null)
-  }, [chainId])
+  }, [stateScope])
 
-  // Persist on every change for the *current* chain. Debouncing isn't
+  // Persist on every change for the *current* scope. Debouncing isn't
   // worth it here — the writes are tiny and infrequent (driven by user
   // input, not render loops).
   useEffect(() => {
@@ -370,12 +385,12 @@ export function OptimizerTab({
       showAdvanced,
     }
     try {
-      localStorage.setItem(STORAGE_KEY(chainId), JSON.stringify(state))
+      localStorage.setItem(STORAGE_KEY(stateScope), JSON.stringify(state))
     } catch {
       /* localStorage may be disabled — ignore */
     }
   }, [
-    chainId,
+    stateScope,
     filters,
     collaterals,
     debts,
@@ -392,7 +407,9 @@ export function OptimizerTab({
   const [page, setPage] = useState(0)
 
   // Lender enumeration drives the row badges (logo + display name).
-  const { lenders: lenderSummaries } = useLenders(chainId)
+  // `/lending/lenders` takes a `chains` CSV, so one call covers the selection.
+  // Merging by lender key across chains is safe: name/logo are chain-agnostic.
+  const { lenders: lenderSummaries } = useLenders(chainIds.join(','))
   const lenderInfoMap = useMemo<Record<string, LenderInfo>>(() => {
     const map: Record<string, LenderInfo> = {}
     for (const s of lenderSummaries ?? []) {
@@ -503,12 +520,27 @@ export function OptimizerTab({
           : { debtAmount: parsedDebtAmount }
         : {}
 
+    // Asset-filter semantics flip with the chain count. With one chain the
+    // backend matches token addresses; with two or more it matches asset
+    // *groups* (an address is meaningless across chains) — sending addresses
+    // in multi-chain mode returns zero rows. The picker switches to selecting
+    // groups to match, so the values here are already the right kind.
+    const assetFilters = isMultiChain
+      ? {
+          chainIds,
+          collateralGroups: collaterals.length ? collaterals : undefined,
+          debtGroups: debts.length ? debts : undefined,
+        }
+      : {
+          chainId: primaryChainId,
+          collaterals: collaterals.length ? collaterals : undefined,
+          debts: debts.length ? debts : undefined,
+        }
+
     return {
-      collaterals: collaterals.length ? collaterals : undefined,
-      debts: debts.length ? debts : undefined,
+      ...assetFilters,
       ...collateralAmt,
       ...debtAmt,
-      chainId,
       excludeLenders: parseCsv(filters.excludeLenders),
       collateralTags: filters.collateralTags.length ? filters.collateralTags : undefined,
       debtTags: filters.debtTags.length ? filters.debtTags : undefined,
@@ -538,7 +570,9 @@ export function OptimizerTab({
     filters,
     collaterals,
     debts,
-    chainId,
+    isMultiChain,
+    primaryChainId,
+    chainIds,
     parsedCollateralAmount,
     parsedDebtAmount,
     collateralUsd,
@@ -552,7 +586,7 @@ export function OptimizerTab({
   useEffect(() => {
     setPage(0)
   }, [
-    chainId,
+    stateScope,
     filters.minApr,
     filters.minLeverage,
     filters.minLtv,
@@ -630,7 +664,7 @@ export function OptimizerTab({
           <div className="border-t border-base-300">
             <UserLenderPositionsTable
               account={account}
-              chainId={chainId}
+              chainIds={chainIds}
               userData={userData}
               lenderInfoMap={lenderInfoMap}
               isLoading={!!isUserDataLoading}
@@ -648,7 +682,7 @@ export function OptimizerTab({
       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_1fr]">
         <div className="space-y-2 rounded-lg border border-base-300 border-l-2 border-l-success/60 bg-base-200/20 p-3">
           <TokenMultiPicker
-            chainId={chainId}
+            chainIds={chainIds}
             selected={collaterals}
             onChange={setCollaterals}
             label="Collateral (supply)"
@@ -708,7 +742,7 @@ export function OptimizerTab({
         </div>
         <div className="space-y-2 rounded-lg border border-base-300 border-l-2 border-l-error/60 bg-base-200/20 p-3">
           <TokenMultiPicker
-            chainId={chainId}
+            chainIds={chainIds}
             selected={debts}
             onChange={setDebts}
             label="Debt (borrow)"
@@ -961,6 +995,7 @@ export function OptimizerTab({
             showMinCollateral={showMinCollateral}
             amount={handoffAmount}
             lenderInfoMap={lenderInfoMap}
+            showChain={isMultiChain}
             pagination={paginationState}
             totalItems={total}
             onSelectPair={setSelectedRow}

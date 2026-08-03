@@ -11,6 +11,9 @@ import { OracleBadge } from '../../shared/OracleBadge'
 import { buildPath } from '../../../../utils/routes'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { Logo } from '../../../common/Logo'
+import { getChainName } from '../../../../lib/lib-utils'
+
+const CHAIN_LOGO_BASE = 'https://raw.githubusercontent.com/1delta-DAO/chains/main'
 
 /** Compact radial utilization indicator */
 const UtilCircle: React.FC<{ pct: number }> = ({ pct }) => {
@@ -44,6 +47,8 @@ const UtilCircle: React.FC<{ pct: number }> = ({ pct }) => {
 interface MarketsTableProps {
   pools: PoolEntry[]
   chainTokens: Record<string, any>
+  /** Tag rows with their chain. On for a multi-chain selection. */
+  showChain?: boolean
   sortKey: SortKey
   sortDir: 'asc' | 'desc'
   onToggleSort: (key: SortKey) => void
@@ -61,6 +66,7 @@ interface MarketsTableProps {
 export const MarketsTable: React.FC<MarketsTableProps> = ({
   pools,
   chainTokens,
+  showChain = false,
   sortKey,
   sortDir,
   onToggleSort,
@@ -77,8 +83,35 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
   const navigate = useNavigate()
   const getAsset = (p: PoolEntry) => p.underlyingInfo?.asset
 
+  /**
+   * Chain marker for the lender sub-line. Rendered inline rather than as its
+   * own column so the table's existing width budget (and the mobile card
+   * layout) stay intact.
+   */
+  const chainMarker = (p: PoolEntry) =>
+    showChain ? (
+      <>
+        {/* Logo only — the Market column is already tight, and spelling the
+            chain out here truncated the lender name next to it. Full name
+            lives in the tooltip and on the asset popover. */}
+        <span className="shrink-0 leading-none" title={getChainName(p.chainId)}>
+          <Logo
+            src={`${CHAIN_LOGO_BASE}/${p.chainId}.webp`}
+            alt={getChainName(p.chainId)}
+            fallbackText={getChainName(p.chainId)}
+            className="rounded-full w-3 h-3"
+          />
+        </span>
+        <span className="text-base-content/30 shrink-0">·</span>
+      </>
+    ) : null
+
+  // Compare the chain too: with several chains merged, a marketUid alone is no
+  // longer guaranteed to identify one row.
   const isRowSelected = (entry: PoolEntry) =>
-    selectedEntry !== null && selectedEntry.marketUid === entry.marketUid
+    selectedEntry !== null &&
+    selectedEntry.marketUid === entry.marketUid &&
+    selectedEntry.chainId === entry.chainId
 
   const sortIndicator = (key: SortKey) =>
     sortKey === key ? (
@@ -166,7 +199,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
 
               return (
                 <tr
-                  key={p.marketUid}
+                  key={`${p.chainId}-${p.marketUid}`}
                   className={`h-16 cursor-pointer transition-colors ${
                     selected ? 'bg-primary/10' : 'hover:bg-base-200'
                   }`}
@@ -201,6 +234,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                               fallbackText={p.lenderInfo?.name ?? p.lenderKey}
                               className="rounded-full object-contain w-3 h-3 shrink-0 token-logo"
                             />
+                            {chainMarker(p)}
                             <span className="truncate">{p.lenderInfo?.name ?? p.lenderKey}</span>
                           </span>
                         </div>
@@ -389,6 +423,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                           fallbackText={p.lenderInfo?.name ?? p.lenderKey}
                           className="rounded-full object-contain w-3 h-3 shrink-0 token-logo"
                         />
+                        {chainMarker(p)}
                         <span className="truncate">{p.lenderInfo?.name ?? p.lenderKey}</span>
                       </span>
                     </div>

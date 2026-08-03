@@ -10,7 +10,13 @@ pnpm i && pnpm start
 
 Set `VITE_BACKEND_BASE_URL` in `.env` to override the default API endpoint. A `VITE_WC_PROJECT_ID` (WalletConnect/Reown) is required for mobile wallet connections.
 
-Feature flags: `VITE_OPTIMIZER_ENABLED=true` shows the Optimize tab (default OFF); `VITE_BRIDGE_UI_ENABLED=false` hides the Cross-Chain (bridge) tab, which is shown by default with a "Beta" pill.
+Feature flags: `VITE_OPTIMIZER_ENABLED=true` shows the Optimize tab (default OFF); `VITE_BRIDGE_UI_ENABLED=false` hides the Cross-Chain (bridge) tab, which is shown by default with a "Beta" pill; `VITE_USER_POSITIONS_RPC=true` reads user positions through the client-side RPC flow rather than the API (default OFF).
+
+### Chain selection
+
+Earn and the Optimizer browse up to 5 chains at once; Lending, Looping and Swap stay on a single chain, and the Cross-Chain tab picks a chain per side inside its own panel. The selection lives in the URL as a CSV (`/earn/1,8453`), so single-chain links keep working unchanged.
+
+Selecting chains is a data filter — it never switches the connected wallet network. That only happens when you submit a transaction, against the chain of the row you acted on.
 
 ## Backend API (for integrators)
 

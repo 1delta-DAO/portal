@@ -11,14 +11,20 @@ const STABLE_GROUPS = new Set(['USDC', 'USDT', 'DAI', 'FRAX', 'LUSD', 'USDE', 'U
 const MAJOR_GROUPS = new Set(['ETH', 'BTC', 'WBTC', 'WETH', 'SOL'])
 
 interface Props {
-  chainId: string
-  selected: string[] // lowercase addresses
+  /** Chains being optimized across. Two or more switches to asset-group mode. */
+  chainIds: string[]
+  /**
+   * Selected values: lowercase token addresses on a single chain, asset group
+   * names (e.g. `USDC`, `ETH`) when several chains are selected.
+   */
+  selected: string[]
   onChange: (next: string[]) => void
   label: string
   placeholder?: string
 }
 
 interface PickerToken {
+  /** Token address, or the asset-group name in group mode. */
   address: string
   symbol?: string
   name?: string
@@ -27,14 +33,24 @@ interface PickerToken {
 }
 
 /**
- * Chip-based multi-token picker driven by `/v1/data/token/available` —
- * the canonical list of assets the optimizer can actually price/lend on
- * a given chain. Token-list data (icons, decimals) is merged in from the
- * regular chain token list when the available endpoint omits it.
+ * Chip-based multi-asset picker driven by `/v1/data/token/available` —
+ * the canonical list of assets the optimizer can actually price/lend.
+ * Token-list data (icons, decimals) is merged in from the regular chain
+ * token list when the available endpoint omits it.
+ *
+ * Two modes, matching what the optimizer endpoint accepts:
+ *  - single chain → pick token *addresses*
+ *  - several chains → pick asset *groups*, since an address only means
+ *    something on one chain and `/pairs/optimize` matches on groups once
+ *    `chainIds` holds more than one entry.
  */
-export function TokenMultiPicker({ chainId, selected, onChange, label, placeholder = 'Add token...' }: Props) {
-  const { assets, isLoading: assetsLoading } = useAvailableLendingAssets({ chainId })
-  const { data: tokens } = useTokenLists(chainId)
+export function TokenMultiPicker({ chainIds, selected, onChange, label, placeholder = 'Add token...' }: Props) {
+  const isGroupMode = chainIds.length > 1
+  const primaryChainId = chainIds[0]
+  const { assets, isLoading: assetsLoading } = useAvailableLendingAssets(
+    isGroupMode ? { chainIds } : { chainId: primaryChainId }
+  )
+  const { data: tokens } = useTokenLists(primaryChainId)
 
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -66,16 +82,34 @@ export function TokenMultiPicker({ chainId, selected, onChange, label, placehold
     for (const a of assets) {
       const addrLower = a.address.toLowerCase()
       const fromList = tokens?.[addrLower] as RawCurrency | undefined
+      const group = a.assetGroup ?? fromList?.assetGroup
+
+      if (isGroupMode) {
+        // Collapse every chain's tokens into one row per group — the same
+        // 1000+ assets across five chains become a couple of dozen entries.
+        // Keep the first icon/name seen for the group.
+        if (!group) continue
+        if (map.has(group)) continue
+        map.set(group, {
+          address: group,
+          symbol: group,
+          name: a.name ?? fromList?.name,
+          logoURI: a.logoURI ?? fromList?.logoURI,
+          assetGroup: group,
+        })
+        continue
+      }
+
       map.set(addrLower, {
         address: addrLower,
         symbol: a.symbol ?? fromList?.symbol,
         name: a.name ?? fromList?.name,
         logoURI: a.logoURI ?? fromList?.logoURI,
-        assetGroup: a.assetGroup ?? fromList?.assetGroup,
+        assetGroup: group,
       })
     }
     return map
-  }, [assets, tokens])
+  }, [assets, tokens, isGroupMode])
 
   const debouncedQuery = useDebounce(query, 150)
 
@@ -98,13 +132,17 @@ export function TokenMultiPicker({ chainId, selected, onChange, label, placehold
     return out
   }, [assetMap, debouncedQuery, preset])
 
+  // Addresses are compared lowercased; asset groups are case-sensitive names
+  // the backend matches verbatim, so they must NOT be folded.
+  const normalize = (v: string) => (isGroupMode ? v : v.toLowerCase())
+
   const toggle = (addr: string) => {
-    const a = addr.toLowerCase()
+    const a = normalize(addr)
     if (selected.includes(a)) onChange(selected.filter((x) => x !== a))
     else onChange([...selected, a])
   }
 
-  const remove = (addr: string) => onChange(selected.filter((x) => x !== addr.toLowerCase()))
+  const remove = (addr: string) => onChange(selected.filter((x) => x !== normalize(addr)))
 
   const applyPresetAsSelection = (p: Preset) => {
     const next = new Set(selected)
@@ -117,8 +155,11 @@ export function TokenMultiPicker({ chainId, selected, onChange, label, placehold
   }
 
   const lookupSelected = (addr: string): PickerToken | undefined => {
-    const a = addr.toLowerCase()
+    const a = normalize(addr)
     if (assetMap.has(a)) return assetMap.get(a)
+    // In group mode there is no token list to fall back to — an unknown group
+    // just renders as its own name via the caller's `?? addr` fallbacks.
+    if (isGroupMode) return undefined
     const fromList = tokens?.[a] as RawCurrency | undefined
     if (!fromList) return undefined
     return {
@@ -209,8 +250,19 @@ export function TokenMultiPicker({ chainId, selected, onChange, label, placehold
                   {p}
                 </button>
               ))}
-              <span className="ml-auto text-[10px] text-base-content/50 self-center">
-                {assetsLoading ? 'loading…' : `${assetMap.size} lendable`}
+              <span
+                className="ml-auto text-[10px] text-base-content/50 self-center"
+                title={
+                  isGroupMode
+                    ? 'Across several chains the optimizer matches asset groups rather than individual token addresses.'
+                    : undefined
+                }
+              >
+                {assetsLoading
+                  ? 'loading…'
+                  : isGroupMode
+                    ? `${assetMap.size} asset groups`
+                    : `${assetMap.size} lendable`}
               </span>
             </div>
             <div className="max-h-72 overflow-y-auto">

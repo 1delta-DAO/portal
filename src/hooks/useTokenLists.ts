@@ -51,3 +51,80 @@ export function useTokenLists(chainId?: string) {
     [data, isLoading]
   )
 }
+
+/**
+ * Fetches token lists for several chains at once, keyed by chain.
+ *
+ * The underlying cache is per chain and dedupes concurrent loads, so this is a
+ * thin fan-out: chains already in memory resolve synchronously and only the
+ * newly selected ones hit the network.
+ *
+ * @returns `{ data, isLoading }` where `data` is `Record<chainId, Record<address, RawCurrency>>`.
+ */
+export function useTokenListsMultiChain(chainIds: string[]) {
+  // Sorted + joined so the effect only re-runs when the *set* changes, not
+  // when the caller happens to rebuild the array.
+  const key = useMemo(() => [...chainIds].sort().join(','), [chainIds])
+
+  const [data, setData] = useState<Record<string, Record<string, RawCurrency>>>(() => {
+    const seeded: Record<string, Record<string, RawCurrency>> = {}
+    for (const chainId of chainIds) {
+      const cached = getChainTokensCache(chainId)
+      if (cached) seeded[chainId] = cached
+    }
+    return seeded
+  })
+  const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    const ids = key ? key.split(',') : []
+    if (ids.length === 0) {
+      setData({})
+      setIsLoading(false)
+      return
+    }
+
+    // Seed synchronously from cache so already-loaded chains render on the
+    // first paint rather than flashing empty.
+    const seeded: Record<string, Record<string, RawCurrency>> = {}
+    const pending: string[] = []
+    for (const chainId of ids) {
+      const cached = getChainTokensCache(chainId)
+      if (cached) seeded[chainId] = cached
+      else pending.push(chainId)
+    }
+    setData(seeded)
+
+    if (pending.length === 0) {
+      setIsLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setIsLoading(true)
+    Promise.all(
+      pending.map(async (chainId) => {
+        try {
+          return [chainId, await loadTokenListForChain(chainId)] as const
+        } catch (e) {
+          console.error(`Failed to load token list for chain ${chainId}:`, e)
+          return [chainId, null] as const
+        }
+      })
+    ).then((entries) => {
+      if (cancelled) return
+      setData((prev) => {
+        const next = { ...prev }
+        for (const [chainId, list] of entries) if (list) next[chainId] = list
+        return next
+      })
+      setIsLoading(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [key])
+
+  return useMemo(() => ({ data, isLoading }), [data, isLoading])
+}

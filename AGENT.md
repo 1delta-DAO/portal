@@ -182,3 +182,38 @@ pnpm format     # Prettier
 | `VITE_WC_PROJECT_ID` | — | WalletConnect/Reown project id (mobile wallets) |
 | `VITE_OPTIMIZER_ENABLED` | off | `true` shows the Optimize tab |
 | `VITE_BRIDGE_UI_ENABLED` | on | Cross-Chain (bridge) tab, shown by default with a "Beta" pill — set `false` to hide it |
+| `VITE_USER_POSITIONS_RPC` | off | `true` fetches user positions for every chain via the client-side prepare → `eth_call` → parse flow instead of the API. Per-chain overrides in `useUserData.ts` apply either way |
+
+## Chain Selection
+
+Chain selection is per tab, driven by `TAB_CHAIN_MODE` in `src/utils/routes.ts`:
+
+| Tab | Mode | Notes |
+|-----|------|-------|
+| Earn, Optimizer | `multi` | Up to `MAX_MULTI_CHAINS` (5) chains at once |
+| Lending, Looping, Swap | `single` | One chain; `useLendingLatest` keys results by lender alone, so it can't hold two chains |
+| Cross-Chain | `none` | The bridge panel picks a chain per side |
+
+The `:chainId` route segment carries a CSV (`/earn/1,8453`); one id parses to a
+one-element list, so existing links are unaffected. `useChainSelection` resolves
+URL → localStorage → mainnet and remembers single/multi selections separately.
+
+**Chain selection never touches wagmi.** It rewrites the URL and nothing else;
+the wallet network is reconciled at transaction time by `useSyncChain` against
+the chain of the row being acted on. See the invariant block in `src/wagmi.ts`.
+
+### Backend multi-chain support
+
+Verified against the live API — not every endpoint takes a chain list:
+
+| Endpoint | Multi-chain |
+|----------|-------------|
+| `/lending/lenders`, `/lending/latest`, `/lending/user-positions` | `chains=` CSV |
+| `/lending/user-positions/rpc-call` | `chains=` CSV (spec says `chain`; the live API rejects it) |
+| `/lending/pairs/optimize` | `chainIds=` CSV — **with ≥2 chains, asset filters match asset _groups_, not addresses** |
+| `/token/available`, `/token/balances/rpc-call` | `chainIds=` / `chains=` CSV |
+| `/lending/pools` | **single chain only** — Earn fans out one query per chain (`useFlattenedPoolsMultiChain`) |
+| `/token/balances/lending` | **single chain only** — `useLendingBalancesMultiChain` fans out |
+
+`chains=all` is not supported: every endpoint answers it with zero rows, which
+is why the chain picker has no "All chains" option.

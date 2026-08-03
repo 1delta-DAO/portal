@@ -3,19 +3,20 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useSpyAccount } from '../../contexts/SpyMode'
 import { useRiskMode } from '../../contexts/RiskMode'
 import { useChains } from '../../hooks/useChains'
-import { ChainFilterSelect } from './shared/ChainFilter'
+import { ChainFilterSelect, ChainMultiSelect } from './shared/ChainFilter'
 import { RiskSelect } from './shared/RiskSelect'
 import { useUserData } from '../../hooks/lending/useUserData'
 import { useLendingLatest, useLenders, type LenderInfoMap } from '../../hooks/lending/usePoolData'
-import { useLendingBalances } from '../../hooks/lending/useLendingBalances'
-import { useTokenLists } from '../../hooks/useTokenLists'
+import { useLendingBalancesMultiChain } from '../../hooks/lending/useLendingBalances'
+import { useTokenListsMultiChain } from '../../hooks/useTokenLists'
 import { EarnTab } from './tabs/earn'
 import { LendingDashboard } from './tabs/lending'
 import { TradingDashboard } from './tabs/trading'
 import { OptimizerTab } from './tabs/optimizer'
 import { SpotSwapPanel } from '../swap/SpotSwapPanel'
 import { XChainSwapPanel } from '../swap/XChainSwapPanel'
-import { tabFromSlug, slugToLender, buildPath } from '../../utils/routes'
+import { tabFromSlug, slugToLender, buildPath, TAB_CHAIN_MODE } from '../../utils/routes'
+import { useChainSelection, usePersistChainSelection } from '../../hooks/useChainSelection'
 import { Badge } from '../common/Badge'
 
 const OPTIMIZER_ENABLED = import.meta.env.VITE_OPTIMIZER_ENABLED === 'true'
@@ -24,6 +25,9 @@ const OPTIMIZER_ENABLED = import.meta.env.VITE_OPTIMIZER_ENABLED === 'true'
 const BRIDGE_UI_ENABLED = import.meta.env.VITE_BRIDGE_UI_ENABLED !== 'false'
 
 export type SubTab = 'earn' | 'lending' | 'trading' | 'swap' | 'xswap' | 'optimize'
+
+/** Stable empty list so the token-list effect doesn't re-run on every render. */
+const EMPTY_CHAINS: string[] = []
 
 export function LenderTab() {
   const { address: account } = useSpyAccount()
@@ -36,35 +40,85 @@ export function LenderTab() {
   // instead of rendering an empty content area.
   const rawTab = tabFromSlug(tabSlug)
   const activeTab = !BRIDGE_UI_ENABLED && rawTab === 'xswap' ? 'earn' : rawTab
-  const selectedChain = chainIdParam || localStorage.getItem('selectedChainId') || '1'
   const initialLender = lenderParam ? slugToLender(lenderParam) : ''
+
+  // Chain selection is per-tab: Earn and Optimizer browse across chains, the
+  // position-management tabs stay on one, and the bridge tab hides the
+  // selector entirely (its panel picks a chain per side).
+  const { chainIds, primaryChainId, mode: chainMode, isHidden: chainSelectorHidden, maxChains } =
+    useChainSelection(activeTab, chainIdParam)
+  const persistChains = usePersistChainSelection()
+  const isMultiChain = chainMode === 'multi'
+
+  // Mirror the resolved selection into localStorage so the *other* kind of tab
+  // restores it later. Done in an effect rather than in the setters below
+  // because the selection also resolves from storage on a fresh deep link.
+  useEffect(() => {
+    persistChains(chainIds, chainMode)
+    // chainIds is rebuilt per render; the join is the stable identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chainIds.join(','), chainMode, persistChains])
 
   const setActiveTab = useCallback(
     (tab: SubTab) => {
-      navigate(buildPath(tab, selectedChain, initialLender || undefined), { replace: true })
+      // Narrow the selection to what the target tab can actually show before
+      // writing it to the URL, so a single-chain tab entered from a 3-chain
+      // Earn view doesn't end up with a URL advertising chains it isn't
+      // rendering (which would then be what the user copies and shares).
+      const next = TAB_CHAIN_MODE[tab] === 'multi' ? chainIds : chainIds.slice(0, 1)
+      navigate(buildPath(tab, next, initialLender || undefined), { replace: true })
     },
-    [navigate, selectedChain, initialLender]
+    [navigate, chainIds, initialLender]
+  )
+
+  const setSelectedChains = useCallback(
+    (next: string[]) => {
+      if (next.length === 0) return
+      persistChains(next, chainMode)
+      // The lender segment is chain-scoped, so a chain change drops it and
+      // lets the auto-select effect below pick a valid one for the new chain.
+      navigate(buildPath(activeTab, next), { replace: true })
+    },
+    [navigate, activeTab, chainMode, persistChains]
   )
 
   const setSelectedChain = useCallback(
-    (chain: string) => {
-      localStorage.setItem('selectedChainId', chain)
-      navigate(buildPath(activeTab, chain), { replace: true })
-    },
-    [navigate, activeTab]
+    (chain: string) => setSelectedChains([chain]),
+    [setSelectedChains]
   )
 
   const setSelectedLender = useCallback(
     (lender: string) => {
-      navigate(buildPath(activeTab, selectedChain, lender), { replace: true })
+      navigate(buildPath(activeTab, chainIds, lender), { replace: true })
     },
-    [navigate, activeTab, selectedChain]
+    [navigate, activeTab, chainIds]
   )
 
-  const effectiveChainId = selectedChain
+  const effectiveChainId = primaryChainId
   const chainsReady = !isChainsLoading
 
-  const { lenders: lenderSummaries, isLendersLoading } = useLenders(effectiveChainId, chainsReady)
+  // Two separate gates, because the two fetches have different appetites.
+  //
+  // The lender *enumeration* is cheap and every lending-ish tab needs it (Earn
+  // and the Optimizer render lender names/logos on position rows). It takes a
+  // `chains` CSV, so it covers the whole selection in one request — and the
+  // shared query key means the Optimizer's own copy dedupes into this one.
+  const needsLenderInfo =
+    activeTab === 'earn' ||
+    activeTab === 'lending' ||
+    activeTab === 'trading' ||
+    activeTab === 'optimize'
+
+  // The heavy per-market fetch is single-chain only: `useLendingLatest` keys
+  // its result by lender alone, so two chains' AAVE_V3 would overwrite each
+  // other. Only Lending and Looping render it at all.
+  const singleChainFetchEnabled =
+    chainsReady && !isMultiChain && (activeTab === 'lending' || activeTab === 'trading')
+
+  const { lenders: lenderSummaries, isLendersLoading } = useLenders(
+    chainIds.join(','),
+    chainsReady && needsLenderInfo
+  )
 
   // Resolve the *active* lender for the heavy per-market fetch:
   //   1. URL value if it exists in the current chain's enumeration
@@ -105,7 +159,7 @@ export function LenderTab() {
   const { lenderData, lenderInfoMap, isPublicDataLoading } = useLendingLatest(
     effectiveChainId,
     lenderKeysToFetch,
-    chainsReady
+    singleChainFetchEnabled
   )
   // The heavy fetch above is scoped to the single active lender, so its
   // lenderInfoMap has exactly one entry. The earn positions table renders
@@ -128,20 +182,28 @@ export function LenderTab() {
         : undefined,
     [activeTab, activeLender]
   )
+  // Positions span the whole selection. `/lending/user-positions` takes a
+  // `chains` CSV natively, so this is one request whether the tab shows one
+  // chain or five; every entry is tagged with its own `chainId`.
   const { userData, isUserDataLoading, error, refetch } = useUserData({
-    chainId: effectiveChainId,
+    chainIds,
     account,
-    enabled: chainsReady,
+    enabled: chainsReady && needsLenderInfo,
     lenders: userDataLenders,
   })
-  const { data: tokens } = useTokenLists(chainsReady ? effectiveChainId : undefined)
+  // Token lists and wallet balances are Earn-only: the Swap and Cross-Chain
+  // panels load their own, and the position tabs read metadata off the market
+  // payload. Balances in particular are one request per chain.
+  const earnDataEnabled = chainsReady && activeTab === 'earn'
+  const { data: tokensByChain } = useTokenListsMultiChain(
+    earnDataEnabled ? chainIds : EMPTY_CHAINS
+  )
   const {
     balances: lendingBalances,
     isLoading: isLendingBalancesLoading,
-    isFetching: isLendingBalancesFetching,
     error: lendingBalancesError,
-    refetch: refetchLendingBalances,
-  } = useLendingBalances({ chainId: effectiveChainId, account, enabled: chainsReady })
+    failedChains: balanceFailedChains,
+  } = useLendingBalancesMultiChain({ chainIds, account, enabled: earnDataEnabled })
 
   const isLoading = isLendersLoading || isPublicDataLoading || isUserDataLoading
 
@@ -220,20 +282,37 @@ export function LenderTab() {
 
         <div className="flex justify-end items-center gap-2">
           <RiskSelect value={maxRiskScore} onChange={setMaxRiskScore} />
-          <ChainFilterSelect chains={chains} value={selectedChain} onChange={setSelectedChain} />
+          {/* The bridge tab picks a chain per side inside its own panel, so a
+              global selector there would be a competing source of truth. */}
+          {!chainSelectorHidden &&
+            (isMultiChain ? (
+              <ChainMultiSelect
+                chains={chains}
+                values={chainIds}
+                onChange={setSelectedChains}
+                maxChains={maxChains}
+              />
+            ) : (
+              <ChainFilterSelect
+                chains={chains}
+                value={effectiveChainId}
+                onChange={setSelectedChain}
+              />
+            ))}
         </div>
       </div>
 
       {activeTab === 'earn' && (
         <EarnTab
           account={account}
-          chainId={effectiveChainId}
-          tokens={tokens}
+          chainIds={chainIds}
+          tokensByChain={tokensByChain}
           userData={userData}
           lenderInfoMap={fullLenderInfoMap}
           lendingBalances={lendingBalances}
           isLendingBalancesLoading={isLendingBalancesLoading}
           lendingBalancesError={lendingBalancesError}
+          balanceFailedChains={balanceFailedChains}
           isLoading={isLoading}
           userDataError={error}
           refetchUserData={refetch}
@@ -272,7 +351,7 @@ export function LenderTab() {
 
       {OPTIMIZER_ENABLED && activeTab === 'optimize' && (
         <OptimizerTab
-          chainId={effectiveChainId}
+          chainIds={chainIds}
           account={account}
           userData={userData}
           isUserDataLoading={isUserDataLoading}

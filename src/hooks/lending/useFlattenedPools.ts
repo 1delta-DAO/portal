@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQueries } from '@tanstack/react-query'
 
 // ============================================================================
 // Types for the /lending/pools API response
@@ -419,4 +419,138 @@ export function useFlattenedPools(params: {
     hasMore: !!hasNextPage,
     error,
   }
+}
+
+// ============================================================================
+// Multi-chain
+// ============================================================================
+
+/**
+ * Hard ceiling on pages fetched per chain. `/lending/pools` has no total-count
+ * field, so paging only stops on a short page; without a budget a wide filter
+ * across several chains could walk tens of thousands of rows into memory.
+ * 4 × 500 = 2000 markets per chain is far past what any filter surfaces.
+ */
+const MAX_PAGES_PER_CHAIN = 4
+
+/** Fetch every page for one chain, up to {@link MAX_PAGES_PER_CHAIN}. */
+async function fetchAllPoolsForChain(
+  chainId: string,
+  lender: string | undefined,
+  maxRiskScore: number | undefined,
+  pageSize: number,
+  filters: PoolsFilters | undefined
+): Promise<{ items: PoolEntry[]; truncated: boolean }> {
+  const items: PoolEntry[] = []
+
+  for (let page = 0; page < MAX_PAGES_PER_CHAIN; page++) {
+    const url = buildPoolsUrl(
+      endpointPools,
+      [chainId],
+      lender,
+      items.length,
+      pageSize,
+      maxRiskScore,
+      filters
+    )
+    const r = await fetch(url)
+    if (!r.ok) {
+      const text = await r.text().catch(() => '')
+      throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
+    }
+    const json = (await r.json()) as PoolsApiResponse
+    if (!json.success) {
+      throw new Error(json.error?.message ?? 'Pools API returned success: false')
+    }
+
+    items.push(...json.data.items)
+    if (json.data.items.length < pageSize) return { items, truncated: false }
+  }
+
+  return { items, truncated: true }
+}
+
+export interface MultiChainPoolsResult {
+  pools: PoolEntry[]
+  count: number
+  isPoolsLoading: boolean
+  isPoolsFetching: boolean
+  /** Chains whose fetch failed this round — the rest still render. */
+  failedChains: string[]
+  /** Chains that hit the per-chain page budget, so their list is incomplete. */
+  truncatedChains: string[]
+  error: unknown
+}
+
+/**
+ * Multi-chain variant of {@link useFlattenedPools}.
+ *
+ * `/v1/data/lending/pools` is single-chain server-side — a CSV, a repeated
+ * `chainId` param and `chainIds` all come back empty — so this fans out one
+ * query per chain and merges. That also buys two things a single merged query
+ * couldn't: adding a chain to the selection refetches only that chain, and one
+ * chain erroring degrades to a partial result instead of blanking the table.
+ *
+ * Push filters down through `filters` wherever possible; every row the server
+ * prunes is a row that doesn't cross the wire N times.
+ */
+export function useFlattenedPoolsMultiChain(params: {
+  chainIds: string[]
+  lender?: string
+  maxRiskScore?: number
+  enabled?: boolean
+  pageSize?: number
+  filters?: PoolsFilters
+}): MultiChainPoolsResult {
+  const { chainIds } = params
+  const lender = params.lender
+  const maxRiskScore = params.maxRiskScore ?? 4
+  const enabled = (params.enabled ?? true) && chainIds.length > 0
+  const pageSize = params.pageSize ?? DEFAULT_PAGE_SIZE
+  const filters = params.filters
+
+  const filtersKey = useMemo(() => (filters ? JSON.stringify(filters) : ''), [filters])
+  // Sorted so a reordered selection reuses the same cache entries.
+  const sortedChainIds = useMemo(() => [...chainIds].sort(), [chainIds])
+
+  const results = useQueries({
+    queries: sortedChainIds.map((chainId) => ({
+      queryKey: ['flattenedPoolsChain', chainId, lender ?? '', maxRiskScore, pageSize, filtersKey],
+      enabled,
+      queryFn: () => fetchAllPoolsForChain(chainId, lender, maxRiskScore, pageSize, filters),
+      refetchInterval: 8 * 60 * 1000,
+      staleTime: 30_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    })),
+  })
+
+  return useMemo(() => {
+    const pools: PoolEntry[] = []
+    const failedChains: string[] = []
+    const truncatedChains: string[] = []
+
+    results.forEach((r, i) => {
+      const chainId = sortedChainIds[i]
+      if (r.error) {
+        failedChains.push(chainId)
+        return
+      }
+      if (!r.data) return
+      pools.push(...r.data.items)
+      if (r.data.truncated) truncatedChains.push(chainId)
+    })
+
+    return {
+      pools,
+      count: pools.length,
+      // Loading only while nothing is renderable; once one chain lands the
+      // table shows partial data rather than a spinner over the whole view.
+      isPoolsLoading: results.length > 0 && results.every((r) => r.isLoading),
+      isPoolsFetching: results.some((r) => r.isFetching),
+      failedChains,
+      truncatedChains,
+      error: failedChains.length === sortedChainIds.length ? results[0]?.error : undefined,
+    }
+  }, [results, sortedChainIds])
 }

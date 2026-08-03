@@ -309,16 +309,24 @@ import { BACKEND_BASE_URL } from '../../config/backend'
 
 const endpointUserData = `${BACKEND_BASE_URL}/v1/data/lending/user-positions`
 
-// Global override: when true, every chain fetches via RPC instead of the API.
-const USE_RPC_FETCH = false
+// Global override: when true, every chain fetches user positions via the
+// prepare → client eth_call → parse flow instead of letting the API read chain
+// state server-side. Set VITE_USER_POSITIONS_RPC=true to flip it without a
+// code change; the per-chain list below applies either way.
+const USE_RPC_FETCH = import.meta.env.VITE_USER_POSITIONS_RPC === 'true'
 
 // Per-chain override: these chains always fetch user positions locally via RPC,
 // regardless of USE_RPC_FETCH. Used for chains the API does not (yet) serve well.
 //   1329 = SEI Network, 1868 = SONEIUM, 1672 = Pharos, 4663 = Robinhood Chain
 const FORCE_RPC_FETCH_CHAINS = new Set<string>(['1329', '1868', '1672', '4663'])
 
+// Chains that must keep using the API even when USE_RPC_FETCH is on — an
+// escape hatch for chains whose public RPCs can't serve the multicall.
+const FORCE_API_FETCH_CHAINS = new Set<string>()
+
 /** Whether to fetch user positions via RPC (vs the API) for a given chain. */
 function shouldUseRpcFetch(chainId: string): boolean {
+  if (FORCE_API_FETCH_CHAINS.has(chainId)) return false
   return USE_RPC_FETCH || FORCE_RPC_FETCH_CHAINS.has(chainId)
 }
 
@@ -329,26 +337,45 @@ function shouldUseRpcFetch(chainId: string): boolean {
 /**
  * useUserData
  * Fetches user lending positions from the /lending/user-positions endpoint.
+ *
+ * Accepts either a single `chainId` or a `chainIds` list — the endpoint takes
+ * a `chains` CSV natively and tags every entry with its `chainId`, so a
+ * multi-chain read is one request. Consumers rendering a mixed-chain list must
+ * act on `entry.chainId`, never on the tab's selection, or they will build
+ * transactions against the wrong chain.
  */
 export function useUserData(params: {
-  chainId: string
+  chainId?: string
+  chainIds?: string[]
   account?: string
   enabled?: boolean
   lenders?: string[]
 }) {
-  const { chainId, account, lenders } = params
-  const enabled = (params.enabled ?? true) && !!account
+  const { account, lenders } = params
+  const chainIds = params.chainIds?.length
+    ? params.chainIds
+    : params.chainId
+      ? [params.chainId]
+      : []
+  // Sorted so a reordered selection hits the same cache entry.
+  const chainsKey = [...chainIds].sort().join(',')
+  const enabled = (params.enabled ?? true) && !!account && chainIds.length > 0
 
   const lendersKey = lenders && lenders.length > 0 ? [...lenders].sort().join(',') : ''
   const lendersQuery = lendersKey ? `&lenders=${lendersKey}` : ''
-  const url = `${endpointUserData}?chains=${chainId}&account=${account}${lendersQuery}`
+  const url = `${endpointUserData}?chains=${chainsKey}&account=${account}${lendersQuery}`
 
   const { data, isLoading, isFetching, error, refetch } = useQuery<UserDataResult>({
-    queryKey: ['userData', chainId, account, lendersKey],
+    queryKey: ['userData', chainsKey, account, lendersKey],
     enabled,
     queryFn: async () => {
-      if (shouldUseRpcFetch(chainId)) {
-        const result = await fetchUserDataViaRpc(chainId, account!, lenders)
+      // If any selected chain needs the RPC path, the whole selection goes
+      // through it. Splitting the read would mean merging two server-computed
+      // summaries — summing balances and re-deriving weighted APRs by hand —
+      // whereas the prepare endpoint happily takes every chain at once and
+      // returns one coherent summary.
+      if (chainIds.some(shouldUseRpcFetch)) {
+        const result = await fetchUserDataViaRpc(chainIds, account!, lenders)
         return {
           raw: result.data.map(transformUserDataEntry),
           summary: result.summary,

@@ -3,7 +3,7 @@ import { UserLenderPositionsTable } from './UserPositionsTable'
 import { UserAssetsTable } from './UserAssetsTable'
 import { LendingPoolsTable } from './MarketsView'
 import { VaultsView } from './vaults'
-import type { TokenBalance } from '../../../../hooks/lending/useTokenBalances'
+import type { ChainTokenBalance } from '../../../../hooks/lending/useLendingBalances'
 import type { LenderInfoMap } from '../../../../hooks/lending/usePoolData'
 import type { UserDataResult } from '../../../../hooks/lending/useUserData'
 import type { RawCurrency } from '../../../../types/currency'
@@ -12,13 +12,17 @@ type EarnMode = 'lending' | 'vaults'
 
 interface EarnTabProps {
   account?: string
-  chainId: string
-  tokens?: Record<string, RawCurrency>
+  /** Chains being browsed. Earn is multi-chain; the first entry is the primary. */
+  chainIds: string[]
+  /** Token metadata keyed by chain, since rows can come from any of them. */
+  tokensByChain?: Record<string, Record<string, RawCurrency>>
   userData?: UserDataResult
   lenderInfoMap?: LenderInfoMap
-  lendingBalances: TokenBalance[]
+  lendingBalances: ChainTokenBalance[]
   isLendingBalancesLoading: boolean
   lendingBalancesError: any
+  /** Chains whose balance fetch failed — surfaced as a partial-result note. */
+  balanceFailedChains?: string[]
   isLoading: boolean
   userDataError: any
   refetchUserData: () => void
@@ -26,13 +30,14 @@ interface EarnTabProps {
 
 export function EarnTab({
   account,
-  chainId,
-  tokens,
+  chainIds,
+  tokensByChain,
   userData,
   lenderInfoMap,
   lendingBalances,
   isLendingBalancesLoading,
   lendingBalancesError,
+  balanceFailedChains,
   isLoading,
   userDataError,
   refetchUserData,
@@ -49,7 +54,10 @@ export function EarnTab({
   const externalAssetFilter = useMemo(() => {
     if (selectedAsset) return selectedAsset
     if (!filterOwned || lendingBalances.length === 0) return ''
-    return lendingBalances.map((b) => b.address.toLowerCase()).join(',')
+    // Addresses only — the same token address can exist on several chains and
+    // the markets table matches on address, so a cross-chain owned-set is a
+    // superset filter rather than a per-chain one.
+    return Array.from(new Set(lendingBalances.map((b) => b.address.toLowerCase()))).join(',')
   }, [selectedAsset, filterOwned, lendingBalances])
 
   return (
@@ -115,7 +123,9 @@ export function EarnTab({
                   balances={lendingBalances}
                   isLoading={isLendingBalancesLoading}
                   error={lendingBalancesError}
-                  tokens={tokens ?? {}}
+                  failedChains={balanceFailedChains}
+                  tokensByChain={tokensByChain ?? {}}
+                  showChain={chainIds.length > 1}
                   filterOwned={filterOwned}
                   onFilterOwnedChange={setFilterOwned}
                   selectedAsset={selectedAsset}
@@ -129,7 +139,7 @@ export function EarnTab({
               {earnSubTab === 'positions' && (
                 <UserLenderPositionsTable
                   account={account}
-                  chainId={chainId}
+                  chainIds={chainIds}
                   userData={userData}
                   lenderInfoMap={lenderInfoMap}
                   isLoading={isLoading}
@@ -140,14 +150,16 @@ export function EarnTab({
             </section>
           )}
           <LendingPoolsTable
-            chainId={chainId}
+            chainIds={chainIds}
             account={account}
             externalAssetFilter={externalAssetFilter}
             userData={userData}
           />
         </>
       ) : (
-        <VaultsView chainId={chainId} account={account} />
+        // Vaults remain single-chain — the vault catalog, validators and
+        // withdrawal queues are all per-chain reads with no CSV form.
+        <VaultsView chainId={chainIds[0]} account={account} />
       )}
     </div>
   )

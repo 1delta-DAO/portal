@@ -16,10 +16,8 @@ export interface SearchableSelectOption {
   trailingTitle?: string
 }
 
-interface SearchableSelectProps {
+interface SearchableSelectBaseProps {
   options: SearchableSelectOption[]
-  value: string
-  onChange: (value: string) => void
   placeholder?: string
   className?: string
   /**
@@ -35,15 +33,51 @@ interface SearchableSelectProps {
   listMaxHeightClassName?: string
 }
 
-export function SearchableSelect({
-  options,
-  value,
-  onChange,
-  placeholder = 'Search...',
-  className = '',
-  menuClassName = 'min-w-full w-max max-w-xs',
-  listMaxHeightClassName = 'max-h-52',
-}: SearchableSelectProps) {
+/**
+ * Single- and multi-select share one implementation so the mobile modal's
+ * iOS scroll-lock (below) only has to be right once. The two shapes are a
+ * discriminated union rather than a `string | string[]` value, so call sites
+ * stay type-safe on both sides of the callback.
+ */
+export type SearchableSelectProps = SearchableSelectBaseProps &
+  (
+    | {
+        multiple?: false
+        value: string
+        onChange: (value: string) => void
+      }
+    | {
+        multiple: true
+        /** Selected values. Order is preserved as the user picks them. */
+        values: string[]
+        onChange: (values: string[]) => void
+        /** Max selectable; further options render disabled once reached. */
+        maxSelected?: number
+        /** Rendered in the trigger, e.g. `(n) => `${n} chains``. */
+        renderLabel?: (selected: SearchableSelectOption[]) => React.ReactNode
+        /** Shown under the search box when the cap is hit. */
+        maxSelectedHint?: string
+      }
+  )
+
+export function SearchableSelect(props: SearchableSelectProps) {
+  const {
+    options,
+    placeholder = 'Search...',
+    className = '',
+    menuClassName = 'min-w-full w-max max-w-xs',
+    listMaxHeightClassName = 'max-h-52',
+  } = props
+
+  const isMulti = props.multiple === true
+  const selectedValues = useMemo(
+    () => (props.multiple === true ? props.values : props.value ? [props.value] : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [props.multiple, props.multiple === true ? props.values : props.value]
+  )
+  const maxSelected = props.multiple === true ? (props.maxSelected ?? Infinity) : 1
+  const atCap = isMulti && selectedValues.length >= maxSelected
+
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -112,19 +146,86 @@ export function SearchableSelect({
     }
   }, [isMobile, isOpen])
 
-  const selectedOption = options.find((o) => o.value === value)
+  const selectedSet = useMemo(() => new Set(selectedValues), [selectedValues])
+  const selectedOptions = useMemo(
+    () => selectedValues.map((v) => options.find((o) => o.value === v)).filter(Boolean) as SearchableSelectOption[],
+    [selectedValues, options]
+  )
+  const selectedOption = selectedOptions[0]
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return options
-    const q = search.toLowerCase()
-    return options.filter((o) => o.label.toLowerCase().includes(q))
-  }, [options, search])
+    const q = search.trim().toLowerCase()
+    const matched = q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options
+    if (!isMulti) return matched
+    // Float the current selection to the top. Chain lists are long and sorted
+    // by id, so an already-picked chain can otherwise sit dozens of rows down
+    // — leaving the open dropdown looking like nothing is selected.
+    const selectedFirst = matched.filter((o) => selectedSet.has(o.value))
+    const rest = matched.filter((o) => !selectedSet.has(o.value))
+    return [...selectedFirst, ...rest]
+  }, [options, search, isMulti, selectedSet])
 
   const handleSelect = (val: string) => {
-    onChange(val)
+    if (props.multiple === true) {
+      // Toggle. The last selected chain can't be removed — an empty selection
+      // has no meaningful query behind it, so the UI never offers that state.
+      const next = selectedSet.has(val)
+        ? selectedValues.filter((v) => v !== val)
+        : [...selectedValues, val]
+      if (next.length === 0) return
+      if (next.length > maxSelected) return
+      props.onChange(next)
+      // Multi-select stays open: picking several chains shouldn't cost several
+      // round-trips through the dropdown.
+      return
+    }
+    props.onChange(val)
     setIsOpen(false)
     setSearch('')
   }
+
+  /** Trigger content — a label for single, a summary for multi. */
+  const triggerContent = () => {
+    if (props.multiple === true) {
+      if (props.renderLabel) return props.renderLabel(selectedOptions)
+      return (
+        <>
+          <span className="flex -space-x-1.5 shrink-0">
+            {selectedOptions.slice(0, 3).map((o) => (
+              <Logo
+                key={o.value}
+                src={o.icon}
+                alt={o.label}
+                fallbackText={o.label}
+                className="w-4 h-4 rounded-full ring-1 ring-base-100 token-logo"
+              />
+            ))}
+          </span>
+          {selectedOptions.length === 1
+            ? selectedOptions[0].label
+            : `${selectedOptions.length} chains`}
+        </>
+      )
+    }
+    if (!selectedOption) return <span className="opacity-50">Select...</span>
+    return (
+      <>
+        {selectedOption.icon !== undefined && (
+          <Logo
+            src={selectedOption.icon}
+            alt={selectedOption.label}
+            fallbackText={selectedOption.label}
+            className="w-4 h-4 rounded-full token-logo"
+          />
+        )}
+        {selectedOption.indicator && <span className="opacity-60">{selectedOption.indicator}</span>}
+        {selectedOption.label}
+      </>
+    )
+  }
+
+  /** Whether an option is selectable right now (cap reached ⇒ only deselects). */
+  const isDisabled = (val: string) => atCap && !selectedSet.has(val)
 
   // Mobile: Modal
   if (isMobile) {
@@ -136,24 +237,7 @@ export function SearchableSelect({
           onClick={() => setIsOpen(true)}
         >
           <span className="truncate flex-1 min-w-0 flex items-center gap-1.5 pr-4">
-            {selectedOption ? (
-              <>
-                {selectedOption.icon !== undefined && (
-                  <Logo
-                    src={selectedOption.icon}
-                    alt={selectedOption.label}
-                    fallbackText={selectedOption.label}
-                    className="w-4 h-4 rounded-full token-logo"
-                  />
-                )}
-                {selectedOption.indicator && (
-                  <span className="opacity-60">{selectedOption.indicator}</span>
-                )}
-                {selectedOption.label}
-              </>
-            ) : (
-              <span className="opacity-50">Select...</span>
-            )}
+            {triggerContent()}
           </span>
         </button>
 
@@ -183,6 +267,10 @@ export function SearchableSelect({
                 </button>
               </div>
 
+              {props.multiple === true && atCap && props.maxSelectedHint && (
+                <p className="shrink-0 text-[11px] text-base-content/50">{props.maxSelectedHint}</p>
+              )}
+
               {/* Options list.
                   iOS-reliable scroll: the list is the scroll container with its
                   OWN explicit max-height + overflow-y-auto. We deliberately do
@@ -200,13 +288,23 @@ export function SearchableSelect({
                   <button
                     key={opt.value}
                     type="button"
+                    disabled={isDisabled(opt.value)}
                     className={`w-full text-left px-2.5 py-2 text-sm rounded-lg transition-colors flex items-center gap-1.5 min-w-0 ${
-                      opt.value === value
+                      selectedSet.has(opt.value)
                         ? 'bg-primary text-primary-content font-medium'
                         : 'bg-base-200 hover:bg-base-300'
-                    }`}
+                    } ${isDisabled(opt.value) ? 'opacity-40' : ''}`}
                     onClick={() => handleSelect(opt.value)}
                   >
+                    {isMulti && (
+                      <input
+                        type="checkbox"
+                        readOnly
+                        tabIndex={-1}
+                        checked={selectedSet.has(opt.value)}
+                        className="checkbox checkbox-xs shrink-0 pointer-events-none"
+                      />
+                    )}
                     {opt.icon !== undefined && (
                       <Logo
                         src={opt.icon}
@@ -247,26 +345,7 @@ export function SearchableSelect({
         className="select select-bordered select-sm flex items-center text-left w-auto max-w-xs"
         onClick={() => setIsOpen((prev) => !prev)}
       >
-        <span className="truncate flex items-center gap-1.5 pr-4">
-          {selectedOption ? (
-            <>
-              {selectedOption.icon !== undefined && (
-                <Logo
-                  src={selectedOption.icon}
-                  alt={selectedOption.label}
-                  fallbackText={selectedOption.label}
-                  className="w-4 h-4 rounded-full token-logo"
-                />
-              )}
-              {selectedOption.indicator && (
-                <span className="opacity-60">{selectedOption.indicator}</span>
-              )}
-              {selectedOption.label}
-            </>
-          ) : (
-            <span className="opacity-50">Select...</span>
-          )}
-        </span>
+        <span className="truncate flex items-center gap-1.5 pr-4">{triggerContent()}</span>
       </button>
 
       {/* Dropdown */}
@@ -290,6 +369,9 @@ export function SearchableSelect({
                 }
               }}
             />
+            {props.multiple === true && atCap && props.maxSelectedHint && (
+              <p className="px-1 pt-1 text-[10px] text-base-content/50">{props.maxSelectedHint}</p>
+            )}
           </div>
 
           {/* Options list */}
@@ -298,11 +380,21 @@ export function SearchableSelect({
               <li key={opt.value}>
                 <button
                   type="button"
+                  disabled={isDisabled(opt.value)}
                   className={`w-full text-left px-3 py-1.5 text-sm hover:bg-base-200 transition-colors cursor-pointer flex items-center gap-1 min-w-0 ${
-                    opt.value === value ? 'bg-primary/10 font-medium' : ''
-                  }`}
+                    selectedSet.has(opt.value) ? 'bg-primary/10 font-medium' : ''
+                  } ${isDisabled(opt.value) ? 'opacity-40 cursor-not-allowed' : ''}`}
                   onClick={() => handleSelect(opt.value)}
                 >
+                  {isMulti && (
+                    <input
+                      type="checkbox"
+                      readOnly
+                      tabIndex={-1}
+                      checked={selectedSet.has(opt.value)}
+                      className="checkbox checkbox-xs shrink-0 mr-1 pointer-events-none"
+                    />
+                  )}
                   {opt.icon !== undefined && (
                     <Logo
                       src={opt.icon}

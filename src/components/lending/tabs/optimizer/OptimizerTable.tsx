@@ -8,6 +8,8 @@ import { buildPath, OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'
 import { LenderBadge } from '../../shared/LenderBadge'
 import { AssetPopover } from '../../shared/AssetPopover'
 import { UsdAmount } from '../../../common/UsdAmount'
+import { Logo } from '../../../common/Logo'
+import { getChainName } from '../../../../lib/lib-utils'
 import { riskDotColor } from '../earn/helpers'
 
 /** Small colored dot for an asset's own token risk. Rendered only when the
@@ -49,6 +51,8 @@ interface Props {
   amount?: number
   /** Optional lender enumeration so we can show real names + logos in the badge. */
   lenderInfoMap?: Record<string, LenderInfo>
+  /** Tag each row with its chain. On for a multi-chain selection. */
+  showChain?: boolean
   /** Server-side pagination state, shaped to match `<TablePagination>`'s expectations. */
   pagination?: OptimizerPaginationState
   /** Total row count from the API (not just the current page). */
@@ -116,6 +120,32 @@ function AmountCell({ tok, usd, sym }: { tok?: number; usd?: number; sym?: strin
         )}
       </div>
     </td>
+  )
+}
+
+const CHAIN_LOGO_BASE = 'https://raw.githubusercontent.com/1delta-DAO/chains/main'
+
+/**
+ * Which chain a pair lives on. Rows can come from any selected chain, and the
+ * pair is only actionable on its own — so the chain is part of the row's
+ * identity, not decoration. Hidden on a single-chain selection where it would
+ * repeat on every row.
+ */
+function ChainTag({ chainId, show }: { chainId: string; show?: boolean }) {
+  if (!show) return null
+  return (
+    <span
+      className="inline-flex items-center gap-1 min-w-0 text-[10px] text-base-content/50"
+      title={getChainName(chainId)}
+    >
+      <Logo
+        src={`${CHAIN_LOGO_BASE}/${chainId}.webp`}
+        alt={getChainName(chainId)}
+        fallbackText={getChainName(chainId)}
+        className="w-3 h-3 rounded-full shrink-0"
+      />
+      <span className="truncate">{getChainName(chainId)}</span>
+    </span>
   )
 }
 
@@ -228,6 +258,7 @@ function PairCard({
   showMaxDebt,
   showMinCollateral,
   lenderInfoMap,
+  showChain,
   selected,
   onSelect,
   onDetails,
@@ -236,6 +267,7 @@ function PairCard({
   showMaxDebt?: boolean
   showMinCollateral?: boolean
   lenderInfoMap?: Record<string, LenderInfo>
+  showChain?: boolean
   selected: boolean
   onSelect?: () => void
   onDetails: () => void
@@ -307,12 +339,15 @@ function PairCard({
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-2">
-        <LenderBadge
-          lenderKey={row.lenderKey}
-          name={lenderInfoMap?.[row.lenderKey]?.name}
-          logoURI={lenderInfoMap?.[row.lenderKey]?.logoURI}
-          bare
-        />
+        <span className="flex items-center gap-1.5 min-w-0">
+          <LenderBadge
+            lenderKey={row.lenderKey}
+            name={lenderInfoMap?.[row.lenderKey]?.name}
+            logoURI={lenderInfoMap?.[row.lenderKey]?.logoURI}
+            bare
+          />
+          <ChainTag chainId={row.chainId} show={showChain} />
+        </span>
         {row.maturityDays != null && (
           <span
             className="text-[10px] text-warning shrink-0"
@@ -358,6 +393,7 @@ export function OptimizerTable({
   showMinCollateral,
   amount,
   lenderInfoMap,
+  showChain,
   pagination,
   totalItems,
   onSelectPair,
@@ -430,12 +466,15 @@ export function OptimizerTable({
                     />
                   </td>
                   <td>
-                    <LenderBadge
-                      lenderKey={row.lenderKey}
-                      name={lenderInfoMap?.[row.lenderKey]?.name}
-                      logoURI={lenderInfoMap?.[row.lenderKey]?.logoURI}
-                      bare
-                    />
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <LenderBadge
+                        lenderKey={row.lenderKey}
+                        name={lenderInfoMap?.[row.lenderKey]?.name}
+                        logoURI={lenderInfoMap?.[row.lenderKey]?.logoURI}
+                        bare
+                      />
+                      <ChainTag chainId={row.chainId} show={showChain} />
+                    </div>
                   </td>
                   <td className="text-right">
                     <div className="flex flex-col items-end leading-tight">
@@ -558,6 +597,7 @@ export function OptimizerTable({
                   showMaxDebt={showMaxDebt}
                   showMinCollateral={showMinCollateral}
                   lenderInfoMap={lenderInfoMap}
+                  showChain={showChain}
                   selected={selectedKey === pk}
                   onSelect={onSelectPair ? () => onSelectPair(row) : undefined}
                   onDetails={() => goLender(row)}

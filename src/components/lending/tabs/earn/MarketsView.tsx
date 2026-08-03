@@ -1,10 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getChainName, isWNative, SupportedChainId } from '../../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
-import { useFlattenedPools, type PoolEntry } from '../../../../hooks/lending/useFlattenedPools'
+import {
+  useFlattenedPoolsMultiChain,
+  type PoolEntry,
+  type PoolsFilters,
+} from '../../../../hooks/lending/useFlattenedPools'
 import type { UserDataResult } from '../../../../hooks/lending/useUserData'
 import { useTokenBalances } from '../../../../hooks/lending/useTokenBalances'
-import { useTokenLists } from '../../../../hooks/useTokenLists'
+import { useTokenListsMultiChain } from '../../../../hooks/useTokenLists'
 import { computePoolMetrics, poolEntryToPoolDataItem, type SortKey } from './helpers'
 import { MarketsTable } from './MarketsTable'
 import { DepositPanel } from './DepositPanel'
@@ -19,8 +23,14 @@ const HIGH_LIQUIDITY_CHAINS: ReadonlySet<string> = new Set([
   SupportedChainId.BASE,
 ])
 
-function getDefaultMinDepositsUsd(chainId?: string): string {
-  return chainId && HIGH_LIQUIDITY_CHAINS.has(chainId) ? '100000' : '25000'
+/**
+ * Deposit floor below which markets are noise. Mirrors the backend's own
+ * `minTvlUsd` default (100k on Ethereum, 25k elsewhere). Across a multi-chain
+ * selection the *highest* applicable floor wins, so adding Ethereum to the
+ * selection doesn't flood the table with 25k-dust markets from everywhere.
+ */
+function getDefaultMinDepositsUsd(chainIds: string[]): string {
+  return chainIds.some((c) => HIGH_LIQUIDITY_CHAINS.has(c)) ? '100000' : '25000'
 }
 
 /** Compute TVL for a lender directly from PoolEntry[] */
@@ -34,21 +44,33 @@ function computeLenderTvlFromPools(pools: PoolEntry[], lender: string): number {
 }
 
 interface LendingPoolsTableProps {
-  chainId?: string
+  /** Chains to browse. One entry behaves exactly as the old single-chain view. */
+  chainIds: string[]
   account?: string
   externalAssetFilter?: string
   userData?: UserDataResult
 }
 
 export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
-  chainId,
+  chainIds,
   account,
   externalAssetFilter,
   userData,
 }) => {
   const isMobile = useIsMobile()
+  const isMultiChain = chainIds.length > 1
+  const primaryChainId = chainIds[0]
 
-  // Persisted filters (survive tab switches and sessions)
+  // Persisted filters (survive tab switches and sessions).
+  //
+  // Multi-chain selections share ONE bucket rather than keying off the chain
+  // set: a per-combination key would silently reset every filter the moment a
+  // user added or removed a chain.
+  const filterScope = useMemo(
+    () => (isMultiChain ? 'multi' : primaryChainId),
+    [isMultiChain, primaryChainId]
+  )
+
   const marketsDefaults = useMemo(
     () => ({
       selectedLender: 'all',
@@ -57,7 +79,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       pageSize: 10,
       minUtilPct: '10',
       maxUtilPct: '90',
-      minDepositsUsd: getDefaultMinDepositsUsd(chainId),
+      minDepositsUsd: getDefaultMinDepositsUsd(chainIds),
       minAprPct: '1',
       assetFilter: '',
       maxAprPct: '',
@@ -76,14 +98,15 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       // Fixed-rate earn markets (Midnight / Term / Exactly) are hidden by default.
       showFixedTerm: false,
     }),
-    [chainId]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chainIds.join(',')]
   )
 
   const {
     filters: f,
     setFilter,
     resetToDefaults: resetFilters,
-  } = usePersistedFilters('markets-view', marketsDefaults, { chainId })
+  } = usePersistedFilters('markets-view', marketsDefaults, { chains: filterScope })
 
   // Destructure for convenience
   const selectedLender = f.selectedLender
@@ -161,20 +184,53 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   // Mobile deposit modal
   const [showMobileDeposit, setShowMobileDeposit] = useState(false)
 
+  // Deliberately NOT pushing the numeric filters below down to the API, even
+  // though `/lending/pools` accepts similar-looking params — the semantics
+  // don't line up and mapping them would quietly change what the tab shows:
+  //
+  //   - `minDepositsUsd` filters on totalDepositsUsd; the API's nearest param,
+  //     `minTvlUsd`, filters on *liquidity* (deposits − debt). Mapping one to
+  //     the other would hide fully-utilized markets with large deposits.
+  //   - The util / APR floors here exempt deposit-only pools (`isFloorExempt`),
+  //     which a server-side floor cannot express.
+  //   - Every numeric filter is skipped when the user has narrowed via an
+  //     external asset filter (row click / "owned only"), so that every market
+  //     for those assets stays visible. A server-side filter would still apply.
+  //
+  // The backend's own `minTvlUsd` default (100k on Ethereum, 25k elsewhere)
+  // already prunes the long tail per request, and the per-chain page budget in
+  // `useFlattenedPoolsMultiChain` bounds the rest. Pushing these down properly
+  // needs matching params on the API side.
+  const serverFilters = useMemo<PoolsFilters>(
+    () => ({
+      // Opt in to fixed-rate earn markets (Midnight / Term / Exactly), hidden by default.
+      includeFixedTerm: showFixedTerm,
+    }),
+    [showFixedTerm]
+  )
+
   const {
     pools,
     isPoolsLoading: loading,
-    isFetchingMore,
+    isPoolsFetching: isFetchingMore,
     count: serverCount,
-  } = useFlattenedPools({
-    chainId,
+    failedChains,
+    truncatedChains,
+  } = useFlattenedPoolsMultiChain({
+    chainIds,
     maxRiskScore: effectiveMaxRisk,
-    enabled: !!chainId,
-    // Opt in to fixed-rate earn markets (Midnight / Term / Exactly), hidden by default.
-    filters: useMemo(() => ({ includeFixedTerm: showFixedTerm }), [showFixedTerm]),
+    enabled: chainIds.length > 0,
+    filters: serverFilters,
   })
 
-  const { data: chainTokens } = useTokenLists(chainId)
+  const { data: tokensByChain } = useTokenListsMultiChain(chainIds)
+  // Most consumers below only need the primary chain's list (search, the
+  // deposit panel's native-token lookup); rows resolve per-chain where it
+  // matters via `tokensByChain`.
+  const chainTokens = useMemo(
+    () => tokensByChain[primaryChainId] ?? {},
+    [tokensByChain, primaryChainId]
+  )
 
   // Convert selected PoolEntry to PoolDataItem using inline asset data
   const resolvedPool = useMemo(
@@ -205,24 +261,38 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   // different field on PoolEntry that doesn't always match the asset address
   // the action components later use for the lookup), plus zeroAddress when
   // any pool is wrapped-native.
+  //
+  // Balances are read for ONE chain — the selected pool's, falling back to the
+  // primary. Requesting them for every chain in the selection would multiply
+  // the call for data only the deposit panel consumes, and the panel only ever
+  // shows the selected pool's asset.
+  const balanceChainId = selectedEntry?.chainId ?? primaryChainId
+  const poolsOnBalanceChain = useMemo(
+    () => pools.filter((p) => p.chainId === balanceChainId),
+    [pools, balanceChainId]
+  )
   const hasWrappedNative = useMemo(
-    () => pools.some((p) => isWNative(p.underlyingInfo?.asset)),
-    [pools]
+    () => poolsOnBalanceChain.some((p) => isWNative(p.underlyingInfo?.asset)),
+    [poolsOnBalanceChain]
   )
   const poolAssetAddresses = useMemo(() => {
     const addrs = [
-      ...new Set(pools.map((p) => p.underlyingInfo?.asset?.address).filter(Boolean) as string[]),
+      ...new Set(
+        poolsOnBalanceChain
+          .map((p) => p.underlyingInfo?.asset?.address)
+          .filter(Boolean) as string[]
+      ),
     ]
     if (hasWrappedNative) addrs.push(zeroAddress)
     return addrs
-  }, [pools, hasWrappedNative])
+  }, [poolsOnBalanceChain, hasWrappedNative])
 
   const {
     balances: walletBalances,
     isBalancesFetching,
     refetchBalances,
   } = useTokenBalances({
-    chainId: chainId ?? '',
+    chainId: balanceChainId,
     account,
     assets: poolAssetAddresses,
   })
@@ -247,11 +317,13 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   // Sub-accounts for the selected entry's lender (for deposit sub-account selector)
   const selectedSubAccounts = useMemo(() => {
     if (!selectedEntry || !userData?.raw) return []
+    // Match the selected pool's own chain — `userData` can span the whole
+    // selection, so the same lender key exists on several chains.
     const entry = userData.raw.find(
-      (e) => e.chainId === chainId && e.lender === selectedEntry.lenderKey
+      (e) => e.chainId === selectedEntry.chainId && e.lender === selectedEntry.lenderKey
     )
     return entry?.data ?? []
-  }, [selectedEntry, userData, chainId])
+  }, [selectedEntry, userData])
 
   // True if the user has any outstanding debt on the *selected pool's lender*
   // — debt on a different lender doesn't share collateral with this deposit,
@@ -574,12 +646,14 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   const endIndex = Math.min(startIndex + pageSize, totalItems)
   const paginatedPools = filteredAndSortedPools.slice(startIndex, endIndex)
 
-  // Reset minDepositsUsd to chain-appropriate default on chain switch (unless user overrode)
+  // Reset minDepositsUsd to a selection-appropriate default when the chain set
+  // changes (unless the user overrode it).
   useEffect(() => {
     if (!userOverrodeMinDeposits.current) {
-      setMinDepositsUsd(getDefaultMinDepositsUsd(chainId))
+      setMinDepositsUsd(getDefaultMinDepositsUsd(chainIds))
     }
-  }, [chainId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chainIds.join(',')])
 
   useEffect(() => {
     setPage(1)
@@ -608,7 +682,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     effectiveMaxRisk,
     assetFilter,
     externalAssetFilter,
-    chainId,
+    chainIds.join(','),
   ])
 
   const toggleSort = (key: SortKey) => {
@@ -637,7 +711,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     }
   }
 
-  if (!chainId) {
+  if (chainIds.length === 0) {
     return (
       <div className="w-full p-3 sm:p-4">
         <p className="text-sm text-base-content/70">Select a chain to view lending markets.</p>
@@ -659,7 +733,28 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-baseline gap-2 flex-wrap">
           <h2 className="text-lg font-semibold">Lending Markets</h2>
-          <span className="text-xs text-base-content/50">{getChainName(chainId)}</span>
+          <span
+            className="text-xs text-base-content/50"
+            title={chainIds.map(getChainName).join(', ')}
+          >
+            {isMultiChain ? `${chainIds.length} chains` : getChainName(primaryChainId)}
+          </span>
+          {failedChains.length > 0 && (
+            <span
+              className="text-xs text-warning"
+              title={`Failed: ${failedChains.map(getChainName).join(', ')}`}
+            >
+              · {failedChains.length} unavailable
+            </span>
+          )}
+          {truncatedChains.length > 0 && (
+            <span
+              className="text-xs text-base-content/40"
+              title={`Showing a capped slice for: ${truncatedChains.map(getChainName).join(', ')}. Narrow the filters to see the rest.`}
+            >
+              · partial
+            </span>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-2 md:justify-end">
@@ -1074,6 +1169,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
         <MarketsTable
           pools={paginatedPools}
           chainTokens={chainTokens}
+          showChain={isMultiChain}
           sortKey={sortKey}
           sortDir={sortDir}
           onToggleSort={toggleSort}
@@ -1095,7 +1191,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
             resolvedPool={resolvedPool}
             walletBalance={selectedWalletBal}
             account={account}
-            chainId={chainId}
+            chainId={selectedEntry?.chainId ?? primaryChainId}
             nativeToken={nativeToken}
             nativeBalance={nativeBalance}
             subAccounts={selectedSubAccounts}
@@ -1125,7 +1221,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
               resolvedPool={resolvedPool}
               walletBalance={selectedWalletBal}
               account={account}
-              chainId={chainId}
+              chainId={selectedEntry?.chainId ?? primaryChainId}
               nativeToken={nativeToken}
               nativeBalance={nativeBalance}
               subAccounts={selectedSubAccounts}
