@@ -14,6 +14,7 @@ import { useLendingOffers, computeEffectiveBorrow } from '../../../hooks/lending
 import { MakeOfferPanel, TakeMakeToggle } from '../shared/MakeOfferPanel'
 import { HealthFactorProjection } from './HealthFactorProjection'
 import { RateImpactIndicator } from './RateImpactIndicator'
+import { ComparableRatesPill } from '../shared/ComparableRatesPill'
 import { TransactionSuccess } from './TransactionSuccess'
 
 export const BorrowAction: React.FC<ActionPanelProps> = ({
@@ -137,6 +138,21 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
     amountNum > 0 && effectivePriceUsd > 0 && borrowAprPct > 0
       ? (amountNum * effectivePriceUsd * (borrowAprPct / 100)) / 12
       : 0
+
+  // Holding period the rate comparison is normalized to. Anchor it to THIS
+  // market's own term so the comparison answers "what else could I pay over the
+  // period I'm actually committing to": a calendar maturity (Midnight/Term/
+  // Exactly) counted from now, else the selected rolling-menu duration (Lista),
+  // else undefined — which lets the server fall back to a year, where a variable
+  // pool's effective rate is just its sticker rate.
+  const comparisonHorizonDays = (() => {
+    if (ftDetails?.maturityMs) {
+      const days = (ftDetails.maturityMs - Date.now()) / 86_400_000
+      if (days > 0) return days
+    }
+    const d = Number(selectedTerm?.durationDays)
+    return Number.isFinite(d) && d > 0 ? d : undefined
+  })()
 
   if (txSuccess) {
     return (
@@ -338,21 +354,35 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
 
       {/* Pool info — fixed term rate when brokered, else the variable rate. For
           an order book this becomes the effective (size-weighted) rate for the
-          entered amount, since a borrow fills several offers at different rates. */}
+          entered amount, since a borrow fills several offers at different rates.
+          The pill next to it answers "what would this cost elsewhere?" — the
+          best comparable venues for the same asset, priced at the entered size
+          and (for a fixed term) over the same maturity. */}
       {pool && (
-        <div className="text-xs flex justify-between px-1">
+        <div className="text-xs flex justify-between items-center gap-2 px-1">
           <span className="text-base-content/60">
             {isBrokered ? 'Fixed borrow APR:' : 'Borrow APR:'}
           </span>
-          <span
-            className="text-warning font-medium"
-            title={
-              effectiveBorrow.aprPct != null
-                ? `Effective (size-weighted) rate across the ${effectiveBorrow.consumedTicks.length} offer(s) this borrow fills — worst offer ${(effectiveBorrow.worstAprPct ?? 0).toFixed(2)}%.`
-                : undefined
-            }
-          >
-            {borrowAprPct.toFixed(2)}%
+          <span className="flex items-center gap-1.5">
+            <ComparableRatesPill
+              chainId={chainId}
+              debtAddress={pool.asset?.address}
+              amount={amountNum > 0 ? amountNum : undefined}
+              horizonDays={comparisonHorizonDays}
+              referenceMarketUid={pool.marketUid}
+              referenceTermId={selectedTermId != null ? String(selectedTermId) : undefined}
+              currentAprPct={borrowAprPct}
+            />
+            <span
+              className="text-warning font-medium"
+              title={
+                effectiveBorrow.aprPct != null
+                  ? `Effective (size-weighted) rate across the ${effectiveBorrow.consumedTicks.length} offer(s) this borrow fills — worst offer ${(effectiveBorrow.worstAprPct ?? 0).toFixed(2)}%.`
+                  : undefined
+              }
+            >
+              {borrowAprPct.toFixed(2)}%
+            </span>
           </span>
         </div>
       )}

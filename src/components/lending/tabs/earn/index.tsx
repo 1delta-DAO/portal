@@ -125,7 +125,7 @@ export function EarnTab({
                   error={lendingBalancesError}
                   failedChains={balanceFailedChains}
                   tokensByChain={tokensByChain ?? {}}
-                  showChain={chainIds.length > 1}
+                  showChain
                   filterOwned={filterOwned}
                   onFilterOwnedChange={setFilterOwned}
                   selectedAsset={selectedAsset}

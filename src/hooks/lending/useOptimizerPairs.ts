@@ -63,6 +63,32 @@ export interface OptimizerAssetRef {
   riskLabel?: string
 }
 
+/**
+ * Score → label, matching the backend's own banding (0/absent = unscored).
+ *
+ * Needed because `/pairs/optimize` selects the chain and lender risk *scores*
+ * but not their label columns, so those two dimensions arrive labelled
+ * "unknown" even when they carry a real score — the label is recoverable from
+ * the score, so recover it rather than render an assessment we do have as
+ * missing.
+ */
+export function riskLabelFromScore(score: number | null | undefined): string {
+  if (score == null || score === 0) return 'unknown'
+  if (score <= 2) return 'low'
+  if (score <= 4) return 'medium'
+  return 'high'
+}
+
+/**
+ * Display names for the pair's risk dimensions. The wire categories name the
+ * sides positionally (`tokenLong` / `tokenShort`), which is backend vocabulary —
+ * the UI calls them collateral and debt everywhere else.
+ */
+const RISK_CATEGORY_LABELS: Record<string, string> = {
+  tokenLong: 'collateral token',
+  tokenShort: 'debt token',
+}
+
 // ---------------------------------------------------------------------------
 // Raw API shape
 // ---------------------------------------------------------------------------
@@ -79,6 +105,29 @@ interface RawAssetInfo {
   }
   prices?: { priceUsd?: number } | null
   oraclePrice?: { oraclePriceUsd?: number } | null
+}
+
+/**
+ * `params.market.fixedTerm` as the backend serves it. Only `auction` is read
+ * today; the rest is the cross-protocol descriptor kept for shape fidelity.
+ */
+interface RawFixedTerm {
+  model?: string
+  maturity?: number
+  provider?: { kind?: string; address?: string } | null
+  auction?: {
+    status?: 'upcoming' | 'open' | 'revealing' | 'closed'
+    canBorrow?: boolean
+    canLend?: boolean
+    secondsUntilClose?: number
+    implications?: string[]
+    id?: string
+    startTime?: number
+    revealTime?: number
+    endTime?: number
+    minBorrowAmount?: string
+    minLendAmount?: string
+  } | null
 }
 
 interface RawOptimizerPair {
@@ -142,6 +191,8 @@ interface RawOptimizerPair {
   // Legacy snake_case fallbacks (older deployments).
   max_debt_amount?: string | number | null
   min_collateral_amount?: string | number | null
+  /** Canonical fixed-term descriptor, joined by lender. Absent on variable markets. */
+  fixedTerm?: RawFixedTerm | null
   // Fixed-term (Midnight/Lista) rate card on the debt side. One entry per
   // maturity, `apr` in percent units. Present when the short market is brokered/
   // order-book (variable borrow rate is 0/meaningless — read the fixed rate here).
@@ -166,7 +217,14 @@ interface RawOptimizerPair {
   // Risk scoring (per-dimension breakdown + max token score).
   risk?: {
     maxTokenScore?: number
-    breakdown?: { category: string; score: number; label: string }[]
+    breakdown?: {
+      category: string
+      score: number
+      label: string
+      /** `curation` only: the curators of the pair's two markets (Morpho Blue,
+       *  Euler). Absent on every other dimension. */
+      curatorIds?: string[] | null
+    }[]
   }
   [extra: string]: unknown
 }
@@ -236,8 +294,16 @@ export interface OptimizerPairRow {
   maxLeverage: number
   /** Overall risk score (worst dimension, 0–5+ where higher = riskier). */
   riskScore: number
-  /** Per-dimension risk breakdown (config / chain / lender / token) for tooltips. */
-  riskBreakdown: { category: string; score: number; label: string }[]
+  /** Per-dimension risk breakdown — config, chain, lender, collateral token,
+   *  debt token, plus `curation` on curated lenders (Morpho Blue, Euler) — for
+   *  the risk badge popover. Labels are normalised, so a dimension only reads
+   *  "unknown" when it genuinely carries no score. */
+  riskBreakdown: {
+    category: string
+    score: number
+    label: string
+    curatorIds?: string[] | null
+  }[]
   /** Utilizations as fractions. */
   utilizationLong: number
   utilizationShort: number
@@ -300,6 +366,44 @@ export interface OptimizerPairRow {
    * "Fixed · Nd" label; `borrowAprEffective` on these rows is the fixed rate.
    */
   maturityDays?: number
+  /**
+   * Origination window for auction-cleared fixed-term markets (Term Finance).
+   *
+   * Present ONLY on those markets — `undefined` means "no window applies", not
+   * "closed". Term borrows are submitted into periodic sealed-bid rounds, so a
+   * row with `status: 'closed'` has a real maturity, a real last-cleared rate
+   * and no way to borrow until the next round opens. Without it a closed repo
+   * is indistinguishable from a live market with no offers, which is what made
+   * the Term rows look broken rather than shut.
+   */
+  auction?: OptimizerAuction
+}
+
+export interface OptimizerAuction {
+  status: 'upcoming' | 'open' | 'revealing' | 'closed'
+  /**
+   * Gate the borrow CTA on this, not on `status`. Re-derived locally from the
+   * timestamps (see `normaliseAuction`) so a cached response can't claim a
+   * window that has since closed.
+   */
+  canBorrow: boolean
+  /**
+   * NOT the inverse of a closed round: lending also works between rounds via
+   * the secondary repo-token book, so a closed market is lend-only rather than
+   * inert and must not be greyed out wholesale.
+   */
+  canLend: boolean
+  /** Submissions open (unix secs). */
+  startTime?: number
+  /** Submissions CLOSE — the deadline to act (unix secs). */
+  revealTime?: number
+  /** Round clears (unix secs). */
+  endTime?: number
+  /** Minimum submission size, debt-token BASE units (raw). */
+  minBorrowAmount?: string
+  minLendAmount?: string
+  /** Ready-to-display consequences from the backend, most important first. */
+  implications?: string[]
 }
 
 const num = (v: unknown): number => {
@@ -340,6 +444,61 @@ function asAssetRef(info: RawAssetInfo | undefined, fallbackChainId: string): Op
   }
 }
 
+/**
+ * Re-derive the auction status from the round's timestamps against the CURRENT
+ * clock rather than trusting the served `status`. Optimizer responses are
+ * cached client-side (15s stale, 2min refetch) and server-side on top of that,
+ * so a round that closed in between would otherwise keep rendering as open —
+ * on a window measured in days that is a small error, but it's the one field
+ * whose whole job is to say whether acting is possible right now.
+ */
+function normaliseAuction(ft: RawFixedTerm | null | undefined): OptimizerAuction | undefined {
+  const a = ft?.auction
+  if (!a) return undefined
+  const now = Math.floor(Date.now() / 1000)
+  const { startTime, revealTime, endTime } = a
+  const status: OptimizerAuction['status'] =
+    endTime == null || endTime <= now
+      ? 'closed'
+      : startTime != null && now < startTime
+        ? 'upcoming'
+        : revealTime != null && now >= revealTime
+          ? 'revealing'
+          : 'open'
+  return {
+    status,
+    // Recomputed from the live status, then intersected with the backend's own
+    // flags: the server knows things the timestamps don't (a matured repo is
+    // never borrowable even mid-round), and we know the clock is current.
+    canBorrow: status === 'open' && a.canBorrow !== false,
+    canLend: a.canLend !== false,
+    startTime,
+    revealTime,
+    endTime,
+    minBorrowAmount: a.minBorrowAmount,
+    minLendAmount: a.minLendAmount,
+    implications: a.implications,
+  }
+}
+
+/**
+ * Per-dimension risk, ready for `<RiskBadge>`: side names spelled the way the
+ * UI names them, and labels back-filled from the score for the dimensions the
+ * endpoint scores but doesn't label (chain, lender). Order is preserved — the
+ * backend emits config → chain → lender → collateral → debt.
+ */
+function normaliseRiskBreakdown(
+  raw?: { category: string; score: number; label: string; curatorIds?: string[] | null }[]
+): OptimizerPairRow['riskBreakdown'] {
+  return (raw ?? []).map((b) => ({
+    category: RISK_CATEGORY_LABELS[b.category] ?? b.category,
+    score: numOr0(b.score),
+    label: b.label && b.label !== 'unknown' ? b.label : riskLabelFromScore(numOr0(b.score)),
+    // Only `curation` carries these; the badge lists them under "Curators".
+    ...(b.curatorIds?.length ? { curatorIds: b.curatorIds } : {}),
+  }))
+}
+
 function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
   // Fixed-term (order-book) markets — Morpho Midnight — report their rate in
   // `termsShort` (one entry per maturity) with variable_borrow_rate = 0. Use the
@@ -356,6 +515,19 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
   const borEff = (borrowShortPct + numOr0(raw.intrinsicYieldShort)) / 100
   const aprTotalFrac =
     fixedTerm && maxLev > 0 ? maxLev * depEff - (maxLev - 1) * borEff : numOr0(raw.aprTotal) / 100
+  // Reward-free counterpart, and it MUST be derived the same way as aprTotal
+  // above. The backend computes both `aprBase` and `aprTotal` off the variable
+  // borrow rate, which is 0 on a fixed-term market — so pairing our term-derived
+  // `aprTotal` with the backend's `aprBase` compares two different borrow costs.
+  // The difference is then rendered as a "reward", producing a large phantom
+  // NEGATIVE incentive (e.g. base 123.22% vs total 53.25% → "−69.97% rwd", which
+  // is really just the term's borrow leg). Re-derive it here: fixed-term order
+  // books carry no borrow reward, so the only reward in `aprTotal` is the
+  // leveraged deposit reward — same treatment as `netAprAtAmountBaseFrac` below.
+  const aprBaseFrac =
+    fixedTerm && maxLev > 0
+      ? aprTotalFrac - maxLev * (numOr0(raw.rewardAprLong) / 100)
+      : numOr0(raw.aprBase) / 100
   // "@ size" net APR: variable markets get it from the backend; fixed-term
   // order-book markets (Midnight) have no IRM grid, so derive it here from the
   // term's size-weighted VWAP rate (`aprAtAmount`) at the entered amount.
@@ -399,7 +571,7 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
     // position APR must be derived from.
     depositAprEffective: depEff,
     borrowAprEffective: borEff,
-    aprBase: numOr0(raw.aprBase) / 100,
+    aprBase: aprBaseFrac,
     aprTotal: aprTotalFrac,
     // LTV / utilizations are already fractions.
     ltv: numOr0(raw.ltv),
@@ -411,7 +583,7 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
       ...(raw.risk?.breakdown?.map((b) => numOr0(b.score)) ?? []),
       numOr0(raw.risk?.maxTokenScore)
     ),
-    riskBreakdown: raw.risk?.breakdown ?? [],
+    riskBreakdown: normaliseRiskBreakdown(raw.risk?.breakdown),
     utilizationLong: numOr0(raw.utilizationLong),
     utilizationShort: numOr0(raw.utilizationShort),
     totalDepositsUsdLong: numOr0(raw.totalDepositsUsdLong),
@@ -436,6 +608,8 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
     termsShort: raw.termsShort,
     // Fixed-term maturity (Midnight): drives the "Fixed · Nd" borrow-rate label.
     maturityDays: fixedTerm ? optNum(fixedTerm.durationDays) : undefined,
+    // Auction origination window (Term Finance) — drives the borrowable gate.
+    auction: normaliseAuction(raw.fixedTerm),
   }
 }
 

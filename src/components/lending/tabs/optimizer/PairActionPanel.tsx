@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { zeroAddress } from 'viem'
-import type {
-  OptimizerAssetRef,
-  OptimizerPairRow,
+import {
+  riskLabelFromScore,
+  type OptimizerAssetRef,
+  type OptimizerAuction,
+  type OptimizerPairRow,
 } from '../../../../hooks/lending/useOptimizerPairs'
 import type { LendingTx } from '../../../../hooks/useSendLendingTransaction'
 import { AmountInput } from '../../../common/AmountInput'
@@ -23,6 +25,8 @@ import { UsdAmount } from '../../../common/UsdAmount'
 import { Logo } from '../../../common/Logo'
 import { OptimizerLoopPanel } from './OptimizerLoopPanel'
 import { DepthChart } from './DepthChart'
+import { ComparableRatesPill } from '../../shared/ComparableRatesPill'
+import { RiskBadge } from '../../shared/RiskBadge'
 import { useCombinedAction, gt0, asCurrency, type CombinedAction } from './useCombinedAction'
 
 type Op = 'deposit-borrow' | 'withdraw-repay' | 'loop'
@@ -266,6 +270,99 @@ function SecondaryLeg({
   )
 }
 
+/** "3d 4h" / "5h 20m" / "12m". */
+function fmtCountdown(secs: number): string {
+  if (secs <= 0) return '0m'
+  const d = Math.floor(secs / 86400)
+  const h = Math.floor((secs % 86400) / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  if (d > 0) return h > 0 ? `${d}d ${h}h` : `${d}d`
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`
+  return `${m}m`
+}
+
+/**
+ * Auction-window notice for Term Finance markets.
+ *
+ * Borrowing here means submitting a sealed bid into a periodic round — it is
+ * not continuously available. When no round is open the borrow leg simply
+ * cannot be built, so the panel has to say that up front instead of letting
+ * someone fill in an amount and press a button that can't do anything. When a
+ * round IS open, the deadline is the actionable fact, so it leads.
+ */
+function AuctionNotice({ auction }: { auction?: OptimizerAuction }) {
+  if (!auction) return null
+  const now = Math.floor(Date.now() / 1000)
+
+  // The backend ships a ready-to-display consequence list (`implications`, the
+  // same convention as Teller's), so the body renders that instead of keeping a
+  // second copy of the wording here that would drift from it. The headline
+  // stays local because it carries a LIVE countdown the cached strings can't.
+  const detail = auction.implications?.length ? (
+    <ul className="mt-1 space-y-0.5 list-disc pl-3.5 text-base-content/60">
+      {auction.implications.map((line, i) => (
+        <li key={i}>{line}</li>
+      ))}
+    </ul>
+  ) : null
+
+  const box = (tone: string, head: ReactNode) => (
+    <div className={`rounded-lg border p-2 text-[11px] leading-tight ${tone}`}>
+      <div className="font-semibold">{head}</div>
+      {detail}
+    </div>
+  )
+
+  if (auction.status === 'open') {
+    const left = auction.revealTime != null ? auction.revealTime - now : null
+    return box(
+      'border-success/30 bg-success/5',
+      <span className="text-success">
+        Auction open
+        {left != null && left > 0 ? ` · closes in ${fmtCountdown(left)}` : ''}
+        {auction.revealTime != null
+          ? ` (${new Date(auction.revealTime * 1000).toLocaleString()})`
+          : ''}
+      </span>
+    )
+  }
+
+  if (auction.status === 'upcoming') {
+    const until = auction.startTime != null ? auction.startTime - now : null
+    return box(
+      'border-info/30 bg-info/5',
+      <span className="text-info">
+        Auction opens in {until != null ? fmtCountdown(until) : 'soon'}
+      </span>
+    )
+  }
+
+  if (auction.status === 'revealing') {
+    return box(
+      'border-warning/30 bg-warning/5',
+      <span className="text-warning">Auction clearing</span>
+    )
+  }
+
+  return box('border-base-300 bg-base-200/50', <span>No auction open</span>)
+}
+
+/**
+ * Holding period the rate comparison is normalized to: the selected fixed
+ * term's length, so a locked rate is compared over the period it is actually
+ * locked for. Undefined for a variable borrow — the server then defaults to a
+ * year, where a floating pool's effective rate is just its sticker rate.
+ */
+function comparisonHorizonDays(
+  terms: CombinedAction['debtTerms'],
+  termId: string | null,
+): number | undefined {
+  if (!termId) return undefined
+  const t = terms.find((x) => String(x.termId ?? '') === termId)
+  const d = Number(t?.durationDays)
+  return Number.isFinite(d) && d > 0 ? d : undefined
+}
+
 /**
  * Fixed-term borrow picker (Lista broker) — one button per maturity. Selecting
  * a term routes the open through the atomic composer; leaving it drives the
@@ -331,6 +428,7 @@ function ExecuteButton({
   running,
   sending,
   building,
+  blockedReason,
   onExecute,
 }: {
   account?: string
@@ -341,13 +439,17 @@ function ExecuteButton({
   running: boolean
   sending: boolean
   building: boolean
+  /** Set when the action cannot be performed at all right now (e.g. the Term
+   *  auction round is closed). Becomes the button label so the CTA states the
+   *  blocker instead of sitting disabled under an unrelated caption. */
+  blockedReason?: string
   onExecute: () => void
 }) {
   return (
     <button
       type="button"
       className="btn btn-success btn-sm w-full"
-      disabled={!account || !steps.length || building || running || sending}
+      disabled={!account || !!blockedReason || !steps.length || building || running || sending}
       onClick={onExecute}
     >
       {running || sending ? (
@@ -358,6 +460,8 @@ function ExecuteButton({
         </>
       ) : !account ? (
         'Connect wallet'
+      ) : blockedReason ? (
+        blockedReason
       ) : steps.length > 1 ? (
         `Execute (${steps.length} steps)`
       ) : isOpen ? (
@@ -433,6 +537,12 @@ function CombinedForm({
         refetchBalances={refetchBalances}
       />
 
+      {/* Auction window (Term Finance). Shown on the borrow leg only — the
+          window gates ORIGINATION; repaying/withdrawing an existing position is
+          unaffected by it. Placed above the term picker because when the round
+          is closed there are no terms to pick and this explains why. */}
+      {a.isOpen && <AuctionNotice auction={row.auction} />}
+
       {a.isDebtBrokered && (
         <FixedTermPicker
           terms={a.debtTerms}
@@ -454,6 +564,26 @@ function CombinedForm({
         onChange={a.setSecondary}
         priceUsd={a.priceS}
       />
+
+      {/* "What would this borrow cost elsewhere?" — the best comparable venues
+          for this exact pair, priced at the entered size and, when a fixed term
+          is selected, over that term's length. Borrow leg only: the comparison
+          is about opening a position, not closing one. */}
+      {a.isOpen && a.debtUid && (
+        <div className="flex items-center justify-between gap-2 px-1 text-xs">
+          <span className="text-base-content/60">Elsewhere</span>
+          <ComparableRatesPill
+            chainId={row.chainId}
+            debtAddress={row.debt.address}
+            collateralAddress={row.collateral.address}
+            amount={Number(a.dSecondary) || undefined}
+            horizonDays={comparisonHorizonDays(a.debtTerms, a.termId)}
+            referenceMarketUid={a.debtUid}
+            referenceTermId={a.termId ?? undefined}
+            currentAprPct={row.borrowAprEffective * 100}
+          />
+        </div>
+      )}
 
       {/* Borrow-rate depth: how the debt market's rate climbs with the borrow
           size, with a live marker at the entered amount. Borrow leg only. */}
@@ -496,6 +626,18 @@ function CombinedForm({
         running={a.running}
         sending={a.sending}
         building={a.building}
+        blockedReason={
+          // Origination-only: an auction round gates OPENING a borrow, never
+          // closing one, so withdraw-and-repay stays available regardless.
+          // `canBorrow` rather than `status` — it also accounts for maturity.
+          a.isOpen && row.auction && !row.auction.canBorrow
+            ? row.auction.status === 'upcoming'
+              ? 'Auction not open yet'
+              : row.auction.status === 'revealing'
+                ? 'Auction is clearing'
+                : 'No auction open'
+            : undefined
+        }
         onExecute={a.execute}
       />
     </div>
@@ -613,7 +755,7 @@ export function PairActionPanel({ row, account, onClose, lenderName, lenderLogo 
               <span className="text-base-content/30 shrink-0">→</span>
               <span className="truncate">{row.debt.symbol}</span>
             </div>
-            <div className="flex items-center gap-1 mt-0.5 min-w-0" title={row.lenderKey}>
+            <div className="flex items-center gap-1 mt-0.5 min-w-0">
               {lenderLogo && (
                 <Logo
                   src={lenderLogo}
@@ -622,7 +764,20 @@ export function PairActionPanel({ row, account, onClose, lenderName, lenderLogo 
                   className="w-3.5 h-3.5 rounded-full shrink-0"
                 />
               )}
-              <span className="text-[11px] text-base-content/60 truncate">{displayLender}</span>
+              <span className="text-[11px] text-base-content/60 truncate" title={row.lenderKey}>
+                {displayLender}
+              </span>
+              {/* Lender / chain / config risk alongside the two token risks —
+                  this panel is where the position is actually opened, so the
+                  protocol-level assessment belongs here and not only in the
+                  table row behind it. */}
+              {row.riskScore > 0 && row.riskBreakdown.length > 0 && (
+                <RiskBadge
+                  label={riskLabelFromScore(row.riskScore)}
+                  breakdown={row.riskBreakdown}
+                  size="sm"
+                />
+              )}
             </div>
           </div>
         </div>

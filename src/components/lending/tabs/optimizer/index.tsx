@@ -995,7 +995,7 @@ export function OptimizerTab({
             showMinCollateral={showMinCollateral}
             amount={handoffAmount}
             lenderInfoMap={lenderInfoMap}
-            showChain={isMultiChain}
+            showChain
             pagination={paginationState}
             totalItems={total}
             onSelectPair={setSelectedRow}

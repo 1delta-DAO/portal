@@ -18,7 +18,7 @@ interface UserAssetsTableProps {
   failedChains?: string[]
   /** Token metadata keyed by chain; balances can span chains. */
   tokensByChain: Record<string, Record<string, RawCurrency>>
-  /** Show the chain column. Off for a single-chain selection. */
+  /** Show the chain column. Defaults on — balances can span chains. */
   showChain?: boolean
   filterOwned: boolean
   onFilterOwnedChange: (v: boolean) => void
@@ -32,7 +32,7 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
   error,
   failedChains,
   tokensByChain,
-  showChain = false,
+  showChain = true,
   filterOwned,
   onFilterOwnedChange,
   selectedAsset,

@@ -278,9 +278,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   const poolAssetAddresses = useMemo(() => {
     const addrs = [
       ...new Set(
-        poolsOnBalanceChain
-          .map((p) => p.underlyingInfo?.asset?.address)
-          .filter(Boolean) as string[]
+        poolsOnBalanceChain.map((p) => p.underlyingInfo?.asset?.address).filter(Boolean) as string[]
       ),
     ]
     if (hasWrappedNative) addrs.push(zeroAddress)
@@ -436,8 +434,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     // Exempt every fixed-term family the API can serve.
     const FIXED_TERM_PREFIXES = ['MORPHO_MIDNIGHT', 'TERM_FINANCE', 'EXACTLY']
     const isFloorExempt = (p: PoolEntry) =>
-      isDepositOnly(p) ||
-      FIXED_TERM_PREFIXES.some((pre) => !!p.lenderKey?.startsWith(pre))
+      isDepositOnly(p) || FIXED_TERM_PREFIXES.some((pre) => !!p.lenderKey?.startsWith(pre))
 
     // --- numeric range helpers ---
     const applyMinMax = (
@@ -1169,7 +1166,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
         <MarketsTable
           pools={paginatedPools}
           chainTokens={chainTokens}
-          showChain={isMultiChain}
+          showChain
           sortKey={sortKey}
           sortDir={sortDir}
           onToggleSort={toggleSort}

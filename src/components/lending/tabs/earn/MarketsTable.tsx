@@ -29,13 +29,21 @@ const UtilCircle: React.FC<{ pct: number }> = ({ pct }) => {
     <svg width={size} height={size} className="shrink-0 -rotate-90">
       <circle cx={cx} cy={cy} r={r} fill="none" strokeWidth={stroke} className="stroke-base-300" />
       <circle
-        cx={cx} cy={cy} r={r} fill="none" strokeWidth={stroke}
-        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill="none"
+        strokeWidth={stroke}
+        strokeDasharray={circ}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
         className={color}
       />
       <text
-        x={cx} y={cy}
-        textAnchor="middle" dominantBaseline="central"
+        x={cx}
+        y={cy}
+        textAnchor="middle"
+        dominantBaseline="central"
         className="fill-base-content rotate-90 origin-center text-[10px] font-semibold"
       >
         {pct.toFixed(0)}%
@@ -47,7 +55,7 @@ const UtilCircle: React.FC<{ pct: number }> = ({ pct }) => {
 interface MarketsTableProps {
   pools: PoolEntry[]
   chainTokens: Record<string, any>
-  /** Tag rows with their chain. On for a multi-chain selection. */
+  /** Tag rows with their chain. Defaults on — this tab is multi-chain. */
   showChain?: boolean
   sortKey: SortKey
   sortDir: 'asc' | 'desc'
@@ -66,7 +74,7 @@ interface MarketsTableProps {
 export const MarketsTable: React.FC<MarketsTableProps> = ({
   pools,
   chainTokens,
-  showChain = false,
+  showChain = true,
   sortKey,
   sortDir,
   onToggleSort,
@@ -172,13 +180,24 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
               <th className="w-[11%] cursor-pointer text-right" onClick={() => onToggleSort('apr')}>
                 APR{sortIndicator('apr')}
               </th>
-              <th className="w-[8%] cursor-pointer text-right" onClick={() => onToggleSort('utilization')} title="Utilization">
+              <th
+                className="w-[8%] cursor-pointer text-right"
+                onClick={() => onToggleSort('utilization')}
+                title="Utilization"
+              >
                 Util.{sortIndicator('utilization')}
               </th>
-              <th className="w-[11%] cursor-pointer text-right" onClick={() => onToggleSort('totalDepositsUSD')}>
+              <th
+                className="w-[11%] cursor-pointer text-right"
+                onClick={() => onToggleSort('totalDepositsUSD')}
+              >
                 Deposits{sortIndicator('totalDepositsUSD')}
               </th>
-              <th className="w-[10%] cursor-pointer text-right" onClick={() => onToggleSort('totalLiquidityUSD')} title="Liquidity">
+              <th
+                className="w-[10%] cursor-pointer text-right"
+                onClick={() => onToggleSort('totalLiquidityUSD')}
+                title="Liquidity"
+              >
                 Liq.{sortIndicator('totalLiquidityUSD')}
               </th>
               <th className="w-[10%] text-right">Price</th>
@@ -190,7 +209,8 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
           </thead>
           <tbody>
             {pools.map((p) => {
-              const { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr } = computePoolMetrics(p)
+              const { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr } =
+                computePoolMetrics(p)
               const utilPct = utilization * 100
               const totalDepositsUSD = parseFloat(p.totalDepositsUsd) || 0
               const totalDebtUSD = parseFloat(p.totalDebtUsd) || 0
@@ -221,7 +241,10 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                         chainId={p.chainId}
                       >
                         <div className="flex flex-col min-w-0">
-                          <span className="font-medium truncate" title={getAsset(p)?.name ?? p.name}>
+                          <span
+                            className="font-medium truncate"
+                            title={getAsset(p)?.name ?? p.name}
+                          >
                             {getAsset(p)?.symbol ?? p.name}
                           </span>
                           <span
@@ -247,8 +270,18 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                           navigate(buildPath('lending', p.chainId, p.lenderKey))
                         }}
                       >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M7 17L17 7" /><path d="M7 7h10v10" />
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M7 17L17 7" />
+                          <path d="M7 7h10v10" />
                         </svg>
                       </a>
                     </div>
@@ -377,7 +410,8 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
         )}
 
         {pools.map((p) => {
-          const { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr } = computePoolMetrics(p)
+          const { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr } =
+            computePoolMetrics(p)
           const utilPct = utilization * 100
           const totalDepositsUSD = parseFloat(p.totalDepositsUsd) || 0
           const totalLiquidityUSD = parseFloat(p.totalLiquidityUsd) || 0
@@ -410,7 +444,10 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                     chainId={p.chainId}
                   >
                     <div className="flex flex-col min-w-0">
-                      <span className="font-semibold text-sm truncate" title={getAsset(p)?.name ?? p.name}>
+                      <span
+                        className="font-semibold text-sm truncate"
+                        title={getAsset(p)?.name ?? p.name}
+                      >
                         {getAsset(p)?.symbol ?? p.name}
                       </span>
                       <span
