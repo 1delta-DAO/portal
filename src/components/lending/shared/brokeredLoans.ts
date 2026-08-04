@@ -15,9 +15,7 @@ import { addAmountStrings } from '../actions/format'
  * the flex/dynamic loan carries it in the variable slot. (Spec §2.)
  */
 export function loanDebtString(pos: UserPositionEntry): string {
-  return pos.term?.isDynamic
-    ? String(pos.debt ?? '0')
-    : String(pos.debtStable ?? '0')
+  return pos.term?.isDynamic ? String(pos.debt ?? '0') : String(pos.debtStable ?? '0')
 }
 
 /**
@@ -90,10 +88,7 @@ export function maturityDisplay(
  * revert `REMAIN_BORROW_TOO_LOW`. The broker refunds any excess (swept back),
  * so over-funding by a hair is free. See loop-refinance OpenAPI sizing notes.
  */
-export function defaultRefinanceAmountString(
-  pos: UserPositionEntry,
-  decimals: number
-): string {
+export function defaultRefinanceAmountString(pos: UserPositionEntry, decimals: number): string {
   const close = closeNowAmountString(pos)
   try {
     const wei = parseUnits(close as `${number}`, decimals)
@@ -110,4 +105,33 @@ export function loanRatePct(pos: UserPositionEntry): number | null {
   const t = pos.term
   if (!t || t.isDynamic) return null
   return t.apr ?? null
+}
+
+const YEAR_SECONDS = 31_536_000
+
+/**
+ * Annualized cost of carrying a fixed loan from NOW to maturity:
+ * `(faceValue/debt - 1) × year / timeToMaturity`.
+ *
+ * This is NOT the rate the loan was opened at. Exactly stores a fixed position
+ * as `(principal, fee)` with no origination timestamp, so the locked APR is not
+ * recoverable on-chain — their own app reads it from an indexer, which is why
+ * their number differs from this one. What this DOES answer is the decision in
+ * front of the user: what holding this loan to maturity costs from here, which
+ * is the right comparison against a roll into another term.
+ *
+ * Null when the inputs are missing, the loan has matured, or it is already at
+ * face (nothing left to accrue).
+ */
+export function loanImpliedRateToMaturityPct(pos: UserPositionEntry): number | null {
+  const t = pos.term
+  if (!t || t.isDynamic || t.isMatured) return null
+  if (!t.faceValue || !t.maturity) return null
+  const face = Number(t.faceValue)
+  // repay-NOW value: the per-loan row carries it on `debtStable`
+  const now = Number(loanDebtString(pos))
+  if (!(face > 0) || !(now > 0) || face <= now) return null
+  const ttm = t.maturity - Math.floor(Date.now() / 1000)
+  if (ttm <= 0) return null
+  return (face / now - 1) * (YEAR_SECONDS / ttm) * 100
 }

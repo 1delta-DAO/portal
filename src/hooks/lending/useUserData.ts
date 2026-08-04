@@ -36,6 +36,19 @@ export interface LoanTerm {
   earlyRepayPenalty?: string
   /** True once `maturity` has passed — interest frozen; do NOT treat as closed. */
   isMatured?: boolean
+  // --- static-face-value fixed-term detail (Exactly) ---
+  /** Amount owed AT maturity (principal + fee). Static — no accrual index. */
+  faceValue?: string
+  /** Rebate for repaying BEFORE maturity (`faceValue - debt`); can be 0. */
+  earlyRepayDiscount?: string
+  /** Penalty accrued past maturity (`debt - faceValue`). */
+  latePenalty?: string
+  /** Further penalty per day overdue — LINEAR on face, not compounding. */
+  latePenaltyPerDay?: string
+  /** Annualized late-penalty rate, percent (~164%/yr on Exactly). */
+  latePenaltyApr?: number
+  /** Seconds past maturity; 0 until overdue. */
+  secondsLate?: number
 }
 
 export interface UserPositionEntry {
@@ -278,15 +291,12 @@ function transformUserDataEntry(raw: RawLenderUserDataEntry): LenderUserDataEntr
   const subs = raw.data ?? []
 
   // Use top-level if provided, otherwise derive from first sub-account
-  const balanceData =
-    raw.balanceData ?? (subs.length > 0 ? subs[0].balanceData : ZERO_BALANCE_DATA)
+  const balanceData = raw.balanceData ?? (subs.length > 0 ? subs[0].balanceData : ZERO_BALANCE_DATA)
   const aprData = raw.aprData ?? (subs.length > 0 ? subs[0].aprData : ZERO_APR_DATA)
   const healthFactor = raw.healthFactor !== undefined ? raw.healthFactor : (subs[0]?.health ?? null)
   const leverage =
     raw.leverage ??
-    (balanceData.deposits > 0 && balanceData.nav > 0
-      ? balanceData.deposits / balanceData.nav
-      : 0)
+    (balanceData.deposits > 0 && balanceData.nav > 0 ? balanceData.deposits / balanceData.nav : 0)
 
   return {
     account: raw.account,

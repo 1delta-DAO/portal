@@ -8,9 +8,15 @@ import { EModeBadge } from './EModeAnalysisModal'
 import { CollateralToggle } from '../tabs/earn/UserPositionsTable'
 import { HealthBadge } from '../../common/HealthBadge'
 import { EmptyState } from '../../common/EmptyState'
-import { loanDebtString, termLabel, maturityDisplay, loanRatePct } from './brokeredLoans'
+import {
+  loanDebtString,
+  termLabel,
+  maturityDisplay,
+  loanRatePct,
+  loanImpliedRateToMaturityPct,
+} from './brokeredLoans'
 import { listaEarlyRepay, earlyRepayLabel } from './fixedTerm'
-import { isMidnightMarket, fixedTermDetails } from '../actions/helpers'
+import { isMidnightMarket, isExactlyMarket, fixedTermDetails } from '../actions/helpers'
 import { RefinanceModal } from './RefinanceModal'
 import { MigrateModal, type MigrateSource } from './MigrateModal'
 
@@ -627,19 +633,20 @@ function LoanBreakdown({
   // card and a connected wallet. Hidden otherwise (e.g. spy mode without an
   // address, or a market that exposes no terms).
   //
-  // ALSO gated to BROKER-fronted markets: `/v1/actions/loop/refinance` is
-  // Lista-broker-only and hard-rejects anything else, so rendering it for other
-  // fixed-term lenders (Exactly exposes a `terms[]` menu too) produced a button
-  // that always errored. Exactly's own roll surface is the protocol's
-  // DebtManager/DebtRoller (`rollFixed`), which is not wired up yet.
-  const isBrokerFronted = fixedTermDetails(pool)?.provider?.kind === 'broker'
-  const canRefinance = !!account && isBrokerFronted && (pool.terms?.length ?? 0) > 0
+  // `/v1/actions/loop/refinance` serves TWO lenders and rejects the rest:
+  // Lista brokered markets (a flash-loan composer bundle) and Exactly (its own
+  // DebtManager/DebtRoller `roll*` — one direct tx). Gating on those two keeps
+  // the button off markets where it would always error.
+  const isRollable =
+    isExactlyMarket(pool.marketUid) || fixedTermDetails(pool)?.provider?.kind === 'broker'
+  const canRefinance = !!account && isRollable && (pool.terms?.length ?? 0) > 0
 
   return (
     <div className="bg-base-200/40 px-3 py-1.5 pl-6 space-y-1">
       {loans.map((loan) => {
         const mat = maturityDisplay(loan)
         const ratePct = loanRatePct(loan)
+        const impliedPct = loanImpliedRateToMaturityPct(loan)
         const earlyRepay = listaEarlyRepay(loan, symbol)
         return (
           <div
@@ -651,8 +658,8 @@ function LoanBreakdown({
               <span
                 className="font-mono tabular-nums text-warning"
                 title={
-                  ratePct == null && !loan.term?.isDynamic
-                    ? "This loan's rate was locked when it was opened. Exactly does not expose the locked APR on-chain (the position stores only principal + fee, with no origination timestamp), so it can't be shown here — the amount owed is what matters: see the repay panel."
+                  ratePct == null && !loan.term?.isDynamic && impliedPct != null
+                    ? 'Annualised cost of holding this loan to maturity from today — compare it against a roll into another term. It is NOT the rate you opened at: a fixed position stores only principal + fee with no origination timestamp, so the locked APR cannot be read on-chain (Exactly’s own app shows it from an indexer, so their number will differ).'
                     : undefined
                 }
               >
@@ -664,8 +671,13 @@ function LoanBreakdown({
                     // position is variable" and shows a rate it never had.
                     loan.term?.isDynamic
                     ? `${marketVariableRate.toFixed(2)}% var`
-                    : '—'}
+                    : impliedPct != null
+                      ? `${impliedPct.toFixed(2)}%`
+                      : '—'}
               </span>
+              {ratePct == null && !loan.term?.isDynamic && impliedPct != null && (
+                <span className="text-[9px] text-base-content/40 leading-none">to maturity</span>
+              )}
               {mat.isPast && (
                 <span className="badge badge-xs bg-warning/15 text-warning border-0">Matured</span>
               )}
