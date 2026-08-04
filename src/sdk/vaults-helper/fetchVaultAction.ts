@@ -3,6 +3,7 @@ import {
   resolveVaultRoute,
   vaultFamily,
   type VaultActionVerb,
+  type VaultFamily,
   type VaultProvider,
 } from './types'
 
@@ -21,6 +22,14 @@ export interface VaultActionParams {
    * this is *routing only*; the native-deposit opt-in is `nativeProvider`.
    */
   provider: VaultProvider
+  /**
+   * Route family override. Only needed where the provider alone doesn't
+   * determine the route: a `savings` vault withdraws through `/savings` when
+   * its exit is cooldown/request-based but through the generic `/withdraw`
+   * when it is instant. Use {@link withdrawFamily} to resolve it from a
+   * catalog entry; omit to derive it from `provider`.
+   */
+  family?: VaultFamily
   chainId: string
   /** Vault contract address (the share token). */
   vault: string
@@ -88,7 +97,7 @@ export async function fetchVaultAction(
   params: VaultActionParams
 ): Promise<VaultActionResult> {
   try {
-    const family = vaultFamily(params.provider)
+    const family = params.family ?? vaultFamily(params.provider)
     const route = resolveVaultRoute(family, params.verb)
 
     const qs = new URLSearchParams()

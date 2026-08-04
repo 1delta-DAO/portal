@@ -82,6 +82,11 @@ function refFromRequest(
     user: req.user,
     recipient: req.recipient,
     outputAsset: req.outputAsset,
+    // Escrow the request actually landed on — Strata markets run two
+    // cooldown contracts and `finalize` only settles the one it's called
+    // against, so this must round-trip or the claim is a silent no-op.
+    withdrawQueue: req.withdrawQueue,
+    claimToken: req.claimToken,
   }
 }
 
@@ -133,8 +138,17 @@ export function useVaultRequestAction(
         return false
       }
       // Async lifecycle only exists for these families; guard against misuse.
+      // `savings` is included for its cooldown/request-based vaults (sUSDe,
+      // sNUSD, sUSD3, the Strata tranches, apyUSD, …) — the /withdrawals
+      // endpoint only ever lists vaults with an actual open request, so an
+      // instant savings vault can't reach this path.
       const family = vaultFamily(provider)
-      if (family !== 'lst' && family !== 'gmx' && family !== 'lagoon') {
+      if (
+        family !== 'lst' &&
+        family !== 'gmx' &&
+        family !== 'lagoon' &&
+        family !== 'savings'
+      ) {
         setError(`${provider} has no claimable withdrawals`)
         return false
       }

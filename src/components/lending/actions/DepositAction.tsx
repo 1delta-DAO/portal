@@ -310,8 +310,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   const isLoanOrderBook =
     ftDetails?.provider?.kind === 'orderbook' && !(pool?.config as any)?.['0']?.debtDisabled
   const { offers: lendOffers } = useLendingOffers({
-    chainId: pool?.marketUid?.split(':')[1],
-    lender: pool?.marketUid?.split(':')[0],
+    marketUid: pool?.marketUid,
     side: 'lend',
     minAssetsUsd: 1,
   })

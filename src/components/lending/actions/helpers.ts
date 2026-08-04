@@ -26,7 +26,8 @@ export function isMidnightMarket(marketUidOrLender?: string | null): boolean {
   return marketUidOrLender.split(':')[0].startsWith('MORPHO_MIDNIGHT')
 }
 
-/** True for Exactly per-market keys / marketUids (`EXACTLY_<MARKET_ADDR>…`). */
+/** True for Exactly markets — the single cross-margin `EXACTLY` key, or any
+ *  marketUid built on it (`EXACTLY:<chainId>:<asset>`). */
 export function isExactlyMarket(marketUidOrLender?: string | null): boolean {
   if (!marketUidOrLender) return false
   return marketUidOrLender.split(':')[0].startsWith('EXACTLY')

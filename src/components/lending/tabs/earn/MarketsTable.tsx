@@ -288,7 +288,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                   </td>
                   <td className="text-right">
                     <div className="flex flex-col items-end gap-0.5 text-xs">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex flex-wrap items-center justify-end gap-1">
                         <span className="font-semibold text-success">
                           {(apr + intrinsicYield).toFixed(2)}%
                         </span>
@@ -478,7 +478,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                   </button>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="flex items-center justify-end gap-1">
+                  <div className="flex flex-wrap items-center justify-end gap-1">
                     <span className="font-bold text-sm text-success">{depTotal.toFixed(2)}%</span>
                     {intrinsicYield > 0 && (
                       <span

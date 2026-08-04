@@ -11,6 +11,7 @@ import {
 import { useBalanceQuery, type BalanceEntry } from '../../hooks/balances/useBalanceQuery'
 import { useXChainBalances, type XChainBalanceItem } from '../../hooks/balances/useXChainBalances'
 import { usePriceQuery } from '../../hooks/prices/usePriceQuery'
+import { useBridgeStatus } from '../../hooks/useBridgeStatus'
 import { TokenSelectorModal } from '../token-selection/TokenSelectorModal'
 import { SlippageInput } from '../lending/tabs/trading/SlippageInput'
 import { ErrorDisplay } from '../lending/tabs/trading/ErrorDisplay'
@@ -221,6 +222,17 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
     [permissionsForQuote, selectedQuote]
   )
 
+  // Live settlement tracking after a bridge submit (not for same-chain spot)
+  const { data: bridgeStatus } = useBridgeStatus({
+    bridge: selectedQuote?.label,
+    fromChainId,
+    toChainId,
+    txHash: txSuccess?.hash,
+    tokenIn: tokenIn?.address,
+    tokenOut: tokenOut?.address,
+    enabled: !!txSuccess?.hash && !isSpotFallback,
+  })
+
   // USD value impact of the selected route (bridge fees + dest swap included)
   const swapUsdImpact = useMemo(() => {
     if (!selectedQuote || tokenInPrice <= 0 || tokenOutPrice <= 0) return null
@@ -371,11 +383,29 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
                   {tokenIn?.symbol} ({chainName(fromChainId)}) → {tokenOut?.symbol} (
                   {chainName(toChainId)})
                 </p>
-                {!isSpotFallback && (
-                  <p className="text-[10px] text-base-content/50">
-                    Funds arrive on the destination chain after the bridge settles.
-                  </p>
-                )}
+                {!isSpotFallback &&
+                  (bridgeStatus?.status === 'DONE' ? (
+                    <p className="text-[10px] text-success flex items-center justify-center gap-1">
+                      Delivered on {chainName(toChainId)}
+                      {bridgeStatus.toHash && (
+                        <span className="font-mono text-base-content/40">
+                          {bridgeStatus.toHash.slice(0, 10)}…
+                        </span>
+                      )}
+                    </p>
+                  ) : bridgeStatus?.status === 'FAILED' ||
+                    bridgeStatus?.status === 'TRANSFER_REFUNDED' ? (
+                    <p className="text-[10px] text-error">
+                      Bridge reported {bridgeStatus.status.toLowerCase().replace('_', ' ')} — check
+                      the source transaction.
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-base-content/50 flex items-center justify-center gap-1.5">
+                      <span className="loading loading-spinner w-2.5 h-2.5" />
+                      Bridging via {selectedQuote?.label}… funds arrive on {chainName(toChainId)}{' '}
+                      once settled.
+                    </p>
+                  ))}
               </div>
               {txSuccess.hash && (
                 <p className="text-[10px] text-base-content/40 font-mono truncate max-w-full px-2">

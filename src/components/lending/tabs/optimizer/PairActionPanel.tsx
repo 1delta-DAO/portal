@@ -55,6 +55,70 @@ const fmtBal = (s?: string): string =>
 const pickToAmount = (size: number): string =>
   Number.isFinite(size) && size > 0 ? String(Number(size.toFixed(6))) : ''
 
+/**
+ * Inverse FiRM only: DBR runway readout on the one-shot forms. FiRM prepays
+ * interest in DBR (1 DBR = 1 DOLA-year; the yearly burn IS the debt), a
+ * zero-DBR borrow silently accrues a ~54.75% APR force-replenish penalty
+ * from the next block, and a deficit freezes withdrawals — so the runway is
+ * the single number a FiRM borrower has to watch.
+ */
+function DbrRunwayInfo({ dbr }: { dbr?: import('../../../../sdk/lending-helper/fetchCombinedAction').InverseDbrState }) {
+  if (!dbr) return null
+  const balance = Number(dbr.balance) / 1e18
+  const deficit = Number(dbr.deficit) / 1e18
+  const yearlyBurn = Number(dbr.yearlyBurn) / 1e18
+  const runwayDays = Number(dbr.runwaySeconds) / 86400
+  // Nothing to show on a full close (no residual debt burns no DBR).
+  if (yearlyBurn <= 0 && deficit <= 0) return null
+
+  const runwayLabel =
+    runwayDays >= 365 * 3
+      ? `${(runwayDays / 365).toFixed(1)}y`
+      : runwayDays >= 90
+        ? `${Math.floor(runwayDays / 30)}mo`
+        : `${Math.floor(runwayDays)}d`
+  const short = deficit > 0 || runwayDays < 30
+
+  return (
+    <div className={`rounded-lg border p-2 text-xs space-y-1 ${deficit > 0 ? 'border-error/50 bg-error/5' : short ? 'border-warning/50 bg-warning/5' : 'border-base-300'}`}>
+      <div className="flex items-center justify-between">
+        <span className="text-base-content/60">DBR (prepaid interest)</span>
+        <a
+          className="link link-primary"
+          href="https://www.inverse.finance/firm/dbr"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Get DBR
+        </a>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-base-content/60">Balance</span>
+        <span>{fmtBal(String(balance))} DBR</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-base-content/60">Burn at this debt</span>
+        <span>{fmtBal(String(yearlyBurn))} DBR / year</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-base-content/60">Runway</span>
+        <span className={short ? 'text-warning font-medium' : ''}>{runwayLabel}</span>
+      </div>
+      {deficit > 0 ? (
+        <div className="text-error">
+          DBR deficit of {fmtBal(String(deficit))} — the position accrues a
+          ~54.75% APR penalty and withdrawals are frozen until you top up DBR.
+        </div>
+      ) : short ? (
+        <div className="text-warning">
+          Runway under 30 days — top up DBR before it runs out or the debt
+          starts accruing a ~54.75% APR penalty.
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 const routeLabel: Record<string, string> = {
   native: 'Atomic (native)',
   composer: 'Atomic (composer)',
@@ -607,6 +671,7 @@ function CombinedForm({
           </span>
         </div>
       )}
+      <DbrRunwayInfo dbr={a.result?.dbr} />
       <HealthFactorProjection simulation={a.result?.simulation} />
 
       {a.building && (

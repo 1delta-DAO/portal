@@ -626,7 +626,14 @@ function LoanBreakdown({
   // Refinance moves debt into a *fixed* term, so it needs the market's rate
   // card and a connected wallet. Hidden otherwise (e.g. spy mode without an
   // address, or a market that exposes no terms).
-  const canRefinance = !!account && (pool.terms?.length ?? 0) > 0
+  //
+  // ALSO gated to BROKER-fronted markets: `/v1/actions/loop/refinance` is
+  // Lista-broker-only and hard-rejects anything else, so rendering it for other
+  // fixed-term lenders (Exactly exposes a `terms[]` menu too) produced a button
+  // that always errored. Exactly's own roll surface is the protocol's
+  // DebtManager/DebtRoller (`rollFixed`), which is not wired up yet.
+  const isBrokerFronted = fixedTermDetails(pool)?.provider?.kind === 'broker'
+  const canRefinance = !!account && isBrokerFronted && (pool.terms?.length ?? 0) > 0
 
   return (
     <div className="bg-base-200/40 px-3 py-1.5 pl-6 space-y-1">
@@ -641,10 +648,23 @@ function LoanBreakdown({
           >
             <span className="flex items-center gap-1.5 min-w-0">
               <span className="font-medium text-base-content/80">{termLabel(loan)}</span>
-              <span className="font-mono tabular-nums text-warning">
+              <span
+                className="font-mono tabular-nums text-warning"
+                title={
+                  ratePct == null && !loan.term?.isDynamic
+                    ? "This loan's rate was locked when it was opened. Exactly does not expose the locked APR on-chain (the position stores only principal + fee, with no origination timestamp), so it can't be shown here — the amount owed is what matters: see the repay panel."
+                    : undefined
+                }
+              >
                 {ratePct != null
                   ? `${ratePct.toFixed(2)}%`
-                  : `${marketVariableRate.toFixed(2)}% var`}
+                  : // The market's VARIABLE rate only describes the flexible
+                    // loan. A fixed loan whose locked rate we don't have must
+                    // NOT be labelled with it — that reads as "this fixed
+                    // position is variable" and shows a rate it never had.
+                    loan.term?.isDynamic
+                    ? `${marketVariableRate.toFixed(2)}% var`
+                    : '—'}
               </span>
               {mat.isPast && (
                 <span className="badge badge-xs bg-warning/15 text-warning border-0">Matured</span>

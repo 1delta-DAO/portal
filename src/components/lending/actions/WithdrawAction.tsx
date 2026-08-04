@@ -144,6 +144,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
         <SellEarlyPanel
           chainId={pool?.marketUid?.split(':')[1] ?? chainId}
           lender={pool!.marketUid.split(':')[0]}
+          marketUid={pool!.marketUid}
           symbol={pool?.asset?.symbol}
           decimals={pool?.asset?.decimals}
           account={account}

@@ -737,7 +737,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                           <td className="text-xs text-right">{abbreviateUsd(entry.balanceData.deposits)}</td>
                           <td className="text-xs text-right">{abbreviateUsd(entry.balanceData.debt)}</td>
                           <td>
-                            <div className="flex items-center justify-end gap-1">
+                            <div className="flex flex-wrap items-center justify-end gap-1">
                               <span className="text-xs font-semibold">
                                 {(entry.aprData.apr + entry.aprData.intrinsicApr).toFixed(2)}%
                               </span>
@@ -789,7 +789,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                             <td className="text-xs text-right">{abbreviateUsd(bal.deposits)}</td>
                             <td className="text-xs text-right">{abbreviateUsd(bal.debt)}</td>
                             <td>
-                              <div className="flex items-center justify-end gap-1">
+                              <div className="flex flex-wrap items-center justify-end gap-1">
                                 <span className="text-xs font-semibold">
                                   {(sub.aprData.apr + sub.aprData.intrinsicApr).toFixed(2)}%
                                 </span>

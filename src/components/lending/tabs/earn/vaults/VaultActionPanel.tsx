@@ -4,8 +4,10 @@ import { isWNative } from '../../../../../lib/lib-utils'
 import { isValidAddress } from '../../../../../utils/addressValidation'
 import type { RawCurrency } from '../../../../../types/currency'
 import {
+  isAsyncVaultWithdraw,
+  savingsWithdrawalCooldownSeconds,
   vaultFamily,
-  withdrawalStyle,
+  withdrawFamily,
   type UserVaultItem,
   type VaultActionVerb,
   type VaultEntry,
@@ -35,6 +37,18 @@ import {
 import { DelegationPicker } from './DelegationPicker'
 
 type VaultAction = 'Deposit' | 'Withdraw'
+
+/** Humanise a cooldown for the async-exit explainer ("7 days", "24 hours"). */
+function formatCooldown(seconds?: number): string | null {
+  if (!seconds || seconds <= 0) return null
+  const days = seconds / 86_400
+  if (days >= 1) {
+    const rounded = Math.round(days * 10) / 10
+    return `${rounded} ${rounded === 1 ? 'day' : 'days'}`
+  }
+  const hours = Math.max(1, Math.round(seconds / 3_600))
+  return `${hours} ${hours === 1 ? 'hour' : 'hours'}`
+}
 
 interface VaultActionPanelProps {
   selected: VaultEntry | null
@@ -111,16 +125,28 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
     ? selected?.provider
     : undefined
 
-  // Async families (lst / gmx / lagoon) don't exit instantly — the Withdraw tab
-  // builds a `request-withdraw` instead, and the matured request is claimed
-  // later from the Pending Withdrawals list.
-  const family = selected ? vaultFamily(selected.provider) : 'erc4626'
-  const isAsyncWithdraw = tab === 'Withdraw' && withdrawalStyle(family) === 'async'
+  // Async exits submit a request now and are claimed later from the Pending
+  // Withdrawals list. That's every lst/gmx/lagoon vault plus the savings
+  // vaults whose `withdrawalMode` is cooldown/request-based/queued (sUSDe,
+  // sNUSD, sUSD3, the Strata tranches, apyUSD, Native wNLP, …) — instant
+  // savings vaults (sUSDS, sDAI) settle in the same transaction.
+  const isAsyncWithdraw =
+    tab === 'Withdraw' && !!selected && isAsyncVaultWithdraw(selected)
+  // Withdrawals route per *vault*, not per provider: an instant savings vault
+  // (sUSDS, sDAI) exits through the generic `/withdraw`, while a
+  // cooldown/request-based one opens a request on `/savings`. Deposits always
+  // use the auto-resolving `/deposit`, so that tab keeps the provider family.
+  const family = selected
+    ? tab === 'Withdraw'
+      ? withdrawFamily(selected)
+      : vaultFamily(selected.provider)
+    : 'erc4626'
+  // `request-withdraw` takes SHARE units on every route that accepts it, so
+  // async exits max out on the share balance; instant ones stay in underlying
+  // units (and keep the withdraw-all path).
   const withdrawVerb: VaultActionVerb | undefined = isAsyncWithdraw
     ? 'request-withdraw'
     : undefined
-  // request-withdraw takes the amount in share/LST units, so for async exits the
-  // input maxes out on the share balance rather than the underlying-equivalent.
   const isAllDirect = tab === 'Withdraw' && !isAsyncWithdraw && isAll
 
   // LST delegation (validator / group / pool selection) — deposit-only. When a
@@ -143,6 +169,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
       actionType: tab,
       verb: withdrawVerb,
       provider: selected?.provider ?? 'morpho',
+      family,
       chainId,
       account,
       receiver: effectiveReceiver,
@@ -188,7 +215,8 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
   const activeBal = canUseNative && useNative && tab === 'Deposit' ? nativeBalance : walletBalance
 
   // For Withdraw, the "max" is the user's underlying-equivalent balance — except
-  // async exits redeem in share units, so they max out on the share balance.
+  // share-request exits redeem in share units, so they max out on the share
+  // balance.
   const maxAmountStr =
     tab === 'Deposit'
       ? activeBal?.balance ?? '0'
@@ -645,12 +673,21 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
           })()}
 
           {/* Async exit explainer — the request matures off-chain, then is
-              claimed from the Pending Withdrawals list below the table. */}
+              claimed from the Pending Withdrawals list below the table. For
+              savings vaults the wait is a known cooldown, so name it: "7 days"
+              is far more useful than "asynchronous". */}
           {isAsyncWithdraw && selected && (
             <div className="text-[11px] text-base-content/60 wrap-break-word px-1">
-              {PROVIDER_LABELS[selected.provider]} withdrawals are asynchronous:
-              this submits a redeem request. Once it matures, claim it from
-              “Pending withdrawals”.
+              {(() => {
+                const wait = formatCooldown(
+                  savingsWithdrawalCooldownSeconds(selected)
+                )
+                const label =
+                  selected.curator ?? PROVIDER_LABELS[selected.provider]
+                return wait
+                  ? `${label} withdrawals have a ${wait} cooldown: this submits a redeem request. Claim it from “Pending withdrawals” once it matures.`
+                  : `${label} withdrawals are asynchronous: this submits a redeem request. Once it matures, claim it from “Pending withdrawals”.`
+              })()}
             </div>
           )}
 

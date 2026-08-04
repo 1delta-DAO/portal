@@ -126,6 +126,38 @@ All primary features live under `src/components/lending/`:
 - `UserTable.tsx` - User's lending positions table with collateral toggles
 - `UserAssetsTable.tsx` - User's wallet assets
 
+### Vaults (`tabs/earn/vaults/`)
+- `VaultsTable.tsx` / `UserVaultsTable.tsx` / `VaultPopover.tsx` - catalog + positions
+- `VaultActionPanel.tsx` - Deposit / Withdraw form
+- `PendingWithdrawals.tsx` - open request → claim/cancel list
+- `DelegationPicker.tsx` - LST validator/group/pool selection (deposit only)
+
+**Withdrawals route per *vault*, not per provider.** Deposits all go through the
+auto-resolving `/vaults/deposit`, but exits split, and `savings` is the mixed
+case — sUSDS exits instantly while sUSDe needs a 7-day cooldown. The
+`sdk/vaults-helper` resolvers own this:
+
+- `isAsyncVaultWithdraw(entry)` - true for lst/gmx/lagoon plus any savings vault
+  whose `withdrawalMode` is `fixed-cooldown` / `request-based` / `queued` /
+  `fee-or-queued`. Drives "Request Withdrawal" + share-denominated input.
+- `withdrawFamily(entry)` - the route: async savings → `/vaults/savings`
+  (`?action=request-withdraw`, SHARE units); instant savings → the generic
+  `/vaults/withdraw` (UNDERLYING units, supports withdraw-all). Sending an
+  instant savings vault to `/savings` fails — that route only speaks
+  `request-withdraw|claim|deposit|cancel` and its registry only lists
+  non-instant vaults. Pass the result as `family` to `useVaultActionExecution`
+  / `fetchVaultAction`.
+- `savingsWithdrawalMode` / `savingsWithdrawalCooldownSeconds(entry)` - read
+  from the row's **`providerMeta`**, not its root.
+
+Matured requests for every async vault (LST queues *and* savings cooldowns)
+come from `/v1/data/vaults/withdrawals` and are claimed from
+`PendingWithdrawals`. Protocol-native reference fields on a request round-trip
+verbatim into the claim builder via `refFromRequest` — including
+`withdrawQueue` / `claimToken`, which are load-bearing for Strata (each market
+runs two cooldown escrows and `finalize` only settles the one it is called
+against, so dropping them makes the claim a silent no-op).
+
 ### Swap Tab (`swap/`)
 - `SpotSwapPanel.tsx` - Token swap interface with route selection
 

@@ -22,6 +22,7 @@ import { useMidnightSell } from '../../../hooks/lending/useMidnightMake'
 export function SellEarlyPanel({
   chainId,
   lender,
+  marketUid,
   symbol,
   decimals = 18,
   account,
@@ -32,6 +33,8 @@ export function SellEarlyPanel({
 }: {
   chainId: string
   lender: string
+  /** Full `lender:chainId:asset` uid (cross-margin market selection). */
+  marketUid?: string
   symbol?: string
   decimals?: number
   account?: string
@@ -47,6 +50,7 @@ export function SellEarlyPanel({
   const { offers: bids } = useLendingOffers({
     chainId,
     lender,
+    marketUid,
     minAssetsUsd: 1,
   })
   const amountNum = parseAmount(amount)
@@ -123,6 +127,7 @@ export function SellEarlyPanel({
             <OfferLadder
               chainId={chainId}
               lender={lender}
+              marketUid={marketUid}
               symbol={symbol}
               side="borrow"
               amountTokens={amountNum}

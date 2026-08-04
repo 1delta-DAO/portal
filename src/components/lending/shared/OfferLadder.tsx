@@ -19,6 +19,7 @@ import { formatUsd, formatTokenAmount } from '../../../utils/format'
 export function OfferLadder({
   chainId,
   lender,
+  marketUid,
   symbol,
   side = 'borrow',
   fallbackAmount,
@@ -29,6 +30,9 @@ export function OfferLadder({
 }: {
   chainId?: string
   lender?: string
+  /** Full `lender:chainId:asset` uid — required for cross-margin lenders
+   *  (Exactly) where the lender key alone cannot select the market. */
+  marketUid?: string
   symbol?: string
   /** Which side of the book: `borrow` (bids, what you pay) or `lend` (asks,
    *  what you earn). Only the copy differs — the fill math is symmetric. */
@@ -45,6 +49,7 @@ export function OfferLadder({
   const { offers, pricing, hasMore, isLoading } = useLendingOffers({
     chainId,
     lender,
+    marketUid,
     side,
     termId,
     // Drop sub-$1 dust so a tiny offer at a great tick can't head the list.

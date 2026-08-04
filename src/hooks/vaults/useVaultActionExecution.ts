@@ -6,6 +6,7 @@ import {
   type VaultActionResponse,
   type VaultActionType,
   type VaultActionVerb,
+  type VaultFamily,
   type VaultProvider,
 } from '../../sdk/vaults-helper'
 import { useSendLendingTransaction } from '../useSendLendingTransaction'
@@ -20,6 +21,13 @@ export interface UseVaultActionExecutionParams {
   verb?: VaultActionVerb
   /** The vault's provider — selects the calldata-builder family/route. */
   provider: VaultProvider
+  /**
+   * Route family override, for vaults whose provider alone doesn't determine
+   * the route (savings withdrawals: `/savings` when the exit is
+   * cooldown/request-based, the generic `/withdraw` when it is instant).
+   * Resolve it with `withdrawFamily`.
+   */
+  family?: VaultFamily
   chainId: string
   account?: string
   /**
@@ -98,6 +106,7 @@ export function useVaultActionExecution(
     actionType,
     verb: verbOverride,
     provider,
+    family,
     chainId,
     account,
     receiver,
@@ -177,6 +186,7 @@ export function useVaultActionExecution(
       const response = await fetchVaultAction({
         verb,
         provider,
+        family,
         chainId,
         vault,
         underlying,
@@ -216,6 +226,7 @@ export function useVaultActionExecution(
     receiveAsset,
     nativeProvider,
     provider,
+    family,
     verb,
     mode,
     extraParamsKey,

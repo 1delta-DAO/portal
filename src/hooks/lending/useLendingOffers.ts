@@ -110,6 +110,13 @@ export function useLendingOffers(params: {
   /** Market/lender key (e.g. `MORPHO_MIDNIGHT_<id>`, or a marketUid's first segment). */
   lender?: string
   /**
+   * Full `lender:chainId:asset` marketUid. REQUIRED for cross-margin lenders
+   * whose single key spans many assets (Exactly): the key alone cannot say
+   * which asset's fixed pool to ladder. When given it also supplies
+   * lender/chainId, so callers need not split it themselves.
+   */
+  marketUid?: string
+  /**
    * Which ladder to read from the SAME order book:
    *  - `borrow` (default) → `offers` (bids): what a borrower takes / pays.
    *  - `lend`             → `lendOffers` (asks): what a lender takes / earns.
@@ -122,23 +129,27 @@ export function useLendingOffers(params: {
   /** Exactly: fixed-pool maturity to ladder (defaults to the nearest live). */
   termId?: number
 }) {
-  const { chainId, lender, side = 'borrow', minAssetsUsd, count = 25, enabled = true, termId } = params
+  const { marketUid, side = 'borrow', minAssetsUsd, count = 25, enabled = true, termId } = params
+  const [uidLender, uidChain] = (marketUid ?? '').split(':')
+  const lender = params.lender || uidLender || ''
+  const chainId = params.chainId || uidChain || ''
 
   // Every lender the unified /book endpoint serves — Midnight (offer book),
   // Term (secondary listings), Exactly (synthetic utilization-curve levels).
   const key = (lender ?? '').toUpperCase()
   const isOrderBook =
-    key.startsWith('MORPHO_MIDNIGHT') ||
-    key.startsWith('TERM_FINANCE') ||
-    key.startsWith('EXACTLY')
+    key.startsWith('MORPHO_MIDNIGHT') || key.startsWith('TERM_FINANCE') || key.startsWith('EXACTLY')
 
   const query = useQuery<{ offers: LendingOffer[]; pricing: BookPricing }>({
-    queryKey: ['lendingOffers', chainId, lender, side, count, minAssetsUsd, termId],
+    queryKey: ['lendingOffers', chainId, lender, marketUid, side, count, minAssetsUsd, termId],
     enabled: enabled && isOrderBook && !!chainId && !!lender,
     queryFn: async () => {
       const sp = new URLSearchParams()
       sp.set('lender', lender!)
       sp.set('chainId', chainId!)
+      // Carries the asset segment — the only way to pick a market on a
+      // cross-margin lender (Exactly).
+      if (marketUid) sp.set('marketUid', marketUid)
       sp.set('side', side)
       sp.set('count', String(count))
       if (minAssetsUsd != null) sp.set('minAssetsUsd', String(minAssetsUsd))

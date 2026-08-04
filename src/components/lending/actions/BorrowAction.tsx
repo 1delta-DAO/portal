@@ -128,8 +128,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   // ladder (react-query dedupes this fetch with the OfferLadder below). Falls
   // back to the top-of-book rate when there's no amount / not an order book.
   const { offers: orderBookOffers } = useLendingOffers({
-    chainId: pool?.marketUid?.split(':')[1],
-    lender: pool?.marketUid?.split(':')[0],
+    marketUid: pool?.marketUid,
     minAssetsUsd: 1,
   })
   const effectiveBorrow = computeEffectiveBorrow(orderBookOffers, amountNum)

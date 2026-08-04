@@ -27,6 +27,25 @@ export interface TermBidReveal {
   nonce: string
 }
 
+/**
+ * Inverse FiRM only: the account's DBR state after the built action.
+ * Interest on FiRM is PREPAID in DBR (1 DBR = 1 DOLA-year, so the yearly
+ * burn equals the post-action debt). A `deficit > 0` account is
+ * force-replenishable at ~54.75% APR onto principal AND has its
+ * withdrawals frozen — the UI must prompt a DBR purchase before the
+ * runway ends, not after.
+ */
+export interface InverseDbrState {
+  /** DBR wallet balance (raw 1e18). */
+  balance: string
+  /** DBR deficit (raw 1e18) — > 0 is the distressed state. */
+  deficit: string
+  /** DBR burned per year at the post-action debt (raw 1e18 = DOLA debt). */
+  yearlyBurn: string
+  /** Seconds the current balance lasts at the post-action debt. */
+  runwaySeconds: string
+}
+
 export interface CombinedActionResponse {
   transactions: CombinedTransaction[]
   permissions: CombinedTransaction[]
@@ -36,6 +55,8 @@ export interface CombinedActionResponse {
   rateImpact?: RateImpactEntry[]
   /** Term auction only — sealed-bid reveal tickets the caller must persist. */
   reveals?: TermBidReveal[]
+  /** Inverse FiRM only — the account's DBR runway after this action. */
+  dbr?: InverseDbrState
 }
 
 export interface CombinedActionResult {
@@ -70,6 +91,7 @@ async function callCombined(
         simulation: json.data?.simulation,
         rateImpact: json.data?.rateImpact,
         reveals: json.data?.reveals,
+        dbr: json.data?.dbr,
       },
     }
   } catch (err: any) {

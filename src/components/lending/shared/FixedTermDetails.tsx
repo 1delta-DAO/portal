@@ -72,6 +72,7 @@ export function FixedTermDetailsRows({
         <OfferLadder
           chainId={chainId}
           lender={lender.split(':')[0]}
+          marketUid={lender}
           symbol={symbol}
           side={side}
           fallbackAmount={details.availableAmount}

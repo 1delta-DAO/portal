@@ -94,6 +94,92 @@ export function withdrawalStyle(family: VaultFamily): 'direct' | 'async' {
     : 'direct'
 }
 
+/**
+ * Savings withdrawal modes that are two-step request → claim rather than an
+ * instant redeem. The backend savings row carries its `withdrawalMode`
+ * (passed through in `extras`):
+ *
+ * - `fixed-cooldown`  — StakedUSDeV2-style escrow + `unstake` (sUSDe, savUSD,
+ *   savETH, strUSD, sNUSD).
+ * - `request-based`   — bespoke request/claim (3Jane sUSD3 cooldown, the
+ *   Strata tranches' cooldown escrows, Apyx's UnlockToken, Maple cycles).
+ * - `queued` / `fee-or-queued` — withdrawal queues (Native wNLP; the free
+ *   queued leg is what `request-withdraw` builds).
+ *
+ * `instant` and `instant-capped` (Spark, 3Jane USD3) stay direct.
+ */
+const ASYNC_SAVINGS_MODES = new Set([
+  'fixed-cooldown',
+  'request-based',
+  'queued',
+  'fee-or-queued',
+])
+
+/**
+ * Per-vault withdrawal asyncness. The family-level `withdrawalStyle` is right
+ * for every family except `savings`, which is a mixed bag: sUSDS exits
+ * instantly while sUSDe needs a 7-day cooldown + claim. The matured requests
+ * of async savings vaults surface in `/v1/data/vaults/withdrawals` next to
+ * the lst/gmx/lagoon ones and are claimed through `/savings?action=claim`.
+ *
+ * The mode lives in the row's `providerMeta`, NOT at its root — verified
+ * against the live catalog, where every savings row carries it.
+ */
+export function isAsyncVaultWithdraw(
+  entry: Pick<VaultEntry, 'provider' | 'extras'>
+): boolean {
+  const family = vaultFamily(entry.provider)
+  if (withdrawalStyle(family) === 'async') return true
+  if (family !== 'savings') return false
+  return ASYNC_SAVINGS_MODES.has(savingsWithdrawalMode(entry) ?? '')
+}
+
+/** The savings row's `withdrawalMode`, or undefined for other providers. */
+export function savingsWithdrawalMode(
+  entry: Pick<VaultEntry, 'extras'>
+): string | undefined {
+  const meta = entry.extras?.providerMeta as
+    | { withdrawalMode?: unknown }
+    | undefined
+  const mode = meta?.withdrawalMode ?? entry.extras?.withdrawalMode
+  return typeof mode === 'string' ? mode : undefined
+}
+
+/**
+ * The route family to use for a vault's **withdrawal**.
+ *
+ * Everything but `savings` is fixed by its provider. Savings is split, because
+ * the `/savings` route only speaks `request-withdraw|claim|deposit|cancel`:
+ *
+ * - cooldown / request-based / queued vaults → `savings`, whose
+ *   `request-withdraw` opens the request in SHARE units.
+ * - instant (and instant-capped) vaults → `erc4626`, i.e. the generic
+ *   `/withdraw` endpoint, which auto-resolves the 4626 surface, takes
+ *   UNDERLYING units and supports withdraw-all. Sending these to `/savings`
+ *   would fail for every vault the calldata registry doesn't carry (sUSDS,
+ *   sDAI, stUSD, …) — it only lists the non-instant ones plus a few pinned
+ *   for address resolution.
+ */
+export function withdrawFamily(
+  entry: Pick<VaultEntry, 'provider' | 'extras'>
+): VaultFamily {
+  const family = vaultFamily(entry.provider)
+  if (family !== 'savings') return family
+  return isAsyncVaultWithdraw(entry) ? 'savings' : 'erc4626'
+}
+
+/** The savings row's cooldown in seconds, when it publishes one. */
+export function savingsWithdrawalCooldownSeconds(
+  entry: Pick<VaultEntry, 'extras'>
+): number | undefined {
+  const meta = entry.extras?.providerMeta as
+    | { withdrawalCooldownSeconds?: unknown }
+    | undefined
+  const raw = meta?.withdrawalCooldownSeconds
+  const n = typeof raw === 'string' ? Number(raw) : raw
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined
+}
+
 /** The verbs the action endpoints accept. */
 export type VaultActionVerb =
   | 'deposit'
@@ -443,6 +529,17 @@ export interface VaultWithdrawalRequest {
   user?: string
   recipient?: string
   outputAsset?: string
+  /**
+   * The escrow contract this request actually sits on, when the protocol runs
+   * more than one. Strata gives each market both an `UnstakeCooldown` and an
+   * `ERC20Cooldown`, and `finalize` only settles requests on the contract it
+   * is called against — so this must be passed back with the claim or it
+   * silently does nothing.
+   */
+  withdrawQueue?: string
+  /** The token the escrow books this request under, when the claim call takes
+   *  it as an argument (Strata's `finalize(claimToken, user)`). */
+  claimToken?: string
   [key: string]: unknown
 }
 

@@ -168,7 +168,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                   </td>
                   <td className="text-right">
                     <div className="flex flex-col items-end gap-0.5">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex flex-wrap items-center justify-end gap-1">
                         <span className="text-sm font-medium text-success">
                           {depositTotal.toFixed(2)}%
                         </span>
@@ -198,7 +198,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                       <BrokeredAprCell terms={pool.terms} />
                     ) : (
                       <div className="flex flex-col items-end gap-0.5">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex flex-wrap items-center justify-end gap-1">
                           <span className="text-sm font-medium text-warning">
                             {borrowTotal.toFixed(2)}%
                           </span>
@@ -349,7 +349,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                   </AssetPopover>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="flex items-center justify-end gap-1">
+                  <div className="flex flex-wrap items-center justify-end gap-1">
                     <span className="font-bold text-sm text-success">{mDepTotal.toFixed(2)}%</span>
                     {mIy > 0 && (
                       <span
