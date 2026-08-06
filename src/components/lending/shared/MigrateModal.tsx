@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react'
 import { parseUnits } from 'viem'
 import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
+import { useAtomicBatch } from '../../../hooks/useAtomicBatch'
+import { BatchExecuteButton } from '../../common/BatchExecuteButton'
 import {
   useOptimizerPairs,
   type OptimizerPairRow,
@@ -496,6 +498,11 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
   const [done, setDone] = useState<{ hash?: string } | null>(null)
 
   const { send } = useSendLendingTransaction({ chainId, account })
+  const {
+    supported: batchSupported,
+    needsUpgrade: batchNeedsUpgrade,
+    sendBatch,
+  } = useAtomicBatch({ chainId, account })
 
   const permissions = result?.permissions ?? []
   const hasPermissions = permissions.length > 0
@@ -616,6 +623,27 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
     setExecutingMain(false)
     setDone({ hash: lastHash })
   }
+
+  // Only offer the bundle while nothing has been confirmed on its own —
+  // re-bundling would ask the wallet to repeat a grant that already landed.
+  const useAtomicPath = batchSupported && permissionsCompleted === 0
+
+  /** Atomic path: approvals + the migration itself in one confirmation. */
+  const executeAll = async () => {
+    if (!result) return
+    setExecutingMain(true)
+    setBuildError(null)
+    const { ok, error: txError, hash } = await sendBatch([...permissions, ...result.transactions])
+    setExecutingMain(false)
+    if (!ok) {
+      setBuildError(txError ?? 'Transaction failed')
+      return
+    }
+    setPermissionsCompleted(permissions.length)
+    setDone({ hash })
+  }
+
+  const executeLabel = `Migrate to ${lenderName(selected?.lenderKey) || 'target'}`
 
   return (
     <div className="modal modal-open" onClick={onClose}>
@@ -1100,8 +1128,22 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
               </div>
             )}
 
+            {/* Atomic path — approvals + migration in one confirmation. */}
+            {result && useAtomicPath && (
+              <BatchExecuteButton
+                steps={[
+                  ...permissions.map((p, i) => p.description || `Approval ${i + 1}`),
+                  executeLabel,
+                ]}
+                label={executeLabel}
+                executing={executingMain}
+                needsUpgrade={batchNeedsUpgrade}
+                onExecute={executeAll}
+              />
+            )}
+
             {/* Permissions */}
-            {result && hasPermissions && !allPermissionsDone && (
+            {result && !useAtomicPath && hasPermissions && !allPermissionsDone && (
               <div className="space-y-1">
                 <span className="text-xs text-base-content/60">
                   Approvals ({permissionsCompleted}/{permissions.length})
@@ -1139,7 +1181,7 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
               </div>
             )}
 
-            {result && allPermissionsDone && (
+            {result && !useAtomicPath && allPermissionsDone && (
               <button
                 type="button"
                 className="btn btn-success btn-sm w-full"
@@ -1149,7 +1191,7 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                 {executingMain ? (
                   <span className="loading loading-spinner loading-xs" />
                 ) : (
-                  `Migrate to ${lenderName(selected?.lenderKey) || 'target'}`
+                  executeLabel
                 )}
               </button>
             )}

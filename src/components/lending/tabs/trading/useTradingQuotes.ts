@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useSendLendingTransaction } from '../../../../hooks/useSendLendingTransaction'
+import { useAtomicBatch } from '../../../../hooks/useAtomicBatch'
 import type { TradingOperation, TradingQuote, QuotePositionDelta, Tx } from './types'
 import type { RateImpactEntry } from '../../../../sdk/lending-helper/fetchLendingAction'
 import { BACKEND_BASE_URL } from '../../../../config/backend'
@@ -227,6 +228,11 @@ interface QuoteState {
 
 export function useTradingQuotes(params: { chainId: string; account?: string }) {
   const { send } = useSendLendingTransaction({ chainId: params.chainId, account: params.account })
+  const {
+    supported: batchSupported,
+    needsUpgrade: batchNeedsUpgrade,
+    sendBatch,
+  } = useAtomicBatch({ chainId: params.chainId, account: params.account })
 
   const initialState: QuoteState = {
     quotes: [],
@@ -393,6 +399,40 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
     [state.selectedIndex, state.quotes, send]
   )
 
+  /**
+   * Atomic path: permissions → setup transactions → the selected quote, all in
+   * ONE wallet confirmation. Order matters and is preserved inside the bundle,
+   * so each grant lands before the composer call that consumes it; an atomic
+   * revert leaves no dangling approvals.
+   *
+   * Never falls back mid-flow — a rejected or failed bundle executed nothing,
+   * so the sequential buttons remain valid with 0 steps completed.
+   */
+  const executeAll = useCallback(
+    async (operation: TradingOperation) => {
+      if (state.selectedIndex === null) return
+      const quote = state.quotes[state.selectedIndex]
+      if (!quote) return
+
+      setState((s) => ({ ...s, executingQuote: true, error: null }))
+      const calls = [...state.permissions, ...state.transactions, quote.tx]
+      const { ok, error: txError, hash } = await sendBatch(calls)
+
+      if (ok) {
+        setState((s) => ({
+          ...s,
+          executingQuote: false,
+          completedPermissions: s.permissions.map((_p, i) => i),
+          completedTransactions: s.transactions.map((_t, i) => i),
+          txSuccess: { operation, hash },
+        }))
+      } else {
+        setState((s) => ({ ...s, executingQuote: false, error: txError ?? 'Execution failed' }))
+      }
+    },
+    [state.selectedIndex, state.quotes, state.permissions, state.transactions, sendBatch]
+  )
+
   const dismissSuccess = useCallback(() => {
     setState((s) => ({
       ...s,
@@ -417,12 +457,17 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
     ...state,
     allPermissionsDone,
     allTransactionsDone,
+    batchSupported,
+    batchNeedsUpgrade,
     fetchQuotes,
     selectQuote,
     executeNextPermission,
     executeNextTransaction,
     executeQuote,
+    executeAll,
     dismissSuccess,
     reset,
   }
 }
+
+export type TradingQuotes = ReturnType<typeof useTradingQuotes>

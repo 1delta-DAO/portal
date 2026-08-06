@@ -11,6 +11,7 @@ import {
   useSendLendingTransaction,
   type LendingTx,
 } from '../../../../hooks/useSendLendingTransaction'
+import { useAtomicBatch } from '../../../../hooks/useAtomicBatch'
 import { isWNative } from '../../../../lib/lib-utils'
 import {
   fetchDepositAndBorrow,
@@ -149,6 +150,11 @@ export function useCombinedAction({
   const dSecondary = useDebounce(secondary, 400)
 
   const { send, sending } = useSendLendingTransaction({ chainId, account })
+  const {
+    supported: batchSupported,
+    needsUpgrade: batchNeedsUpgrade,
+    sendBatch,
+  } = useAtomicBatch({ chainId, account })
   const [step, setStep] = useState(0)
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState(false)
@@ -353,6 +359,26 @@ export function useCombinedAction({
     setRunning(false)
   }
 
+  /**
+   * Atomic path: the same ordered `steps` in ONE wallet confirmation. Nothing
+   * partial can land — either every grant plus the open/close applies, or none
+   * of it does — so `step` jumps straight to the end on success.
+   */
+  const executeBatch = async () => {
+    if (!steps.length) return
+    setRunning(true)
+    setRunError(null)
+    const { ok, error } = await sendBatch(steps)
+    if (!ok) {
+      setRunError(error ?? 'Transaction failed')
+      setRunning(false)
+      return
+    }
+    setStep(steps.length)
+    setDone(true)
+    setRunning(false)
+  }
+
   // Clear the "done" screen and the amounts to start a fresh action.
   const startAnother = () => {
     setDone(false)
@@ -408,6 +434,9 @@ export function useCombinedAction({
     done,
     runError,
     execute,
+    executeBatch,
+    batchSupported,
+    batchNeedsUpgrade,
     startAnother,
   }
 }

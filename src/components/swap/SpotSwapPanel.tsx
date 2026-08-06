@@ -16,6 +16,7 @@ import { WalletConnect } from '../connect'
 import { getCurrency } from '../../lib/trade-helpers/utils'
 import { useDebounce } from '../../hooks/useDebounce'
 import { Logo } from '../common/Logo'
+import { BatchExecuteButton } from '../common/BatchExecuteButton'
 
 interface SpotSwapPanelProps {
   chainId: string
@@ -183,6 +184,9 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
     selectQuote,
     executePermission,
     executeSwap,
+    executeAll,
+    batchSupported,
+    batchNeedsUpgrade,
     dismissSuccess,
     reset,
   } = useSpotSwapQuote({ chainId, account })
@@ -694,31 +698,46 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
               </button>
             ) : (
               <>
-                {permissions.map((tx, i) => (
-                  <button
-                    key={`perm-${i}`}
-                    type="button"
-                    className="btn btn-outline btn-sm w-full"
-                    onClick={() => executePermission(tx)}
-                  >
-                    {tx.description || 'Approve'}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="btn btn-success btn-sm w-full"
-                  disabled={executing}
-                  onClick={executeSwap}
-                >
-                  {executing ? (
-                    <>
-                      <span className="loading loading-spinner loading-xs" />
-                      Executing swap...
-                    </>
-                  ) : (
-                    'Execute Swap'
-                  )}
-                </button>
+                {batchSupported ? (
+                  <BatchExecuteButton
+                    steps={[
+                      ...permissions.map((tx, i) => tx.description || `Approve ${i + 1}`),
+                      'Execute Swap',
+                    ]}
+                    label="Execute Swap"
+                    executing={executing}
+                    needsUpgrade={batchNeedsUpgrade}
+                    onExecute={executeAll}
+                  />
+                ) : (
+                  <>
+                    {permissions.map((tx, i) => (
+                      <button
+                        key={`perm-${i}`}
+                        type="button"
+                        className="btn btn-outline btn-sm w-full"
+                        onClick={() => executePermission(tx)}
+                      >
+                        {tx.description || 'Approve'}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className="btn btn-success btn-sm w-full"
+                      disabled={executing}
+                      onClick={executeSwap}
+                    >
+                      {executing ? (
+                        <>
+                          <span className="loading loading-spinner loading-xs" />
+                          Executing swap...
+                        </>
+                      ) : (
+                        'Execute Swap'
+                      )}
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   className="btn btn-ghost btn-xs w-full"

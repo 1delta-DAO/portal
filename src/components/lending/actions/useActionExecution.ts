@@ -10,6 +10,7 @@ import {
 } from '../../../sdk/lending-helper/fetchLendingAction'
 import type { LoopRangeSimulationBody } from '../../../sdk/lending-helper/fetchLoopRange'
 import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
+import { useAtomicBatch } from '../../../hooks/useAtomicBatch'
 import { useDebounce } from '../../../hooks/useDebounce'
 import type { ActionType } from './types'
 
@@ -58,6 +59,11 @@ export function useActionExecution(params: {
   } = params
   const effectiveReceiver = receiver && receiver.length > 0 ? receiver : account
   const { send } = useSendLendingTransaction({ chainId: chainId ?? '', account })
+  const {
+    supported: batchSupported,
+    needsUpgrade: batchNeedsUpgrade,
+    sendBatch,
+  } = useAtomicBatch({ chainId: chainId ?? '', account })
 
   const [result, setResult] = useState<LendingActionResponseWithSimulation | null>(null)
   const [loading, setLoading] = useState(false)
@@ -221,6 +227,32 @@ export function useActionExecution(params: {
     })
   }
 
+  /**
+   * Atomic path: permissions + the action's transactions in ONE confirmation.
+   * Ordering is preserved inside the bundle, so approvals land before the call
+   * that spends them, and an atomic revert leaves no dangling allowance.
+   */
+  const executeAll = async () => {
+    if (!result || !pool) return
+    setExecutingMain(true)
+    setError(null)
+
+    const { ok, error: txError, hash } = await sendBatch([...permissions, ...result.transactions])
+    setExecutingMain(false)
+    if (!ok) {
+      setError(txError ?? 'Transaction failed')
+      return
+    }
+
+    setPermissionsCompleted(permissions.length)
+    setTxSuccess({
+      actionType,
+      amount,
+      symbol: pool.asset.symbol ?? '',
+      hash,
+    })
+  }
+
   return {
     result,
     simulation,
@@ -233,11 +265,16 @@ export function useActionExecution(params: {
     hasPermissions,
     permissionsCompleted,
     allPermissionsDone,
+    batchSupported,
+    batchNeedsUpgrade,
     error,
     txSuccess,
     executeNextPermission,
     executeMain,
+    executeAll,
     resetState,
     dismissSuccess,
   }
 }
+
+export type ActionExecution = ReturnType<typeof useActionExecution>

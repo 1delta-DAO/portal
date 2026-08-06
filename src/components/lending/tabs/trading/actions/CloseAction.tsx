@@ -15,6 +15,7 @@ import {
 } from '../../../actions/format'
 import { ErrorDisplay } from '../ErrorDisplay'
 import { useTradingQuotes, buildSimulationBody } from '../useTradingQuotes'
+import { TradingExecuteBlock } from '../TradingExecuteBlock'
 import { TradingTransactionSuccess } from '../TradingTransactionSuccess'
 import { RateImpactIndicator } from '../../../actions/RateImpactIndicator'
 import { SimulationIndicator } from '../../../actions/SimulationIndicator'
@@ -58,31 +59,20 @@ export const CloseAction: React.FC<TradingActionProps> = ({
   const [isAll, setIsAll] = useState(false)
   const [slippage, setSlippage] = useState('0.3')
 
+  const tradingQuotes = useTradingQuotes({ chainId, account })
   const {
     quotes,
-    permissions,
-    transactions,
-    completedPermissions,
-    completedTransactions,
-    executingPermissionIdx,
-    executingTransactionIdx,
-    allPermissionsDone,
-    allTransactionsDone,
     rateImpact,
     simulation,
     selectedIndex,
     loading,
-    executingQuote,
     txSuccess,
     error,
     fetchQuotes,
     selectQuote,
-    executeNextPermission,
-    executeNextTransaction,
-    executeQuote,
     dismissSuccess,
     reset,
-  } = useTradingQuotes({ chainId, account })
+  } = tradingQuotes
 
   // Notify parent
   useEffect(() => {
@@ -597,73 +587,11 @@ export const CloseAction: React.FC<TradingActionProps> = ({
       <SimulationIndicator simulation={simulation} />
 
       {selectedIndex !== null && (
-        <div className="space-y-1.5">
-          {permissions.map((tx, i) => {
-            const done = completedPermissions.includes(i)
-            const executing = executingPermissionIdx === i
-            const label = tx.description || 'Approve'
-            return (
-              <button
-                key={`perm-${i}`}
-                type="button"
-                className={`btn btn-sm w-full h-auto min-h-8 py-1 text-xs ${done ? 'btn-outline btn-success' : 'btn-outline'}`}
-                disabled={executing || executingPermissionIdx !== null}
-                title={label}
-                onClick={() => executeNextPermission(i)}
-              >
-                {executing ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  <span className="block truncate max-w-full">{done ? `✓ ${label}` : label}</span>
-                )}
-              </button>
-            )
-          })}
-          {transactions.map((tx, i) => {
-            const done = completedTransactions.includes(i)
-            const executing = executingTransactionIdx === i
-            const label = tx.description || 'Execute Setup Transaction'
-            return (
-              <button
-                key={`tx-${i}`}
-                type="button"
-                className={`btn btn-sm w-full h-auto min-h-8 py-1 text-xs ${done ? 'btn-outline btn-success' : 'btn-outline'}`}
-                disabled={executing || executingTransactionIdx !== null}
-                title={label}
-                onClick={() => executeNextTransaction(i)}
-              >
-                {executing ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  <span className="block truncate max-w-full">{done ? `✓ ${label}` : label}</span>
-                )}
-              </button>
-            )
-          })}
-          <button
-            type="button"
-            className="btn btn-success btn-sm w-full"
-            disabled={executingQuote || !allPermissionsDone || !allTransactionsDone}
-            title={
-              !allPermissionsDone
-                ? 'Complete the approval(s) above first'
-                : !allTransactionsDone
-                  ? 'Complete the setup transaction(s) above first'
-                  : undefined
-            }
-            onClick={() => executeQuote('Close')}
-          >
-            {executingQuote ? (
-              <span className="loading loading-spinner loading-xs" />
-            ) : !allPermissionsDone ? (
-              'Approve first'
-            ) : !allTransactionsDone ? (
-              'Complete setup first'
-            ) : (
-              'Execute Close'
-            )}
-          </button>
-        </div>
+        <TradingExecuteBlock
+          quotes={tradingQuotes}
+          operation="Close"
+          executeLabel="Execute Close"
+        />
       )}
     </div>
   )

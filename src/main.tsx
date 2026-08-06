@@ -11,6 +11,7 @@ import App from './App'
 import { ToastProvider } from './components/common/ToastHost'
 import { SpyModeProvider } from './contexts/SpyMode'
 import { RiskModeProvider } from './contexts/RiskMode'
+import { BatchModeProvider } from './contexts/BatchMode'
 import { rainbowDaisyTheme } from './rainbowkitTheme'
 
 const client = new QueryClient()
@@ -23,9 +24,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <BrowserRouter>
             <SpyModeProvider>
               <RiskModeProvider>
-                <ToastProvider>
-                  <App />
-                </ToastProvider>
+                <BatchModeProvider>
+                  <ToastProvider>
+                    <App />
+                  </ToastProvider>
+                </BatchModeProvider>
               </RiskModeProvider>
             </SpyModeProvider>
           </BrowserRouter>

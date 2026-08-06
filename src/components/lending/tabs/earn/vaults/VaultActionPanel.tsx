@@ -16,6 +16,7 @@ import { useSyncChain } from '../../../../../hooks/useSyncChain'
 import { useSpyMode } from '../../../../../contexts/SpyMode'
 import { useUserVaults, useVaultActionExecution } from '../../../../../hooks/vaults'
 import { AmountInput } from '../../../../common/AmountInput'
+import { BatchExecuteButton } from '../../../../common/BatchExecuteButton'
 import { Logo } from '../../../../common/Logo'
 import { WalletConnect } from '../../../../connect'
 import { NativeCurrencySelector } from '../../../actions/NativeCurrencySelector'
@@ -132,6 +133,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
   // savings vaults (sUSDS, sDAI) settle in the same transaction.
   const isAsyncWithdraw =
     tab === 'Withdraw' && !!selected && isAsyncVaultWithdraw(selected)
+  const executeLabel = isAsyncWithdraw ? 'Request Withdrawal' : `Execute ${tab}`
   // Withdrawals route per *vault*, not per provider: an instant savings vault
   // (sUSDS, sDAI) exits through the generic `/withdraw`, while a
   // cooldown/request-based one opens a request on `/savings`. Deposits always
@@ -185,6 +187,10 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
     },
     underlyingToken?.symbol ?? selected?.symbol ?? ''
   )
+
+  // Only offer the bundle while nothing has been confirmed on its own —
+  // re-bundling would ask the wallet to repeat a grant that already landed.
+  const useAtomicPath = exec.batchSupported && exec.permissionsCompleted === 0
 
   // Fetch the receiver's existing position on the *selected* vault so the
   // integrator can see how much that address already holds. Only fires when
@@ -708,8 +714,22 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
             </div>
           )}
 
+          {/* Atomic path — approvals + the action itself in one confirmation. */}
+          {exec.result && !overMax && delegationReady && useAtomicPath && (
+            <BatchExecuteButton
+              steps={[
+                ...exec.permissions.map((p, i) => p.description || `Approval ${i + 1}`),
+                executeLabel,
+              ]}
+              label={executeLabel}
+              executing={exec.executingMain}
+              needsUpgrade={exec.batchNeedsUpgrade}
+              onExecute={exec.executeAll}
+            />
+          )}
+
           {/* Permissions */}
-          {exec.result && !overMax && delegationReady && exec.hasPermissions && !exec.allPermissionsDone && (
+          {exec.result && !overMax && delegationReady && !useAtomicPath && exec.hasPermissions && !exec.allPermissionsDone && (
             <div className="space-y-1">
               <span className="text-xs text-base-content/60">
                 Approvals ({exec.permissionsCompleted}/{exec.permissions.length})
@@ -749,22 +769,24 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
           )}
 
           {/* Execute */}
-          {exec.result && !overMax && delegationReady && (!exec.hasPermissions || exec.allPermissionsDone) && (
-            <button
-              type="button"
-              className="btn btn-success btn-sm w-full"
-              disabled={exec.executingMain}
-              onClick={exec.executeMain}
-            >
-              {exec.executingMain ? (
-                <span className="loading loading-spinner loading-xs" />
-              ) : isAsyncWithdraw ? (
-                'Request Withdrawal'
-              ) : (
-                `Execute ${tab}`
-              )}
-            </button>
-          )}
+          {exec.result &&
+            !overMax &&
+            delegationReady &&
+            !useAtomicPath &&
+            (!exec.hasPermissions || exec.allPermissionsDone) && (
+              <button
+                type="button"
+                className="btn btn-success btn-sm w-full"
+                disabled={exec.executingMain}
+                onClick={exec.executeMain}
+              >
+                {exec.executingMain ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  executeLabel
+                )}
+              </button>
+            )}
         </>
       )}
     </div>

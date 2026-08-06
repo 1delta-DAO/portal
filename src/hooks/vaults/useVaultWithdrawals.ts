@@ -9,6 +9,7 @@ import {
   type VaultWithdrawalRequest,
 } from '../../sdk/vaults-helper'
 import { useSendLendingTransaction } from '../useSendLendingTransaction'
+import { useAtomicBatch } from '../useAtomicBatch'
 
 export interface UseVaultWithdrawalsParams {
   chainId?: string
@@ -115,13 +116,15 @@ export function withdrawalKey(req: VaultWithdrawalRequest): string {
 /**
  * Imperative runner for the claim/cancel half of the async withdrawal lifecycle.
  * Builds the calldata from a `/withdrawals` entry and sends permissions →
- * transactions → postTransactions in order.
+ * transactions → postTransactions in order — as one atomic bundle where the
+ * wallet supports it, otherwise one confirmation per step.
  */
 export function useVaultRequestAction(
   params: UseVaultRequestActionParams
 ): UseVaultRequestActionResult {
   const { chainId, account } = params
   const { send } = useSendLendingTransaction({ chainId, account })
+  const { supported: batchSupported, sendBatch } = useAtomicBatch({ chainId, account })
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -174,6 +177,15 @@ export function useVaultRequestAction(
           ...built.data.transactions,
           ...built.data.postTransactions,
         ]
+        if (batchSupported) {
+          const { ok, error: txError } = await sendBatch(steps)
+          if (!ok) {
+            setError(txError ?? 'Transaction failed')
+            return false
+          }
+          return true
+        }
+
         for (const tx of steps) {
           const { ok, error: txError } = await send(tx)
           if (!ok) {
@@ -189,7 +201,7 @@ export function useVaultRequestAction(
         setBusyKey(null)
       }
     },
-    [account, chainId, send]
+    [account, chainId, send, batchSupported, sendBatch]
   )
 
   return { run, busyKey, error, reset }

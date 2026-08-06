@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { LenderTab } from './components/lending/LendingTab'
 import { ThemeSwitcher } from './components/themeSwitcher'
 import { WalletConnect } from './components/connect'
+import { SettingsMenu } from './components/settingsMenu'
 import { PortalLogo } from './components/PortalLogo'
 import { IrmDockProvider } from './components/lending/shared/IrmDock'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
@@ -20,6 +21,7 @@ export default function App() {
           </div>
           <div className="flex gap-2 items-center">
             <ThemeSwitcher />
+            <SettingsMenu />
             <WalletConnect />
           </div>
         </div>

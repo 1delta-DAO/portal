@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { BACKEND_BASE_URL } from '../config/backend'
 import { useSendLendingTransaction, type LendingTx } from './useSendLendingTransaction'
+import { useAtomicBatch } from './useAtomicBatch'
 import type { RawCurrency } from '../types/currency'
 
 export interface SpotSwapQuote {
@@ -49,6 +50,11 @@ export interface SpotSwapParams {
 
 export function useSpotSwapQuote(params: { chainId: string; account?: string }) {
   const { send } = useSendLendingTransaction({ chainId: params.chainId, account: params.account })
+  const {
+    supported: batchSupported,
+    needsUpgrade: batchNeedsUpgrade,
+    sendBatch,
+  } = useAtomicBatch({ chainId: params.chainId, account: params.account })
 
   const [state, setState] = useState<SpotSwapState>({
     quotes: [],
@@ -156,6 +162,22 @@ export function useSpotSwapQuote(params: { chainId: string; account?: string }) 
     }
   }, [state.selectedIndex, state.quotes, send])
 
+  /** Atomic path: approval(s) + the selected swap in one confirmation. */
+  const executeAll = useCallback(async () => {
+    if (state.selectedIndex === null) return
+    const quote = state.quotes[state.selectedIndex]
+    if (!quote) return
+
+    setState((s) => ({ ...s, executing: true, error: null }))
+    const calls = [...state.permissions, quote.tx] as LendingTx[]
+    const { ok, error: txError, hash } = await sendBatch(calls)
+    if (ok) {
+      setState((s) => ({ ...s, executing: false, txSuccess: { hash } }))
+    } else {
+      setState((s) => ({ ...s, executing: false, error: txError ?? 'Swap execution failed' }))
+    }
+  }, [state.selectedIndex, state.quotes, state.permissions, sendBatch])
+
   const dismissSuccess = useCallback(() => {
     setState((s) => ({ ...s, txSuccess: null, quotes: [], permissions: [], selectedIndex: null }))
   }, [])
@@ -176,10 +198,13 @@ export function useSpotSwapQuote(params: { chainId: string; account?: string }) 
 
   return {
     ...state,
+    batchSupported,
+    batchNeedsUpgrade,
     fetchQuote,
     selectQuote,
     executePermission,
     executeSwap,
+    executeAll,
     dismissSuccess,
     reset,
   }

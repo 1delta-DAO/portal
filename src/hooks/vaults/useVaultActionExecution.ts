@@ -10,6 +10,7 @@ import {
   type VaultProvider,
 } from '../../sdk/vaults-helper'
 import { useSendLendingTransaction } from '../useSendLendingTransaction'
+import { useAtomicBatch } from '../useAtomicBatch'
 import { useDebounce } from '../useDebounce'
 
 export interface UseVaultActionExecutionParams {
@@ -72,6 +73,10 @@ export interface UseVaultActionExecutionResult {
   hasPermissions: boolean
   permissionsCompleted: number
   allPermissionsDone: boolean
+  /** Wallet can collapse the whole flow into one atomic confirmation. */
+  batchSupported: boolean
+  /** …but will prompt the EIP-7702 account upgrade the first time. */
+  batchNeedsUpgrade: boolean
   error: string | null
   txSuccess: {
     actionType: VaultActionType
@@ -81,6 +86,7 @@ export interface UseVaultActionExecutionResult {
   } | null
   executeNextPermission: () => Promise<void>
   executeMain: () => Promise<void>
+  executeAll: () => Promise<void>
   resetState: () => void
   dismissSuccess: () => void
 }
@@ -128,6 +134,11 @@ export function useVaultActionExecution(
   const effectiveReceiver = receiver && receiver.length > 0 ? receiver : account
 
   const { send } = useSendLendingTransaction({ chainId, account })
+  const {
+    supported: batchSupported,
+    needsUpgrade: batchNeedsUpgrade,
+    sendBatch,
+  } = useAtomicBatch({ chainId, account })
 
   const [result, setResult] = useState<VaultActionResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -275,6 +286,32 @@ export function useVaultActionExecution(
     })
   }
 
+  /** Atomic path: permissions → transactions → postTransactions, one bundle. */
+  const executeAll = async () => {
+    if (!result) return
+    setExecutingMain(true)
+    setError(null)
+
+    const { ok, error: txError, hash } = await sendBatch([
+      ...permissions,
+      ...result.transactions,
+      ...result.postTransactions,
+    ])
+    setExecutingMain(false)
+    if (!ok) {
+      setError(txError ?? 'Transaction failed')
+      return
+    }
+
+    setPermissionsCompleted(permissions.length)
+    setTxSuccess({
+      actionType,
+      amount,
+      symbol: underlyingSymbol,
+      hash,
+    })
+  }
+
   return {
     result,
     loading,
@@ -284,10 +321,13 @@ export function useVaultActionExecution(
     hasPermissions,
     permissionsCompleted,
     allPermissionsDone,
+    batchSupported,
+    batchNeedsUpgrade,
     error,
     txSuccess,
     executeNextPermission,
     executeMain,
+    executeAll,
     resetState,
     dismissSuccess,
   }

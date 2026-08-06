@@ -8,6 +8,7 @@ import {
 } from '../../../../hooks/lending/useOptimizerPairs'
 import type { LendingTx } from '../../../../hooks/useSendLendingTransaction'
 import { AmountInput } from '../../../common/AmountInput'
+import { BatchExecuteButton } from '../../../common/BatchExecuteButton'
 import { HealthFactorProjection } from '../../actions/HealthFactorProjection'
 import { NativeCurrencySelector } from '../../actions/NativeCurrencySelector'
 import { SubAccountSelector } from '../../actions/SubAccountSelector'
@@ -482,7 +483,11 @@ function FixedTermPicker({
   )
 }
 
-/** Primary CTA — sends the permissions then the transactions, showing progress. */
+/**
+ * Primary CTA — sends the permissions then the transactions, showing progress.
+ * When the wallet can batch atomically the whole `steps` list collapses into a
+ * single confirmation instead (see `BatchExecuteButton`).
+ */
 function ExecuteButton({
   account,
   isOpen,
@@ -493,7 +498,10 @@ function ExecuteButton({
   sending,
   building,
   blockedReason,
+  batchSupported,
+  batchNeedsUpgrade,
   onExecute,
+  onExecuteBatch,
 }: {
   account?: string
   isOpen: boolean
@@ -507,8 +515,28 @@ function ExecuteButton({
    *  auction round is closed). Becomes the button label so the CTA states the
    *  blocker instead of sitting disabled under an unrelated caption. */
   blockedReason?: string
+  batchSupported: boolean
+  batchNeedsUpgrade: boolean
   onExecute: () => void
+  onExecuteBatch: () => void
 }) {
+  const idleLabel = !account
+    ? 'Connect wallet'
+    : (blockedReason ?? (isOpen ? 'Deposit & Borrow' : 'Withdraw & Repay'))
+
+  if (batchSupported && steps.length > 0) {
+    return (
+      <BatchExecuteButton
+        steps={stepLabels}
+        label={idleLabel}
+        executing={running || sending}
+        disabled={!account || !!blockedReason || building}
+        needsUpgrade={batchNeedsUpgrade}
+        onExecute={onExecuteBatch}
+      />
+    )
+  }
+
   return (
     <button
       type="button"
@@ -691,6 +719,9 @@ function CombinedForm({
         running={a.running}
         sending={a.sending}
         building={a.building}
+        batchSupported={a.batchSupported}
+        batchNeedsUpgrade={a.batchNeedsUpgrade}
+        onExecuteBatch={a.executeBatch}
         blockedReason={
           // Origination-only: an auction round gates OPENING a borrow, never
           // closing one, so withdraw-and-repay stays available regardless.

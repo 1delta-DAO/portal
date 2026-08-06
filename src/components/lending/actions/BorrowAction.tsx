@@ -3,6 +3,7 @@ import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
+import { ActionExecuteBlock } from './ActionExecuteBlock'
 import { formatTokenAmount, formatUsd, parseAmount } from './format'
 import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
@@ -64,24 +65,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
 
   const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
 
-  const {
-    result,
-    simulation,
-    rateImpact,
-    loading,
-    executingPermission,
-    executingMain,
-    permissions,
-    hasPermissions,
-    permissionsCompleted,
-    allPermissionsDone,
-    error,
-    txSuccess,
-    executeNextPermission,
-    executeMain,
-    resetState,
-    dismissSuccess,
-  } = useActionExecution({
+  const exec = useActionExecution({
     actionType: 'Borrow',
     pool,
     account,
@@ -93,6 +77,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
     chainId,
     subAccount,
   })
+  const { simulation, rateImpact, loading, error, txSuccess, resetState, dismissSuccess } = exec
 
   // Reset when pool changes
   useEffect(() => {
@@ -447,52 +432,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
         }
       />
 
-      {result && hasPermissions && !allPermissionsDone && (
-        <div className="space-y-1">
-          <span className="text-xs text-base-content/60">
-            Approvals ({permissionsCompleted}/{permissions.length})
-          </span>
-          {permissions.map((perm, i) => {
-            const done = i < permissionsCompleted
-            const isCurrent = i === permissionsCompleted
-            return (
-              <button
-                key={i}
-                type="button"
-                className={`btn btn-sm w-full ${done ? 'btn-disabled btn-outline btn-success' : isCurrent ? 'btn-warning' : 'btn-outline btn-ghost'}`}
-                disabled={!isCurrent || executingPermission}
-                onClick={isCurrent ? executeNextPermission : undefined}
-                title={perm.description || `Approval ${i + 1}`}
-              >
-                <span className="truncate max-w-full">
-                  {done ? (
-                    `\u2713 ${perm.description || `Approval ${i + 1}`}`
-                  ) : isCurrent && executingPermission ? (
-                    <span className="loading loading-spinner loading-xs" />
-                  ) : (
-                    perm.description || `Approval ${i + 1}`
-                  )}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      {result && (!hasPermissions || allPermissionsDone) && (
-        <button
-          type="button"
-          className="btn btn-success btn-sm w-full"
-          disabled={executingMain}
-          onClick={executeMain}
-        >
-          {executingMain ? (
-            <span className="loading loading-spinner loading-xs" />
-          ) : (
-            'Execute Borrow'
-          )}
-        </button>
-      )}
+      <ActionExecuteBlock exec={exec} label="Execute Borrow" />
     </div>
   )
 }

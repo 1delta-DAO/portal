@@ -3,6 +3,8 @@ import { parseUnits } from 'viem'
 import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry } from '../../../hooks/lending/useUserData'
 import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
+import { useAtomicBatch } from '../../../hooks/useAtomicBatch'
+import { BatchExecuteButton } from '../../common/BatchExecuteButton'
 import { useDebounce } from '../../../hooks/useDebounce'
 import {
   fetchRefinance,
@@ -91,6 +93,11 @@ export const RefinanceModal: React.FC<RefinanceModalProps> = ({
   const [done, setDone] = useState<{ hash?: string } | null>(null)
 
   const { send } = useSendLendingTransaction({ chainId, account })
+  const {
+    supported: batchSupported,
+    needsUpgrade: batchNeedsUpgrade,
+    sendBatch,
+  } = useAtomicBatch({ chainId, account })
 
   const debouncedAmount = useDebounce(amount, 500)
   const permissions = result?.permissions ?? []
@@ -200,7 +207,32 @@ export const RefinanceModal: React.FC<RefinanceModalProps> = ({
     setDone({ hash: lastHash })
   }
 
+  // Only offer the bundle while nothing has been confirmed on its own —
+  // re-bundling would ask the wallet to repeat a grant that already landed.
+  const useAtomicPath = batchSupported && permissionsCompleted === 0
+
+  /** Atomic path: approvals + the refinance itself in one confirmation. */
+  const executeAll = async () => {
+    if (!result) return
+    setExecutingMain(true)
+    setError(null)
+    const { ok, error: txError, hash } = await sendBatch([...permissions, ...result.transactions])
+    setExecutingMain(false)
+    if (!ok) {
+      setError(txError ?? 'Transaction failed')
+      return
+    }
+    setPermissionsCompleted(permissions.length)
+    setDone({ hash })
+  }
+
   const targetTerm = terms.find((t) => t.termId === termId) ?? null
+  const targetTermLabel = targetTerm
+    ? `${Math.max(1, Math.round(targetTerm.durationDays))}-day`
+    : 'fixed'
+  const executeLabel = isDynamicSource
+    ? `Refinance to ${targetTermLabel}`
+    : `Roll over to ${targetTermLabel}`
   const ratePct = loanRatePct(loan)
   const mat = maturityDisplay(loan)
   const hasPenalty = hasEarlyRepayPenalty(loan)
@@ -347,8 +379,22 @@ export const RefinanceModal: React.FC<RefinanceModalProps> = ({
               </div>
             )}
 
+            {/* Atomic path — approvals + refinance in one confirmation. */}
+            {result && useAtomicPath && (
+              <BatchExecuteButton
+                steps={[
+                  ...permissions.map((p, i) => p.description || `Approval ${i + 1}`),
+                  executeLabel,
+                ]}
+                label={executeLabel}
+                executing={executingMain}
+                needsUpgrade={batchNeedsUpgrade}
+                onExecute={executeAll}
+              />
+            )}
+
             {/* Permissions */}
-            {result && hasPermissions && !allPermissionsDone && (
+            {result && !useAtomicPath && hasPermissions && !allPermissionsDone && (
               <div className="space-y-1">
                 <span className="text-xs text-base-content/60">
                   Approvals ({permissionsCompleted}/{permissions.length})
@@ -386,7 +432,7 @@ export const RefinanceModal: React.FC<RefinanceModalProps> = ({
               </div>
             )}
 
-            {result && allPermissionsDone && (
+            {result && !useAtomicPath && allPermissionsDone && (
               <button
                 type="button"
                 className="btn btn-success btn-sm w-full"
@@ -395,10 +441,8 @@ export const RefinanceModal: React.FC<RefinanceModalProps> = ({
               >
                 {executingMain ? (
                   <span className="loading loading-spinner loading-xs" />
-                ) : isDynamicSource ? (
-                  `Refinance to ${targetTerm ? `${Math.max(1, Math.round(targetTerm.durationDays))}-day` : 'fixed'}`
                 ) : (
-                  `Roll over to ${targetTerm ? `${Math.max(1, Math.round(targetTerm.durationDays))}-day` : 'fixed'}`
+                  executeLabel
                 )}
               </button>
             )}
