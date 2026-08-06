@@ -131,7 +131,11 @@ export const SubAccountSelector: React.FC<SubAccountSelectorProps> = ({
                   {sub.health != null && (
                     <span
                       className={`badge badge-xs font-semibold ${
-                        sub.health < 1.1 ? 'badge-error' : sub.health < 1.3 ? 'badge-warning' : 'badge-success'
+                        sub.health < 1.1
+                          ? 'badge-error'
+                          : sub.health < 1.3
+                            ? 'badge-warning'
+                            : 'badge-success'
                       }`}
                     >
                       {sub.health.toFixed(2)}

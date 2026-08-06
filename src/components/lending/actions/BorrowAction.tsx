@@ -15,6 +15,14 @@ import { useLendingOffers, computeEffectiveBorrow } from '../../../hooks/lending
 import { MakeOfferPanel, TakeMakeToggle } from '../shared/MakeOfferPanel'
 import { HealthFactorProjection } from './HealthFactorProjection'
 import { RateImpactIndicator } from './RateImpactIndicator'
+import { TermsSummary } from '../terms'
+import { useTermsAcknowledgement } from '../terms/TermsDisclosure'
+import { useTermSheet } from '../../../hooks/lending/useTermSheet'
+import type { RateSetterState } from '../terms/RateSetterRow'
+import { aprPercentToWad } from '../../../sdk/lending-helper/fetchLiquityRate'
+import { isLiquityFamily } from '@1delta/lender-registry'
+import { LiquityOpenPanel } from './LiquityOpenPanel'
+import { isFullSheet } from '../terms/types'
 import { ComparableRatesPill } from '../shared/ComparableRatesPill'
 import { TransactionSuccess } from './TransactionSuccess'
 
@@ -34,6 +42,37 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   priceUsd,
 }) => {
   const [amount, setAmount] = useState('')
+  // Term sheet for this market's BORROW side. Gates the wallet when the market
+  // carries `critical` terms (time-based liquidation, full-collateral seizure,
+  // redeemable-while-healthy, physical delivery) the user hasn't acknowledged.
+  // The row carries a DIGEST (the API default). Upgrade to the full sheet
+  // for this one market so the panel can show exit terms, liquidation
+  // params, fees, oracle and governance — the digest has none of those.
+  const { sheet: termSheet } = useTermSheet({
+    marketUid: pool?.marketUid,
+    chainId,
+    fallback: pool?.termSheet,
+  })
+  const termsAck = useTermsAcknowledgement(termSheet, 'borrow')
+
+  // User-set-rate markets (the Liquity family) have no algorithmic rate — the
+  // borrower picks one, and it is edited inside the term sheet rather than in
+  // a separate field, because it IS one of the terms.
+  const userSet = isFullSheet(termSheet) ? termSheet.borrow?.rate.userSet : undefined
+  const [rateState, setRateState] = useState<RateSetterState | undefined>(undefined)
+  const chosenRatePct = rateState?.aprPercent ?? userSet?.default
+  // A rate outside the protocol's bounds reverts, so block the CTA rather than
+  // letting the transaction fail.
+  const rateBlocks = userSet?.required === true && rateState?.valid === false
+
+  // Liquity-family markets need a TROVE before debt can be increased, and
+  // opening one is a different call entirely (collateral + debt + rate in a
+  // single transaction). With no trove there is nothing for the borrow form to
+  // act on, so hand over to the open panel rather than building a request the
+  // endpoint will reject.
+  const isLiquity = isLiquityFamily(pool?.marketUid?.split(':')[0] ?? '')
+  const hasTrove = (subAccounts?.length ?? 0) > 0 || Number(userPosition?.debt ?? 0) > 0
+  const needsOpen = isLiquity && !hasTrove
   const [useNative, setUseNative] = useState(false)
 
   const hasSubAccounts = lenderSupportsSubAccounts(lenderKey)
@@ -74,6 +113,9 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
     receiveAsset: canUseNative && useNative ? zeroAddress : undefined,
     accountId: hasSubAccounts ? (selectedAccountId ?? undefined) : undefined,
     termId: isBrokered ? (selectedTermId ?? undefined) : undefined,
+    // Percent in the UI, WAD on the wire — converted once, here.
+    interestRate:
+      userSet?.required && chosenRatePct != null ? aprPercentToWad(chosenRatePct) : undefined,
     chainId,
     subAccount,
   })
@@ -173,6 +215,25 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
     )
   }
 
+  // No trove yet on a Liquity-family branch: the borrow form has nothing to
+  // increase, so open one instead.
+  if (needsOpen && pool) {
+    return (
+      <LiquityOpenPanel
+        pool={pool}
+        // A Liquity branch has exactly one collateral; the sheet names it.
+        collateralAsset={
+          isFullSheet(termSheet)
+            ? termSheet.borrow?.acceptedCollateral?.items?.[0]?.asset
+            : undefined
+        }
+        termSheet={termSheet}
+        account={account}
+        chainId={chainId}
+      />
+    )
+  }
+
   return (
     <div className="space-y-3">
       {isOrderBook && <TakeMakeToggle value={obMode} onChange={setObMode} />}
@@ -242,6 +303,9 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
                 details={ftDetails}
                 symbol={pool?.asset?.symbol}
                 lender={pool?.marketUid}
+                // Term rows now come from <TermsSummary> for every lender;
+                // this stays for the live depth ladder + tap-to-fill.
+                hideRows
                 amountTokens={amountNum}
                 hideLadder={isOrderBook}
                 termId={selectedTermId ?? undefined}
@@ -432,7 +496,28 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
         }
       />
 
-      <ActionExecuteBlock exec={exec} label="Execute Borrow" />
+      {/* One card, every lender: what you pay and whether it grows, when it is
+          due and what happens if you do nothing, what can take your collateral,
+          and what exiting early costs. */}
+      <TermsSummary
+        sheet={termSheet}
+        side="borrow"
+        rateEdit={userSet?.required ? { value: chosenRatePct, onChange: setRateState } : undefined}
+      />
+
+      {rateBlocks ? (
+        <div className="rounded-lg border border-error/30 bg-error/10 px-2 py-1.5 text-[11px] text-error">
+          Set an interest rate within the allowed range before borrowing.
+        </div>
+      ) : null}
+
+      <ActionExecuteBlock
+        exec={exec}
+        label="Execute Borrow"
+        terms={termsAck}
+        termsSide="borrow"
+        termsActionLabel="borrow"
+      />
     </div>
   )
 }

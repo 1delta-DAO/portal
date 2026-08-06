@@ -34,7 +34,9 @@ export const TransactionSuccess: React.FC<{
         <p className="text-sm font-semibold">Transaction Confirmed</p>
         <p className="text-xs text-base-content/70">
           Successfully {ACTION_LABELS[actionType]}{' '}
-          <span className="font-medium text-base-content">{amount} {symbol}</span>
+          <span className="font-medium text-base-content">
+            {amount} {symbol}
+          </span>
         </p>
       </div>
 
@@ -44,11 +46,7 @@ export const TransactionSuccess: React.FC<{
         </p>
       )}
 
-      <button
-        type="button"
-        className="btn btn-sm btn-ghost w-full mt-1"
-        onClick={onDismiss}
-      >
+      <button type="button" className="btn btn-sm btn-ghost w-full mt-1" onClick={onDismiss}>
         Done
       </button>
     </div>

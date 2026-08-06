@@ -21,6 +21,13 @@ export interface LendingActionParams {
    * `FLEX_LOAN_ID` sentinel to target the dynamic/flex position.
    */
   loanId?: string
+  /**
+   * Liquity-family only: the borrower-chosen annual interest rate, in **WAD**
+   * (1e18-scaled fraction). Use `aprPercentToWad` — the UI speaks percent and
+   * the wire speaks WAD, and passing one where the other is meant is a 100×
+   * error. Omitted ⇒ the protocol applies the branch average.
+   */
+  interestRate?: string
   /** When true, the server runs an e2e simulation and returns projected health factor / balances */
   simulate?: boolean
   /** When provided, sent as POST body for simulation (same shape as loop simulation body) */
@@ -133,6 +140,8 @@ export async function fetchLendingAction(
     if (params.accountId) qs.set('accountId', params.accountId)
     if (params.termId != null) qs.set('termId', String(params.termId))
     if (params.loanId != null) qs.set('loanId', params.loanId)
+    if (params.interestRate != null)
+      qs.set('interestRate', params.interestRate)
     if (params.simulate) qs.set('simulate', 'true')
 
     const url = `${LENDING_ACTIONS_BASE}/${action}?${qs}`

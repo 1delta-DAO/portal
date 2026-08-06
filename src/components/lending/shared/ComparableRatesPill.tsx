@@ -124,20 +124,18 @@ export function ComparableRatesPill({
       limit,
       referenceMarketUid,
       referenceTermId,
-    ],
+    ]
   )
 
   const { data, isFetching, error } = useComparableRates(params)
 
   // Only rates you can actually take set the headline.
   const live = useMemo(() => (data?.items ?? []).filter((i) => i.obtainable), [data])
-  const unobtainable = useMemo(
-    () => (data?.items ?? []).filter((i) => !i.obtainable),
-    [data],
-  )
+  const unobtainable = useMemo(() => (data?.items ?? []).filter((i) => !i.obtainable), [data])
   const best = live[0] ?? null
 
-  const anchorPct = currentAprPct ?? (data?.reference ? (displayRate(data.reference) ?? null) : null)
+  const anchorPct =
+    currentAprPct ?? (data?.reference ? (displayRate(data.reference) ?? null) : null)
   const bestPct = best ? displayRate(best) : null
   // For a borrow a lower rate is better; for a supply, higher.
   const delta =
@@ -181,7 +179,7 @@ export function ComparableRatesPill({
   // per chain, in which case each row's own collateral is the honest label.
   const basisGroups = useMemo(
     () => [...new Set(Object.values(data?.collateralBasis ?? {}))],
-    [data],
+    [data]
   )
   const basisLabel = !collateralAddress && basisGroups.length === 1 ? basisGroups[0] : null
   const showCollateral = !collateralAddress && basisGroups.length !== 1
@@ -221,9 +219,7 @@ export function ComparableRatesPill({
             {delta != null && beatsCurrent && (
               <span className="font-mono tabular-nums opacity-80">{fmtDelta(delta)}</span>
             )}
-            <span className="opacity-60">
-              {beatsCurrent ? 'elsewhere' : `${count} comparable`}
-            </span>
+            <span className="opacity-60">{beatsCurrent ? 'elsewhere' : `${count} comparable`}</span>
           </>
         )}
       </button>
@@ -245,14 +241,10 @@ export function ComparableRatesPill({
             </span>
           </div>
 
-          {error && (
-            <div className="text-[10px] text-error">Couldn’t load comparable rates.</div>
-          )}
+          {error && <div className="text-[10px] text-error">Couldn’t load comparable rates.</div>}
 
           {!error && !live.length && !unobtainable.length && (
-            <div className="text-[10px] text-base-content/50">
-              No other venue offers this pair.
-            </div>
+            <div className="text-[10px] text-base-content/50">No other venue offers this pair.</div>
           )}
 
           {/* When the caller pinned no collateral the server picks ONE to compare
@@ -272,6 +264,7 @@ export function ComparableRatesPill({
                 side={side}
                 showCollateral={showCollateral}
                 lenderInfoMap={lenderInfoMap}
+                referenceLenderName={data?.reference?.lenderName}
               />
             ))}
           </ul>
@@ -290,6 +283,7 @@ export function ComparableRatesPill({
                     side={side}
                     showCollateral={showCollateral}
                     lenderInfoMap={lenderInfoMap}
+                    referenceLenderName={data?.reference?.lenderName}
                   />
                 ))}
               </ul>
@@ -302,7 +296,8 @@ export function ComparableRatesPill({
           {!!data?.droppedIlliquid && (
             <div className="mt-1 text-[9px] text-base-content/40">
               {data.droppedIlliquid} market{data.droppedIlliquid === 1 ? '' : 's'} too shallow to
-              compare{data.liquidityFloorUsd > 0 ? ` (under $${fmtAmount(data.liquidityFloorUsd)})` : ''}.
+              compare
+              {data.liquidityFloorUsd > 0 ? ` (under $${fmtAmount(data.liquidityFloorUsd)})` : ''}.
             </div>
           )}
 
@@ -333,6 +328,7 @@ function ComparableRow({
   side,
   showCollateral,
   lenderInfoMap,
+  referenceLenderName,
 }: {
   r: ComparableRate
   anchorPct: number | null
@@ -340,6 +336,14 @@ function ComparableRow({
   /** Label each row with its own collateral (mixed-collateral comparisons). */
   showCollateral?: boolean
   lenderInfoMap?: Record<string, LenderInfo>
+  /**
+   * Display name of the venue the user is on. A comparable from the SAME brand
+   * is legitimate — Aave runs several independent deployments, and the
+   * comparison can span chains — but rendering both as a bare "Aave V3" reads
+   * as the venue being compared against itself. When the brand matches, the
+   * row disambiguates itself with its market name.
+   */
+  referenceLenderName?: string | null
 }) {
   const rate = displayRate(r)
   const delta =
@@ -356,6 +360,12 @@ function ComparableRow({
   // has to be rolled is explicitly not, and the tooltip carries the server's
   // own wording for why.
   const locked = r.horizon?.locked === true
+
+  // Same brand as the venue the user is on: show WHICH market, so the row is
+  // never mistaken for a self-comparison.
+  const sameBrand = !!referenceLenderName && (r.lenderName ?? '') === referenceLenderName
+  const qualifier =
+    r.marketName || r.curatorName || (r.collateral?.symbol ? `vs ${r.collateral.symbol}` : null)
   const tooltip = [
     r.obtainableReason,
     ...(r.horizon?.assumptions ?? []),
@@ -391,6 +401,14 @@ function ComparableRow({
         maxChars={14}
         className="text-[10px] shrink-0"
       />
+      {sameBrand && qualifier && (
+        <span
+          className="shrink-0 rounded bg-base-300/60 px-1 py-px text-[9px] leading-none text-base-content/60"
+          title={`A different ${r.lenderName ?? 'deployment'} market — ${r.marketUid}`}
+        >
+          {qualifier}
+        </span>
+      )}
 
       <div className="flex min-w-0 flex-1 items-center gap-1">
         {showCollateral && r.collateral.symbol && (
@@ -412,12 +430,18 @@ function ComparableRow({
           </span>
         )}
         {locked && (
-          <span className="text-[9px] leading-none text-success/80" title="Rate is locked for your whole holding period">
+          <span
+            className="text-[9px] leading-none text-success/80"
+            title="Rate is locked for your whole holding period"
+          >
             locked
           </span>
         )}
         {r.depth.capped && (
-          <span className="text-[9px] leading-none text-error/80" title="This venue cannot fund your size">
+          <span
+            className="text-[9px] leading-none text-error/80"
+            title="This venue cannot fund your size"
+          >
             capped
           </span>
         )}

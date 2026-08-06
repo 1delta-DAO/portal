@@ -1,3 +1,4 @@
+import type { AnyTermSheet } from '../../components/lending/terms/types'
 import { useQuery } from '@tanstack/react-query'
 import type {
   PoolRiskBreakdown,
@@ -175,6 +176,18 @@ export interface PoolDataItem {
   terms?: PoolTerm[] | null
   /** True when variable borrowing isn't offered (brokered markets). */
   variableBorrowDisabled?: boolean
+  /**
+   * Structured description of this market's lend and borrow offer — rate,
+   * maturity, fees, exit terms, liquidation, governance, oracle, exposures.
+   * One shape for every lender we serve. See `components/lending/terms/`.
+   *
+   * Typed as `AnyTermSheet` on purpose: the list endpoints default to
+   * `?terms=digest`, whose sides hoist `headline`/`tags` to the root and carry
+   * NO `info` object — so a `sheet.supply.info.tags` read is a runtime crash,
+   * not a type error, once the value crosses the network. Always read it
+   * through `sideInfo()` / `isFullSheet()`.
+   */
+  termSheet?: AnyTermSheet
 }
 
 export interface PoolAsset {
@@ -248,18 +261,16 @@ function rawMarketToPoolDataItem(raw: RawMarket): PoolDataItem {
     // variableBorrowRate,link}; sum each side and collect sources for display.
     depositRewardApr: (Array.isArray(raw.rewards) ? raw.rewards : []).reduce(
       (s: number, r: any) => s + (Number(r?.depositRate) || 0),
-      0,
+      0
     ),
     borrowRewardApr: (Array.isArray(raw.rewards) ? raw.rewards : []).reduce(
       (s: number, r: any) => s + (Number(r?.variableBorrowRate) || 0),
-      0,
+      0
     ),
     rewardSources: Array.from(
       new Set(
-        (Array.isArray(raw.rewards) ? raw.rewards : [])
-          .map((r: any) => r?.source)
-          .filter(Boolean),
-      ),
+        (Array.isArray(raw.rewards) ? raw.rewards : []).map((r: any) => r?.source).filter(Boolean)
+      )
     ) as string[],
     config: raw.config ?? {},
     borrowCap: raw.caps?.borrowCap ?? 0,
@@ -272,6 +283,7 @@ function rawMarketToPoolDataItem(raw: RawMarket): PoolDataItem {
     isFrozen: raw.flags?.isFrozen ?? false,
     oraclePrice: info.oraclePrice?.oraclePrice ?? undefined,
     oraclePriceUSD: info.oraclePrice?.oraclePriceUsd ?? undefined,
+    termSheet: (raw as { termSheet?: AnyTermSheet }).termSheet,
     risk: raw.risk ?? null,
     oracleInfo: raw.oracleInfo ?? null,
     params: raw.params,

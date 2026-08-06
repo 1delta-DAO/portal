@@ -36,9 +36,7 @@ export const HealthFactorProjection: React.FC<{
         <span className="text-base-content/60">Health Factor:</span>
         <div className="flex items-center gap-1.5">
           {before != null ? (
-            <span className={`font-semibold ${healthColor(before)}`}>
-              {formatHealth(before)}
-            </span>
+            <span className={`font-semibold ${healthColor(before)}`}>{formatHealth(before)}</span>
           ) : (
             <span className="text-base-content/40">n/a</span>
           )}
@@ -56,11 +54,19 @@ export const HealthFactorProjection: React.FC<{
         <span className="text-base-content/60">Borrow Capacity:</span>
         <div className="flex items-center gap-1.5">
           <span className="font-semibold">
-            ${simulation.pre.borrowCapacity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            $
+            {simulation.pre.borrowCapacity.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </span>
           <span className="text-base-content/40">{'\u2192'}</span>
           <span className="badge badge-xs font-semibold">
-            ${simulation.post.borrowCapacity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            $
+            {simulation.post.borrowCapacity.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </span>
         </div>
       </div>

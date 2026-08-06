@@ -35,6 +35,11 @@ export function useActionExecution(params: {
   accountId?: string
   /** Brokered Borrow: chosen fixed-term id from the market's `terms[]` rate card. */
   termId?: number
+  /**
+   * Liquity-family only: the borrower-chosen rate in WAD. Percent→WAD lives in
+   * `fetchLiquityRate.aprPercentToWad`; never pass a percent here.
+   */
+  interestRate?: string
   /** Brokered Repay: the loan's posId (or `FLEX_LOAN_ID` for the flex position). */
   loanId?: string
   /** Chain ID string for query invalidation */
@@ -53,6 +58,7 @@ export function useActionExecution(params: {
     receiveAsset,
     accountId,
     termId,
+    interestRate,
     loanId,
     chainId,
     subAccount,
@@ -169,6 +175,7 @@ export function useActionExecution(params: {
         accountId,
         termId,
         loanId,
+        interestRate,
         simulate: shouldSimulate,
         simulationBody,
       })
@@ -184,7 +191,21 @@ export function useActionExecution(params: {
     }
 
     doFetch()
-  }, [debouncedAmount, pool?.marketUid, account, effectiveReceiver, isAll, payAsset, receiveAsset, accountId, termId, loanId, actionType, shouldSimulate])
+  }, [
+    debouncedAmount,
+    pool?.marketUid,
+    account,
+    effectiveReceiver,
+    isAll,
+    payAsset,
+    receiveAsset,
+    accountId,
+    termId,
+    interestRate,
+    loanId,
+    actionType,
+    shouldSimulate,
+  ])
 
   /** Execute the next pending permission transaction */
   const executeNextPermission = async () => {

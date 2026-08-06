@@ -18,6 +18,9 @@ import { MakeOfferPanel, TakeMakeToggle } from '../shared/MakeOfferPanel'
 import { HealthFactorProjection } from './HealthFactorProjection'
 import { RateImpactIndicator } from './RateImpactIndicator'
 import { TransactionSuccess } from './TransactionSuccess'
+import { TermsSummary } from '../terms'
+import { useTermsAcknowledgement } from '../terms/TermsDisclosure'
+import { useTermSheet } from '../../../hooks/lending/useTermSheet'
 
 export const DepositAction: React.FC<ActionPanelProps> = ({
   pool,
@@ -38,6 +41,18 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   allowCustomReceiver,
 }) => {
   const [amount, setAmount] = useState('')
+  // Term sheet for this market's SUPPLY side. `cleared` is false only when the
+  // market carries `critical` terms the user has not acknowledged — which is
+  // rare by design, so the gate stays credible when it does fire.
+  // The row carries a DIGEST (the API default). Upgrade to the full sheet
+  // for this one market so the panel can show exit terms, liquidation
+  // params, fees, oracle and governance — the digest has none of those.
+  const { sheet: termSheet } = useTermSheet({
+    marketUid: pool?.marketUid,
+    chainId,
+    fallback: pool?.termSheet,
+  })
+  const termsAck = useTermsAcknowledgement(termSheet, 'supply')
   const [useNative, setUseNative] = useState(false)
   // Take (fill existing offers) vs Make (post your own limit offer) — order books only.
   const [obMode, setObMode] = useState<'take' | 'make'>('take')
@@ -653,13 +668,6 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
           Loan leg only (the collateral-deposit leg keeps the plain view). */}
       {isLoanOrderBook && ftDetails && (
         <div className="mt-1 space-y-1.5 px-1 text-[10px] text-base-content/60">
-          <FixedTermDetailsRows
-            details={ftDetails}
-            symbol={pool?.asset?.symbol}
-            lender={pool?.marketUid}
-            side="lend"
-            hideLadder
-          />
           <MidnightOrderBook
             chainId={pool?.marketUid?.split(':')[1]}
             lender={pool?.marketUid?.split(':')[0]}
@@ -733,7 +741,18 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
         </>
       )}
 
-      <ActionExecuteBlock exec={exec} label="Execute Deposit" />
+      {/* One card, every lender: rate breakdown, exit terms + utilization,
+          what backs the deposit, fees, oracle and governance — all derived
+          from `termSheet`, with no lender-key branching. */}
+      <TermsSummary sheet={termSheet} side="supply" />
+
+      <ActionExecuteBlock
+        exec={exec}
+        label="Execute Deposit"
+        terms={termsAck}
+        termsSide="supply"
+        termsActionLabel="deposit"
+      />
     </div>
   )
 }

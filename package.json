@@ -7,10 +7,13 @@
     "start": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "format": "prettier . --write"
+    "format": "prettier . --write",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@1delta/chain-registry": "^0.0.5",
+    "@1delta/lender-registry": "^0.0.42",
     "@1delta/providers": "^0.0.59",
     "@rainbow-me/rainbowkit": "^2.2.10",
     "@tailwindcss/postcss": "^4.2.2",
@@ -40,6 +43,7 @@
     "dotenv": "^17.3.1",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^4.1.10"
   }
 }

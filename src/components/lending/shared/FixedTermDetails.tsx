@@ -23,6 +23,7 @@ export function FixedTermDetailsRows({
   amountTokens,
   hideLadder = false,
   termId,
+  hideRows = false,
 }: {
   details: FixedTermDetails
   symbol?: string
@@ -41,17 +42,27 @@ export function FixedTermDetailsRows({
   hideLadder?: boolean
   /** Exactly: fixed-pool maturity to ladder (defaults to the nearest live pool). */
   termId?: number
+  /**
+   * Suppress the label→value term rows and render ONLY the depth ladder.
+   *
+   * These rows are superseded by `<TermsSummary>`, which derives the same
+   * facts from the market's `termSheet` for EVERY lender rather than the
+   * fixed-term subset. The ladder has no term-sheet equivalent (it is live
+   * order-book depth with tap-to-fill), so it stays here as a specialist
+   * slot — see `terms/README.md`.
+   */
+  hideRows?: boolean
 }) {
   const chainId = lender?.split(':')[1]
   return (
     <>
-      {details.maturityMs != null && (
+      {!hideRows && details.maturityMs != null && (
         <div className="flex justify-between gap-2">
           <span>Fixed maturity</span>
           <span className="tabular-nums">{new Date(details.maturityMs).toLocaleDateString()}</span>
         </div>
       )}
-      {providerLabel(details.provider) != null && (
+      {!hideRows && providerLabel(details.provider) != null && (
         <div className="flex justify-between gap-2">
           <span title="Who offers this fixed term: Lista terms come from a single market broker; Midnight terms are filled from an order book of maker offers.">
             Offered by
@@ -82,6 +93,7 @@ export function FixedTermDetailsRows({
           termId={termId}
         />
       ) : (
+        !hideRows &&
         details.availableAmount != null &&
         details.availableAmount > 0 && (
           <div className="flex justify-between gap-2">
@@ -96,7 +108,7 @@ export function FixedTermDetailsRows({
           </div>
         )
       )}
-      {details.continuousFeeAprPct != null && (
+      {!hideRows && details.continuousFeeAprPct != null && (
         <div className="flex justify-between gap-2">
           <span title="Ongoing fee accrued to lenders while the position is open. Deducted continuously from the lender's redeemable balance.">
             Continuous fee
@@ -104,7 +116,7 @@ export function FixedTermDetailsRows({
           <span className="tabular-nums">{details.continuousFeeAprPct.toFixed(2)}%/yr</span>
         </div>
       )}
-      {details.settlementFeePct != null && (
+      {!hideRows && details.settlementFeePct != null && (
         <div className="flex justify-between gap-2">
           <span title="One-off fee taken at settlement, scaled by time to maturity.">
             Settlement fee
@@ -112,7 +124,7 @@ export function FixedTermDetailsRows({
           <span className="tabular-nums">{details.settlementFeePct.toFixed(2)}%</span>
         </div>
       )}
-      {details.latePenaltyAprPct != null && details.latePenaltyAprPct > 0 && (
+      {!hideRows && details.latePenaltyAprPct != null && details.latePenaltyAprPct > 0 && (
         <div className="flex justify-between gap-2">
           <span
             className="text-warning"
@@ -125,14 +137,16 @@ export function FixedTermDetailsRows({
           </span>
         </div>
       )}
-      <div className="flex justify-between gap-2">
-        <span title="Repaying before maturity: Lista charges a per-loan penalty; Midnight has none (buy debt units back at the market price); Exactly rebates unassigned earnings (a discount below face value).">
-          Early repayment
-        </span>
-        <span className={`tabular-nums ${earlyRepayTone(details.earlyRepay)}`}>
-          {earlyRepayLabel(details.earlyRepay)}
-        </span>
-      </div>
+      {hideRows ? null : (
+        <div className="flex justify-between gap-2">
+          <span title="Repaying before maturity: Lista charges a per-loan penalty; Midnight has none (buy debt units back at the market price); Exactly rebates unassigned earnings (a discount below face value).">
+            Early repayment
+          </span>
+          <span className={`tabular-nums ${earlyRepayTone(details.earlyRepay)}`}>
+            {earlyRepayLabel(details.earlyRepay)}
+          </span>
+        </div>
+      )}
     </>
   )
 }

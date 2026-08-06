@@ -73,14 +73,10 @@ interface ApiFixedTerm {
  * render shape. One code path, no per-protocol branching. Returns `null` for
  * markets that carry no fixed-term block.
  */
-export function fixedTermDetails(
-  pool?: FixedTermPoolLike | null,
-): FixedTermDetails | null {
+export function fixedTermDetails(pool?: FixedTermPoolLike | null): FixedTermDetails | null {
   const n = (v: unknown): number | undefined =>
     v == null || Number.isNaN(Number(v)) ? undefined : Number(v)
-  const ft = (pool?.fixedTerm ?? pool?.params?.market?.fixedTerm) as
-    | ApiFixedTerm
-    | undefined
+  const ft = (pool?.fixedTerm ?? pool?.params?.market?.fixedTerm) as ApiFixedTerm | undefined
   if (!ft) {
     // Pre-publish fallback: the canonical `fixedTerm` block (maturity / fees /
     // provider) may not be served yet, but a Midnight market always carries an
