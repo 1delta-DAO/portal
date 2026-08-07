@@ -20,6 +20,7 @@ export function SettingsMenu() {
   // would apply to, and the only chain we can act on from here.
   const {
     atomicStatus,
+    chainNotListed,
     capabilities,
     probing,
     probeError,
@@ -44,15 +45,20 @@ export function SettingsMenu() {
     ? 'Connect a wallet to detect support.'
     : probing
       ? 'Detecting wallet support…'
-      : probeError
-        ? `Your wallet doesn't answer the EIP-5792 capability probe, so flows stay step-by-step. (${probeError})`
-        : atomicStatus === 'supported'
-          ? `Active on chain ${chainId} — multi-step flows run as one transaction.`
-          : atomicStatus === 'ready'
-            ? `Available on chain ${chainId}. Your account isn't upgraded yet — the first batch (or the button below) will ask your wallet to do it.`
-            : atomicStatus === 'unsupported'
-              ? `Your wallet reports no atomic batching on chain ${chainId}, so flows stay step-by-step.`
-              : `Your wallet returned no capabilities for chain ${chainId}, so flows stay step-by-step.`
+      : atomicStatus === 'supported'
+        ? `Active on chain ${chainId} — multi-step flows run as one transaction.`
+        : atomicStatus === 'ready'
+          ? `Available on chain ${chainId}. Your account isn't upgraded yet — the first batch (or the button below) will ask your wallet to do it.`
+          : atomicStatus === 'unsupported'
+            ? `Your wallet reports no atomic batching on chain ${chainId}, so flows stay step-by-step.`
+            : chainNotListed
+              ? // The wallet answered — it just doesn't offer batching here.
+                // Wallets enable 7702 chain by chain; this is their gate, not
+                // the chain's and not ours.
+                `Your wallet doesn't offer batching on chain ${chainId} yet, so flows stay step-by-step. Support is enabled per chain by the wallet.`
+              : probeError
+                ? `Your wallet doesn't answer the EIP-5792 capability probe, so flows stay step-by-step. (${probeError})`
+                : `Your wallet returned no capabilities for chain ${chainId}, so flows stay step-by-step.`
 
   return (
     <div className="relative" ref={ref}>
@@ -79,7 +85,9 @@ export function SettingsMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 z-50 w-80 rounded-box border border-base-300 bg-base-100 p-3 shadow-lg space-y-2">
+        // Width is capped to the viewport so the panel can't hang off a narrow
+        // screen; long diagnostics wrap rather than widen it.
+        <div className="absolute right-0 top-full mt-2 z-50 w-80 max-w-[calc(100vw-1.5rem)] max-h-[75vh] overflow-y-auto overflow-x-hidden overscroll-contain rounded-box border border-base-300 bg-base-100 p-3 shadow-lg space-y-2">
           <div className="text-xs font-semibold text-base-content/70">Transactions</div>
 
           <label className="flex items-start gap-2 cursor-pointer">
@@ -99,12 +107,12 @@ export function SettingsMenu() {
             </span>
           </label>
 
-          <div className="rounded-lg bg-base-200/60 px-2 py-1.5 text-[10px] leading-tight text-base-content/60 space-y-1">
+          <div className="rounded-lg bg-base-200/60 px-2 py-1.5 text-[10px] leading-tight text-base-content/60 space-y-1 break-words">
             <div>{statusLine}</div>
             {otherChains.length > 0 && (
               <div>
-                Also available on chain{otherChains.length > 1 ? 's' : ''}{' '}
-                {otherChains.map((c) => c.chainId).join(', ')}.
+                {atomicStatus ? 'Also available' : 'Available'} on chain
+                {otherChains.length > 1 ? 's' : ''} {otherChains.map((c) => c.chainId).join(', ')}.
               </div>
             )}
             {!batchEnabled && (
@@ -147,8 +155,11 @@ export function SettingsMenu() {
           {address && !probing && (
             <details className="text-[10px] text-base-content/50">
               <summary className="cursor-pointer">Wallet capability response</summary>
-              <pre className="mt-1 max-h-40 overflow-auto rounded bg-base-200/60 p-1.5 text-[9px] leading-tight">
-                {probeError ?? JSON.stringify(capabilities ?? {}, null, 1)}
+              {/* Wrap rather than scroll sideways — a horizontal scrollbar
+                  inside a dropdown reads as clipped content. */}
+              <pre className="mt-1 max-h-40 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-all rounded bg-base-200/60 p-1.5 text-[9px] leading-tight">
+                {JSON.stringify(capabilities ?? {}, null, 1)}
+                {probeError ? `\n\nprobe error: ${probeError}` : ''}
               </pre>
             </details>
           )}

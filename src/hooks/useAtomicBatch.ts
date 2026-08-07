@@ -27,12 +27,7 @@ export type AtomicStatus = 'supported' | 'ready' | 'unsupported'
  *
  * `undefined` means the chain wasn't in the response at all.
  */
-export function atomicStatusFor(
-  capabilities: Record<number, any> | undefined,
-  chainId: number
-): AtomicStatus | undefined {
-  if (!Number.isFinite(chainId)) return undefined
-  const entry = capabilities?.[chainId]
+export function atomicStatusOf(entry: any): AtomicStatus | undefined {
   if (!entry) return undefined
   const status = entry.atomic?.status
   if (status === 'supported' || status === 'ready' || status === 'unsupported') return status
@@ -40,6 +35,15 @@ export function atomicStatusFor(
   if (legacy === true) return 'supported'
   if (legacy === false) return 'unsupported'
   return undefined
+}
+
+/** Same, indexed out of the full per-chain record. */
+export function atomicStatusFor(
+  capabilities: Record<number, any> | undefined,
+  chainId: number
+): AtomicStatus | undefined {
+  if (!Number.isFinite(chainId)) return undefined
+  return atomicStatusOf(capabilities?.[chainId])
 }
 
 /** Every chain in the response that can batch, for diagnostics in settings. */
@@ -106,14 +110,64 @@ export function useAtomicBatch(params: { chainId: string; account?: string }) {
     },
   })
 
-  const probeError = probeErrorRaw
-    ? ((probeErrorRaw as any).shortMessage ??
-      probeErrorRaw.message ??
-      'Wallet did not answer the capability probe')
-    : null
-
   const numericChainId = Number(chainId)
-  const atomicStatus = atomicStatusFor(capabilities, numericChainId)
+  const validChainId = Number.isFinite(numericChainId) && numericChainId > 0
+  const unfilteredStatus = atomicStatusFor(capabilities, numericChainId)
+
+  /** The unfiltered probe produced a real per-chain list (however long). */
+  const answeredBroadly = !probeErrorRaw && !!capabilities && Object.keys(capabilities).length > 0
+
+  // Fallback probe, scoped to the one chain we're about to act on.
+  //
+  // `wallet_getCapabilities(address)` is supposed to answer for every chain the
+  // wallet knows, but some wallets answer only for the chain they're currently
+  // on — or return `{}` outright — and only give a real answer when asked about
+  // a specific chain. Without this, batching silently disappears on every chain
+  // except whichever one the wallet happens to be sitting on.
+  //
+  // It fires ONLY when the broad probe told us nothing at all. If the wallet did
+  // return a chain list that simply omits ours, that IS the answer — asking
+  // again per-chain just makes viem return `undefined`, which react-query
+  // rejects as "data is undefined", producing a bogus "wallet doesn't answer
+  // the probe" in the UI for what is really "this chain isn't supported".
+  const needsScopedProbe =
+    !!address && validChainId && !probing && unfilteredStatus === undefined && !answeredBroadly
+
+  const {
+    data: scopedCaps,
+    isLoading: scopedProbing,
+    error: scopedErrorRaw,
+  } = useCapabilities({
+    account: address,
+    chainId: numericChainId as never,
+    query: {
+      enabled: needsScopedProbe,
+      retry: false,
+      staleTime: 60_000,
+    },
+  })
+
+  const errorText = (e: unknown) =>
+    (e as any)?.shortMessage ?? (e as Error | undefined)?.message ?? null
+
+  // A scoped probe for a chain the wallet knows nothing about resolves to
+  // `undefined`, which react-query surfaces as an error. That's an answer
+  // ("no capability here"), not a probe failure — don't report it as one.
+  const scopedErrorText = errorText(scopedErrorRaw)
+  const scopedFoundNothing = !!scopedErrorText && /data is undefined/i.test(scopedErrorText)
+
+  const probeError = probeErrorRaw
+    ? (errorText(probeErrorRaw) ?? 'Wallet did not answer the capability probe')
+    : scopedErrorRaw && !scopedFoundNothing
+      ? (scopedErrorText ?? 'Wallet did not answer the capability probe')
+      : null
+
+  /** The wallet answered, but has nothing at all to say about this chain. */
+  const chainNotListed =
+    !probeError && unfilteredStatus === undefined && (answeredBroadly || scopedFoundNothing)
+
+  // A chain-scoped response is the capability object itself, not a record.
+  const atomicStatus = unfilteredStatus ?? atomicStatusOf(scopedCaps)
 
   /**
    * `'ready'` means the wallet *can* batch but will prompt the user to upgrade
@@ -222,8 +276,9 @@ export function useAtomicBatch(params: { chainId: string; account?: string }) {
     supported,
     needsUpgrade,
     atomicStatus,
+    chainNotListed,
     capabilities,
-    probing,
+    probing: probing || scopedProbing,
     probeError,
     sendBatch,
     upgradeAccount,
