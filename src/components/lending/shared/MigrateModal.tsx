@@ -122,6 +122,26 @@ function buildMidnightPairRow(
 // native asset, so the target must be the wrapped form). Keyed by chainId string.
 const NATIVE_SENTINEL = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
 
+/**
+ * Lender keys that can never be a migrate TARGET (they are still valid
+ * as a SOURCE). Euler V2 / Dolomite are detectable by key; non-Venus Compound V2
+ * can't be classified client-side, so the build returns a clear UNSUPPORTED
+ * error for those instead.
+ *
+ * These MUST be pushed into the optimizer query (`excludeLenders`) and not only
+ * filtered client-side: the endpoint truncates to `count` BEFORE we get to drop
+ * anything, so unsupported rows that outrank the real targets silently eat the
+ * page. On Ethereum WETH/USDC that was 15 of 25 slots taken by Euler V2 vaults,
+ * which pushed Aave V4 (rank 30 of 41) off the list entirely — while wstETH/USDC,
+ * with fewer Euler vaults, kept it.
+ *
+ * NB: these must be the REGISTRY lender keys, not brand prefixes. The endpoint's
+ * "prefix-expanded" means a base key expands to its per-market keys
+ * (`AAVE_V4` → `AAVE_V4_<hub>_<spoke>`); it does NOT truncate, so `EULER`
+ * matches nothing and `EULER_V2` is required.
+ */
+const UNSUPPORTED_TARGET_LENDERS = ['EULER_V2', 'DOLOMITE']
+
 const WRAPPED_NATIVE_BY_CHAIN: Record<string, string> = {
   '1': '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', // WETH
   '10': '0x4200000000000000000000000000000000000006', // WETH (Optimism)
@@ -316,6 +336,7 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
       chainId,
       collaterals: swapLeg === 'debt' ? collateralSearch : undefined,
       debts: swapLeg === 'collateral' ? debtSearch : undefined,
+      excludeLenders: UNSUPPORTED_TARGET_LENDERS,
       sortBy: 'aprTotal',
       sortDir: 'DESC',
       count: 100,
@@ -356,24 +377,26 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
   // default risk cap (which hides whole chains, e.g. Polygon, whose chain/config
   // dimensions score "high") — we surface every target and show its risk score
   // instead so the user can judge it.
+  // Both legs are pinned to a single asset here, so the qualifying set is small
+  // (~40 rows on the widest Ethereum pair). Ask for all of it rather than a
+  // 25-row page: the server truncates before the client-side drops below, so a
+  // small page loses real targets to rows we then discard.
   const { rows, isLoading, error: pairsError } = useOptimizerPairs({
     chainId,
     collaterals: activeCollateralSearch,
     debts: activeDebtSearch,
+    excludeLenders: UNSUPPORTED_TARGET_LENDERS,
     sortBy: 'aprTotal',
     sortDir: 'DESC',
-    count: 25,
+    count: 100,
     maxRiskScore: 100,
   })
 
   // Drop the source pair itself (no-op) and lenders that can't be a migration
-  // TARGET. Euler V2 / Dolomite are detectable by key; non-Venus Compound V2
-  // can't be classified client-side, so the build returns a clear UNSUPPORTED
-  // error for those. (All of these are still valid as a SOURCE.)
-  const isUnsupportedTarget = (key: string) => {
-    const k = key.toUpperCase()
-    return k.startsWith('EULER') || k.startsWith('DOLOMITE')
-  }
+  // TARGET. `excludeLenders` already removes these server-side; this is the
+  // client-side backstop for a backend that ignores the param.
+  const isUnsupportedTarget = (key: string) =>
+    UNSUPPORTED_TARGET_LENDERS.some((p) => key.toUpperCase().startsWith(p))
   // Re-filter client-side to EXACTLY the intended assets: the source (native ⇄
   // wrapped forms) on the fixed leg, and the picked target on the converted leg.
   // Then drop targets whose debt market can't supply the borrow: a migrate must
