@@ -15,7 +15,7 @@ import {
 import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
-import { isExactlyMarket, lenderSupportsSubAccounts } from './helpers'
+import { isExactlyMarket, lenderSupportsSubAccounts, lenderSupportsNative } from './helpers'
 import { HealthFactorProjection } from './HealthFactorProjection'
 import { RateImpactIndicator } from './RateImpactIndicator'
 import { TransactionSuccess } from './TransactionSuccess'
@@ -80,7 +80,8 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
     !!selectedLoan &&
     compareAmountStrings(amount || '0', closeNowAmountString(selectedLoan)) >= 0
 
-  const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
+  const canUseNative =
+    !!pool && isWNative(pool.asset) && !!nativeToken && lenderSupportsNative(lenderKey)
 
   const exec = useActionExecution({
     actionType: 'Repay',

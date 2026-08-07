@@ -32,11 +32,17 @@ export function useTermSheet(params: {
    */
   fallback?: AnyTermSheet
   enabled?: boolean
-}): { sheet: AnyTermSheet | undefined; isFull: boolean; isLoading: boolean } {
+}): {
+  sheet: AnyTermSheet | undefined
+  isFull: boolean
+  isLoading: boolean
+  /** Surfaced so a caller can tell "still fetching" from "genuinely failed". */
+  error: unknown
+} {
   const { marketUid, chainId, fallback, enabled = true } = params
   const lender = marketUid?.split(':')[0]
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['termSheet', marketUid ?? ''],
     enabled: enabled && !!marketUid && !!chainId && !!lender,
     // Governance and oracle move far slower than rates, and the whole sheet is
@@ -46,7 +52,11 @@ export function useTermSheet(params: {
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<TermSheet | undefined> => {
       const url = new URL(`${BACKEND_BASE_URL}/v1/data/lending/pools`)
-      url.searchParams.set('chains', String(chainId))
+      // `chainId`, NOT `chains`. The origin rejects `chains` with a 500
+      // ("chainId is required") — and because this hook falls back to the
+      // digest on any failure, getting it wrong shows "Full terms are not
+      // loaded" on EVERY market instead of surfacing an error.
+      url.searchParams.set('chainId', String(chainId))
       url.searchParams.set('lender', String(lender))
       url.searchParams.set('terms', 'full')
       const r = await fetch(url.toString())
@@ -61,5 +71,5 @@ export function useTermSheet(params: {
   })
 
   const sheet = data ?? fallback
-  return { sheet, isFull: isFullSheet(sheet), isLoading }
+  return { sheet, isFull: isFullSheet(sheet), isLoading, error }
 }

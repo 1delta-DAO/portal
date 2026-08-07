@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { duration, exposureSummary, feeAmount, isRebate, pct, tagLabel } from './format'
-import { criticalFindings, findings, hasCritical, rankedTags, severityOfTag } from './severity'
+import {
+  criticalFindings,
+  findings,
+  hasCritical,
+  hasExpandableDetail,
+  rankedTags,
+  severityOfTag,
+  splitFindings,
+} from './severity'
 import { isFullSheet, sideInfo } from './types'
+import { lenderSupportsNative } from '../actions/helpers'
 import { aprPercentToWad, wadToAprPercent } from '../../../sdk/lending-helper/fetchLiquityRate'
 import type { AnyTermSheet, FeeTerm, TermSheet, TermSheetDigest } from './types'
 
@@ -380,5 +389,83 @@ describe('Liquity open: the borrow form cannot express this call', () => {
     globalThis.fetch = orig
     // Sending 0 would set a 0 % rate — first in the redemption queue.
     expect('interestRate' in calls[0]).toBe(false)
+  })
+})
+
+describe('summary collapse — what survives it, and when to offer a toggle', () => {
+  // A digest with a critical tag (time liquidation) and a non-critical one
+  // (governance boilerplate) on the borrow side.
+  const digest = (tags: string[], description?: string): AnyTermSheet =>
+    ({
+      borrow: {
+        headline: 'Variable 8.43% · repay any time at no extra cost',
+        tags,
+        ...(description ? { description } : {}),
+      },
+    }) as unknown as AnyTermSheet
+
+  it('keeps criticals out of the collapsed-away pile', () => {
+    // A critical is what gates the wallet — it must not be reachable only by
+    // expanding.
+    const { criticals, secondary } = splitFindings(
+      digest(['time-liquidation', 'no-timelock']),
+      'borrow',
+    )
+    expect(criticals.map((f) => f.id)).toContain('borrow-time-liquidation')
+    expect(secondary.map((f) => f.id)).not.toContain('borrow-time-liquidation')
+  })
+
+  it('moves governance boilerplate into the detail', () => {
+    const { criticals, secondary } = splitFindings(digest(['no-timelock']), 'borrow')
+    expect(criticals).toEqual([])
+    expect(secondary.map((f) => f.id)).toContain('borrow-no-timelock')
+  })
+
+  it('offers a toggle when there IS something behind it', () => {
+    // A secondary finding alone is enough.
+    expect(hasExpandableDetail(digest(['no-timelock']), 'borrow')).toBe(true)
+    // So is a description, with no findings at all.
+    expect(hasExpandableDetail(digest([], 'Some prose.'), 'borrow')).toBe(true)
+  })
+
+  it('offers NO toggle on a digest with nothing but criticals', () => {
+    // Expanding would show "Full terms are not loaded for this market" — a
+    // dead end. The critical itself is already visible while collapsed.
+    expect(hasExpandableDetail(digest(['time-liquidation']), 'borrow')).toBe(false)
+    expect(hasExpandableDetail(digest([]), 'borrow')).toBe(false)
+  })
+
+  it('always offers a toggle on a FULL sheet — there are rows to show', () => {
+    const full = {
+      borrow: { info: { headline: 'x', description: '', tags: [] } },
+    } as unknown as AnyTermSheet
+    expect(hasExpandableDetail(full, 'borrow')).toBe(true)
+  })
+})
+
+describe('native capability — allow by default, deny only where impossible', () => {
+  it('leaves every ordinary lender alone', () => {
+    // The gate is a DENY list precisely so this stays true: flipping it to
+    // allow-by-exception would silently drop the toggle everywhere.
+    for (const l of ['AAVE_V3', 'MORPHO_BLUE', 'EULER_V2', 'FLUID_1_11', undefined]) {
+      expect(lenderSupportsNative(l), String(l)).toBe(true)
+    }
+  })
+
+  it('denies Curvance, including its per-market keys', () => {
+    expect(lenderSupportsNative('CURVANCE')).toBe(false)
+    expect(lenderSupportsNative('CURVANCE_143_E1C24B2E93230FBE33D32BA38ECA3218284143E2')).toBe(false)
+    // A marketUid, which is what some call sites hold.
+    expect(lenderSupportsNative('CURVANCE_143_ABC:143:0xdead')).toBe(false)
+  })
+
+  it('does NOT deny Midnight — "not built yet" is not "cannot exist"', () => {
+    // Midnight has no composer path yet and the API 501s; that error is meant
+    // to surface in the panel. Curvance has no native entry point at all.
+    expect(lenderSupportsNative('MORPHO_MIDNIGHT_0xabc')).toBe(true)
+  })
+
+  it('is not fooled by a lender that merely starts with the same letters', () => {
+    expect(lenderSupportsNative('CURVE_LEND')).toBe(true)
   })
 })

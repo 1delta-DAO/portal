@@ -246,6 +246,7 @@ const TAG_LABEL: Record<string, string> = {
   'exit-instant': 'Instant exit',
   'exit-capped': 'Capped exit',
   'exit-cooldown': 'Exit cooldown',
+  'repay-locked': 'Repayment locked',
   'exit-queued': 'Queued exit',
   'exit-market-sale': 'Exit by market sale',
   'exit-may-be-impossible': 'Exit may be impossible',
@@ -261,6 +262,10 @@ const TAG_LABEL: Record<string, string> = {
   'no-timelock': 'No timelock',
   'eoa-controlled': 'EOA-controlled',
   'points-rewards': 'Includes points',
+  // Yield PROVENANCE. Both read as plain statements rather than warnings —
+  // intrinsic yield is not a defect, it just is not this market paying you.
+  'intrinsic-yield': 'Mostly asset yield',
+  'no-market-interest': 'Market pays no interest',
   'oracle-flagged': 'Oracle flagged',
   'no-oracle': 'No oracle',
 }

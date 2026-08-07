@@ -8,7 +8,7 @@ import { formatTokenAmount, formatUsd, parseAmount } from './format'
 import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
-import { lenderSupportsSubAccounts, fixedTermDetails } from './helpers'
+import { lenderSupportsSubAccounts, fixedTermDetails, lenderSupportsNative } from './helpers'
 import { SellEarlyPanel } from '../shared/SellEarlyPanel'
 import { HealthFactorProjection } from './HealthFactorProjection'
 import { RateImpactIndicator } from './RateImpactIndicator'
@@ -40,7 +40,8 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
     setSelectedAccountId(accountId ?? null)
   }, [accountId])
 
-  const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
+  const canUseNative =
+    !!pool && isWNative(pool.asset) && !!nativeToken && lenderSupportsNative(lenderKey)
 
   const exec = useActionExecution({
     actionType: 'Withdraw',

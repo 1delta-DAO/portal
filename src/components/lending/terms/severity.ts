@@ -1,5 +1,5 @@
 import type { AnyTermSheet, TermSide, TermTag } from './types'
-import { sideInfo } from './types'
+import { sideInfo, isFullSheet } from './types'
 
 /**
  * Severity — PURE, derived only from structured term-sheet fields.
@@ -37,6 +37,7 @@ const CRITICAL_TAGS = new Set<TermTag>([
   'full-collateral-seizure',
   'time-liquidation',
   'redeemable',
+  'repay-locked',
   'physical-delivery',
   'first-loss',
   'undercollateralized',
@@ -87,6 +88,8 @@ const TAG_MESSAGE: Partial<Record<string, string>> = {
   'exit-may-be-impossible':
     'Exiting early needs a buyer on the order book, and there may be none at any price.',
   'exit-cooldown': 'Withdrawals require a waiting period.',
+  'repay-locked':
+    'The debt cannot be repaid for a period after opening or topping up — the position cannot be closed or deleveraged, and a liquidation cannot be averted by repaying.',
   'exit-queued': 'Withdrawals are queued rather than instant.',
   'exit-market-sale': 'Exiting early means selling at the prevailing market price.',
   'socialized-loss': 'Bad debt is socialised across all lenders in this market.',
@@ -185,4 +188,44 @@ export function severityBadgeClass(s: Severity): string {
     default:
       return 'border-base-300 bg-base-200/60 text-base-content/70'
   }
+}
+
+/**
+ * Split a side's findings into the ones that must survive collapse and the
+ * ones that belong in the detail.
+ *
+ * CRITICALS stay visible: they are what `useTermsAcknowledgement` gates the
+ * wallet on, so putting one behind a chevron would trade a real safety
+ * property for tidiness. Everything else — governance boilerplate like
+ * "Parameters can be changed with no notice period", true of most markets —
+ * earns its place in the expanded body instead of competing with the headline.
+ */
+export function splitFindings(
+  sheet: AnyTermSheet | undefined,
+  side: TermSide,
+): { criticals: TermFinding[]; secondary: TermFinding[] } {
+  const ranked = sheet ? findings(sheet, side) : []
+  return {
+    criticals: ranked.filter((f) => f.severity === 'critical'),
+    secondary: ranked.filter((f) => f.severity !== 'critical'),
+  }
+}
+
+/**
+ * Would expanding this side actually reveal anything?
+ *
+ * Drives whether the summary offers a toggle at all. A chevron that expands to
+ * "Full terms are not loaded for this market" is a dead end, and on a
+ * digest-only row with no secondary findings and no description that is all
+ * there is.
+ */
+export function hasExpandableDetail(
+  sheet: AnyTermSheet | undefined,
+  side: TermSide,
+): boolean {
+  if (!sheet) return false
+  if (splitFindings(sheet, side).secondary.length > 0) return true
+  if (sideInfo(sheet, side)?.description) return true
+  // A full sheet always has detail rows to render.
+  return isFullSheet(sheet)
 }

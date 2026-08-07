@@ -29,7 +29,7 @@ import {
   solvencyLabel,
   triggerLabel,
 } from './format'
-import { findings, severityTextClass } from './severity'
+import { hasExpandableDetail, severityTextClass, splitFindings } from './severity'
 import type { AnyTermSheet, FeeTerm, TermSheet, TermSide } from './types'
 import { isFullSheet, sideInfo } from './types'
 
@@ -535,7 +535,10 @@ export const TermsSummary: React.FC<{
    * Omit to render the sheet read-only.
    */
   rateEdit?: TermsRateEdit
-}> = ({ sheet, side, defaultOpen = false, className, rateEdit }) => {
+  /** True while the full sheet is being fetched — keeps "summary only" from
+   *  reading as a permanent fact about the market. */
+  termsLoading?: boolean
+}> = ({ sheet, side, defaultOpen = false, className, rateEdit, termsLoading }) => {
   const [open, setOpen] = useState(defaultOpen)
   if (!sheet) return null
 
@@ -552,7 +555,11 @@ export const TermsSummary: React.FC<{
     )
   }
 
-  const ranked = findings(sheet, side)
+  // Criticals stay visible while collapsed; everything else moves into the
+  // expanded body. See `splitFindings` for why the split is not a blanket
+  // "hide the findings".
+  const { criticals, secondary } = splitFindings(sheet, side)
+
   // `canOpen` is nested on the full sheet and hoisted on the digest.
   const sideAny = sheet[side] as
     | { canOpen?: boolean; availability?: { canOpen: boolean; blockedBy?: string } }
@@ -561,20 +568,31 @@ export const TermsSummary: React.FC<{
   const blockedBy = sideAny?.availability?.blockedBy
   const blocked = !canOpen
 
+  const hasMore = hasExpandableDetail(sheet, side)
+
   return (
     <div className={`rounded-lg border border-base-300 text-[11px] ${className ?? ''}`}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full px-2 py-1.5 flex items-start justify-between gap-2 text-left hover:bg-base-200/40 transition-colors rounded-lg"
-        aria-expanded={open}
-      >
-        <div className="min-w-0 space-y-1">
+      {hasMore ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="w-full px-2 py-1.5 flex items-start justify-between gap-2 text-left hover:bg-base-200/40 transition-colors rounded-lg"
+          aria-expanded={open}
+        >
+          <div className="min-w-0 space-y-1">
+            <div className="font-medium text-base-content/80">{info.headline}</div>
+            <TermsChips sheet={sheet} side={side} limit={3} />
+          </div>
+          <span className="text-base-content/40 shrink-0 mt-0.5">{open ? '▲' : '▼'}</span>
+        </button>
+      ) : (
+        // Nothing to expand — render the same header as static content rather
+        // than a button that does nothing when clicked.
+        <div className="w-full px-2 py-1.5 min-w-0 space-y-1">
           <div className="font-medium text-base-content/80">{info.headline}</div>
           <TermsChips sheet={sheet} side={side} limit={3} />
         </div>
-        <span className="text-base-content/40 shrink-0 mt-0.5">{open ? '▲' : '▼'}</span>
-      </button>
+      )}
 
       {blocked ? (
         <div className="mx-2 mb-1.5 rounded border border-error/30 bg-error/10 px-2 py-1 text-error">
@@ -582,12 +600,12 @@ export const TermsSummary: React.FC<{
         </div>
       ) : null}
 
-      {ranked.length > 0 ? (
+      {criticals.length > 0 ? (
         <ul className="mx-2 mb-1.5 space-y-1">
-          {ranked.slice(0, open ? undefined : 2).map((f) => (
+          {criticals.map((f) => (
             <li key={f.id} className={`flex gap-1.5 ${severityTextClass(f.severity)}`}>
               <span aria-hidden className="shrink-0">
-                {f.severity === 'critical' ? '⚠' : '•'}
+                ⚠
               </span>
               <span>{f.message}</span>
             </li>
@@ -597,6 +615,18 @@ export const TermsSummary: React.FC<{
 
       {open ? (
         <div className="border-t border-base-300 px-2 py-2 space-y-2.5">
+          {secondary.length > 0 ? (
+            <ul className="space-y-1">
+              {secondary.map((f) => (
+                <li key={f.id} className={`flex gap-1.5 ${severityTextClass(f.severity)}`}>
+                  <span aria-hidden className="shrink-0">
+                    •
+                  </span>
+                  <span>{f.message}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           {info.description ? <p className="text-base-content/60">{info.description}</p> : null}
           {full ? (
             <>
@@ -620,10 +650,13 @@ export const TermsSummary: React.FC<{
               ) : null}
             </>
           ) : (
-            // Digest only — say so rather than rendering an empty panel, which
-            // would read as "this market has no terms".
+            // Digest only. This is normally TRANSIENT — the full sheet is
+            // being fetched — so it must not read as a permanent property of
+            // the market. Distinguishing loading from failure matters:
+            // wording this as a fact made a wrong query param look like every
+            // market simply had no terms.
             <p className="text-base-content/50 italic">
-              Full terms are not loaded for this market.
+              {termsLoading ? 'Loading full terms…' : 'Showing summary terms only.'}
             </p>
           )}
         </div>

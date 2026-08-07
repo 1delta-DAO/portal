@@ -10,7 +10,7 @@ import { formatTokenAmount, formatUsd, parseAmount } from './format'
 import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
-import { lenderSupportsSubAccounts, fixedTermDetails } from './helpers'
+import { lenderSupportsSubAccounts, fixedTermDetails, lenderSupportsNative } from './helpers'
 import { FixedTermDetailsRows } from '../shared/FixedTermDetails'
 import { MidnightOrderBook } from '../shared/MidnightOrderBook'
 import { useLendingOffers, computeEffectiveBorrow } from '../../../hooks/lending/useLendingOffers'
@@ -47,7 +47,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   // The row carries a DIGEST (the API default). Upgrade to the full sheet
   // for this one market so the panel can show exit terms, liquidation
   // params, fees, oracle and governance — the digest has none of those.
-  const { sheet: termSheet } = useTermSheet({
+  const { sheet: termSheet, isLoading: termsLoading } = useTermSheet({
     marketUid: pool?.marketUid,
     chainId,
     fallback: pool?.termSheet,
@@ -232,7 +232,8 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   const displayPosition =
     allowCustomReceiver && receiverOverride ? receiverPosition : operatorPosition
 
-  const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
+  const canUseNative =
+    !!pool && isWNative(pool.asset) && !!nativeToken && lenderSupportsNative(lenderKey)
 
   const exec = useActionExecution({
     actionType: 'Deposit',
@@ -744,7 +745,7 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
       {/* One card, every lender: rate breakdown, exit terms + utilization,
           what backs the deposit, fees, oracle and governance — all derived
           from `termSheet`, with no lender-key branching. */}
-      <TermsSummary sheet={termSheet} side="supply" />
+      <TermsSummary sheet={termSheet} side="supply" termsLoading={termsLoading} />
 
       <ActionExecuteBlock
         exec={exec}

@@ -130,3 +130,27 @@ not terms. They stay as separate components, selected by
 `FixedTermDetailsRows` now takes `hideRows` for exactly this reason: its term
 rows are superseded by `TermsSummary` (which covers every lender, not just the
 fixed-term subset), while its ladder is still the only live-depth renderer.
+
+## Collapsed vs expanded — what survives the fold
+
+`TermsSummary` renders in two states, and the split between them is a safety
+decision rather than a layout one.
+
+**Always visible (collapsed):** the headline, up to three chips, the
+unavailability banner, and **every `critical` finding**. Criticals are what
+`useTermsAcknowledgement` gates the wallet on, so putting one behind a chevron
+would trade a real safety property for tidiness.
+
+**Expanded only:** `warn` / `info` findings, the description, and the detail
+rows. Governance boilerplate — *"Parameters can be changed with no notice
+period"* — is true of most markets we serve; leaving it in the summary made it
+compete with the headline while saying little.
+
+**The toggle is conditional.** `hasExpandableDetail()` decides whether the
+header is a button at all. A digest-only row whose findings are all critical has
+nothing behind the chevron but *"Full terms are not loaded for this market"* — a
+dead end — so it renders as static content with no affordance.
+
+Both rules live in `severity.ts` (`splitFindings`, `hasExpandableDetail`) rather
+than inline in the component, so they are unit-tested; this package has no DOM
+test harness.

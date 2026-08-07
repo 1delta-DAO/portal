@@ -13,6 +13,34 @@ export function lenderSupportsSubAccounts(lender?: string): boolean {
 }
 
 /**
+ * Lenders with NO native ↔ wrapped-native path at all.
+ *
+ * Deliberately a DENY list with an allow-by-default: the UI's native toggle
+ * keys off `isWNative(pool.asset)`, which asks whether the *asset* is wrapped
+ * native and never whether the *lender* can take the unwrapped form. Flipping
+ * that to allow-by-exception would silently drop the toggle from every lender
+ * that already works.
+ *
+ * - **Curvance** — every cToken entry point is `nonpayable` and it ships no
+ *   native gateway, so its five WMON markets can never accept MON. Nor can we
+ *   wrap on the way in: it is direct-route-only by design (delegating to a
+ *   shared contract is unsafe there), so there is no transaction to bundle a
+ *   wrap into.
+ *
+ * Note the contrast with Midnight, which is deliberately NOT listed: it has no
+ * composer path *yet*, so the toggle stays and the API's 501 surfaces in the
+ * panel. The difference is "not built" versus "cannot exist" — only the second
+ * belongs here.
+ */
+const NO_NATIVE_LENDERS = ['CURVANCE'] as const
+
+export function lenderSupportsNative(lender?: string | null): boolean {
+  if (!lender) return true
+  const key = lender.split(':')[0].toUpperCase()
+  return !NO_NATIVE_LENDERS.some((l) => key === l || key.startsWith(`${l}_`))
+}
+
+/**
  * Morpho Midnight markets (fixed-rate, fixed-maturity order-book). Detected from
  * the lender segment of a `marketUid` (`MORPHO_MIDNIGHT_<id>:<chain>:<token>`) or
  * a raw lender key. Mirrors `isMidnight` in `@1delta/lender-registry`.

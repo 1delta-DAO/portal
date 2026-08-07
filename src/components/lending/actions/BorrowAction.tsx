@@ -8,7 +8,7 @@ import { formatTokenAmount, formatUsd, parseAmount } from './format'
 import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
-import { lenderSupportsSubAccounts, fixedTermDetails } from './helpers'
+import { lenderSupportsSubAccounts, fixedTermDetails, lenderSupportsNative } from './helpers'
 import { FixedTermDetailsRows } from '../shared/FixedTermDetails'
 import { MidnightOrderBook } from '../shared/MidnightOrderBook'
 import { useLendingOffers, computeEffectiveBorrow } from '../../../hooks/lending/useLendingOffers'
@@ -48,7 +48,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   // The row carries a DIGEST (the API default). Upgrade to the full sheet
   // for this one market so the panel can show exit terms, liquidation
   // params, fees, oracle and governance — the digest has none of those.
-  const { sheet: termSheet } = useTermSheet({
+  const { sheet: termSheet, isLoading: termsLoading } = useTermSheet({
     marketUid: pool?.marketUid,
     chainId,
     fallback: pool?.termSheet,
@@ -102,7 +102,8 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   // API's `params.market.fixedTerm` — same shape for Lista and Midnight.
   const ftDetails = fixedTermDetails(pool)
 
-  const canUseNative = !!pool && isWNative(pool.asset) && !!nativeToken
+  const canUseNative =
+    !!pool && isWNative(pool.asset) && !!nativeToken && lenderSupportsNative(lenderKey)
 
   const exec = useActionExecution({
     actionType: 'Borrow',
@@ -502,6 +503,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
       <TermsSummary
         sheet={termSheet}
         side="borrow"
+        termsLoading={termsLoading}
         rateEdit={userSet?.required ? { value: chosenRatePct, onChange: setRateState } : undefined}
       />
 

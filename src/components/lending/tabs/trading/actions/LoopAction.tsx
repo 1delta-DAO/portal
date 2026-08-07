@@ -25,6 +25,8 @@ import { SubAccountSelector } from '../../../actions/SubAccountSelector'
 import { lenderSupportsSubAccounts, fixedTermDetails } from '../../../actions/helpers'
 import { FixedTermDetailsRows } from '../../../shared/FixedTermDetails'
 import { MidnightOrderBook } from '../../../shared/MidnightOrderBook'
+import { TermsSummary } from '../../../terms'
+import { useTermSheet } from '../../../../../hooks/lending/useTermSheet'
 import {
   fetchLoopRangeWithSimulation,
   fetchLoopRange,
@@ -139,6 +141,30 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
   // Amounts — pre-fill the pay amount when the optimizer hands one through.
   const [debtAmount, setDebtAmount] = useState('')
+
+  // A loop signs the user up to BOTH sides at once — it supplies into the
+  // collateral market and borrows out of the debt market — so one sheet cannot
+  // describe it. Two sheets, each on its own side.
+  //
+  // This matters more here than on the single-sided panels, because the terms
+  // that bite hardest on a loop are exit terms: Curvance stamps a 20-minute
+  // hold on POSTING COLLATERAL and on BORROWING during which repayment and
+  // redemption both revert, so a freshly opened loop cannot be closed or
+  // deleveraged at all for that window — and its $10 minimum debt gates the
+  // partial repay a deleverage performs, not just the open.
+  //
+  // Rows carry a DIGEST (the API default); upgrade each to the full sheet so
+  // exit terms, liquidation params and fees are actually present.
+  const { sheet: collateralTermSheet } = useTermSheet({
+    marketUid: collateralPool?.marketUid,
+    chainId,
+    fallback: collateralPool?.termSheet,
+  })
+  const { sheet: debtTermSheet } = useTermSheet({
+    marketUid: debtPool?.marketUid,
+    chainId,
+    fallback: debtPool?.termSheet,
+  })
   const [payAmount, setPayAmount] = useState(
     initialSelection?.amount != null ? String(initialSelection.amount) : ''
   )
@@ -816,6 +842,44 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
       {/* Position impact (health factor / borrow capacity) */}
       <SimulationIndicator simulation={simulation} />
+
+      {/* Both sides' terms. Collapsed by default so the panel stays compact;
+          `TermsSummary` still surfaces critical findings when collapsed.
+
+          Each block is LABELLED with its role and asset. Without that the two
+          sheets are indistinguishable — both render as "Variable x% · …" and a
+          reader cannot tell which side they are agreeing to, which is the one
+          thing that matters when the same panel opens a position on both. */}
+      {collateralTermSheet || debtTermSheet ? (
+        <div className="space-y-1.5">
+          {collateralTermSheet ? (
+            <div>
+              <div className="flex items-center gap-1.5 px-1 mb-0.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-success/80">
+                  Collateral
+                </span>
+                <span className="text-[10px] text-base-content/50">
+                  {collateralPool?.asset.symbol} — what you supply and earn on
+                </span>
+              </div>
+              <TermsSummary sheet={collateralTermSheet} side="supply" />
+            </div>
+          ) : null}
+          {debtTermSheet ? (
+            <div>
+              <div className="flex items-center gap-1.5 px-1 mb-0.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-warning/80">
+                  Debt
+                </span>
+                <span className="text-[10px] text-base-content/50">
+                  {debtPool?.asset.symbol} — what you borrow and pay on
+                </span>
+              </div>
+              <TermsSummary sheet={debtTermSheet} side="borrow" />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* Permissions, transactions, and execute. Shown once a quote is selected;
           the wallet-balance warning stays advisory (see the quotes button). */}

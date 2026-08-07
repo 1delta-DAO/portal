@@ -40,6 +40,7 @@ export type TermTag = Open<
   | 'exit-instant'
   | 'exit-capped'
   | 'exit-cooldown'
+  | 'repay-locked'
   | 'exit-queued'
   | 'exit-market-sale'
   | 'exit-may-be-impossible'
@@ -55,6 +56,8 @@ export type TermTag = Open<
   | 'no-timelock'
   | 'eoa-controlled'
   | 'points-rewards'
+  | 'intrinsic-yield'
+  | 'no-market-interest'
   | 'oracle-flagged'
   | 'no-oracle'
 >
