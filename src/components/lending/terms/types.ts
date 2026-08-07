@@ -271,7 +271,12 @@ export interface LiquidationTerms {
   trigger: Open<'price' | 'time' | 'price-and-time' | 'redemption' | 'none'>
   ltv?: number
   liquidationLtv?: number
-  penalty: number
+  /**
+   * OPTIONAL — `0` means the liquidator gets no bonus, `undefined` means we do
+   * not know it. Never render an unknown penalty as "+0%": that reads as a
+   * promise the data does not make.
+   */
+  penalty?: number
   closeFactor: number
   targetHealthFactor?: number
   seizure: Open<'proportional' | 'full-collateral'>

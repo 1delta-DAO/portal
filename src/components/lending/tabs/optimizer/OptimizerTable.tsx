@@ -114,6 +114,128 @@ const fmtTok = (n: number | undefined, sym?: string) =>
     ? '–'
     : `${n.toLocaleString(undefined, { maximumFractionDigits: 4 })}${sym ? ` ${sym}` : ''}`
 
+/** Rewards are folded into the legs by the backend: `depositAprLong` already
+ *  INCLUDES `rewardAprLong`, and `borrowAprShort` is already NET of
+ *  `rewardAprShort`. So the leg line is reward-inclusive at 1×, while
+ *  `aprTotal − aprBase` is that same reward amplified by the loop — the
+ *  collateral leg maxLev×, the debt leg (maxLev−1)×. Rendering the two next to
+ *  each other without saying so is what makes a 2.36% incentive read as "+57% rwd".
+ */
+function rewardSplit(row: OptimizerPairRow) {
+  const lev = row.maxLeverage
+  const dep = row.rewardAprLong || 0
+  const brw = row.rewardAprShort || 0
+  return {
+    dep,
+    brw,
+    levDep: lev > 0 ? lev * dep : dep,
+    levBrw: lev > 1 ? (lev - 1) * brw : 0,
+    lev,
+  }
+}
+
+const hasRwd = (n: number) => Math.abs(n) > 0.0002
+
+/** Per-leg rates for ONE unit of collateral — never leveraged. */
+function LegRates({ row }: { row: OptimizerPairRow }) {
+  // A negative borrow rate means the incentive exceeds the interest: the debt
+  // leg pays you. Colouring that red reads as a cost.
+  const rebate = row.borrowAprShort < 0
+  const organicBorrow = row.borrowAprShort + row.rewardAprShort
+  return (
+    <>
+      <span
+        className="text-success"
+        title={
+          hasRwd(row.rewardAprLong)
+            ? `Deposit APR at 1×, rewards included: ${fmtPct(
+                row.depositAprLong - row.rewardAprLong
+              )} organic + ${fmtPct(row.rewardAprLong)} rewards`
+            : 'Deposit APR at 1× (no leverage applied)'
+        }
+      >
+        {fmtPct(row.depositAprLong)}
+      </span>
+      {' / '}
+      <span
+        className={rebate ? 'text-success' : 'text-error'}
+        title={
+          hasRwd(row.rewardAprShort)
+            ? `Borrow APR at 1×, already net of rewards: ${fmtPct(
+                organicBorrow
+              )} interest − ${fmtPct(row.rewardAprShort)} rewards${
+                rebate ? ' — negative, so the debt leg currently pays you' : ''
+              }`
+            : 'Borrow APR at 1× (no leverage applied)'
+        }
+      >
+        {fmtPct(row.borrowAprShort)}
+      </span>
+    </>
+  )
+}
+
+/** The "rwd in legs" + "base … · rwd @ lev" sublines. Rendered as block-level
+ *  divs so this drops into both the flex-col table cell and the card's
+ *  text-right stack. */
+function RewardLines({ row }: { row: OptimizerPairRow }) {
+  const { dep, brw, levDep, levBrw, lev } = rewardSplit(row)
+  const uplift = row.aprTotal - row.aprBase
+  const showUplift = Math.abs(uplift) > 0.0002
+  const showLegs = hasRwd(dep) || hasRwd(brw)
+  if (!showUplift && !showLegs) return null
+  return (
+    <>
+      {showLegs && (
+        <div
+          className="text-[10px] text-warning/80"
+          title="Reward incentives already contained in the 1× leg rates above — the deposit reward is added to the deposit APR, the borrow reward is subtracted from the borrow APR."
+        >
+          rwd in legs:{' '}
+          {[
+            hasRwd(dep) ? `${fmtDeltaPct(dep)} dep` : null,
+            // Borrow rewards reduce the borrow cost, so they read as negative
+            // here — same convention as the lending/earn tables.
+            hasRwd(brw) ? `${fmtDeltaPct(-brw)} brw` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </div>
+      )}
+      {showUplift && (
+        <div
+          className="text-[10px] text-base-content/50"
+          title={
+            showLegs
+              ? `Net APR excluding rewards — the sustainable rate; incentives are typically transient. The ${fmtDeltaPct(
+                  uplift
+                )} uplift is the leg rewards amplified by the loop: ${fmtLev(lev)} · ${fmtDeltaPct(
+                  dep
+                )} deposit = ${fmtDeltaPct(levDep)}${
+                  hasRwd(brw)
+                    ? `, ${fmtLev(Math.max(lev - 1, 0))} · ${fmtPct(brw)} borrow = ${fmtDeltaPct(
+                        levBrw
+                      )}`
+                    : ''
+                }.`
+              : 'Net APR excluding rewards — the sustainable rate. Reward incentives are typically transient.'
+          }
+        >
+          base{' '}
+          <span className={row.aprBase < 0 ? 'text-error' : 'text-success'}>
+            {fmtPct(row.aprBase)}
+          </span>
+          <span className="text-warning">
+            {' '}
+            · {fmtDeltaPct(uplift)} rwd
+            {lev > 1 ? ` @ ${fmtLev(lev)}` : ''}
+          </span>
+        </div>
+      )}
+    </>
+  )
+}
+
 const ExternalLinkIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -431,9 +553,7 @@ function PairCard({
             {aprIsIndicative(row) ? '*' : ''}
           </div>
           <div className="text-[10px] text-base-content/50">
-            <span className="text-success">{fmtPct(row.depositAprLong)}</span>
-            {' / '}
-            <span className="text-error">{fmtPct(row.borrowAprShort)}</span>
+            <LegRates row={row} />
             {row.originationFeeShort ? (
               <span
                 className="ml-1 text-warning"
@@ -443,18 +563,7 @@ function PairCard({
               </span>
             ) : null}
           </div>
-          {Math.abs(row.aprTotal - row.aprBase) > 0.0002 && (
-            <div
-              className="text-[10px] text-base-content/50"
-              title="Net APR excluding rewards — the sustainable rate. Reward incentives are typically transient."
-            >
-              base{' '}
-              <span className={row.aprBase < 0 ? 'text-error' : 'text-success'}>
-                {fmtPct(row.aprBase)}
-              </span>
-              <span className="text-warning"> · {fmtDeltaPct(row.aprTotal - row.aprBase)} rwd</span>
-            </div>
-          )}
+          <RewardLines row={row} />
           {row.netAprAtAmount != null && (
             <div
               className="text-[10px] text-info"
@@ -633,9 +742,7 @@ export function OptimizerTable({
                         {aprIsIndicative(row) ? '*' : ''}
                       </span>
                       <span className="text-[10px] text-base-content/50">
-                        <span className="text-success">{fmtPct(row.depositAprLong)}</span>
-                        {' / '}
-                        <span className="text-error">{fmtPct(row.borrowAprShort)}</span>
+                        <LegRates row={row} />
                         {row.maturityDays != null && (
                           <span
                             className="ml-1 text-warning"
@@ -653,21 +760,7 @@ export function OptimizerTable({
                           </span>
                         ) : null}
                       </span>
-                      {Math.abs(row.aprTotal - row.aprBase) > 0.0002 && (
-                        <span
-                          className="text-[10px] text-base-content/50"
-                          title="Net APR excluding rewards — the sustainable rate. Reward incentives are typically transient."
-                        >
-                          base{' '}
-                          <span className={row.aprBase < 0 ? 'text-error' : 'text-success'}>
-                            {fmtPct(row.aprBase)}
-                          </span>
-                          <span className="text-warning">
-                            {' '}
-                            · {fmtDeltaPct(row.aprTotal - row.aprBase)} rwd
-                          </span>
-                        </span>
-                      )}
+                      <RewardLines row={row} />
                       {row.netAprAtAmount != null && (
                         <span
                           className="text-[10px] text-info"

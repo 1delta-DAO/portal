@@ -16,9 +16,13 @@ import { isFullSheet } from '../../components/lending/terms/types'
  * so this is a small request rather than a second full page load.
  */
 
-interface PoolsApiResponse {
+interface LendingLatestApiResponse {
   success: boolean
-  data?: { items?: { marketUid?: string; termSheet?: AnyTermSheet }[] }
+  data?: {
+    items?: {
+      markets?: { marketUid?: string; termSheet?: AnyTermSheet }[]
+    }[]
+  }
   error?: { message?: string }
 }
 
@@ -43,30 +47,57 @@ export function useTermSheet(params: {
   const lender = marketUid?.split(':')[0]
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['termSheet', marketUid ?? ''],
+    // Keyed on (chain, lender) rather than on the market, because the request
+    // IS per-lender: one call returns every market that lender has on the
+    // chain. A loop panel needs two sheets from the SAME lender, and keying on
+    // marketUid made those two identical 3.4 MB responses (Aave V3 on Ethereum,
+    // 67 markets at `terms=full`) miss each other in the cache and download
+    // twice. Sharing the key lets React Query dedupe them, and `select` picks
+    // the row — so both sides also land in the same render rather than
+    // popping in one after the other.
+    queryKey: ['termSheets', String(chainId ?? ''), lender ?? ''],
+    select: (rows: Map<string, TermSheet>) =>
+      marketUid ? rows.get(marketUid) : undefined,
     enabled: enabled && !!marketUid && !!chainId && !!lender,
     // Governance and oracle move far slower than rates, and the whole sheet is
     // a snapshot — a long stale window is correct here, not a shortcut.
     staleTime: 60_000,
     retry: 1,
     refetchOnWindowFocus: false,
-    queryFn: async (): Promise<TermSheet | undefined> => {
-      const url = new URL(`${BACKEND_BASE_URL}/v1/data/lending/pools`)
-      // `chainId`, NOT `chains`. The origin rejects `chains` with a 500
-      // ("chainId is required") — and because this hook falls back to the
-      // digest on any failure, getting it wrong shows "Full terms are not
-      // loaded" on EVERY market instead of surfacing an error.
-      url.searchParams.set('chainId', String(chainId))
-      url.searchParams.set('lender', String(lender))
+    queryFn: async (): Promise<Map<string, TermSheet>> => {
+      // `/lending/latest`, NOT `/lending/pools`.
+      //
+      // `/pools` carries no `config` map at all, and almost everything a
+      // borrower reads is derived from it: LTV, liquidation threshold,
+      // penalty, the e-mode `modes[]` (Aave V3 mainnet has EIGHT categories)
+      // and the accepted-collateral set. A sheet built from `/pools` is
+      // technically "full" — every block present — while being empty of the
+      // numbers that matter, which is exactly how Aave V3 ended up showing
+      // nothing but a headline.
+      //
+      // Note the parameter names differ between the two endpoints:
+      // `/latest` takes `chains` + `lenders` (plural), `/pools` takes
+      // `chainId` + `lender`. Getting that wrong 500s.
+      const url = new URL(`${BACKEND_BASE_URL}/v1/data/lending/latest`)
+      url.searchParams.set('chains', String(chainId))
+      url.searchParams.set('lenders', String(lender))
       url.searchParams.set('terms', 'full')
       const r = await fetch(url.toString())
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const json = (await r.json()) as PoolsApiResponse
+      const json = (await r.json()) as LendingLatestApiResponse
       if (!json.success) throw new Error(json.error?.message ?? 'terms fetch failed')
-      const row = (json.data?.items ?? []).find((i) => i.marketUid === marketUid)
-      // Only accept an actual full sheet — a digest here would silently
-      // replace the fallback with something no richer.
-      return isFullSheet(row?.termSheet) ? row!.termSheet : undefined
+      // Only actual FULL sheets go in the map — a digest here would silently
+      // replace the caller's fallback with something no richer.
+      //
+      // Returning a Map (never `undefined`) also matters: a TanStack v5
+      // `queryFn` that resolves to `undefined` THROWS "Query data cannot be
+      // undefined", so the old shape turned "this market has no full sheet"
+      // into a retrying error rather than a quiet fallback.
+      const out = new Map<string, TermSheet>()
+      for (const m of (json.data?.items ?? []).flatMap((i) => i.markets ?? [])) {
+        if (m.marketUid && isFullSheet(m.termSheet)) out.set(m.marketUid, m.termSheet)
+      }
+      return out
     },
   })
 

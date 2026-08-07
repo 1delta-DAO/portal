@@ -1,4 +1,4 @@
-export { TermsSummary, type TermsRateEdit } from './TermsSummary'
+export { TermsSummary, type TermsRateEdit, type TermsTitleTone } from './TermsSummary'
 export { TermsChips } from './TermsChips'
 export { RateModelRows } from './RateModelRows'
 export { RateSetterRow, type RateSetterState } from './RateSetterRow'

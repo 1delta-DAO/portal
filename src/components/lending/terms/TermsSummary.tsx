@@ -292,7 +292,9 @@ function BorrowRows({ sheet, rateEdit }: { sheet: TermSheet; rateEdit?: TermsRat
               ? 'ALL of your collateral'
               : b.liquidation.reversible
                 ? 'Nothing — conversion is penalty-free'
-                : `Debt repaid + ${pct(b.liquidation.penalty * 100)}`
+                : b.liquidation.penalty != null
+                  ? `Debt repaid + ${pct(b.liquidation.penalty * 100)}`
+                  : undefined
           }
           tone={b.liquidation.seizure === 'full-collateral' ? 'critical' : 'default'}
         />
@@ -409,19 +411,48 @@ function BorrowRows({ sheet, rateEdit }: { sheet: TermSheet; rateEdit?: TermsRat
 
       {b.modes && b.modes.length > 1 ? (
         <TermSection title="Modes">
-          {b.modes.map((m) => (
-            <TermRow
-              key={m.modeId}
-              label={m.label ?? `Mode ${m.modeId}`}
-              value={
-                m.liquidation?.ltv != null
-                  ? `${pct(m.liquidation.ltv * 100)} LTV${m.isDefault ? ' (default)' : ''}`
-                  : m.isDefault
-                    ? 'default'
-                    : '—'
-              }
-            />
-          ))}
+          {(() => {
+            // Aave V3 mainnet publishes ~49 categories. Dumping all of them
+            // buries the terms they sit among, and most are irrelevant to the
+            // asset in hand: what a borrower wants is the ones that RAISE the
+            // LTV above the default. Show those, best first, and say how many
+            // were left out rather than silently truncating.
+            const def = b.modes!.find((x) => x.isDefault)
+            const defLtv = def?.liquidation?.ltv ?? b.liquidation.ltv ?? 0
+            const better = b
+              .modes!.filter((x) => !x.isDefault && (x.liquidation?.ltv ?? 0) > defLtv)
+              .sort((x, y) => (y.liquidation?.ltv ?? 0) - (x.liquidation?.ltv ?? 0))
+            const shown = better.slice(0, 4)
+            return (
+              <>
+                <TermRow
+                  label={def?.label ?? 'Default'}
+                  value={`${pct((defLtv ?? 0) * 100)} LTV`}
+                  hint="Applies unless you opt into another mode."
+                />
+                {shown.map((mode) => (
+                  <TermRow
+                    key={mode.modeId}
+                    label={mode.label ?? `Mode ${mode.modeId}`}
+                    value={`${pct((mode.liquidation?.ltv ?? 0) * 100)} LTV`}
+                    tone="good"
+                    hint={
+                      mode.acceptedCollateral
+                        ? 'Higher LTV, but this mode restricts which collateral you may post.'
+                        : undefined
+                    }
+                  />
+                ))}
+                {better.length > shown.length ? (
+                  <TermRow
+                    label="Other modes"
+                    value={`+${better.length - shown.length} more`}
+                    note="Modes that do not raise the LTV for this asset are omitted."
+                  />
+                ) : null}
+              </>
+            )
+          })()}
         </TermSection>
       ) : null}
     </>
@@ -505,6 +536,39 @@ function MarketRows({ sheet }: { sheet: TermSheet }) {
   )
 }
 
+const TITLE_TONE = {
+  default: 'text-base-content/40',
+  good: 'text-success/80',
+  warn: 'text-warning/80',
+} as const
+
+export type TermsTitleTone = keyof typeof TITLE_TONE
+
+/**
+ * Names the card.
+ *
+ * Without it the collapsed state is a bare headline — "Variable 4.64% ·
+ * withdraw any time" over a chip — which reads as an unlabelled rate dropdown
+ * rather than as the terms of the deal. Styled like `TermSection`'s title so
+ * the card's name and the names of the blocks inside it are the same language.
+ */
+const TermsHeader: React.FC<{
+  title: string
+  subtitle?: React.ReactNode
+  tone: TermsTitleTone
+}> = ({ title, subtitle, tone }) => (
+  <div className="flex items-baseline gap-1.5 min-w-0">
+    <span
+      className={`text-[10px] font-semibold uppercase tracking-wide shrink-0 ${TITLE_TONE[tone]}`}
+    >
+      {title}
+    </span>
+    {subtitle ? (
+      <span className="text-[10px] text-base-content/50 truncate">{subtitle}</span>
+    ) : null}
+  </div>
+)
+
 export interface TermsRateEdit {
   /** Controlled value, PERCENT. */
   value?: number
@@ -538,9 +602,33 @@ export const TermsSummary: React.FC<{
   /** True while the full sheet is being fetched — keeps "summary only" from
    *  reading as a permanent fact about the market. */
   termsLoading?: boolean
-}> = ({ sheet, side, defaultOpen = false, className, rateEdit, termsLoading }) => {
+  /**
+   * Overrides the card's name. Defaults to "Deposit terms" / "Borrow terms".
+   *
+   * Panels that open BOTH sides at once (Loop) name them by ROLE instead —
+   * "Collateral" / "Debt" — because two cards that both read "Variable x% · …"
+   * are otherwise indistinguishable, and which side you are agreeing to is the
+   * one thing that matters there.
+   */
+  title?: string
+  /** Qualifier after the title, e.g. the asset and what the side does. */
+  subtitle?: React.ReactNode
+  titleTone?: TermsTitleTone
+}> = ({
+  sheet,
+  side,
+  defaultOpen = false,
+  className,
+  rateEdit,
+  termsLoading,
+  title,
+  subtitle,
+  titleTone = 'default',
+}) => {
   const [open, setOpen] = useState(defaultOpen)
   if (!sheet) return null
+
+  const heading = title ?? (side === 'borrow' ? 'Borrow terms' : 'Deposit terms')
 
   const info = sideInfo(sheet, side)
   const full = isFullSheet(sheet) ? sheet : undefined
@@ -571,7 +659,10 @@ export const TermsSummary: React.FC<{
   const hasMore = hasExpandableDetail(sheet, side)
 
   return (
-    <div className={`rounded-lg border border-base-300 text-[11px] ${className ?? ''}`}>
+    <section
+      className={`rounded-lg border border-base-300 text-[11px] ${className ?? ''}`}
+      aria-label={heading}
+    >
       {hasMore ? (
         <button
           type="button"
@@ -580,6 +671,7 @@ export const TermsSummary: React.FC<{
           aria-expanded={open}
         >
           <div className="min-w-0 space-y-1">
+            <TermsHeader title={heading} subtitle={subtitle} tone={titleTone} />
             <div className="font-medium text-base-content/80">{info.headline}</div>
             <TermsChips sheet={sheet} side={side} limit={3} />
           </div>
@@ -589,6 +681,7 @@ export const TermsSummary: React.FC<{
         // Nothing to expand — render the same header as static content rather
         // than a button that does nothing when clicked.
         <div className="w-full px-2 py-1.5 min-w-0 space-y-1">
+          <TermsHeader title={heading} subtitle={subtitle} tone={titleTone} />
           <div className="font-medium text-base-content/80">{info.headline}</div>
           <TermsChips sheet={sheet} side={side} limit={3} />
         </div>
@@ -661,6 +754,6 @@ export const TermsSummary: React.FC<{
           )}
         </div>
       ) : null}
-    </div>
+    </section>
   )
 }

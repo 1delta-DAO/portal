@@ -93,6 +93,13 @@ disclosure gate, so if findings came only from `implications[]` the gate would
 
 - **Present-but-zero is stated, not hidden.** `0` renders; only `undefined`
   hides a row. A `0.00%` fee is information; a missing row is not.
+- **The corollary: never DEFAULT an unknown to zero.**
+  `liquidation.penalty` shipped as `penalty ?? 0` and every market on
+  `/lending/latest` read "Liquidator takes debt repaid + 0%" — the origin's
+  `market_config` had no penalty column at all, so nothing was known (fixed by
+  yield-tracer migration `0102`). The two states are not interchangeable: `0`
+  is a promise, `undefined` is silence. Fields that can be unknown are
+  optional in `types.ts` for exactly this reason.
 - **`coverage.pending` renders as "not yet available"** (`<TermPending/>`).
   A missing oracle block must never read as "this market has no oracle" when
   the truth is "we have not classified it yet".

@@ -846,37 +846,31 @@ export const LoopAction: React.FC<TradingActionProps> = ({
       {/* Both sides' terms. Collapsed by default so the panel stays compact;
           `TermsSummary` still surfaces critical findings when collapsed.
 
-          Each block is LABELLED with its role and asset. Without that the two
-          sheets are indistinguishable — both render as "Variable x% · …" and a
-          reader cannot tell which side they are agreeing to, which is the one
-          thing that matters when the same panel opens a position on both. */}
+          Each block is LABELLED by ROLE and asset (via TermsSummary's `title` /
+          `subtitle`) rather than by the default "Deposit terms" / "Borrow
+          terms". Without that the two sheets are indistinguishable — both
+          render as "Variable x% · …" and a reader cannot tell which side they
+          are agreeing to, which is the one thing that matters when the same
+          panel opens a position on both. */}
       {collateralTermSheet || debtTermSheet ? (
         <div className="space-y-1.5">
           {collateralTermSheet ? (
-            <div>
-              <div className="flex items-center gap-1.5 px-1 mb-0.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-success/80">
-                  Collateral
-                </span>
-                <span className="text-[10px] text-base-content/50">
-                  {collateralPool?.asset.symbol} — what you supply and earn on
-                </span>
-              </div>
-              <TermsSummary sheet={collateralTermSheet} side="supply" />
-            </div>
+            <TermsSummary
+              sheet={collateralTermSheet}
+              side="supply"
+              title="Collateral"
+              titleTone="good"
+              subtitle={`${collateralPool?.asset.symbol ?? ''} — what you supply and earn on`}
+            />
           ) : null}
           {debtTermSheet ? (
-            <div>
-              <div className="flex items-center gap-1.5 px-1 mb-0.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-warning/80">
-                  Debt
-                </span>
-                <span className="text-[10px] text-base-content/50">
-                  {debtPool?.asset.symbol} — what you borrow and pay on
-                </span>
-              </div>
-              <TermsSummary sheet={debtTermSheet} side="borrow" />
-            </div>
+            <TermsSummary
+              sheet={debtTermSheet}
+              side="borrow"
+              title="Debt"
+              titleTone="warn"
+              subtitle={`${debtPool?.asset.symbol ?? ''} — what you borrow and pay on`}
+            />
           ) : null}
         </div>
       ) : null}
