@@ -2,6 +2,7 @@ export { TermsSummary, type TermsRateEdit, type TermsTitleTone } from './TermsSu
 export { TermsChips } from './TermsChips'
 export { RateModelRows } from './RateModelRows'
 export { RateSetterRow, type RateSetterState } from './RateSetterRow'
+export { BandSetterRow, type BandSetterState } from './BandSetterRow'
 export { TermsDisclosure, useTermsAcknowledgement } from './TermsDisclosure'
 export { TermRow, TermSection, TermPending } from './TermRow'
 export {

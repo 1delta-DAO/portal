@@ -264,9 +264,33 @@ export interface LiquidationTerms {
   badDebt?: Open<
     'socialized' | 'redistributed' | 'insurance-fund' | 'protocol-absorbed' | 'unknown'
   >
-  /** `soft-band`: collateral factor as a function of band count. */
+  /**
+   * `soft-band`: collateral factor as a function of band count.
+   *
+   * @deprecated Sampled points only (4 of 47 possible band counts), and absent
+   * whenever the market has no lend liquidity — it is derived from
+   * `max_borrowable`, which returns 0 on an idle vault. Prefer
+   * {@link openParameter}, which describes the whole domain and is always
+   * available. Kept while the new field rolls out.
+   */
   bandLtv?: Record<string, number>
   defaultBands?: number
+  /**
+   * The knob the BORROWER turns at open, when the factor above depends on one.
+   *
+   * Describes the DOMAIN, not this position's value — a lender with
+   * sub-accounts has several live values at once, so the realised value comes
+   * from per-position data. `kind` is what makes the number readable: a band
+   * count of 15 would otherwise render as "e-mode 15".
+   */
+  openParameter?: {
+    kind: 'llamalend-bands' | 'interest-rate'
+    dimension: 'collateralFactor' | 'rate'
+    domain: { min: number; max: number } | { values: number[] }
+    default: number
+    immutableAfterOpen: boolean
+    adjustCooldownSeconds?: number
+  }
   fullCloseBelowHealthFactor?: number
   trigger: Open<'price' | 'time' | 'price-and-time' | 'redemption' | 'none'>
   ltv?: number

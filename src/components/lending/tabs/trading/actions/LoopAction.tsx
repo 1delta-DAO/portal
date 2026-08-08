@@ -25,7 +25,7 @@ import { SubAccountSelector } from '../../../actions/SubAccountSelector'
 import { lenderSupportsSubAccounts, fixedTermDetails } from '../../../actions/helpers'
 import { FixedTermDetailsRows } from '../../../shared/FixedTermDetails'
 import { MidnightOrderBook } from '../../../shared/MidnightOrderBook'
-import { TermsSummary } from '../../../terms'
+import { TermsSummary, type BandSetterState } from '../../../terms'
 import { useTermSheet } from '../../../../../hooks/lending/useTermSheet'
 import {
   fetchLoopRangeWithSimulation,
@@ -141,6 +141,12 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
   // Amounts — pre-fill the pay amount when the optimizer hands one through.
   const [debtAmount, setDebtAmount] = useState('')
+  /**
+   * LlamaLend band count. Undefined until the user touches it, so the API
+   * applies the market default rather than us guessing one — and `bands` is
+   * only meaningful on markets whose term sheet advertises the parameter.
+   */
+  const [bands, setBands] = useState<BandSetterState | undefined>(undefined)
 
   // A loop signs the user up to BOTH sides at once — it supplies into the
   // collateral market and borrows out of the debt market — so one sheet cannot
@@ -419,6 +425,10 @@ export const LoopAction: React.FC<TradingActionProps> = ({
         // Brokered debt: open the borrow at the chosen fixed term. (Docs §6)
         ...(isDebtBrokered && selectedTermId != null ? { termId: selectedTermId } : {}),
         usePendleMintRedeem: false,
+        // Only sent once the user has actually chosen, and only when valid —
+        // an out-of-range N is refused by the Controller, so it is better to
+        // omit it and take the market default than to send a rejected one.
+        ...(bands?.dirty && bands.valid ? { bands: bands.bands } : {}),
         ...(selectedPayCurrency ? { payAsset: selectedPayCurrency.address } : {}),
         ...(selectedPayCurrency && payAmount
           ? { payAmount: parseUnits(payAmount, selectedPayCurrency.decimals).toString() }
@@ -870,6 +880,9 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               title="Debt"
               titleTone="warn"
               subtitle={`${debtPool?.asset.symbol ?? ''} — what you borrow and pay on`}
+              // The band count is a BORROW-side term: it sets how much can be
+              // drawn against the collateral, and it is fixed at open.
+              bandEdit={{ value: bands?.bands, onChange: setBands }}
             />
           ) : null}
         </div>

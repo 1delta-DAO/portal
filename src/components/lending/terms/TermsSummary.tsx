@@ -3,6 +3,7 @@ import { TermPending, TermRow, TermSection } from './TermRow'
 import { TermsChips } from './TermsChips'
 import { RateModelRows } from './RateModelRows'
 import { RateSetterRow, type RateSetterState } from './RateSetterRow'
+import { BandSetterRow, type BandSetterState } from './BandSetterRow'
 import {
   atMaturityLabel,
   badDebtLabel,
@@ -188,7 +189,15 @@ function SupplyRows({ sheet }: { sheet: TermSheet }) {
   )
 }
 
-function BorrowRows({ sheet, rateEdit }: { sheet: TermSheet; rateEdit?: TermsRateEdit }) {
+function BorrowRows({
+  sheet,
+  rateEdit,
+  bandEdit,
+}: {
+  sheet: TermSheet
+  rateEdit?: TermsRateEdit
+  bandEdit?: TermsBandEdit
+}) {
   const b = sheet.borrow
   if (!b) return null
 
@@ -303,16 +312,47 @@ function BorrowRows({ sheet, rateEdit }: { sheet: TermSheet; rateEdit?: TermsRat
         {b.liquidation.penalties?.map((p) => (
           <TermRow key={p.id} label={p.label} value={pct(p.value * 100)} hint={p.description} />
         ))}
-        {b.liquidation.bandLtv ? (
-          <TermRow
-            label="LTV by band count"
-            value={`${Object.keys(b.liquidation.bandLtv).length} options`}
-            note={Object.entries(b.liquidation.bandLtv)
-              .map(([n, ltv]) => `N=${n}: ${pct(ltv * 100)}`)
-              .join(' · ')}
-            hint="Your collateral factor is fixed by the band count you choose when you open — fewer bands means a higher LTV but a narrower soft-liquidation range."
-          />
-        ) : null}
+        {/* Prefer the DOMAIN over sampled points: `bandLtv` only ever carried 4
+            of 47 possible band counts and is absent entirely on markets with no
+            lend liquidity, so it under-reports the choice and disappears exactly
+            where the market is quietest. Fall back to it until `openParameter`
+            has rolled through the pipeline. */}
+        {(() => {
+          const op = b.liquidation.openParameter
+          if (op?.kind === 'llamalend-bands' && 'min' in op.domain) {
+            return (
+              <TermRow
+                label="LTV by band count"
+                value={`N = ${op.domain.min}–${op.domain.max}`}
+                note={`default ${op.default}${
+                  op.immutableAfterOpen ? ' · fixed once the loan is open' : ''
+                }`}
+                hint="Your collateral factor is set by the band count you choose when you open — fewer bands means a higher LTV but a narrower soft-liquidation range. It cannot be changed afterwards; you would have to close and reopen."
+              />
+            )
+          }
+          if (b.liquidation.bandLtv) {
+            return (
+              <TermRow
+                label="LTV by band count"
+                value={`${Object.keys(b.liquidation.bandLtv).length} options`}
+                note={Object.entries(b.liquidation.bandLtv)
+                  .map(([n, ltv]) => `N=${n}: ${pct(ltv * 100)}`)
+                  .join(' · ')}
+                hint="Your collateral factor is fixed by the band count you choose when you open — fewer bands means a higher LTV but a narrower soft-liquidation range."
+              />
+            )
+          }
+          return null
+        })()}
+        {/* The knob itself, directly under the row that explains it. Renders
+            nothing unless the market exposes a band parameter. */}
+        <BandSetterRow
+          liquidation={b.liquidation}
+          value={bandEdit?.value}
+          onChange={bandEdit?.onChange}
+          existingPosition={bandEdit?.existingPosition}
+        />
         {b.liquidation.windowSecs != null ? (
           <TermRow
             label="Liquidation window"
@@ -579,6 +619,19 @@ export interface TermsRateEdit {
   commitLabel?: string
 }
 
+/**
+ * The band-count knob (LlamaLend). Deliberately separate from
+ * {@link TermsRateEdit}: there is no commit path, because the value is fixed
+ * for the life of the loan.
+ */
+export interface TermsBandEdit {
+  /** Controlled value — a whole band count. */
+  value?: number
+  onChange?: (state: BandSetterState) => void
+  /** True when editing an EXISTING loan: the control goes read-only. */
+  existingPosition?: boolean
+}
+
 export const TermsSummary: React.FC<{
   /**
    * Either shape. List endpoints default to `?terms=digest`, so this is a
@@ -599,6 +652,7 @@ export const TermsSummary: React.FC<{
    * Omit to render the sheet read-only.
    */
   rateEdit?: TermsRateEdit
+  bandEdit?: TermsBandEdit
   /** True while the full sheet is being fetched — keeps "summary only" from
    *  reading as a permanent fact about the market. */
   termsLoading?: boolean
@@ -620,6 +674,7 @@ export const TermsSummary: React.FC<{
   defaultOpen = false,
   className,
   rateEdit,
+  bandEdit,
   termsLoading,
   title,
   subtitle,
@@ -726,7 +781,7 @@ export const TermsSummary: React.FC<{
               {side === 'supply' ? (
                 <SupplyRows sheet={full} />
               ) : (
-                <BorrowRows sheet={full} rateEdit={rateEdit} />
+                <BorrowRows sheet={full} rateEdit={rateEdit} bandEdit={bandEdit} />
               )}
               {/* The curve belongs next to the rate it explains: "3.94% now"
                   and "3.94% until utilization moves" are different offers. */}

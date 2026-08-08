@@ -505,6 +505,12 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
         side="borrow"
         termsLoading={termsLoading}
         rateEdit={userSet?.required ? { value: chosenRatePct, onChange: setRateState } : undefined}
+        /* `/lending/borrow` only ever INCREASES debt on a loan that already
+           exists — opening one needs collateral, debt and the band count
+           together, which is the loop/deposit-and-borrow path. So on this
+           screen the band count is always already fixed: render it read-only
+           rather than offering a control that cannot take effect. */
+        bandEdit={{ existingPosition: true }}
       />
 
       {rateBlocks ? (

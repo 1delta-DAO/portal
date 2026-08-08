@@ -219,6 +219,19 @@ export interface PoolConfig {
   collateralFactor: number
   collateralDisabled: boolean
   borrowCollateralFactor: number
+  /**
+   * Present when `collateralFactor` above is ONE POINT on a curve the borrower
+   * picks from at open (LlamaLend band count) rather than a constant. Quoting a
+   * different value means recomputing — not reusing `collateralFactor`.
+   */
+  openParameter?: {
+    kind: 'llamalend-bands' | 'interest-rate'
+    dimension: 'collateralFactor' | 'rate'
+    domain: { min: number; max: number } | { values: number[] }
+    default: number
+    immutableAfterOpen: boolean
+    adjustCooldownSeconds?: number
+  }
 }
 
 // ============================================================================
