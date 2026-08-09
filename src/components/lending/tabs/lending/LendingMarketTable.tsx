@@ -1,4 +1,5 @@
 import React from 'react'
+import { RewardBadge } from '../../shared/RewardBadge'
 import type { PoolDataItem } from '../../../../hooks/lending/usePoolData'
 import type { UserPositionEntry } from '../../../../hooks/lending/useUserData'
 import {
@@ -69,23 +70,64 @@ export const LendingMarketTable: React.FC<Props> = ({
         <table className="table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden">
           <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
             <tr>
-              <SortableHeader sortKey="symbol" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} className="w-[18%]">
+              <SortableHeader
+                sortKey="symbol"
+                activeKey={sortKey}
+                activeDir={sortDir}
+                onToggle={onToggleSort}
+                className="w-[18%]"
+              >
                 Asset
               </SortableHeader>
-              <SortableHeader sortKey="depositApr" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Deposit APR" className="w-[11%] text-right">
+              <SortableHeader
+                sortKey="depositApr"
+                activeKey={sortKey}
+                activeDir={sortDir}
+                onToggle={onToggleSort}
+                title="Deposit APR"
+                className="w-[11%] text-right"
+              >
                 Dep APR
               </SortableHeader>
-              <SortableHeader sortKey="borrowApr" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Borrow APR" className="w-[11%] text-right">
+              <SortableHeader
+                sortKey="borrowApr"
+                activeKey={sortKey}
+                activeDir={sortDir}
+                onToggle={onToggleSort}
+                title="Borrow APR"
+                className="w-[11%] text-right"
+              >
                 Bor APR
               </SortableHeader>
               <th className="w-[10%]">LTV</th>
-              <SortableHeader sortKey="totalDepositsUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Total Deposits" className="w-[13%] text-right">
+              <SortableHeader
+                sortKey="totalDepositsUSD"
+                activeKey={sortKey}
+                activeDir={sortDir}
+                onToggle={onToggleSort}
+                title="Total Deposits"
+                className="w-[13%] text-right"
+              >
                 Deposits
               </SortableHeader>
-              <SortableHeader sortKey="totalDebtUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Total Borrows" className="w-[13%] text-right">
+              <SortableHeader
+                sortKey="totalDebtUSD"
+                activeKey={sortKey}
+                activeDir={sortDir}
+                onToggle={onToggleSort}
+                title="Total Borrows"
+                className="w-[13%] text-right"
+              >
                 Borrows
               </SortableHeader>
-              <SortableHeader sortKey="totalLiquidityUSD" activeKey={sortKey} activeDir={sortDir} onToggle={onToggleSort} title="Liquidity" className="w-[12%] text-right">
+              <SortableHeader
+                sortKey="totalLiquidityUSD"
+                activeKey={sortKey}
+                activeDir={sortDir}
+                onToggle={onToggleSort}
+                title="Liquidity"
+                className="w-[12%] text-right"
+              >
                 Liq.
               </SortableHeader>
               <th className="w-[12%]">Risk</th>
@@ -161,16 +203,7 @@ export const LendingMarketTable: React.FC<Props> = ({
                           </span>
                         )}
                       </div>
-                      {pool.depositRewardApr > 0.005 && (
-                        <span
-                          className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help whitespace-nowrap"
-                          title={`Reward incentive: +${pool.depositRewardApr.toFixed(2)}% APR (transient)${
-                            pool.rewardSources.length ? ` · ${pool.rewardSources.join(', ')}` : ''
-                          }`}
-                        >
-                          +{pool.depositRewardApr.toFixed(1)}% rwd
-                        </span>
-                      )}
+                      <RewardBadge rewards={pool.rewards} side="deposit" />
                     </div>
                   </td>
                   <td className="text-right">
@@ -191,14 +224,7 @@ export const LendingMarketTable: React.FC<Props> = ({
                             </span>
                           )}
                         </div>
-                        {pool.borrowRewardApr > 0.005 && (
-                          <span
-                            className="badge badge-xs bg-success/15 text-success border-0 cursor-help whitespace-nowrap"
-                            title={`Borrow reward rebate: −${pool.borrowRewardApr.toFixed(2)}% APR (lowers borrow cost, transient)`}
-                          >
-                            −{pool.borrowRewardApr.toFixed(1)}% rwd
-                          </span>
-                        )}
+                        <RewardBadge rewards={pool.rewards} side="borrow" />
                       </div>
                     )}
                   </td>
@@ -336,11 +362,8 @@ const MobilePoolCards: React.FC<{
         const mIy = pool.intrinsicYield ?? 0
         const mDepTotal = pool.depositRate + mIy
         const mBorTotal = pool.variableBorrowRate + mIy
-        const mIsBrokered =
-          pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0
-        const mBestTermApr = pool.terms?.length
-          ? Math.min(...pool.terms.map((t) => t.apr))
-          : null
+        const mIsBrokered = pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0
+        const mBestTermApr = pool.terms?.length ? Math.min(...pool.terms.map((t) => t.apr)) : null
 
         return (
           <div
@@ -384,18 +407,9 @@ const MobilePoolCards: React.FC<{
                     </span>
                   )}
                 </div>
-                {pool.depositRewardApr > 0.005 && (
-                  <div className="flex justify-end mt-0.5">
-                    <span
-                      className="badge badge-xs bg-warning/15 text-warning border-0 whitespace-nowrap"
-                      title={`Reward incentive: +${pool.depositRewardApr.toFixed(2)}% APR (transient)${
-                        pool.rewardSources.length ? ` · ${pool.rewardSources.join(', ')}` : ''
-                      }`}
-                    >
-                      +{pool.depositRewardApr.toFixed(1)}% rwd
-                    </span>
-                  </div>
-                )}
+                <div className="flex justify-end mt-0.5">
+                  <RewardBadge rewards={pool.rewards} side="deposit" />
+                </div>
                 <span className="text-[10px] text-base-content/50 block">Deposit APR</span>
               </div>
             </div>
@@ -411,29 +425,24 @@ const MobilePoolCards: React.FC<{
                       Fixed
                     </span>
                     {mBestTermApr != null && (
-                      <span className="text-warning font-medium">from {mBestTermApr.toFixed(2)}%</span>
+                      <span className="text-warning font-medium">
+                        from {mBestTermApr.toFixed(2)}%
+                      </span>
                     )}
                   </span>
                 ) : (
-                <span className="flex items-baseline gap-1 min-w-0 truncate">
-                  <span className="text-warning font-medium">{mBorTotal.toFixed(2)}%</span>
-                  {mIy > 0 && (
-                    <span
-                      className="badge badge-xs bg-warning/15 text-warning border-0 whitespace-nowrap"
-                      title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
-                    >
-                      +{mIy.toFixed(1)}%
-                    </span>
-                  )}
-                  {pool.borrowRewardApr > 0.005 && (
-                    <span
-                      className="badge badge-xs bg-success/15 text-success border-0 whitespace-nowrap"
-                      title={`Borrow reward rebate: −${pool.borrowRewardApr.toFixed(2)}% APR (lowers borrow cost, transient)`}
-                    >
-                      −{pool.borrowRewardApr.toFixed(1)}% rwd
-                    </span>
-                  )}
-                </span>
+                  <span className="flex items-baseline gap-1 min-w-0 truncate">
+                    <span className="text-warning font-medium">{mBorTotal.toFixed(2)}%</span>
+                    {mIy > 0 && (
+                      <span
+                        className="badge badge-xs bg-warning/15 text-warning border-0 whitespace-nowrap"
+                        title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
+                      >
+                        +{mIy.toFixed(1)}%
+                      </span>
+                    )}
+                    <RewardBadge rewards={pool.rewards} side="borrow" />
+                  </span>
                 )}
               </div>
 
@@ -473,7 +482,11 @@ const MobilePoolCards: React.FC<{
                   <span className="text-base-content/50">Risk</span>
                   <span className="flex items-center gap-3">
                     {pool.risk && (
-                      <RiskBadge label={pool.risk.label} breakdown={pool.risk.breakdown} size="sm" />
+                      <RiskBadge
+                        label={pool.risk.label}
+                        breakdown={pool.risk.breakdown}
+                        size="sm"
+                      />
                     )}
                     {pool.oracleInfo && pool.oracleInfo.feeds.length > 0 && (
                       <OracleBadge oracleInfo={pool.oracleInfo} size="sm" />

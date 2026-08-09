@@ -1,4 +1,5 @@
 import type { AnyTermSheet } from '../../components/lending/terms/types'
+import { RewardEntry, totalRewardApr } from '../../components/lending/shared/rewards'
 import { useQuery } from '@tanstack/react-query'
 import type {
   PoolRiskBreakdown,
@@ -56,7 +57,12 @@ interface RawMarket {
   variableBorrowRate: number
   stableBorrowRate: number
   intrinsicYield: number
-  rewards: Record<string, unknown>
+  /**
+   * Reward programs as the API serves them: one entry per (reward token,
+   * source), carrying symbol / logo / sourceLabel / link / endsAt. An ARRAY —
+   * it used to be defaulted to `{}`, which discarded all provenance.
+   */
+  rewards: RewardEntry[]
   config: Record<string, PoolConfig>
   caps: { borrowCap: number | null; supplyCap: number | null; debtCeiling: number | null } | null
   flags: {
@@ -147,7 +153,12 @@ export interface PoolDataItem {
   variableBorrowRate: number
   stableBorrowRate: number
   intrinsicYield: number
-  rewards: Record<string, unknown>
+  /**
+   * Reward programs as the API serves them: one entry per (reward token,
+   * source), carrying symbol / logo / sourceLabel / link / endsAt. An ARRAY —
+   * it used to be defaulted to `{}`, which discarded all provenance.
+   */
+  rewards: RewardEntry[]
   /** Summed deposit-side reward APR (percent) from incentive campaigns. */
   depositRewardApr: number
   /** Summed borrow-side reward APR (percent) — a rebate that lowers borrow cost. */
@@ -269,20 +280,20 @@ function rawMarketToPoolDataItem(raw: RawMarket): PoolDataItem {
     variableBorrowRate: raw.variableBorrowRate,
     stableBorrowRate: raw.stableBorrowRate,
     intrinsicYield: raw.intrinsicYield,
-    rewards: raw.rewards ?? {},
-    // The API serialises rewards as an array of {asset,source,depositRate,
-    // variableBorrowRate,link}; sum each side and collect sources for display.
-    depositRewardApr: (Array.isArray(raw.rewards) ? raw.rewards : []).reduce(
-      (s: number, r: any) => s + (Number(r?.depositRate) || 0),
-      0
-    ),
-    borrowRewardApr: (Array.isArray(raw.rewards) ? raw.rewards : []).reduce(
-      (s: number, r: any) => s + (Number(r?.variableBorrowRate) || 0),
-      0
-    ),
+    // Keep the ARRAY — RewardBadge renders per-program detail (token, source,
+    // exact link, end date) off it. Defaulting to {} threw all of that away.
+    rewards: Array.isArray(raw.rewards) ? raw.rewards : [],
+    // Points programs are excluded from these totals: they have no priceable
+    // value, so folding them in would overstate the yield. See RewardBadge.
+    depositRewardApr: totalRewardApr(raw.rewards, 'deposit'),
+    borrowRewardApr: totalRewardApr(raw.rewards, 'borrow'),
+    // Prefer the program IDENTITY over the legacy mechanism tag — `source` is
+    // 'merkle' for every Merkl campaign and so names nothing.
     rewardSources: Array.from(
       new Set(
-        (Array.isArray(raw.rewards) ? raw.rewards : []).map((r: any) => r?.source).filter(Boolean)
+        (Array.isArray(raw.rewards) ? raw.rewards : [])
+          .map((r: any) => r?.sourceLabel ?? r?.sourceId ?? r?.source)
+          .filter(Boolean)
       )
     ) as string[],
     config: raw.config ?? {},

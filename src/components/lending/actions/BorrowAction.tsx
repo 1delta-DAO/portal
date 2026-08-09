@@ -20,8 +20,9 @@ import { useTermsAcknowledgement } from '../terms/TermsDisclosure'
 import { useTermSheet } from '../../../hooks/lending/useTermSheet'
 import type { RateSetterState } from '../terms/RateSetterRow'
 import { aprPercentToWad } from '../../../sdk/lending-helper/fetchLiquityRate'
-import { isLiquityFamily } from '@1delta/lender-registry'
+import { isLiquityFamily, isLlamaLend } from '@1delta/lender-registry'
 import { LiquityOpenPanel } from './LiquityOpenPanel'
+import { LlamaLendOpenNotice } from './LlamaLendOpenNotice'
 import { isFullSheet } from '../terms/types'
 import { ComparableRatesPill } from '../shared/ComparableRatesPill'
 import { TransactionSuccess } from './TransactionSuccess'
@@ -70,9 +71,26 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   // single transaction). With no trove there is nothing for the borrow form to
   // act on, so hand over to the open panel rather than building a request the
   // endpoint will reject.
-  const isLiquity = isLiquityFamily(pool?.marketUid?.split(':')[0] ?? '')
+  const lenderOfPool = pool?.marketUid?.split(':')[0] ?? ''
+  const isLiquity = isLiquityFamily(lenderOfPool)
   const hasTrove = (subAccounts?.length ?? 0) > 0 || Number(userPosition?.debt ?? 0) > 0
   const needsOpen = isLiquity && !hasTrove
+
+  /**
+   * LlamaLend is the same shape as Liquity for the same reason: this screen
+   * calls `borrow_more`, which requires a loan to already exist. Opening one is
+   * `create_loan`, which needs collateral AND a band count in the same
+   * transaction — so it cannot be reached from a borrow-only form.
+   *
+   * Without this branch the panel rendered a disabled band control captioned
+   * "fixed for the life of this loan" to users who had no loan, and the borrow
+   * itself would have failed server-side with "no open loan ... use
+   * deposit-and-borrow". Say that up front instead.
+   *
+   * It also makes the read-only band row BELOW correct by construction: past
+   * this point a loan always exists, so the parameter really is immutable.
+   */
+  const llamaLendNeedsOpen = isLlamaLend(lenderOfPool) && !hasTrove
   const [useNative, setUseNative] = useState(false)
 
   const hasSubAccounts = lenderSupportsSubAccounts(lenderKey)
@@ -218,6 +236,10 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
 
   // No trove yet on a Liquity-family branch: the borrow form has nothing to
   // increase, so open one instead.
+  if (llamaLendNeedsOpen && pool) {
+    return <LlamaLendOpenNotice symbol={pool.asset.symbol} />
+  }
+
   if (needsOpen && pool) {
     return (
       <LiquityOpenPanel
@@ -507,10 +529,10 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
         rateEdit={userSet?.required ? { value: chosenRatePct, onChange: setRateState } : undefined}
         /* `/lending/borrow` only ever INCREASES debt on a loan that already
            exists — opening one needs collateral, debt and the band count
-           together, which is the loop/deposit-and-borrow path. So on this
-           screen the band count is always already fixed: render it read-only
-           rather than offering a control that cannot take effect. */
-        bandEdit={{ existingPosition: true }}
+           together, which is the loop/deposit-and-borrow path. The no-loan case
+           returns above, so by here the loan exists and its band count really
+           is fixed: read-only is the truth, not a fallback. */
+        bandEdit={{ mode: 'locked' }}
       />
 
       {rateBlocks ? (

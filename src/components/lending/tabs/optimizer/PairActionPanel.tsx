@@ -29,6 +29,7 @@ import { DepthChart } from './DepthChart'
 import { ComparableRatesPill } from '../../shared/ComparableRatesPill'
 import { RiskBadge } from '../../shared/RiskBadge'
 import { useCombinedAction, gt0, asCurrency, type CombinedAction } from './useCombinedAction'
+import { BandSetterRow } from '../../terms/BandSetterRow'
 
 type Op = 'deposit-borrow' | 'withdraw-repay' | 'loop'
 
@@ -63,7 +64,11 @@ const pickToAmount = (size: number): string =>
  * from the next block, and a deficit freezes withdrawals — so the runway is
  * the single number a FiRM borrower has to watch.
  */
-function DbrRunwayInfo({ dbr }: { dbr?: import('../../../../sdk/lending-helper/fetchCombinedAction').InverseDbrState }) {
+function DbrRunwayInfo({
+  dbr,
+}: {
+  dbr?: import('../../../../sdk/lending-helper/fetchCombinedAction').InverseDbrState
+}) {
   if (!dbr) return null
   const balance = Number(dbr.balance) / 1e18
   const deficit = Number(dbr.deficit) / 1e18
@@ -81,7 +86,9 @@ function DbrRunwayInfo({ dbr }: { dbr?: import('../../../../sdk/lending-helper/f
   const short = deficit > 0 || runwayDays < 30
 
   return (
-    <div className={`rounded-lg border p-2 text-xs space-y-1 ${deficit > 0 ? 'border-error/50 bg-error/5' : short ? 'border-warning/50 bg-warning/5' : 'border-base-300'}`}>
+    <div
+      className={`rounded-lg border p-2 text-xs space-y-1 ${deficit > 0 ? 'border-error/50 bg-error/5' : short ? 'border-warning/50 bg-warning/5' : 'border-base-300'}`}
+    >
       <div className="flex items-center justify-between">
         <span className="text-base-content/60">DBR (prepaid interest)</span>
         <a
@@ -107,13 +114,13 @@ function DbrRunwayInfo({ dbr }: { dbr?: import('../../../../sdk/lending-helper/f
       </div>
       {deficit > 0 ? (
         <div className="text-error">
-          DBR deficit of {fmtBal(String(deficit))} — the position accrues a
-          ~54.75% APR penalty and withdrawals are frozen until you top up DBR.
+          DBR deficit of {fmtBal(String(deficit))} — the position accrues a ~54.75% APR penalty and
+          withdrawals are frozen until you top up DBR.
         </div>
       ) : short ? (
         <div className="text-warning">
-          Runway under 30 days — top up DBR before it runs out or the debt
-          starts accruing a ~54.75% APR penalty.
+          Runway under 30 days — top up DBR before it runs out or the debt starts accruing a ~54.75%
+          APR penalty.
         </div>
       ) : null}
     </div>
@@ -420,7 +427,7 @@ function AuctionNotice({ auction }: { auction?: OptimizerAuction }) {
  */
 function comparisonHorizonDays(
   terms: CombinedAction['debtTerms'],
-  termId: string | null,
+  termId: string | null
 ): number | undefined {
   if (!termId) return undefined
   const t = terms.find((x) => String(x.termId ?? '') === termId)
@@ -641,6 +648,20 @@ function CombinedForm({
           termId={a.termId}
           onSelect={a.setTermId}
           symbol={a.secondaryToken.symbol}
+        />
+      )}
+
+      {/* The band count, in the FORM BODY rather than inside the term sheet.
+          It is immutable once `create_loan` lands, so it is a decision being
+          made here — not a term being reviewed — and a decision that only
+          exists at open must not be buried where it gets defaulted by
+          accident. Renders nothing unless the market exposes the parameter. */}
+      {a.bandLiquidation && (
+        <BandSetterRow
+          liquidation={a.bandLiquidation}
+          value={a.bandValue}
+          onChange={a.setBandState}
+          variant="field"
         />
       )}
 

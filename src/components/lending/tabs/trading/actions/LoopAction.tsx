@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect, useCallback } from 'react'
 import { isWNative, LendingMode, type RawCurrency } from '../../../../../lib/lib-utils'
 import { parseUnits, zeroAddress } from 'viem'
 import { useTokenLists } from '../../../../../hooks/useTokenLists'
@@ -26,6 +26,8 @@ import { lenderSupportsSubAccounts, fixedTermDetails } from '../../../actions/he
 import { FixedTermDetailsRows } from '../../../shared/FixedTermDetails'
 import { MidnightOrderBook } from '../../../shared/MidnightOrderBook'
 import { TermsSummary, type BandSetterState } from '../../../terms'
+import { BandSetterRow } from '../../../terms/BandSetterRow'
+import { isFullSheet } from '../../../terms/types'
 import { useTermSheet } from '../../../../../hooks/lending/useTermSheet'
 import {
   fetchLoopRangeWithSimulation,
@@ -196,6 +198,22 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     dismissSuccess,
     reset,
   } = tradingQuotes
+
+  /**
+   * Changing `N` RE-PRICES the loan — it moves the collateral factor, so a
+   * quote fetched at the old value is sized against an LTV that no longer
+   * applies. Drop any fetched quotes, exactly as the amount input does.
+   */
+  const handleBandsChange = useCallback(
+    (next: BandSetterState) => {
+      setBands((prev) => {
+        if (prev && prev.bands === next.bands && prev.valid === next.valid) return prev
+        if (prev && prev.bands !== next.bands) reset()
+        return next
+      })
+    },
+    [reset]
+  )
 
   // Derive pay currencies from selected pools
   const payCurrencies = useMemo(() => {
@@ -744,6 +762,20 @@ export const LoopAction: React.FC<TradingActionProps> = ({
         )}
       </div>
 
+      {/* Band count — a LOAN-SHAPING input, so it sits with amount and
+          slippage rather than at the bottom of the term sheet. It is fixed once
+          `create_loan` lands, which is exactly why it must be seen before the
+          quote rather than reviewed after it. Renders nothing unless the debt
+          market exposes the parameter. */}
+      {debtTermSheet && isFullSheet(debtTermSheet) && debtTermSheet.borrow?.liquidation ? (
+        <BandSetterRow
+          liquidation={debtTermSheet.borrow.liquidation}
+          value={bands?.bands}
+          onChange={handleBandsChange}
+          variant="field"
+        />
+      ) : null}
+
       {/* Slippage */}
       <SlippageInput value={slippage} onChange={setSlippage} />
 
@@ -881,8 +913,11 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               titleTone="warn"
               subtitle={`${debtPool?.asset.symbol ?? ''} — what you borrow and pay on`}
               // The band count is a BORROW-side term: it sets how much can be
-              // drawn against the collateral, and it is fixed at open.
-              bandEdit={{ value: bands?.bands, onChange: setBands }}
+              // drawn against the collateral, and it is fixed at open. The
+              // LIVE control is in the form body — this is a read-only mirror,
+              // because two inputs bound to one value fight each other and the
+              // quote is sized against whichever wrote last.
+              bandEdit={{ value: bands?.bands, mode: 'mirror' }}
             />
           ) : null}
         </div>

@@ -22,6 +22,9 @@ import {
   fetchDepositBorrowRange,
   fetchWithdrawRepayRange,
 } from '../../../../sdk/lending-helper/fetchLendingRange'
+import { useTermSheet } from '../../../../hooks/lending/useTermSheet'
+import { isFullSheet } from '../../../lending/terms/types'
+import type { BandSetterState } from '../../../lending/terms/BandSetterRow'
 
 // ---------------------------------------------------------------------------
 // Small helpers shared with the presentational form.
@@ -111,9 +114,36 @@ export function useCombinedAction({
   const [secondary, setSecondary] = useState('')
   const [secondaryMax, setSecondaryMax] = useState('0')
   const [modeId, setModeId] = useState<string | undefined>(row.eModeConfigId)
+  /**
+   * LlamaLend band count for the loan being OPENED.
+   *
+   * `undefined` until the market's term sheet says the parameter exists, so a
+   * lender without one never sends the param. Before this existed the panel
+   * opened every LlamaLend loan at the market default with no way to choose —
+   * the endpoint has accepted `bands` all along.
+   */
+  const [bandState, setBandState] = useState<BandSetterState | undefined>(undefined)
   const [payNative, setPayNative] = useState(false)
   const [receiveNative, setReceiveNative] = useState(false)
   const payNativeSettledRef = useRef(false)
+
+  /**
+   * The BORROW-side term sheet for the debt market. Needed only for its
+   * `openParameter`: the band count is a term, and the optimizer panel had no
+   * term sheet at all, which is why the control could not be offered here.
+   */
+  const { sheet: debtSheet } = useTermSheet({
+    marketUid: debtUid,
+    chainId: row.chainId,
+    enabled: isOpen,
+  })
+  const openParameter =
+    isOpen && debtSheet && isFullSheet(debtSheet)
+      ? debtSheet.borrow?.liquidation?.openParameter
+      : undefined
+  /** Only forward a band count when this market actually takes one. */
+  const bandsForRequest =
+    openParameter?.kind === 'llamalend-bands' && bandState?.valid ? bandState.bands : undefined
 
   // Fixed-term broker (Lista) on the BORROW leg — `termsShort` carries one entry
   // per maturity. Selecting a term routes the open through the ATOMIC composer
@@ -271,6 +301,7 @@ export function useCombinedAction({
             payAsset,
             receiveAsset,
             modeId,
+            bands: bandsForRequest,
             accountId,
             debtTermId: isDebtBrokered && termId != null ? Number(termId) : undefined,
             simulate: true,
@@ -308,6 +339,7 @@ export function useCombinedAction({
     debtUid,
     isOpen,
     modeId,
+    bandsForRequest,
     payAsset,
     receiveAsset,
     accountId,
@@ -421,6 +453,12 @@ export function useCombinedAction({
     isDebtBrokered,
     termId,
     setTermId,
+    // open parameter (LlamaLend band count) — the term sheet's liquidation
+    // block drives the control; `undefined` means this market has none.
+    bandLiquidation:
+      isOpen && debtSheet && isFullSheet(debtSheet) ? debtSheet.borrow?.liquidation : undefined,
+    bandValue: bandState?.bands,
+    setBandState,
     // build result
     building,
     result,

@@ -3,7 +3,7 @@ import { TermPending, TermRow, TermSection } from './TermRow'
 import { TermsChips } from './TermsChips'
 import { RateModelRows } from './RateModelRows'
 import { RateSetterRow, type RateSetterState } from './RateSetterRow'
-import { BandSetterRow, type BandSetterState } from './BandSetterRow'
+import { BandSetterRow, type BandSetterState, type BandSetterMode } from './BandSetterRow'
 import {
   atMaturityLabel,
   badDebtLabel,
@@ -336,9 +336,22 @@ function BorrowRows({
               <TermRow
                 label="LTV by band count"
                 value={`${Object.keys(b.liquidation.bandLtv).length} options`}
-                note={Object.entries(b.liquidation.bandLtv)
-                  .map(([n, ltv]) => `N=${n}: ${pct(ltv * 100)}`)
-                  .join(' · ')}
+                /* Endpoints only. This used to join EVERY entry, which was
+                   tolerable at 4 sampled points and is not now the curve
+                   spans the whole 4..50 domain. */
+                note={(() => {
+                  const ns = Object.keys(b.liquidation.bandLtv!)
+                    .map(Number)
+                    .filter((n) => Number.isFinite(n))
+                    .sort((x, y) => x - y)
+                  if (ns.length === 0) return undefined
+                  const lo = ns[0]
+                  const hi = ns[ns.length - 1]
+                  const at = (n: number) => pct(b.liquidation.bandLtv![String(n)] * 100)
+                  return lo === hi
+                    ? `N=${lo}: ${at(lo)}`
+                    : `N=${lo}: ${at(lo)} … N=${hi}: ${at(hi)}`
+                })()}
                 hint="Your collateral factor is fixed by the band count you choose when you open — fewer bands means a higher LTV but a narrower soft-liquidation range."
               />
             )
@@ -351,6 +364,7 @@ function BorrowRows({
           liquidation={b.liquidation}
           value={bandEdit?.value}
           onChange={bandEdit?.onChange}
+          mode={bandEdit?.mode}
           existingPosition={bandEdit?.existingPosition}
         />
         {b.liquidation.windowSecs != null ? (
@@ -628,7 +642,14 @@ export interface TermsBandEdit {
   /** Controlled value — a whole band count. */
   value?: number
   onChange?: (state: BandSetterState) => void
-  /** True when editing an EXISTING loan: the control goes read-only. */
+  /**
+   * What the caller knows about the position. `locked` = existing loan,
+   * `mirror` = the live control is elsewhere on the screen (the create forms
+   * hoist it into the form body, so the term-sheet copy must not be a second
+   * input). Defaults to `edit`.
+   */
+  mode?: BandSetterMode
+  /** @deprecated Pass `mode: 'locked'`. */
   existingPosition?: boolean
 }
 

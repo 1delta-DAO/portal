@@ -121,6 +121,16 @@ export interface DepositAndBorrowParams {
   accountId?: string
   /** E-mode / config id the collateral factor was computed against. */
   modeId?: string
+  /**
+   * LlamaLend band count `N` for the loan being OPENED.
+   *
+   * Distinct from `modeId`: this is not a category id, it is a number the
+   * borrower picks that sets the collateral factor and how gradually soft
+   * liquidation unwinds — and it is immutable once `create_loan` lands. Omit
+   * and the market's default is used, which is what happened for every loan
+   * opened from this panel before the control existed.
+   */
+  bands?: number
   /** Fixed-term broker id (Lista) — enables the atomic composer open; absent =
    *  flex/dynamic borrow (falls back to the sequential path server-side). */
   debtTermId?: number
@@ -144,6 +154,7 @@ export async function fetchDepositAndBorrow(
   if (p.borrowMode) qs.set('borrowMode', p.borrowMode)
   if (p.accountId) qs.set('accountId', p.accountId)
   if (p.modeId) qs.set('modeId', p.modeId)
+  if (p.bands != null) qs.set('bands', String(p.bands))
   if (p.debtTermId != null) qs.set('debtTermId', String(p.debtTermId))
   if (p.receiveAsset) qs.set('receiveAsset', p.receiveAsset)
   if (p.simulate) qs.set('simulate', 'true')

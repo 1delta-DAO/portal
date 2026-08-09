@@ -1,4 +1,5 @@
 import type { PoolEntry } from '../../../../hooks/lending/useFlattenedPools'
+import { totalRewardApr } from '../../shared/rewards'
 import type { PoolDataItem } from '../../../../hooks/lending/usePoolData'
 
 export type SortKey =
@@ -49,12 +50,9 @@ export function computePoolMetrics(pool: PoolEntry) {
   // Incentive rewards — `rewards` is an array of {depositRate, variableBorrowRate,
   // source, …}; sum each side. Deposit rewards boost earn APR; borrow rewards are
   // a rebate.
-  const rewardsList = Array.isArray(pool.rewards) ? (pool.rewards as any[]) : []
-  const depositRewardApr = rewardsList.reduce((s, r) => s + (Number(r?.depositRate) || 0), 0)
-  const borrowRewardApr = rewardsList.reduce(
-    (s, r) => s + (Number(r?.variableBorrowRate) || 0),
-    0,
-  )
+  // Points programs excluded — unpriceable, see RewardBadge.
+  const depositRewardApr = totalRewardApr(pool.rewards, 'deposit')
+  const borrowRewardApr = totalRewardApr(pool.rewards, 'borrow')
 
   return { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr, borrowRewardApr }
 }
@@ -88,21 +86,15 @@ export function poolEntryToPoolDataItem(entry: PoolEntry): PoolDataItem {
     variableBorrowRate: parseFloat(entry.variableBorrowRate) || 0,
     stableBorrowRate: parseFloat(entry.stableBorrowRate) || 0,
     intrinsicYield: parseFloat(entry.intrinsicYield ?? '') || 0,
-    rewards: {},
-    depositRewardApr: (Array.isArray((entry as any).rewards) ? (entry as any).rewards : []).reduce(
-      (s: number, r: any) => s + (Number(r?.depositRate) || 0),
-      0,
-    ),
-    borrowRewardApr: (Array.isArray((entry as any).rewards) ? (entry as any).rewards : []).reduce(
-      (s: number, r: any) => s + (Number(r?.variableBorrowRate) || 0),
-      0,
-    ),
+    rewards: Array.isArray((entry as any).rewards) ? (entry as any).rewards : [],
+    depositRewardApr: totalRewardApr((entry as any).rewards, 'deposit'),
+    borrowRewardApr: totalRewardApr((entry as any).rewards, 'borrow'),
     rewardSources: Array.from(
       new Set(
         (Array.isArray((entry as any).rewards) ? (entry as any).rewards : [])
-          .map((r: any) => r?.source)
-          .filter(Boolean),
-      ),
+          .map((r: any) => r?.sourceLabel ?? r?.sourceId ?? r?.source)
+          .filter(Boolean)
+      )
     ) as string[],
     config: {},
     borrowCap: 0,
@@ -122,6 +114,7 @@ export function poolEntryToPoolDataItem(entry: PoolEntry): PoolDataItem {
           apr: Number(t.apr),
         }))
       : null,
-    variableBorrowDisabled: entry.variableBorrowDisabled ?? entry.flags?.variableBorrowDisabled ?? false,
+    variableBorrowDisabled:
+      entry.variableBorrowDisabled ?? entry.flags?.variableBorrowDisabled ?? false,
   }
 }
