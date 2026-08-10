@@ -16,6 +16,38 @@ export interface SearchableSelectOption {
   trailingTitle?: string
 }
 
+/**
+ * Normalise a typed/pasted query: identifiers arrive from clipboards, and a
+ * stray separator from a copied list should not read as "no such option".
+ */
+export const normalizeSelectQuery = (raw: string): string =>
+  raw
+    .trim()
+    .toLowerCase()
+    .replace(/^[\s,;|]+|[\s,;|]+$/g, '')
+
+/**
+ * Does an option match a (already normalised) query?
+ *
+ * Matches the option's VALUE as well as its label. The value is the identifier
+ * — a lender key like `LLAMALEND_5756A035…`, a chain id, a market key — and it
+ * used to be unsearchable, so pasting an id that unambiguously names one option
+ * returned "No matches". That bit hardest exactly where identifiers matter:
+ * per-market lenders, whose label ("LlamaLend crvUSD / wstETH") shares no
+ * characters with their key. It appeared to work for lenders without metadata
+ * only because their label falls back to the key.
+ *
+ * The value test runs BOTH directions so a pasted full `marketUid`
+ * (`LLAMALEND_x:1:0xabc…`) finds the option whose value is only its lender key
+ * — the identifier to hand is usually the longer one.
+ */
+export const optionMatchesQuery = (option: SearchableSelectOption, query: string): boolean => {
+  if (!query) return true
+  if (option.label.toLowerCase().includes(query)) return true
+  const v = option.value.toLowerCase()
+  return v.includes(query) || query.includes(v)
+}
+
 interface SearchableSelectBaseProps {
   options: SearchableSelectOption[]
   placeholder?: string
@@ -148,14 +180,17 @@ export function SearchableSelect(props: SearchableSelectProps) {
 
   const selectedSet = useMemo(() => new Set(selectedValues), [selectedValues])
   const selectedOptions = useMemo(
-    () => selectedValues.map((v) => options.find((o) => o.value === v)).filter(Boolean) as SearchableSelectOption[],
+    () =>
+      selectedValues
+        .map((v) => options.find((o) => o.value === v))
+        .filter(Boolean) as SearchableSelectOption[],
     [selectedValues, options]
   )
   const selectedOption = selectedOptions[0]
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const matched = q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options
+    const q = normalizeSelectQuery(search)
+    const matched = q ? options.filter((o) => optionMatchesQuery(o, q)) : options
     if (!isMulti) return matched
     // Float the current selection to the top. Chain lists are long and sorted
     // by id, so an already-picked chain can otherwise sit dozens of rows down
@@ -316,7 +351,9 @@ export function SearchableSelect(props: SearchableSelectProps) {
                     {opt.indicator && (
                       <span className="opacity-60 text-xs shrink-0">{opt.indicator}</span>
                     )}
-                    <span className="flex-1 min-w-0 truncate" title={opt.label}>{opt.label}</span>
+                    <span className="flex-1 min-w-0 truncate" title={opt.label}>
+                      {opt.label}
+                    </span>
                     {opt.trailing && (
                       <span
                         className="shrink-0 ml-2 text-[10px] opacity-60 tabular-nums"
@@ -350,7 +387,9 @@ export function SearchableSelect(props: SearchableSelectProps) {
 
       {/* Dropdown */}
       {isOpen && (
-        <div className={`absolute z-50 mt-1 rounded-box border border-base-300 bg-base-100 shadow-lg ${menuClassName}`}>
+        <div
+          className={`absolute z-50 mt-1 rounded-box border border-base-300 bg-base-100 shadow-lg ${menuClassName}`}
+        >
           {/* Search input */}
           <div className="p-1.5">
             <input
@@ -406,7 +445,9 @@ export function SearchableSelect(props: SearchableSelectProps) {
                   {opt.indicator && (
                     <span className="opacity-60 text-xs shrink-0">{opt.indicator}</span>
                   )}
-                  <span className="flex-1 min-w-0 truncate" title={opt.label}>{opt.label}</span>
+                  <span className="flex-1 min-w-0 truncate" title={opt.label}>
+                    {opt.label}
+                  </span>
                   {opt.trailing && (
                     <span
                       className="shrink-0 ml-2 text-[10px] text-base-content/50 tabular-nums"
