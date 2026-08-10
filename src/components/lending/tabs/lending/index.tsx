@@ -2,7 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { isWNative } from '../../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
-import { OPTIMIZER_DEEPLINK_KEYS, type LendingDeepLinkAction } from '../../../../utils/routes'
+import { type LendingDeepLinkAction } from '../../../../utils/routes'
+import {
+  findConfigContaining,
+  readOptimizerDeepLink,
+  resolveDeepLinkPool,
+  stripDeepLinkParams,
+} from '../../shared/deepLink'
 import type {
   LenderData,
   LenderInfoMap,
@@ -82,6 +88,15 @@ export function LendingDashboard({
   const [selectedSubAccountId, setSelectedSubAccountId] = useState<string | null>(null)
   const [selectedPool, setSelectedPool] = useState<PoolDataItem | null>(null)
   const [actionTab, setActionTab] = useState<ActionType>('Deposit')
+  // Config requested by an optimizer hand-off (`?config=`). Held in state
+  // rather than read from the URL at render time, because the hand-off params
+  // are stripped as soon as they're consumed — see the deep-link effect below.
+  const [pinnedConfigId, setPinnedConfigId] = useState<string | null>(null)
+  // The market a hand-off asked for, remembered past the moment it was applied.
+  // The config groups load LATER than the pools, so without this the config
+  // view settles on its own default — one that need not contain this market —
+  // and the selection looks like it was ignored.
+  const [deepLinkMarketUid, setDeepLinkMarketUid] = useState<string | null>(null)
 
   // Optimizer → Lending deep-link consumer. The optimizer pushes
   // ?col=&debt=&action=&config=&amt= when the user clicks Supply / Borrow on
@@ -160,14 +175,11 @@ export function LendingDashboard({
   // re-renders don't re-fire after we've stripped the params from the URL.
   useEffect(() => {
     if (allPools.length === 0) return
-    const colAddr = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.collateral)
-    const debtAddr = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.debt)
-    const actionParam = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.action) as
-      | LendingDeepLinkAction
-      | null
-    if (!colAddr && !debtAddr) return
+    const link = readOptimizerDeepLink(searchParams)
+    const actionParam = link.action as LendingDeepLinkAction | null
+    if (!link.hasPair && !link.configId) return
 
-    const signature = `${selectedLender}:${colAddr ?? ''}:${debtAddr ?? ''}:${actionParam ?? ''}`
+    const signature = `${selectedLender}:${link.signature}`
     if (deepLinkConsumedRef.current === signature) return
     deepLinkConsumedRef.current = signature
 
@@ -175,13 +187,25 @@ export function LendingDashboard({
     // wants to borrow Y, and the receiving panel needs the collateral
     // already in place via their existing position. For Supply / Withdraw /
     // Repay the relevant pool is the collateral leg.
-    const targetAddress =
-      actionParam === 'borrow' || actionParam === 'repay' ? debtAddr : colAddr
-    if (targetAddress) {
-      const match = allPools.find(
-        (p) => p.underlying.toLowerCase() === targetAddress.toLowerCase()
-      )
-      if (match) setSelectedPool(match)
+    const wantsDebtLeg = actionParam === 'borrow' || actionParam === 'repay'
+    const match = resolveDeepLinkPool(
+      allPools,
+      wantsDebtLeg ? link.debtMarketUid : link.colMarketUid,
+      wantsDebtLeg ? link.debtAddr : link.colAddr
+    )
+    if (match) {
+      setSelectedPool(match)
+      setDeepLinkMarketUid(match.marketUid)
+    }
+
+    // Pin the config the optimizer row was priced against. Without this the
+    // config view falls back to its own default (the user's active e-mode, else
+    // the deepest group) and shows a different LTV and leverage than the row
+    // the user clicked. Force the config view too — the pin is invisible in the
+    // flat "Default" table, so a user parked there would see no effect at all.
+    if (link.configId) {
+      setPinnedConfigId(link.configId)
+      setViewMode('config')
     }
 
     if (actionParam) {
@@ -195,10 +219,14 @@ export function LendingDashboard({
     }
 
     // Strip the optimizer params so the next navigation starts clean. We
-    // keep any unrelated params intact.
-    const next = new URLSearchParams(searchParams)
-    for (const k of Object.values(OPTIMIZER_DEEPLINK_KEYS)) next.delete(k)
-    setSearchParams(next, { replace: true })
+    // keep any unrelated params intact (notably `riskTolerance`, which
+    // RiskMode owns). The pin now lives in component state, so stripping the
+    // URL doesn't undo it.
+    setSearchParams(stripDeepLinkParams(searchParams), { replace: true })
+    // `setViewMode` is a fresh closure every render (it wraps the persisted-
+    // filter setter), so listing it here would re-run this effect constantly;
+    // the signature guard above absorbs that, but the dependency is noise.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPools, searchParams, setSearchParams, selectedLender])
 
   // Config-grouped pool data (fetched when config view is active)
@@ -207,6 +235,21 @@ export function LendingDashboard({
     selectedLender,
     maxRiskScore
   )
+
+  // Late-binding half of the hand-off. The pools and the config groups are two
+  // independent fetches, and the groups usually lose: by the time they arrive
+  // the market is already selected and the params are stripped. Resolve the
+  // config from the market here, once there is something to resolve against.
+  // Only fills a gap — an explicit `?config=` from the optimizer is never
+  // overridden, and neither is a config the user has since chosen.
+  useEffect(() => {
+    if (!deepLinkMarketUid || pinnedConfigId || !configGroups?.length) return
+    const configId = findConfigContaining(configGroups, deepLinkMarketUid)
+    if (configId) setPinnedConfigId(configId)
+    // Either way this hand-off is fully applied; a second pass would fight the
+    // user's own config picks from here on.
+    setDeepLinkMarketUid(null)
+  }, [configGroups, deepLinkMarketUid, pinnedConfigId])
 
   // Token lists for native token lookup
   const { data: chainTokens } = useTokenLists(chainId)
@@ -325,6 +368,9 @@ export function LendingDashboard({
     onLenderChange(lender)
     setSelectedSubAccountId(null)
     setSelectedPool(null)
+    // Config ids are only meaningful within one lender, so a pin from a
+    // hand-off into lender A must not survive a switch to lender B.
+    setPinnedConfigId(null)
   }
 
   // User position for the currently selected pool
@@ -464,6 +510,7 @@ export function LendingDashboard({
               configGroups={configGroups ?? []}
               allPools={allPools}
               selectedMarketUid={selectedPool?.marketUid}
+              pinnedConfigId={pinnedConfigId}
               // Lending is single-side (one selected market drives the panel),
               // so the row's side hint isn't used here.
               onPoolSelect={(pool) => handlePoolSelect(pool)}

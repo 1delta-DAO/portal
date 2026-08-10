@@ -29,6 +29,18 @@ interface Props {
   /** Controlled config selection (optional — uses internal state if not provided). */
   selectedConfigId?: string | null
   onConfigChange?: (configId: string) => void
+  /**
+   * A config the caller wants selected — an explicit request (today: an
+   * optimizer deep link naming the config its LTV/leverage were computed
+   * against), as opposed to the default this view would otherwise choose.
+   *
+   * It outranks the default INCLUDING the user's own active e-mode: the user
+   * clicked a specific row, and landing on a different config would show
+   * different LTV and leverage than the numbers they clicked. Ignored when it
+   * names no visible group, and dropped the moment the user picks anything
+   * else, so it seeds the selection without freezing it.
+   */
+  pinnedConfigId?: string | null
   /** The user's active e-mode category string — matching configs are visually emphasized. */
   userActiveCategory?: string | null
 }
@@ -118,6 +130,7 @@ export const ConfigMarketView: React.FC<Props> = ({
   isLoading,
   selectedConfigId: controlledConfigId,
   onConfigChange,
+  pinnedConfigId,
   userActiveCategory,
 }) => {
   const [internalConfigId, setInternalConfigId] = useState<string | null>(null)
@@ -135,6 +148,14 @@ export const ConfigMarketView: React.FC<Props> = ({
   React.useEffect(() => {
     setUserTouched(false)
   }, [configGroups])
+
+  // A NEW pin (a fresh deep link) re-opens the default tracking so it can be
+  // applied even if the user had already picked a config in this mount. Keyed
+  // on the value, so re-renders carrying the same pin never undo a later
+  // manual choice.
+  React.useEffect(() => {
+    if (pinnedConfigId) setUserTouched(false)
+  }, [pinnedConfigId])
 
   // Use controlled or internal state
   const isControlled = controlledConfigId !== undefined
@@ -157,7 +178,16 @@ export const ConfigMarketView: React.FC<Props> = ({
     }
   }
 
-  // Sort config groups: user's active e-mode first, then by total liquidity descending
+  // Sort config groups: pinned config first, then the user's active e-mode,
+  // then by total liquidity descending.
+  //
+  // The pin leads for the same reason it outranks the default selection: it is
+  // an explicit request. It also has to be VISIBLE to count — this list
+  // paginates at 8 and Euler V2 on Ethereum has 216 configs, so a pin left in
+  // liquidity order lands ~20 pages deep, correctly selected and expanded where
+  // nobody will ever see it. Sorting it to the top is the same treatment the
+  // active e-mode already gets, and it puts the config on the first page rather
+  // than relying on the page-follow below.
   const sortedGroups = useMemo(() => {
     const q = configFilter.trim().toLowerCase()
     const filtered = q
@@ -173,6 +203,10 @@ export const ConfigMarketView: React.FC<Props> = ({
         })
       : configGroups
     return [...filtered].sort((a, b) => {
+      if (pinnedConfigId != null) {
+        if (a.configId === pinnedConfigId) return -1
+        if (b.configId === pinnedConfigId) return 1
+      }
       if (userActiveCategory != null) {
         const aIsActive = a.category === userActiveCategory
         const bIsActive = b.category === userActiveCategory
@@ -181,11 +215,41 @@ export const ConfigMarketView: React.FC<Props> = ({
       }
       return configBorrowLiquidity(b) - configBorrowLiquidity(a)
     })
-  }, [configGroups, userActiveCategory, configFilter])
+  }, [configGroups, userActiveCategory, configFilter, pinnedConfigId])
 
   // Pagination — auto-resets on filter / group-count change
   const configPagination = useTablePagination(sortedGroups, PAGE_SIZE, [configFilter])
-  const { pagedItems: pagedGroups } = configPagination
+  const { pagedItems: pagedGroups, page: configPage, setPage: setConfigPage } = configPagination
+
+  /**
+   * Keep the selected config on the VISIBLE page.
+   *
+   * Selecting a config is state, not scroll position: the list paginates at
+   * PAGE_SIZE and a lender can have hundreds of configs — Euler V2 on Ethereum
+   * returns 216, i.e. 27 pages — so a selection the user didn't click with
+   * their own hands (a deep-link pin, or their active e-mode) routinely lands
+   * on a page nobody is looking at. The config was selected and expanded
+   * correctly; it was simply off-screen, which from the outside is
+   * indistinguishable from the hand-off having opened the wrong config.
+   *
+   * Aligned at most once per selection, tracked by ref rather than by comparing
+   * against the current page. Both alternatives are wrong: re-running on every
+   * page change would trap the user on the selection's page, and re-running on
+   * every `sortedGroups` change would yank them back to it each time they typed
+   * in the config filter (which resets to page 0 by design).
+   */
+  const alignedForRef = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (!selectedConfigId || sortedGroups.length === 0) return
+    if (alignedForRef.current === selectedConfigId) return
+    const idx = sortedGroups.findIndex((g) => g.configId === selectedConfigId)
+    // Not in the list yet (groups still loading, or filtered out) — leave the
+    // ref unset so this retries once the selection actually resolves.
+    if (idx < 0) return
+    alignedForRef.current = selectedConfigId
+    const target = Math.floor(idx / PAGE_SIZE)
+    if (target !== configPage) setConfigPage(target)
+  }, [selectedConfigId, sortedGroups, configPage, setConfigPage])
 
   // The preferred default config: the user's enabled (active e-mode) config if
   // it's present, otherwise the top group (active-first, then liquidity, per the
@@ -194,12 +258,19 @@ export const ConfigMarketView: React.FC<Props> = ({
   // between "enabled config" and "topmost".
   const preferredConfigId = useMemo(() => {
     if (sortedGroups.length === 0) return null
+    // An explicitly pinned config outranks every default — it is a request,
+    // not a guess. Only honoured while it names a visible group; a stale or
+    // filtered-out pin falls through to the normal default rather than
+    // leaving nothing selected.
+    if (pinnedConfigId && sortedGroups.some((g) => g.configId === pinnedConfigId)) {
+      return pinnedConfigId
+    }
     if (userActiveCategory != null) {
       const active = sortedGroups.find((g) => g.category === userActiveCategory)
       if (active) return active.configId
     }
     return sortedGroups[0].configId
-  }, [sortedGroups, userActiveCategory])
+  }, [sortedGroups, userActiveCategory, pinnedConfigId])
 
   // Drive the default selection. Until the user interacts, the selection tracks
   // `preferredConfigId` and re-aligns as async data settles (so a late-loading
@@ -646,7 +717,24 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
     sortDir,
     highlightMap,
   ])
-  const { pagedItems: pagedRows } = detailPagination
+  const { pagedItems: pagedRows, page: detailPage, setPage: setDetailPage } = detailPagination
+
+  // Same problem one level down, and the same fix as the config list: a market
+  // selected by a hand-off (Earn → Lending pre-selects the row the user clicked)
+  // can sort below the page boundary inside a large config, so the row is
+  // selected but invisible. Loop-role highlights solve this by pinning to the
+  // top; a selection shouldn't reorder the table under the user, so it pages to
+  // the row instead. Aligned once per selection — see the config-list note.
+  const alignedMarketRef = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (!selectedMarketUid || pinnedSorted.length === 0) return
+    if (alignedMarketRef.current === selectedMarketUid) return
+    const idx = pinnedSorted.findIndex((r) => r.item.marketUid === selectedMarketUid)
+    if (idx < 0) return
+    alignedMarketRef.current = selectedMarketUid
+    const target = Math.floor(idx / DETAIL_PAGE_SIZE)
+    if (target !== detailPage) setDetailPage(target)
+  }, [selectedMarketUid, pinnedSorted, detailPage, setDetailPage])
 
   const toggleSort = (key: DetailSortKey) => {
     if (sortKey === key) {

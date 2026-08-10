@@ -619,7 +619,7 @@ function PairCard({
         <button
           type="button"
           className="btn btn-xs btn-ghost gap-1"
-          title={`Open ${row.collateral.symbol ?? 'this pair'} / ${row.debt.symbol ?? ''} in the lender tab`}
+          title={`Open ${row.collateral.symbol ?? 'this pair'} / ${row.debt.symbol ?? ''} in the Loop tab`}
           onClick={(e) => {
             e.stopPropagation()
             onDetails()
@@ -651,16 +651,33 @@ export function OptimizerTable({
   const colSpan = 8 + (showMaxDebt ? 1 : 0) + (showMinCollateral ? 1 : 0)
 
   const baseQuery = (row: OptimizerPairRow) => ({
+    // Market UIDs first — they name exactly one market each, which token
+    // addresses cannot do on vault lenders (Euler: many vaults per underlying).
+    // The addresses ride along as the fallback for rows without UIDs.
+    [OPTIMIZER_DEEPLINK_KEYS.colMarket]: row.marketLongUid,
+    [OPTIMIZER_DEEPLINK_KEYS.debtMarket]: row.marketShortUid,
     [OPTIMIZER_DEEPLINK_KEYS.collateral]: row.collateral.address,
     [OPTIMIZER_DEEPLINK_KEYS.debt]: row.debt.address,
+    // The config the row's LTV and leverage were computed against — without it
+    // the receiving tab falls back to its own default and shows different
+    // numbers than the row the user clicked.
     [OPTIMIZER_DEEPLINK_KEYS.config]: row.eModeConfigId,
     // The caller only passes `amount` when it's in token units.
     [OPTIMIZER_DEEPLINK_KEYS.amount]: amount,
   })
 
-  // Single hand-off: open the pair in the full lender (Lending) tab.
-  const goLender = (row: OptimizerPairRow) => {
-    navigate(buildPath('lending', row.chainId, row.lenderKey, baseQuery(row)))
+  // Single hand-off: open the pair in the Loop tab. The optimizer ranks pairs
+  // by the return on a LEVERAGED position — a row only means anything as a
+  // loop, so the destination is the loop builder, not the per-market lending
+  // view. (Earn is the tab that hands off into Lending, where a single asset is
+  // the whole subject.)
+  const goLoop = (row: OptimizerPairRow) => {
+    navigate(
+      buildPath('trading', row.chainId, row.lenderKey, {
+        ...baseQuery(row),
+        [OPTIMIZER_DEEPLINK_KEYS.action]: 'loop',
+      })
+    )
   }
 
   return (
@@ -808,10 +825,10 @@ export function OptimizerTable({
                     <button
                       type="button"
                       className="btn btn-xs btn-ghost gap-1"
-                      title={`Open ${row.collateral.symbol ?? 'this pair'} / ${row.debt.symbol ?? ''} in the lender tab`}
+                      title={`Open ${row.collateral.symbol ?? 'this pair'} / ${row.debt.symbol ?? ''} in the Loop tab`}
                       onClick={(e) => {
                         e.stopPropagation()
-                        goLender(row)
+                        goLoop(row)
                       }}
                     >
                       Details
@@ -843,7 +860,7 @@ export function OptimizerTable({
                   showChain={showChain}
                   selected={selectedKey === pk}
                   onSelect={onSelectPair ? () => onSelectPair(row) : undefined}
-                  onDetails={() => goLender(row)}
+                  onDetails={() => goLoop(row)}
                 />
               )
             })}

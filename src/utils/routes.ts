@@ -88,14 +88,34 @@ export function slugFromTab(tab: SubTab): string {
   return TAB_TO_SLUG[tab]
 }
 
-/** Convert internal lender key to URL-friendly slug: AAVE_V3 → aave-v3 */
+/**
+ * Convert an internal lender key to a URL-friendly slug: `AAVE_V3` → `aave-v3`.
+ *
+ * **Lender keys use `_` as their only separator** — verified across all ~9k
+ * keys in `lender-labels.json`. That invariant is what makes this mapping
+ * reversible, and it is enforced upstream: Sky/USDD market keys embed a Maker
+ * ilk whose own `-` is re-spelled at construction (`WBTC-A` →
+ * `SKY_1_WBTC_A`, see margin-fetcher's `dssLenderKey`), precisely because a
+ * key mixing both separators cannot survive this round-trip.
+ *
+ * The `.` escape below is a SAFETY NET for a key that violates the invariant
+ * anyway: without it, a stray hyphen collapses into the `_` mapping and
+ * `slugToLender` returns a key matching no lender, so the page silently falls
+ * back to whichever lender sorts first rather than failing loudly. It never
+ * fires today, and it leaves every hyphen-free key byte-identical, so all
+ * existing links are unaffected.
+ */
 export function lenderToSlug(lenderKey: string): string {
-  return lenderKey.toLowerCase().replace(/_/g, '-')
+  return lenderKey.toLowerCase().replace(/-/g, '.').replace(/_/g, '-')
 }
 
-/** Convert URL slug back to internal lender key: aave-v3 → AAVE_V3 */
+/**
+ * Convert a URL slug back to the internal lender key: `aave-v3` → `AAVE_V3`,
+ * `sky-1-wbtc-a` → `SKY_1_WBTC_A`. Inverse of {@link lenderToSlug}; the order
+ * of the two replacements is load-bearing in both directions.
+ */
 export function slugToLender(slug: string): string {
-  return slug.toUpperCase().replace(/-/g, '_')
+  return slug.toUpperCase().replace(/-/g, '_').replace(/\./g, '-')
 }
 
 export function buildPath(
@@ -126,10 +146,19 @@ export function buildPath(
 /**
  * Query-param keys used to deep-link from the optimizer into Lending / Loop.
  * Centralised so producers and consumers can't drift.
+ *
+ * `colMarket` / `debtMarket` carry the pair's **market UIDs** and are the
+ * primary handle; `collateral` / `debt` carry token addresses and remain as the
+ * fallback (and keep older shared links working). An address is ambiguous on
+ * vault lenders — Euler runs many vaults over the same underlying, so resolving
+ * a hand-off by address lands on whichever vault happens to be first, which is
+ * usually not the one whose rate was on screen. A UID names exactly one market.
  */
 export const OPTIMIZER_DEEPLINK_KEYS = {
   collateral: 'col',
   debt: 'debt',
+  colMarket: 'colm',
+  debtMarket: 'debtm',
   action: 'action',
   config: 'config',
   amount: 'amt',

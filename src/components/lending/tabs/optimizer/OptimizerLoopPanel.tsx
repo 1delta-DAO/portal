@@ -11,6 +11,7 @@ import {
 import { useTokenBalances } from '../../../../hooks/lending/useTokenBalances'
 import { LoopAction } from '../trading/actions/LoopAction'
 import { buildPath, OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'
+import { resolveDeepLinkPool } from '../../shared/deepLink'
 
 const EMPTY_SET: Set<string> = new Set()
 const NOOP = () => {}
@@ -33,19 +34,15 @@ export function OptimizerLoopPanel({ row, account }: { row: OptimizerPairRow; ac
   const { lenderData, isPublicDataLoading } = useLendingLatest(chainId, [lender], true)
   const allPools = useMemo(() => lenderData?.[lender] ?? [], [lenderData, lender])
 
-  // Resolve the pair's pools. Prefer an exact marketUid match (correct for
-  // vault lenders like Euler/Fluid where several pools share an underlying),
-  // falling back to the underlying address.
-  const findPool = (marketUid?: string, addr?: string) =>
-    (marketUid ? allPools.find((p) => p.marketUid === marketUid) : undefined) ??
-    (addr ? allPools.find((p) => p.underlying.toLowerCase() === addr.toLowerCase()) : undefined) ??
-    null
+  // Resolve the pair's pools — marketUid first, underlying address as the
+  // fallback. Shared with the Lending / Loop tab hand-offs so all three
+  // resolve a pair the same way.
   const collateralPool = useMemo(
-    () => findPool(row.marketLongUid, row.collateral.address),
+    () => resolveDeepLinkPool(allPools, row.marketLongUid, row.collateral.address) ?? null,
     [allPools, row.marketLongUid, row.collateral.address]
   )
   const debtPool = useMemo(
-    () => findPool(row.marketShortUid, row.debt.address),
+    () => resolveDeepLinkPool(allPools, row.marketShortUid, row.debt.address) ?? null,
     [allPools, row.marketShortUid, row.debt.address]
   )
 
@@ -111,6 +108,12 @@ export function OptimizerLoopPanel({ row, account }: { row: OptimizerPairRow; ac
           onClick={() =>
             navigate(
               buildPath('trading', chainId, lender, {
+                // UIDs first, addresses as the fallback — see
+                // OPTIMIZER_DEEPLINK_KEYS. This panel already failed to resolve
+                // the pair locally, so naming the markets exactly is what gives
+                // the Loop tab a chance the embedded view didn't have.
+                [OPTIMIZER_DEEPLINK_KEYS.colMarket]: row.marketLongUid,
+                [OPTIMIZER_DEEPLINK_KEYS.debtMarket]: row.marketShortUid,
                 [OPTIMIZER_DEEPLINK_KEYS.collateral]: row.collateral.address,
                 [OPTIMIZER_DEEPLINK_KEYS.debt]: row.debt.address,
                 [OPTIMIZER_DEEPLINK_KEYS.config]: row.eModeConfigId,

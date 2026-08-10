@@ -8,12 +8,35 @@ import { ExposureCell } from './ExposureCell'
 import { AssetPopover } from '../../shared/AssetPopover'
 import { RiskBadge } from '../../shared/RiskBadge'
 import { OracleBadge } from '../../shared/OracleBadge'
-import { buildPath } from '../../../../utils/routes'
+import { buildPath, OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { Logo } from '../../../common/Logo'
 import { getChainName } from '../../../../lib/lib-utils'
 
 const CHAIN_LOGO_BASE = 'https://raw.githubusercontent.com/1delta-DAO/chains/main'
+
+/**
+ * Where an Earn row hands off to: the Lending tab with THIS market selected and
+ * the Deposit panel open.
+ *
+ * Earn is about one asset earning a yield, so the destination is the per-market
+ * lending view — the mirror of the optimizer, which ranks leveraged PAIRS and
+ * therefore hands off to Loop. Landing on the lender with nothing selected made
+ * the user re-find the row they had just clicked, and on a lender with dozens of
+ * markets (Euler, Morpho) that is a real search.
+ *
+ * The market UID is the handle; the underlying address rides along as the
+ * fallback for rows without one. Both are the collateral-leg keys, which is the
+ * side a `deposit` action resolves — see `resolveDeepLinkPool`.
+ */
+function lendingPathForPool(p: PoolEntry): string {
+  return buildPath('lending', p.chainId, p.lenderKey, {
+    [OPTIMIZER_DEEPLINK_KEYS.colMarket]: p.marketUid,
+    [OPTIMIZER_DEEPLINK_KEYS.collateral]:
+      p.underlyingAddress || p.underlyingInfo?.asset?.address,
+    [OPTIMIZER_DEEPLINK_KEYS.action]: 'deposit',
+  })
+}
 
 /** Compact radial utilization indicator */
 const UtilCircle: React.FC<{ pct: number }> = ({ pct }) => {
@@ -264,10 +287,12 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                       </AssetPopover>
                       <a
                         className="shrink-0 text-base-content/30 hover:text-primary transition-colors"
-                        title={`Open ${p.lenderInfo?.name ?? p.lenderKey} lending`}
+                        title={`Open ${p.underlyingInfo?.asset?.symbol ?? 'this market'} on ${
+                          p.lenderInfo?.name ?? p.lenderKey
+                        } in the Lending tab`}
                         onClick={(e) => {
                           e.stopPropagation()
-                          navigate(buildPath('lending', p.chainId, p.lenderKey))
+                          navigate(lendingPathForPool(p))
                         }}
                       >
                         <svg
@@ -468,10 +493,12 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                   <button
                     type="button"
                     className="btn btn-ghost btn-xs btn-circle opacity-40 hover:opacity-100"
-                    title={`Open ${p.lenderInfo?.name ?? p.lenderKey} lending`}
+                    title={`Open ${p.underlyingInfo?.asset?.symbol ?? 'this market'} on ${
+                          p.lenderInfo?.name ?? p.lenderKey
+                        } in the Lending tab`}
                     onClick={(e) => {
                       e.stopPropagation()
-                      navigate(buildPath('lending', p.chainId, p.lenderKey))
+                      navigate(lendingPathForPool(p))
                     }}
                   >
                     →

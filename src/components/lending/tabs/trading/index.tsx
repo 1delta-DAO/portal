@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'
+import {
+  findConfigContaining,
+  readOptimizerDeepLink,
+  resolveDeepLinkPool,
+  stripDeepLinkParams,
+} from '../../shared/deepLink'
 import type { InitialActionSelection } from './types'
 import type {
   LenderData,
@@ -116,6 +121,11 @@ export function TradingDashboard({
   const [selectedPools, setSelectedPools] = useState<SelectedPool[]>([])
   const [showMobileAction, setShowMobileAction] = useState(false)
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
+  // Config requested by an optimizer hand-off (`?config=`). Kept apart from
+  // `selectedConfigId` — that one tracks whatever is currently open, while this
+  // records what was ASKED for, which is what ConfigMarketView needs to
+  // outrank its own default once the groups load.
+  const [pinnedConfigId, setPinnedConfigId] = useState<string | null>(null)
   // Click on a by-config row → buffered here so the active action's effect
   // can route it to the matching slot. Cleared by the action via
   // consumeMarketClick once it's been applied.
@@ -161,51 +171,67 @@ export function TradingDashboard({
     return lenderData[selectedLender] ?? []
   }, [lenderData, selectedLender])
 
-  // Optimizer → Loop deep-link consumer. Once the lender's pools are
-  // loaded, resolve the `?col=&debt=` addresses to PoolDataItems and pass
-  // them down to the action panel as `initialSelection`. The matched
-  // selection is held in a ref so it survives until the action component
-  // mounts (LoopAction reads it via initialState), then we strip the URL
-  // params so subsequent navigation isn't sticky.
+  // Optimizer → Loop deep-link consumer. Once the lender's pools are loaded,
+  // resolve the hand-off params to PoolDataItems and pass them down to the
+  // action panel as `initialSelection`.
+  //
+  // STATE, not a ref consumed during render. The previous version read the ref
+  // and nulled it in the render body, which lost the selection outright in two
+  // ordinary situations, both of them races against data that loads on its own
+  // schedule:
+  //   1. `isPublicDataLoading` true on that render (react-query serves the
+  //      optimizer's already-cached pools while refetching in the background)
+  //      — the render returns a spinner BELOW this point, so nothing consumed
+  //      the selection that had just been thrown away.
+  //   2. The persisted `activeOperation` wasn't Loop — the switch to Loop
+  //      happens in an effect one render later, so the render that cleared the
+  //      ref never mounted LoopAction at all.
+  // Either way the URL params were already stripped and the effect's signature
+  // guard blocks a retry, so the pre-selection was gone for good.
+  //
+  // Keeping it in state is safe because LoopAction seeds from it only in its
+  // `useState` initialisers, and its `key` (below) is derived from the
+  // selection: an unchanged selection means no remount, so it cannot re-apply
+  // over the user's later edits.
   const [searchParams, setSearchParams] = useSearchParams()
-  const initialSelectionRef = useRef<InitialActionSelection | null>(null)
-  const [, forceRender] = useState(0)
+  const [pendingSelection, setPendingSelection] = useState<InitialActionSelection | null>(null)
   const deepLinkConsumedRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (allPools.length === 0) return
-    const colAddr = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.collateral)
-    const debtAddr = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.debt)
-    const amountStr = searchParams.get(OPTIMIZER_DEEPLINK_KEYS.amount)
-    if (!colAddr && !debtAddr) return
+    const link = readOptimizerDeepLink(searchParams)
+    if (!link.hasPair && !link.configId) return
 
-    const signature = `${selectedLender}:${colAddr ?? ''}:${debtAddr ?? ''}:${amountStr ?? ''}`
+    const signature = `${selectedLender}:${link.signature}`
     if (deepLinkConsumedRef.current === signature) return
     deepLinkConsumedRef.current = signature
 
-    const collateralPool =
-      colAddr != null
-        ? allPools.find((p) => p.underlying.toLowerCase() === colAddr.toLowerCase())
-        : undefined
-    const debtPool =
-      debtAddr != null
-        ? allPools.find((p) => p.underlying.toLowerCase() === debtAddr.toLowerCase())
-        : undefined
+    // Market UID first, token address as the fallback. Resolving by address
+    // alone picks whichever vault sorts first for that underlying, which on
+    // Euler is routinely a different market than the row the user clicked —
+    // the loop would then be priced off markets they never chose.
+    const collateralPool = resolveDeepLinkPool(allPools, link.colMarketUid, link.colAddr)
+    const debtPool = resolveDeepLinkPool(allPools, link.debtMarketUid, link.debtAddr)
 
     if (collateralPool || debtPool) {
-      initialSelectionRef.current = {
+      setPendingSelection({
         collateralPool,
         debtPool,
-        amount: amountStr ? Number(amountStr) || undefined : undefined,
-      }
-      // Force a re-render so `actionProps.initialSelection` picks up the
-      // new ref content; LoopAction will be remounted via its `key` below.
-      forceRender((n) => n + 1)
+        amount: link.amount ? Number(link.amount) || undefined : undefined,
+      })
     }
 
-    const next = new URLSearchParams(searchParams)
-    for (const k of Object.values(OPTIMIZER_DEEPLINK_KEYS)) next.delete(k)
-    setSearchParams(next, { replace: true })
+    // Pin the config the pair was priced against, so the leverage shown here
+    // matches the row that was clicked instead of this tab's own default.
+    if (link.configId) {
+      setPinnedConfigId(link.configId)
+      setViewMode('config')
+    }
+
+    setSearchParams(stripDeepLinkParams(searchParams), { replace: true })
+    // `setViewMode` wraps the persisted-filter setter and is a fresh closure
+    // every render — see the matching note in the Lending tab's consumer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPools, searchParams, setSearchParams, selectedLender])
 
   // Config-grouped pool data
@@ -221,10 +247,38 @@ export function TradingDashboard({
   // moment the user collapses it (the empty selection is coerced to ''),
   // causing a close→open flicker — so we don't.
 
-  // Reset config selection when lender changes
+  // Reset config + hand-off selection when the lender CHANGES. Config ids and
+  // PoolDataItems are only meaningful within one lender, so neither may outlive
+  // a switch.
+  //
+  // The previous-value guard is load-bearing, not defensive: this effect is
+  // declared after the deep-link consumer, so on a mount where the pools are
+  // already cached (arriving from the optimizer, which prefetched them) the
+  // consumer sets the pin and the selection in the same commit — and an
+  // unguarded reset would then wipe both before anything rendered.
+  const prevLenderRef = useRef(selectedLender)
   React.useEffect(() => {
+    if (prevLenderRef.current === selectedLender) return
+    prevLenderRef.current = selectedLender
     setSelectedConfigId(null)
+    setPinnedConfigId(null)
+    setPendingSelection(null)
   }, [selectedLender])
+
+  // Late-binding half of the hand-off: the pools and the config groups are two
+  // independent fetches and the groups arrive second, long after the legs were
+  // resolved and the URL params stripped. Derive the config from the pair so
+  // the by-config view opens on a group that actually holds both legs instead
+  // of its own default. Never overrides an explicit `?config=`.
+  useEffect(() => {
+    if (!pendingSelection || pinnedConfigId || !configGroups?.length) return
+    const configId = findConfigContaining(
+      configGroups,
+      pendingSelection.collateralPool?.marketUid,
+      pendingSelection.debtPool?.marketUid
+    )
+    if (configId) setPinnedConfigId(configId)
+  }, [configGroups, pendingSelection, pinnedConfigId])
 
   // Active config group
   const activeConfigGroup = useMemo(
@@ -369,12 +423,9 @@ export function TradingDashboard({
     setSelectedSubAccountId(id)
   }, [])
 
-  // Pull (and clear) any pending deep-link selection so we hand it to the
-  // action exactly once. The receiving action's `key` includes the
-  // selection signature, which forces a fresh mount that re-runs its
-  // initialiser with the new pools.
-  const pendingSelection = initialSelectionRef.current
-  if (pendingSelection) initialSelectionRef.current = null
+  // The receiving action's `key` includes the selection signature, so a NEW
+  // hand-off forces a fresh mount that re-runs its initialiser with the new
+  // pools, while the same one re-rendering leaves the mounted action alone.
   const initialSelectionKey = pendingSelection
     ? `${pendingSelection.collateralPool?.marketUid ?? ''}:${
         pendingSelection.debtPool?.marketUid ?? ''
@@ -505,6 +556,7 @@ export function TradingDashboard({
               allPools={allPools}
               selectedConfigId={selectedConfigId}
               onConfigChange={setSelectedConfigId}
+              pinnedConfigId={pinnedConfigId}
               onPoolSelect={(pool, side) => {
                 setPendingMarketClick({ pool, side, nonce: Date.now() })
               }}
