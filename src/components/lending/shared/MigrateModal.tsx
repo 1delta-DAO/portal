@@ -1,19 +1,14 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { parseUnits } from 'viem'
 import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
 import { useAtomicBatch } from '../../../hooks/useAtomicBatch'
 import { BatchExecuteButton } from '../../common/BatchExecuteButton'
+import type { OptimizerAssetRef } from '../../../hooks/lending/useOptimizerPairs'
+import { useLenders } from '../../../hooks/lending/usePoolData'
 import {
-  useOptimizerPairs,
-  type OptimizerPairRow,
-  type OptimizerAssetRef,
-} from '../../../hooks/lending/useOptimizerPairs'
-import {
-  useLenders,
-  useLendingLatest,
-  type PoolDataItem,
-} from '../../../hooks/lending/usePoolData'
-import { isMidnightMarket } from '../actions/helpers'
+  fetchMigrateTargets,
+  type MigrateTargetRow,
+} from '../../../sdk/lending-helper/fetchMigrateTargets'
 import {
   fetchMigrate,
   type MigrateResult,
@@ -23,141 +18,16 @@ import { LenderBadge } from './LenderBadge'
 import { Logo } from '../../common/Logo'
 
 /**
- * Build a synthetic optimizer-pair row for a Morpho Midnight market so it can be
- * offered as a migrate TARGET. Midnight is a fixed-term / order-book lender and
- * is intentionally absent from the variable-rate `/pairs/optimize` feed, but its
- * full market data IS in `/lending/latest`. Each Midnight lender key groups its
- * loan (borrowable) + collateral markets; we pair the loan matching the source
- * DEBT asset with the collateral matching the source COLLATERAL asset. The
- * "borrow APR" here is the FIXED rate (shown with the maturity), not a variable
- * rate — matching how a Midnight debt leg renders elsewhere.
- */
-function buildMidnightPairRow(
-  chainId: string,
-  lenderKey: string,
-  markets: PoolDataItem[],
-  colAddr: string,
-  debtAddr: string,
-): OptimizerPairRow | null {
-  const cfg0 = (m: PoolDataItem) => m.config?.['0']
-  const loan = markets.find(
-    (m) =>
-      m.asset?.address?.toLowerCase() === debtAddr &&
-      !!cfg0(m) &&
-      !cfg0(m)!.debtDisabled &&
-      m.borrowingEnabled !== false &&
-      !m.isFrozen,
-  )
-  const coll = markets.find(
-    (m) =>
-      m.asset?.address?.toLowerCase() === colAddr &&
-      !!cfg0(m) &&
-      !cfg0(m)!.collateralDisabled &&
-      (cfg0(m)!.borrowCollateralFactor ?? 0) > 0,
-  )
-  if (!loan || !coll) return null
-
-  const collCfg = cfg0(coll)!
-  const lltv = collCfg.collateralFactor || collCfg.borrowCollateralFactor || 0
-  // Fixed borrow rate as a FRACTION (the API serves a percent). Prefer the term
-  // card's apr; fall back to the market's variableBorrowRate mirror.
-  const ratePct = Number(loan.terms?.[0]?.apr ?? loan.variableBorrowRate ?? 0)
-  const borrowApr = ratePct / 100
-  const maxLev = lltv > 0 && lltv < 1 ? 1 / (1 - lltv) : 1
-  const maturityDays = loan.terms?.[0]?.durationDays
-    ? Number(loan.terms[0].durationDays)
-    : undefined
-
-  const ref = (m: PoolDataItem): OptimizerAssetRef => ({
-    chainId,
-    address: m.asset.address,
-    symbol: m.asset.symbol,
-    name: m.asset.name,
-    decimals: m.asset.decimals,
-    logoURI: m.asset.logoURI,
-    assetGroup: m.asset.assetGroup,
-    priceUsd: m.oraclePriceUSD ?? undefined,
-  })
-
-  return {
-    chainId,
-    lenderKey,
-    marketLongUid: coll.marketUid,
-    marketShortUid: loan.marketUid,
-    collateral: ref(coll),
-    debt: ref(loan),
-    depositAprLong: 0,
-    borrowAprShort: borrowApr,
-    rewardAprLong: 0,
-    rewardAprShort: 0,
-    intrinsicYieldLong: 0,
-    intrinsicYieldShort: 0,
-    depositAprEffective: 0,
-    borrowAprEffective: borrowApr,
-    aprBase: -borrowApr * (maxLev - 1),
-    aprTotal: -borrowApr * (maxLev - 1),
-    ltv: lltv,
-    liquidationThreshold: lltv,
-    maxLeverage: maxLev,
-    riskScore: 0,
-    riskBreakdown: [],
-    utilizationLong: 0,
-    utilizationShort: 0,
-    totalDepositsUsdLong: coll.totalDepositsUSD ?? 0,
-    totalDebtUsdLong: 0,
-    totalLiquidityUsdLong: coll.totalLiquidityUSD ?? 0,
-    totalDepositsUsdShort: loan.totalDepositsUSD ?? 0,
-    totalDebtUsdShort: loan.totalDebtUSD ?? 0,
-    totalLiquidityUsdShort: loan.totalLiquidityUSD ?? 0,
-    // Synthetic row: we don't have a separate cap-adjusted token amount, so the
-    // token field is left at 0 and the USD figure carries the pool liquidity.
-    borrowLiquidityShort: 0,
-    borrowLiquidityUsdShort: loan.totalLiquidityUSD ?? 0,
-    maturityDays,
-  }
-}
-
-// Canonical wrapped-native ERC20 per chain. Used only to find WBNB-style targets
-// when migrating a NATIVE debt (the on-behalf borrow can't be delegated for the
-// native asset, so the target must be the wrapped form). Keyed by chainId string.
-const NATIVE_SENTINEL = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
-
-/**
- * Lender keys that can never be a migrate TARGET (they are still valid
- * as a SOURCE). Euler V2 / Dolomite are detectable by key; non-Venus Compound V2
- * can't be classified client-side, so the build returns a clear UNSUPPORTED
- * error for those instead.
- *
- * These MUST be pushed into the optimizer query (`excludeLenders`) and not only
- * filtered client-side: the endpoint truncates to `count` BEFORE we get to drop
- * anything, so unsupported rows that outrank the real targets silently eat the
- * page. On Ethereum WETH/USDC that was 15 of 25 slots taken by Euler V2 vaults,
- * which pushed Aave V4 (rank 30 of 41) off the list entirely — while wstETH/USDC,
- * with fewer Euler vaults, kept it.
- *
- * NB: these must be the REGISTRY lender keys, not brand prefixes. The endpoint's
- * "prefix-expanded" means a base key expands to its per-market keys
- * (`AAVE_V4` → `AAVE_V4_<hub>_<spoke>`); it does NOT truncate, so `EULER`
- * matches nothing and `EULER_V2` is required.
- */
-const UNSUPPORTED_TARGET_LENDERS = ['EULER_V2', 'DOLOMITE']
-
-const WRAPPED_NATIVE_BY_CHAIN: Record<string, string> = {
-  '1': '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', // WETH
-  '10': '0x4200000000000000000000000000000000000006', // WETH (Optimism)
-  '56': '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c', // WBNB
-  '137': '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270', // WPOL/WMATIC
-  '8453': '0x4200000000000000000000000000000000000006', // WETH (Base)
-  '42161': '0x82af49447d8a07e3bd95bd0d56f35241523fbab1', // WETH (Arbitrum)
-  '43114': '0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7', // WAVAX
-}
-
-/**
  * Show a leg's USD value when a price is available, else fall back to the token
  * AMOUNT (so a leg never renders as "—" just because its price feed is missing —
  * e.g. WMON on Monad has an amount but no USD price).
  */
-function legValue(leg?: { amount?: string; amountUsd?: number; decimals?: number; symbol?: string }): string {
+function legValue(leg?: {
+  amount?: string
+  amountUsd?: number
+  decimals?: number
+  symbol?: string
+}): string {
   if (!leg) return '—'
   if (leg.amountUsd != null)
     return `$${leg.amountUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
@@ -206,13 +76,9 @@ function healthColorClass(h: number): string {
   return 'text-error'
 }
 
-/** True for the native-asset sentinel addresses (0x0…0 / 0xEee…EEeE). */
-function isNativeSentinel(addr: string): boolean {
-  const a = addr.toLowerCase()
-  return (
-    a === '0x0000000000000000000000000000000000000000' ||
-    a === '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
-  )
+/** Days until a fixed-term maturity (unix seconds), for the term badge. */
+function daysUntil(unixSeconds: number): number {
+  return Math.max(0, Math.round((unixSeconds * 1000 - Date.now()) / 86_400_000))
 }
 
 // ---------------------------------------------------------------------------
@@ -239,8 +105,10 @@ export interface MigrateSource {
   lenderKey: string
   /** Current health factor of the source position (for the before→after compare). */
   currentHealth?: number | null
-  /** Oracle USD prices from the source position — fallback when the server feed
-   *  lacks a token (e.g. WMON on Monad), so the result still shows USD/net/HF. */
+  /** Live oracle USD prices read off the position. The endpoints resolve prices
+   *  themselves; these are passed as overrides because a read from the position
+   *  the user is looking at is fresher than the shared feed — and is the only
+   *  source for a token the feed doesn't carry (e.g. WMON on Monad). */
   collateralPriceUsd?: number
   debtPriceUsd?: number
   /** Collateral leg + its live amount in token units (for the result display). */
@@ -264,218 +132,165 @@ interface MigrateModalProps {
 /**
  * Migrate a whole (collateral + debt) position to another lender or market.
  *
- * Opens from a position in `YourPositions`. We fetch the *qualifying target
- * pairs* — optimizer pairs on the same chain with the same collateral and debt
- * underlyings — and let the user pick one. Picking + confirming builds the
- * flash-loan-backed migrate bundle server-side (`fetchMigrate`) and executes
- * its permissions then transactions. Works at any LTV; the source repay is
- * sized with a small buffer so the full collateral withdrawal can't revert.
+ * Opens from a position in `YourPositions`. `/v1/actions/loop/migrate/targets`
+ * returns the destinations the migrate builder will actually accept — already
+ * ranked, already priced for this position's size — and the user picks one.
+ * Picking + confirming builds the flash-loan-backed bundle (`fetchMigrate`) and
+ * executes its permissions then transactions. Works at any LTV; the source
+ * repay is sized with a small buffer so the full collateral withdrawal can't
+ * revert.
+ *
+ * This component deliberately holds NO protocol knowledge. It used to: a
+ * per-chain wrapped-native address table, a hand-maintained list of lenders that
+ * cannot be a migrate target, a synthetic pair-row builder for order-book
+ * markets, and its own health-factor / net-APR maths. Every one of those was a
+ * copy of something the API already knew, and two of them were wrong (the
+ * native-asset search used a sentinel no data endpoint serves, and the lender
+ * denylist was missing three of five exclusions). If a rule about what can be
+ * migrated where belongs anywhere, it belongs behind the endpoint.
  */
 export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) => {
   const { account, chainId, accountId, collateral, debt } = source
 
-  // Human-readable lender names + logos (same source the optimizer table uses),
-  // so we show "Aave V3" / "Neverland" instead of raw keys like AAVE_V3.
+  // Human-readable lender names + logos, so we show "Aave V3" / "Neverland"
+  // instead of raw keys like AAVE_V3. Per-market keys (Midnight, Morpho markets)
+  // that this enumeration misses fall back to the key itself.
   const { lenders: lenderSummaries } = useLenders(chainId, true, 100)
-
-  // Morpho Midnight (fixed-term / order-book) markets are NOT in the optimizer
-  // pairs feed (that's a variable-rate surface) nor in `useLenders`, so migrate
-  // targets never included them. Their full market data + lender info live in
-  // `/lending/latest` — pull all Midnight markets on this chain and synthesize
-  // same-asset target rows (see the `targets` memo below).
-  const { lenderData: midnightLenderData, lenderInfoMap: midnightLenderInfo } =
-    useLendingLatest(chainId, ['MORPHO_MIDNIGHT'], true, 100)
-
   const lenderInfo = useMemo(() => {
     const map: Record<string, { name?: string; logoURI?: string }> = {}
     for (const s of lenderSummaries ?? []) {
       if (s.lenderInfo?.key) map[s.lenderInfo.key] = s.lenderInfo
     }
-    // Midnight lender infos (per-market keys) so their target badges show a name.
-    for (const [key, info] of Object.entries(midnightLenderInfo ?? {})) {
-      if (info) map[key] = info as { name?: string; logoURI?: string }
-    }
     return map
-  }, [lenderSummaries, midnightLenderInfo])
+  }, [lenderSummaries])
   const lenderName = (key?: string) => (key ? (lenderInfo[key]?.name ?? key) : '')
-
-  // Native ↔ wrapped-native are interchangeable across lenders: some markets use
-  // the native sentinel (e.g. Fluid ETH vaults), others the wrapped ERC20 (Aave
-  // WETH). So when the position's asset is EITHER form, search for BOTH so markets
-  // on either side surface — the builder bridges them by wrapping/unwrapping.
-  const wrappedNative = WRAPPED_NATIVE_BY_CHAIN[chainId]?.toLowerCase()
-  const withNativeCounterpart = (addr: string): string[] => {
-    const a = addr.toLowerCase()
-    if (isNativeSentinel(a) && wrappedNative) return [addr, wrappedNative]
-    if (wrappedNative && a === wrappedNative) return [addr, NATIVE_SENTINEL]
-    return [addr]
-  }
-  const collateralSearch = withNativeCounterpart(collateral.address)
-  const debtSearch = withNativeCounterpart(debt.address)
-
-  // Exact-address match against a search list — the optimizer's asset filter can
-  // group/partial-match, so we re-filter client-side to the intended addresses.
-  const matchesAsset = (addr: string | undefined, list: string[]) =>
-    !!addr && list.some((s) => s.toLowerCase() === addr.toLowerCase())
 
   // ── Optional asset CONVERSION (swap leg) ──────────────────────────────────
   // The migrate can convert ONE leg via an aggregator swap. The user toggles it
-  // on, picks WHICH leg (collateral or debt) to convert, then a target asset. The
-  // target-asset options are OPTIMIZER-DERIVED: assets that actually have
-  // qualifying markets for the fixed (non-converted) leg — so every choice yields
-  // results. The chosen target asset then drives the main search for that leg.
+  // on, picks WHICH leg to convert, then a target asset. The pickable assets come
+  // back from the same endpoint (`convertibleAssets`) — they are the assets that
+  // actually have qualifying markets against the fixed leg, so every choice
+  // yields results.
   const [swapEnabled, setSwapEnabled] = useState(false)
   const [swapLeg, setSwapLeg] = useState<'collateral' | 'debt'>('collateral')
   const [swapTarget, setSwapTarget] = useState<string | null>(null)
-
-  // Derive the pickable target assets: query the optimizer with only the FIXED
-  // (non-converted) leg constrained, then collect the distinct assets on the
-  // converted side (excluding the source asset — that's the no-swap case).
-  const { rows: swapOptionRows } = useOptimizerPairs(
-    {
-      chainId,
-      collaterals: swapLeg === 'debt' ? collateralSearch : undefined,
-      debts: swapLeg === 'collateral' ? debtSearch : undefined,
-      excludeLenders: UNSUPPORTED_TARGET_LENDERS,
-      sortBy: 'aprTotal',
-      sortDir: 'DESC',
-      count: 100,
-      maxRiskScore: 100,
-    },
-    swapEnabled,
-  )
-  const swapAssetOptions = useMemo(() => {
-    const sourceAddr = (swapLeg === 'collateral' ? collateral.address : debt.address).toLowerCase()
-    // The FIXED (non-converted) leg must match the source asset exactly, so we
-    // only collect target assets from markets that actually pair with the source.
-    const fixedList = swapLeg === 'collateral' ? debtSearch : collateralSearch
-    const seen = new Map<string, OptimizerAssetRef>()
-    for (const r of swapOptionRows) {
-      const fixedAddr = swapLeg === 'collateral' ? r.debt.address : r.collateral.address
-      if (!matchesAsset(fixedAddr, fixedList)) continue
-      const a = swapLeg === 'collateral' ? r.collateral : r.debt
-      const addr = a.address?.toLowerCase()
-      if (addr && addr !== sourceAddr && !seen.has(addr)) seen.set(addr, a)
-    }
-    return [...seen.values()]
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [swapOptionRows, swapLeg, collateral.address, debt.address, chainId])
-
-  const swapTargetAsset = swapAssetOptions.find(
-    (a) => a.address.toLowerCase() === swapTarget?.toLowerCase(),
-  )
-
-  // The converted leg searches by the picked target asset; the fixed leg keeps
-  // its native-aware search. No swap (or no target picked yet) → same-asset.
-  const activeCollateralSearch =
-    swapEnabled && swapLeg === 'collateral' && swapTarget ? [swapTarget] : collateralSearch
-  const activeDebtSearch =
-    swapEnabled && swapLeg === 'debt' && swapTarget ? [swapTarget] : debtSearch
-
-  // Qualifying targets: same collateral + same debt underlying, best APR first.
-  // Migration moves an EXISTING position, so we don't apply the optimizer's
-  // default risk cap (which hides whole chains, e.g. Polygon, whose chain/config
-  // dimensions score "high") — we surface every target and show its risk score
-  // instead so the user can judge it.
-  // Both legs are pinned to a single asset here, so the qualifying set is small
-  // (~40 rows on the widest Ethereum pair). Ask for all of it rather than a
-  // 25-row page: the server truncates before the client-side drops below, so a
-  // small page loses real targets to rows we then discard.
-  const { rows, isLoading, error: pairsError } = useOptimizerPairs({
-    chainId,
-    collaterals: activeCollateralSearch,
-    debts: activeDebtSearch,
-    excludeLenders: UNSUPPORTED_TARGET_LENDERS,
-    sortBy: 'aprTotal',
-    sortDir: 'DESC',
-    count: 100,
-    maxRiskScore: 100,
-  })
-
-  // Drop the source pair itself (no-op) and lenders that can't be a migration
-  // TARGET. `excludeLenders` already removes these server-side; this is the
-  // client-side backstop for a backend that ignores the param.
-  const isUnsupportedTarget = (key: string) =>
-    UNSUPPORTED_TARGET_LENDERS.some((p) => key.toUpperCase().startsWith(p))
-  // Re-filter client-side to EXACTLY the intended assets: the source (native ⇄
-  // wrapped forms) on the fixed leg, and the picked target on the converted leg.
-  // Then drop targets whose debt market can't supply the borrow: a migrate must
-  // borrow the whole debt on the target, so a market with less available borrow
-  // liquidity than the migrated debt would revert. `borrowLiquidityUsdShort` is the
-  // available borrow liquidity in USD (falls back to the debt pool liquidity).
-  // NB: `borrowLiquidityShort` is the debt-TOKEN amount, not USD — comparing it
-  // against `requiredBorrowUsd` mis-scales any non-$1 debt asset (e.g. WBNB).
-  // Rows with UNKNOWN (0) liquidity are kept — we don't over-hide on data gaps.
-  const { targets, lowLiquidity } = useMemo(() => {
-    const requiredBorrowUsd = (debt.amount ?? 0) * (source.debtPriceUsd ?? 0)
-    const base = rows.filter(
-      (r) =>
-        !(
-          r.marketLongUid === collateral.marketUid &&
-          r.marketShortUid === debt.marketUid
-        ) &&
-        !!r.marketLongUid &&
-        !!r.marketShortUid &&
-        !isUnsupportedTarget(r.lenderKey) &&
-        // Drop the optimizer's Midnight rows — they leak in only via a raised
-        // risk cap and carry NO maturity + a 0% rate for empty-book maturities.
-        // We re-add richer Midnight targets (fixed rate + maturity) from
-        // `/lending/latest` below, so this avoids duplicate rows too.
-        !isMidnightMarket(r.marketShortUid) &&
-        matchesAsset(r.collateral.address, activeCollateralSearch) &&
-        matchesAsset(r.debt.address, activeDebtSearch),
-    )
-    // Add synthetic Midnight fixed-term targets (same-asset only — a converted
-    // leg / swap migrate into an order-book market isn't wired). Each Midnight
-    // lender key pairs its loan (= source debt) with its collateral (= source
-    // collateral); skip the source market itself.
-    if (!swapEnabled && midnightLenderData) {
-      const colAddr = collateral.address.toLowerCase()
-      const debtAddr = debt.address.toLowerCase()
-      for (const [lk, mks] of Object.entries(midnightLenderData)) {
-        const row = buildMidnightPairRow(chainId, lk, mks, colAddr, debtAddr)
-        if (
-          row &&
-          !(
-            row.marketLongUid === collateral.marketUid &&
-            row.marketShortUid === debt.marketUid
-          )
-        ) {
-          base.push(row)
-        }
-      }
-    }
-    if (requiredBorrowUsd <= 0) return { targets: base, lowLiquidity: [] as OptimizerPairRow[] }
-    const targets: OptimizerPairRow[] = []
-    const lowLiquidity: OptimizerPairRow[] = []
-    for (const r of base) {
-      const liq = r.borrowLiquidityUsdShort || r.totalLiquidityUsdShort
-      if (liq > 0 && liq < requiredBorrowUsd) lowLiquidity.push(r)
-      else targets.push(r)
-    }
-    return { targets, lowLiquidity }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, midnightLenderData, collateral.marketUid, debt.marketUid, swapEnabled, swapLeg, swapTarget, collateral.address, debt.address, chainId, debt.amount, source.debtPriceUsd])
-  const hiddenForLiquidity = lowLiquidity.length
   const [showLowLiquidity, setShowLowLiquidity] = useState(false)
-  const lowLiquiditySet = useMemo(
-    () => new Set(lowLiquidity.map((r) => `${r.marketLongUid}|${r.marketShortUid}`)),
-    [lowLiquidity],
+
+  // Debt to migrate, in wei. The backend buffers above this, so rounding the
+  // float token amount up to full precision is safe.
+  const debtAmountWei = useMemo(() => {
+    try {
+      return parseUnits(debt.amount.toFixed(debt.decimals) as `${number}`, debt.decimals).toString()
+    } catch {
+      return null
+    }
+  }, [debt.amount, debt.decimals])
+
+  const collateralAmountWei = useMemo(() => {
+    if (collateral.amount == null) return undefined
+    try {
+      return parseUnits(
+        collateral.amount.toFixed(collateral.decimals) as `${number}`,
+        collateral.decimals
+      ).toString()
+    } catch {
+      return undefined
+    }
+  }, [collateral.amount, collateral.decimals])
+
+  // ── Target discovery ──────────────────────────────────────────────────────
+  // One call. `/v1/actions/loop/migrate/targets` returns exactly the
+  // destinations `/migrate` will accept for this position, already ranked by the
+  // resulting net APR and already filtered for: the migrate support matrix,
+  // native ⇄ wrapped-native equivalence, native-debt targets, un-openable order
+  // books, and borrow liquidity at this position's size. All of that used to be
+  // re-implemented here — including a hard-coded per-chain wrapped-native table
+  // and a lender denylist that silently went stale — so the shape of this
+  // component is now "render what the API decided", deliberately.
+  const [targetsState, setTargetsState] = useState<{
+    rows: MigrateTargetRow[]
+    convertibleAssets?: OptimizerAssetRef[]
+    excluded: { lender: string; reason: string }[]
+    isLoading: boolean
+    error: string | null
+  }>({ rows: [], excluded: [], isLoading: true, error: null })
+
+  useEffect(() => {
+    const ctrl = new AbortController()
+    setTargetsState((s) => ({ ...s, isLoading: true, error: null }))
+    fetchMigrateTargets(
+      {
+        marketUidSourceCollateral: collateral.marketUid,
+        marketUidSourceDebt: debt.marketUid,
+        debtAmount: debtAmountWei ?? undefined,
+        collateralAmount: collateralAmountWei,
+        convertLeg: swapEnabled ? swapLeg : undefined,
+        convertTo: swapEnabled ? (swapTarget ?? undefined) : undefined,
+        // Live oracle prices off the position we are looking at — fresher than
+        // any feed, and the only source for a token the feed doesn't carry.
+        collateralPriceUsd: source.collateralPriceUsd,
+        debtPriceUsd: source.debtPriceUsd,
+        count: 100,
+        // Ask for the illiquid ones too and split them below. The alternative —
+        // refetching when the user reveals them — makes the reveal toggle
+        // disappear, because the endpoint then reports nothing as hidden.
+        includeIlliquid: true,
+      },
+      ctrl.signal
+    )
+      .then((res) =>
+        setTargetsState({
+          rows: res.targets,
+          convertibleAssets: res.convertibleAssets,
+          excluded: res.excluded,
+          isLoading: false,
+          error: res.success ? null : (res.error ?? 'Failed to load markets'),
+        })
+      )
+      .catch((e) => {
+        if (e?.name === 'AbortError') return
+        setTargetsState((s) => ({ ...s, isLoading: false, error: e?.message }))
+      })
+    return () => ctrl.abort()
+  }, [
+    collateral.marketUid,
+    debt.marketUid,
+    debtAmountWei,
+    collateralAmountWei,
+    swapEnabled,
+    swapLeg,
+    swapTarget,
+    source.collateralPriceUsd,
+    source.debtPriceUsd,
+  ])
+
+  const { isLoading, error: pairsError } = targetsState
+  // A target that cannot fund the whole migrated debt would revert the borrow,
+  // so it is hidden behind an explicit reveal rather than ranked alongside the
+  // rest. `sufficientLiquidity` is the server's verdict at this position's size.
+  const [liquidTargets, illiquidTargets] = useMemo(() => {
+    const ok: MigrateTargetRow[] = []
+    const low: MigrateTargetRow[] = []
+    for (const r of targetsState.rows) (r.migrate.sufficientLiquidity ? ok : low).push(r)
+    return [ok, low]
+  }, [targetsState.rows])
+  const hiddenForLiquidity = illiquidTargets.length
+  const shownTargets = showLowLiquidity ? [...liquidTargets, ...illiquidTargets] : liquidTargets
+  const swapAssetOptions = targetsState.convertibleAssets ?? []
+  const swapTargetAsset = swapAssetOptions.find(
+    (a) => a.address.toLowerCase() === swapTarget?.toLowerCase()
   )
-  const rowKey = (r: OptimizerPairRow) => `${r.marketLongUid}|${r.marketShortUid}`
-  // The low-liquidity markets are appended only when the user opts to reveal them.
-  const shownTargets = showLowLiquidity ? [...targets, ...lowLiquidity] : targets
+  const rowKey = (r: MigrateTargetRow) => `${r.marketLongUid}|${r.marketShortUid}`
 
   // Per-market lenders (Euler vaults, Morpho markets, Aave e-modes) offer several
   // configs for the same asset pair, so one lender name appears on multiple rows.
-  // Tag those rows with which config they are — for Euler the controller (debt)
-  // vault, which lives in the debt market's uid.
+  // Tag those rows with which config they are.
   const lenderCounts = useMemo(() => {
     const c: Record<string, number> = {}
-    for (const r of targets) c[r.lenderKey] = (c[r.lenderKey] ?? 0) + 1
+    for (const r of shownTargets) c[r.lenderKey] = (c[r.lenderKey] ?? 0) + 1
     return c
-  }, [targets])
-  const configTag = (row: OptimizerPairRow): string | undefined => {
+  }, [shownTargets])
+  const configTag = (row: MigrateTargetRow): string | undefined => {
     if ((lenderCounts[row.lenderKey] ?? 0) <= 1) return undefined
     // Configs of the same lender differ by their RISK params, so label them by
     // what actually differs (LTV / max leverage / e-mode) — readable, unlike the
@@ -489,27 +304,7 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
     return id ? `${id.slice(0, 6)}…${id.slice(-4)}` : undefined
   }
 
-  // Resulting position value (same for every target — a migrate preserves the
-  // collateral & debt value; only the target's liquidation threshold differs),
-  // used to preview each target's health factor before the user picks one.
-  const collateralUsd = (source.collateral.amount ?? 0) * (source.collateralPriceUsd ?? 0)
-  const debtUsd = (debt.amount ?? 0) * (source.debtPriceUsd ?? 0)
-  const targetHealth = (row: OptimizerPairRow): number | null => {
-    if (debtUsd <= 0 || collateralUsd <= 0 || row.liquidationThreshold <= 0) return null
-    return (collateralUsd * row.liquidationThreshold) / debtUsd
-  }
-  // Net position APR for THIS migrated position (not the optimizer's max-leverage
-  // `aprTotal`): the equity-weighted earn-minus-pay using EFFECTIVE rates (lending
-  // rate + intrinsic/staking yield). net = (depEff·col − borEff·debt) / equity.
-  const targetNetApr = (row: OptimizerPairRow): number | null => {
-    const equityUsd = collateralUsd - debtUsd
-    if (equityUsd <= 0) return row.depositAprEffective - row.borrowAprEffective
-    return (
-      (row.depositAprEffective * collateralUsd - row.borrowAprEffective * debtUsd) / equityUsd
-    )
-  }
-
-  const [selected, setSelected] = useState<OptimizerPairRow | null>(null)
+  const [selected, setSelected] = useState<MigrateTargetRow | null>(null)
 
   const [result, setResult] = useState<MigrateResult['data'] | null>(null)
   const [position, setPosition] = useState<MigratePositionResult | null>(null)
@@ -531,20 +326,7 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
   const hasPermissions = permissions.length > 0
   const allPermissionsDone = !hasPermissions || permissionsCompleted >= permissions.length
 
-  // Debt to migrate, in wei. The backend buffers above this, so rounding the
-  // float token amount up to full precision is safe.
-  const debtAmountWei = useMemo(() => {
-    try {
-      return parseUnits(
-        debt.amount.toFixed(debt.decimals) as `${number}`,
-        debt.decimals,
-      ).toString()
-    } catch {
-      return null
-    }
-  }, [debt.amount, debt.decimals])
-
-  const pickTarget = async (row: OptimizerPairRow) => {
+  const pickTarget = async (row: MigrateTargetRow) => {
     setSelected(row)
     setResult(null)
     setPosition(null)
@@ -555,6 +337,10 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
       return
     }
     setBuilding(true)
+    // Deliberately minimal. The endpoint resolves the target's rates,
+    // liquidation threshold, decimals and prices itself — those parameters exist
+    // only as overrides, and passing them from here just re-asserted numbers the
+    // server already had (and had to be kept in step with).
     const res = await fetchMigrate({
       marketUidSourceCollateral: collateral.marketUid,
       marketUidSourceDebt: debt.marketUid,
@@ -565,50 +351,18 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
       isMaxIn: true,
       accountId,
       loanId: debt.loanId,
-      // Pass the EFFECTIVE rates (lending + intrinsic/staking yield) + liquidation
-      // threshold so the endpoint's resulting net APR respects intrinsic yields.
-      depositApr: row.depositAprEffective,
-      borrowApr: row.borrowAprEffective,
-      liqThreshold: row.liquidationThreshold,
-      // TARGET-leg price/decimals — the swap target's for a converted leg, else
-      // the source's. Pins the result USD conversion (the worker token list can
-      // carry a wrong decimals for a target token, e.g. a Spark/Morpho market, and
-      // mis-scale the display USD). For a swapped leg the worker uses the trade's
-      // actual output/input amount valued at THIS target price.
-      collateralPriceUsd:
-        swapEnabled && swapLeg === 'collateral' && swapTargetAsset
-          ? swapTargetAsset.priceUsd
-          : source.collateralPriceUsd,
-      debtPriceUsd:
-        swapEnabled && swapLeg === 'debt' && swapTargetAsset
-          ? swapTargetAsset.priceUsd
-          : source.debtPriceUsd,
-      collateralDecimals:
-        swapEnabled && swapLeg === 'collateral' && swapTargetAsset
-          ? swapTargetAsset.decimals
-          : collateral.decimals,
-      debtDecimals:
-        swapEnabled && swapLeg === 'debt' && swapTargetAsset
-          ? swapTargetAsset.decimals
-          : debt.decimals,
-      sourceDebtDecimals: debt.decimals,
       // Swap-leg slippage (only used server-side when a leg is converted).
       slippage: swapEnabled && swapTarget ? 0.005 : undefined,
-      // Display hint so the result shows the collateral for non-Aave sources
-      // (where the worker can't read the deposited amount).
-      collateralAmountHint:
-        source.collateral.amount != null && collateral.decimals != null
-          ? (() => {
-              try {
-                return parseUnits(
-                  source.collateral.amount.toFixed(collateral.decimals) as `${number}`,
-                  collateral.decimals,
-                ).toString()
-              } catch {
-                return undefined
-              }
-            })()
-          : undefined,
+      // Display hint: for non-Aave sources the composer resolves the withdraw
+      // on-chain, so the worker cannot know the deposited amount. This is the
+      // one number only the client holds.
+      collateralAmountHint: collateralAmountWei,
+      // Same-asset moves only: a converted leg lands on a different token, whose
+      // price the server resolves from the TARGET market. Sending the source
+      // price there would value the new position at the old asset's price.
+      collateralPriceUsd:
+        swapEnabled && swapLeg === 'collateral' ? undefined : source.collateralPriceUsd,
+      debtPriceUsd: swapEnabled && swapLeg === 'debt' ? undefined : source.debtPriceUsd,
     })
     setBuilding(false)
     if (!res.success) {
@@ -740,7 +494,9 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
             {/* Optional asset conversion (swap leg) */}
             <div className="rounded-lg border border-base-300 px-2.5 py-2 space-y-2">
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-xs text-base-content/70">Convert an asset (swap one leg)</span>
+                <span className="text-xs text-base-content/70">
+                  Convert an asset (swap one leg)
+                </span>
                 <input
                   type="checkbox"
                   className="toggle toggle-sm"
@@ -766,7 +522,9 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                           setSelected(null)
                         }}
                       >
-                        {leg === 'collateral' ? `Collateral (${collateral.symbol})` : `Debt (${debt.symbol})`}
+                        {leg === 'collateral'
+                          ? `Collateral (${collateral.symbol})`
+                          : `Debt (${debt.symbol})`}
                       </button>
                     ))}
                   </div>
@@ -775,7 +533,8 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                   </div>
                   {swapAssetOptions.length === 0 ? (
                     <span className="text-[10px] text-base-content/40 px-0.5">
-                      No convertible {swapLeg} assets pair with your {swapLeg === 'collateral' ? debt.symbol : collateral.symbol}.
+                      No convertible {swapLeg} assets pair with your{' '}
+                      {swapLeg === 'collateral' ? debt.symbol : collateral.symbol}.
                     </span>
                   ) : (
                     <div className="max-h-44 overflow-y-auto rounded-lg border border-base-300 divide-y divide-base-300/60">
@@ -786,7 +545,9 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                             key={a.address}
                             type="button"
                             className={`flex items-center gap-2 w-full px-2 py-1.5 text-left text-xs transition-colors ${
-                              isSel ? 'bg-primary/15 ring-1 ring-primary ring-inset' : 'hover:bg-base-200'
+                              isSel
+                                ? 'bg-primary/15 ring-1 ring-primary ring-inset'
+                                : 'hover:bg-base-200'
                             }`}
                             onClick={() => {
                               setSwapTarget(isSel ? null : a.address)
@@ -804,14 +565,20 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                                 {a.symbol ?? `${a.address.slice(0, 6)}…${a.address.slice(-4)}`}
                               </span>
                               {a.name && (
-                                <span className="text-[10px] text-base-content/50 truncate" title={a.name}>
+                                <span
+                                  className="text-[10px] text-base-content/50 truncate"
+                                  title={a.name}
+                                >
                                   {a.name}
                                 </span>
                               )}
                             </div>
                             {a.priceUsd != null && a.priceUsd > 0 && (
                               <span className="shrink-0 text-[10px] text-base-content/50 font-mono tabular-nums">
-                                ${a.priceUsd.toLocaleString(undefined, { maximumFractionDigits: a.priceUsd < 1 ? 4 : 2 })}
+                                $
+                                {a.priceUsd.toLocaleString(undefined, {
+                                  maximumFractionDigits: a.priceUsd < 1 ? 4 : 2,
+                                })}
                               </span>
                             )}
                           </button>
@@ -831,8 +598,15 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
             {/* Target picker */}
             <div className="space-y-1.5">
               <span className="text-xs text-base-content/60 px-1">
-                Migrate to {swapEnabled && swapLeg === 'collateral' && swapTargetAsset ? swapTargetAsset.symbol : collateral.symbol} /{' '}
-                {swapEnabled && swapLeg === 'debt' && swapTargetAsset ? swapTargetAsset.symbol : debt.symbol} on
+                Migrate to{' '}
+                {swapEnabled && swapLeg === 'collateral' && swapTargetAsset
+                  ? swapTargetAsset.symbol
+                  : collateral.symbol}{' '}
+                /{' '}
+                {swapEnabled && swapLeg === 'debt' && swapTargetAsset
+                  ? swapTargetAsset.symbol
+                  : debt.symbol}{' '}
+                on
               </span>
 
               {isLoading && (
@@ -842,22 +616,24 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                 </div>
               )}
 
-              {pairsError && (
-                <div className="text-[11px] text-error px-1">
-                  {(pairsError as Error)?.message ?? 'Failed to load markets'}
-                </div>
-              )}
+              {pairsError && <div className="text-[11px] text-error px-1">{pairsError}</div>}
 
               {!isLoading && shownTargets.length === 0 && (
-                <div className="text-[11px] text-base-content/50 px-1">
-                  {rows.length === 0
-                    ? // The optimizer returned nothing for the whole chain — almost
-                      // always a coverage gap (e.g. Polygon isn't indexed yet) rather
-                      // than a missing pair.
-                      'No migration targets are indexed for this chain yet.'
-                    : hiddenForLiquidity > 0
+                <div className="text-[11px] text-base-content/50 px-1 space-y-1">
+                  <div>
+                    {hiddenForLiquidity > 0
                       ? `No target market has enough borrow liquidity for this ${debt.symbol} debt (${hiddenForLiquidity} hidden with insufficient liquidity).`
-                      : `No other market offers this ${collateral.symbol}/${debt.symbol} pair.`}
+                      : `No other market can receive this ${collateral.symbol}/${debt.symbol} position.`}
+                  </div>
+                  {/* An empty list is far more useful with the reasons attached —
+                      the endpoint reports one per distinct cause. */}
+                  {targetsState.excluded.length > 0 && (
+                    <ul className="text-base-content/40 list-disc pl-4 space-y-0.5">
+                      {targetsState.excluded.slice(0, 4).map((e) => (
+                        <li key={e.lender}>{e.reason}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
 
@@ -882,10 +658,10 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                   const active =
                     selected?.marketLongUid === row.marketLongUid &&
                     selected?.marketShortUid === row.marketShortUid
-                  const isLowLiq = lowLiquiditySet.has(rowKey(row))
+                  const isLowLiq = !row.migrate.sufficientLiquidity
                   return (
                     <button
-                      key={`${row.lenderKey}-${row.marketLongUid}-${row.marketShortUid}`}
+                      key={rowKey(row)}
                       type="button"
                       onClick={() => pickTarget(row)}
                       disabled={building || executingPermission || executingMain}
@@ -909,19 +685,17 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                             {configTag(row)}
                           </span>
                         )}
-                        {isMidnightMarket(row.marketShortUid) && (
+                        {/* A quoted maturity is what makes a destination a
+                            fixed-term loan — no lender-key sniffing needed. */}
+                        {row.migrate.maturity != null && (
                           <span
                             className="badge badge-xs border-0 bg-primary/15 text-primary ml-1"
                             title={
-                              row.maturityDays != null
-                                ? `Fixed-term (order book) · matures in ~${Math.round(row.maturityDays)} days`
-                                : 'Fixed-term (order book)'
+                              row.migrate.termHeadline ??
+                              `Fixed-term · matures in ~${daysUntil(row.migrate.maturity)} days`
                             }
                           >
-                            Fixed
-                            {row.maturityDays != null
-                              ? ` · ${Math.round(row.maturityDays)}d`
-                              : ''}
+                            Fixed · {daysUntil(row.migrate.maturity)}d
                           </span>
                         )}
                       </span>
@@ -929,7 +703,7 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                         {isLowLiq && (
                           <span
                             className="badge badge-xs border-0 bg-warning/20 text-warning"
-                            title={`Borrow liquidity ($${(row.borrowLiquidityUsdShort || row.totalLiquidityUsdShort).toLocaleString(undefined, { maximumFractionDigits: 0 })}) is below the migrated debt — the borrow may revert.`}
+                            title={`Borrow liquidity ($${row.migrate.borrowLiquidityUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}) is below the migrated debt — the borrow may revert.`}
                           >
                             low liq
                           </span>
@@ -940,40 +714,46 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                         >
                           {riskLabel(row.riskScore)}
                         </span>
-                        {targetHealth(row) != null && (
+                        {/* Health factor, net APR and the effective rates are
+                            all computed server-side for THIS position size —
+                            including the real term rate on a fixed-term market,
+                            where the pair feed's own borrow rate reads 0%. */}
+                        {row.migrate.healthFactor != null && (
                           <span
-                            className={`font-mono tabular-nums ${healthColorClass(targetHealth(row)!)}`}
+                            className={`font-mono tabular-nums ${healthColorClass(row.migrate.healthFactor)}`}
                             title={`Resulting health factor (liq. threshold ${(row.liquidationThreshold * 100).toFixed(0)}%)`}
                           >
-                            HF {fmtHealth(targetHealth(row)!)}
+                            HF {fmtHealth(row.migrate.healthFactor)}
                           </span>
                         )}
                         <span
                           className="flex flex-col items-end leading-tight font-mono tabular-nums"
                           title={
-                            `Deposit APR ${(row.depositAprEffective * 100).toFixed(2)}% ` +
+                            `Deposit APR ${((row.migrate.depositApr ?? 0) * 100).toFixed(2)}% ` +
                             `(lending ${(row.depositAprLong * 100).toFixed(2)}% + intrinsic ${(row.intrinsicYieldLong * 100).toFixed(2)}%)\n` +
-                            `Borrow APR ${(row.borrowAprEffective * 100).toFixed(2)}% ` +
+                            `Borrow APR ${((row.migrate.borrowApr ?? 0) * 100).toFixed(2)}% ` +
                             `(lending ${(row.borrowAprShort * 100).toFixed(2)}% + intrinsic ${(row.intrinsicYieldShort * 100).toFixed(2)}%)\n` +
                             `Net = equity-weighted earn − pay on this position`
                           }
                         >
                           <span className="text-success">
                             <span className="text-base-content/40">D</span>{' '}
-                            {(row.depositAprEffective * 100).toFixed(2)}%
+                            {((row.migrate.depositApr ?? 0) * 100).toFixed(2)}%
                           </span>
                           <span className="text-base-content/60">
                             <span className="text-base-content/40">B</span>{' '}
-                            {(row.borrowAprEffective * 100).toFixed(2)}%
+                            {((row.migrate.borrowApr ?? 0) * 100).toFixed(2)}%
                           </span>
-                          {targetNetApr(row) != null && (
+                          {row.migrate.netApr != null && (
                             <span
                               className={
-                                targetNetApr(row)! >= 0 ? 'text-success font-semibold' : 'text-error font-semibold'
+                                row.migrate.netApr >= 0
+                                  ? 'text-success font-semibold'
+                                  : 'text-error font-semibold'
                               }
                             >
                               <span className="text-base-content/40">Net</span>{' '}
-                              {(targetNetApr(row)! * 100).toFixed(2)}%
+                              {(row.migrate.netApr * 100).toFixed(2)}%
                             </span>
                           )}
                         </span>
@@ -1028,7 +808,10 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                 )}
                 {position.apr?.deposit != null && (
                   <div className="flex items-center justify-between">
-                    <span className="text-base-content/60" title="Collateral yield incl. intrinsic (staking) yield">
+                    <span
+                      className="text-base-content/60"
+                      title="Collateral yield incl. intrinsic (staking) yield"
+                    >
                       Deposit APR
                     </span>
                     <span className="font-mono tabular-nums text-success">
@@ -1038,7 +821,10 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                 )}
                 {position.apr?.borrow != null && (
                   <div className="flex items-center justify-between">
-                    <span className="text-base-content/60" title="Debt cost incl. intrinsic yield of the borrowed asset">
+                    <span
+                      className="text-base-content/60"
+                      title="Debt cost incl. intrinsic yield of the borrowed asset"
+                    >
                       Borrow APR
                     </span>
                     <span className="font-mono tabular-nums text-base-content/80">
@@ -1048,7 +834,10 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                 )}
                 {position.apr?.net != null && (
                   <div className="flex items-center justify-between">
-                    <span className="text-base-content/60" title="Equity-weighted net APR (deposit earn − borrow pay)">
+                    <span
+                      className="text-base-content/60"
+                      title="Equity-weighted net APR (deposit earn − borrow pay)"
+                    >
                       Net APR
                     </span>
                     <span
@@ -1137,9 +926,16 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                             <span
                               className={`font-semibold tabular-nums ${impactPos ? 'text-success' : 'text-error'}`}
                             >
-                              {impactPos ? '+' : ''}${Math.abs(impact).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                              {impactPos ? '+' : ''}$
+                              {Math.abs(impact).toLocaleString(undefined, {
+                                maximumFractionDigits: 2,
+                              })}
                               {q.priceImpactPct != null && (
-                                <> ({impactPos ? '+' : ''}{(q.priceImpactPct * 100).toFixed(2)}%)</>
+                                <>
+                                  {' '}
+                                  ({impactPos ? '+' : ''}
+                                  {(q.priceImpactPct * 100).toFixed(2)}%)
+                                </>
                               )}
                             </span>
                           </div>

@@ -58,21 +58,27 @@ export interface MigrateParams {
   /** Swap-leg slippage as a fraction (0.005 = 0.5%). Only used when a leg is
    *  converted via an aggregator swap. Defaults server-side to 0.5%. */
   slippage?: number
+  /** Source collateral amount in wei (display hint so the result shows collateral for non-Aave sources). */
+  collateralAmountHint?: string
+
+  // --- Display overrides ---------------------------------------------------
+  // Everything below is RESOLVED SERVER-SIDE from the target markets and only
+  // needs sending to overrule the published metadata. Leave them unset unless
+  // you hold something better: passing a value the server already knows just
+  // creates a second copy to keep in step.
   /** Target collateral deposit APR as a fraction (0.05 = 5%) — drives `result.apr.net`. */
   depositApr?: number
   /** Target debt borrow APR as a fraction (0.05 = 5%). */
   borrowApr?: number
   /** Target collateral liquidation threshold as a fraction (0.85) — drives `result.healthFactor`. */
   liqThreshold?: number
-  /** Fallback collateral USD price (oracle) when the server price feed lacks the token. */
+  /** Collateral USD price. Worth sending for a SAME-ASSET move when you hold a live oracle read from the position. */
   collateralPriceUsd?: number
-  /** Fallback debt USD price (oracle) when the server price feed lacks the token. */
+  /** Debt USD price. Same caveat — and never send the source price for a leg that converts. */
   debtPriceUsd?: number
-  /** Source collateral amount in wei (display hint so the result shows collateral for non-Aave sources). */
-  collateralAmountHint?: string
-  /** Authoritative TARGET collateral decimals (pool metadata) — the swap target's when the collateral converts, else the source's. Overrides the worker token list for the display USD. */
+  /** TARGET collateral decimals — the swap target's when the collateral converts, else the source's. */
   collateralDecimals?: number
-  /** Authoritative TARGET debt decimals (pool metadata) — the swap target's when the debt converts, else the source's. */
+  /** TARGET debt decimals — the swap target's when the debt converts, else the source's. */
   debtDecimals?: number
   /** SOURCE debt decimals, for the from-leg display when the debt is converted. Defaults to `debtDecimals`. */
   sourceDebtDecimals?: number
@@ -138,12 +144,16 @@ export async function fetchMigrate(params: MigrateParams): Promise<MigrateResult
     if (params.depositApr != null) qs.set('depositApr', String(params.depositApr))
     if (params.borrowApr != null) qs.set('borrowApr', String(params.borrowApr))
     if (params.liqThreshold != null) qs.set('liqThreshold', String(params.liqThreshold))
-    if (params.collateralPriceUsd != null) qs.set('collateralPriceUsd', String(params.collateralPriceUsd))
+    if (params.collateralPriceUsd != null)
+      qs.set('collateralPriceUsd', String(params.collateralPriceUsd))
     if (params.debtPriceUsd != null) qs.set('debtPriceUsd', String(params.debtPriceUsd))
-    if (params.collateralAmountHint != null) qs.set('collateralAmountHint', params.collateralAmountHint)
-    if (params.collateralDecimals != null) qs.set('collateralDecimals', String(params.collateralDecimals))
+    if (params.collateralAmountHint != null)
+      qs.set('collateralAmountHint', params.collateralAmountHint)
+    if (params.collateralDecimals != null)
+      qs.set('collateralDecimals', String(params.collateralDecimals))
     if (params.debtDecimals != null) qs.set('debtDecimals', String(params.debtDecimals))
-    if (params.sourceDebtDecimals != null) qs.set('sourceDebtDecimals', String(params.sourceDebtDecimals))
+    if (params.sourceDebtDecimals != null)
+      qs.set('sourceDebtDecimals', String(params.sourceDebtDecimals))
     if (params.slippage != null) qs.set('slippage', String(params.slippage))
 
     const res = await fetch(`${BACKEND_BASE_URL}/v1/actions/loop/migrate?${qs}`)

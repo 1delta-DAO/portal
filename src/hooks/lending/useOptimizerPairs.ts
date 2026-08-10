@@ -499,6 +499,15 @@ function normaliseRiskBreakdown(
   }))
 }
 
+/**
+ * Wire row → UI row. Exported because `/v1/actions/loop/migrate/targets` serves
+ * rows in this exact shape (deliberately, so its consumers reuse this rather
+ * than growing a second normaliser that drifts) — see `fetchMigrateTargets`.
+ */
+export function normalisePairRow(raw: RawOptimizerPair): OptimizerPairRow {
+  return normalisePair(raw)
+}
+
 function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
   // Fixed-term (order-book) markets — Morpho Midnight — report their rate in
   // `termsShort` (one entry per maturity) with variable_borrow_rate = 0. Use the
