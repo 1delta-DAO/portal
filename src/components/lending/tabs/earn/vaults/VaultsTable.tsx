@@ -12,6 +12,7 @@ import {
   hasLiquidity,
   hasRewardsApr,
   isSupplyRateMeaningful,
+  isNegativeApr,
   rewardsApr,
   totalApr,
   liquidityNative,
@@ -209,12 +210,18 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                     <div className="flex flex-col items-end leading-tight">
                       <span
                         className={`text-xs font-semibold ${
-                          isSupplyRateMeaningful(v) ? 'text-success' : 'text-base-content/40'
+                          isNegativeApr(v)
+                            ? 'text-error'
+                            : isSupplyRateMeaningful(v)
+                              ? 'text-success'
+                              : 'text-base-content/40'
                         }`}
                         title={
-                          isSupplyRateMeaningful(v)
-                            ? `${baseApr(v).toFixed(2)}% base lending yield (real APR)`
-                            : 'APR not exposed by this provider'
+                          isNegativeApr(v)
+                            ? `${baseApr(v).toFixed(2)}% — this vault's strategy is currently losing value in ${v.symbol ? 'underlying' : 'asset'} terms. Negative is a real reading for a leveraged/volatile strategy, not a missing rate.`
+                            : isSupplyRateMeaningful(v)
+                              ? `${baseApr(v).toFixed(2)}% base lending yield (real APR)`
+                              : 'APR not exposed by this provider'
                         }
                       >
                         {formatSupplyRate(v)}

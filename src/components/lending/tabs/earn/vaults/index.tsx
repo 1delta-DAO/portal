@@ -206,7 +206,9 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
       // Keep vaults whose rate the backend didn't expose (rendered as "—") so a
       // min-APR filter doesn't hide unknown-rate vaults; apply the threshold to
       // everything that does report a rate — including Euler Earn vaults, which
-      // now populate real rates rather than always returning 0.
+      // now populate real rates rather than always returning 0. A negative rate
+      // IS reported, so it is filtered out by any positive threshold, which is
+      // what asking for "at least X%" means.
       arr = arr.filter(
         (v) => !isSupplyRateMeaningful(v) || baseApr(v) >= minSupplyRatePct
       )
@@ -237,6 +239,8 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
       // didn't expose a rate for) sink to the bottom regardless of direction.
       // They aren't a rank you can sort against, and otherwise their `0`
       // value lands them at one extreme or scattered through the table.
+      // Unknown-rate rows sink; a negative rate is a real rank and sorts
+      // normally against the positives.
       if (sortKey === 'supplyRate') {
         const am = isSupplyRateMeaningful(a)
         const bm = isSupplyRateMeaningful(b)

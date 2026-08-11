@@ -38,11 +38,24 @@ export const PROVIDER_LOGOS: Partial<Record<VaultProvider, string>> = {
  * Whether the backend exposed a usable APR. A `0` rate means "unknown / not
  * populated" (some vaults — historically every Euler Earn vault, though many
  * now report real rates — return 0), so we render those as "—" rather than a
- * misleading 0.00%. Don't blanket-exclude by provider: a positive rate is
+ * misleading 0.00%. Don't blanket-exclude by provider: a real rate is
  * meaningful no matter who reports it.
+ *
+ * **A negative rate is real, not missing.** Leveraged-strategy vaults
+ * (`yieldProfile: 'volatile'` — Yield Basis's yb-* markets, Strata's junior
+ * tranches) genuinely lose value in underlying terms when their strategy is
+ * underwater, and that is the single most important thing to show about them.
+ * An earlier `> 0` test folded those in with the unknown-rate rows and printed
+ * "—", which reads as "we have no data" for a number we very much do have.
  */
 export function isSupplyRateMeaningful(entry: VaultEntry): boolean {
-  return (entry.baseRate ?? 0) > 0 || (entry.supplyRate ?? 0) > 0
+  return (entry.baseRate ?? 0) !== 0 || (entry.supplyRate ?? 0) !== 0
+}
+
+/** True when the exposed rate is a loss — drives the red/neutral styling and
+ *  keeps these rows out of an "at least X% APR" filter. */
+export function isNegativeApr(entry: VaultEntry): boolean {
+  return isSupplyRateMeaningful(entry) && baseApr(entry) < 0
 }
 
 /**
@@ -76,6 +89,8 @@ export function rewardsApr(entry: VaultEntry): number {
  */
 export function formatSupplyRate(entry: VaultEntry): string {
   if (!isSupplyRateMeaningful(entry)) return '—'
+  // `toFixed` already carries the sign; don't add a `+` to positives, which
+  // would make every ordinary savings row look like a delta.
   return `${baseApr(entry).toFixed(2)}%`
 }
 
