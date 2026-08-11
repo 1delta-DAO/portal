@@ -10,6 +10,7 @@ import { useLendingLatest, useLenders, type LenderInfoMap } from '../../hooks/le
 import { useLendingBalancesMultiChain } from '../../hooks/lending/useLendingBalances'
 import { useTokenListsMultiChain } from '../../hooks/useTokenLists'
 import { EarnTab } from './tabs/earn'
+import { UnifiedEarnTab } from './tabs/unified'
 import { LendingDashboard } from './tabs/lending'
 import { TradingDashboard } from './tabs/trading'
 import { OptimizerTab } from './tabs/optimizer'
@@ -23,8 +24,27 @@ const OPTIMIZER_ENABLED = import.meta.env.VITE_OPTIMIZER_ENABLED === 'true'
 // Bridge / cross-chain swap UI ships enabled but is still flagged Beta in the
 // tab bar — set VITE_BRIDGE_UI_ENABLED=false in .env to hide the tab again.
 const BRIDGE_UI_ENABLED = import.meta.env.VITE_BRIDGE_UI_ENABLED !== 'false'
+// Unified Earn is OPT-IN — set VITE_UNIFIED_EARN_ENABLED=true in .env to show
+// it. Opt-in rather than opt-out on purpose: a flag you have to remember to
+// turn OFF ships the feature by accident on the first deploy that forgets.
+const UNIFIED_EARN_ENABLED = import.meta.env.VITE_UNIFIED_EARN_ENABLED === 'true'
 
-export type SubTab = 'earn' | 'lending' | 'trading' | 'swap' | 'xswap' | 'optimize'
+export type SubTab = 'earn' | 'unified' | 'lending' | 'trading' | 'swap' | 'xswap' | 'optimize'
+
+/**
+ * Tabs this build has turned off.
+ *
+ * A tab is hidden in THREE places — the button, the content, and this set —
+ * and the third is the one that is easy to forget: without it a deep link to a
+ * disabled tab keeps `activeTab` pointing at it, so the button is gone, the
+ * content is gated off, and the user gets a blank page under a tab bar with
+ * nothing selected. `optimize` had exactly that gap.
+ */
+const DISABLED_TABS: ReadonlySet<SubTab> = new Set<SubTab>([
+  ...(BRIDGE_UI_ENABLED ? [] : (['xswap'] as SubTab[])),
+  ...(UNIFIED_EARN_ENABLED ? [] : (['unified'] as SubTab[])),
+  ...(OPTIMIZER_ENABLED ? [] : (['optimize'] as SubTab[])),
+])
 
 /** Stable empty list so the token-list effect doesn't re-run on every render. */
 const EMPTY_CHAINS: string[] = []
@@ -36,17 +56,22 @@ export function LenderTab() {
   const navigate = useNavigate()
   const { tab: tabSlug, chainId: chainIdParam, lender: lenderParam } = useParams()
 
-  // Deep links to the disabled bridge tab fall back to the default tab
-  // instead of rendering an empty content area.
+  // Deep links to a disabled tab fall back to the default tab instead of
+  // rendering an empty content area.
   const rawTab = tabFromSlug(tabSlug)
-  const activeTab = !BRIDGE_UI_ENABLED && rawTab === 'xswap' ? 'earn' : rawTab
+  const activeTab = DISABLED_TABS.has(rawTab) ? 'earn' : rawTab
   const initialLender = lenderParam ? slugToLender(lenderParam) : ''
 
   // Chain selection is per-tab: Earn and Optimizer browse across chains, the
   // position-management tabs stay on one, and the bridge tab hides the
   // selector entirely (its panel picks a chain per side).
-  const { chainIds, primaryChainId, mode: chainMode, isHidden: chainSelectorHidden, maxChains } =
-    useChainSelection(activeTab, chainIdParam)
+  const {
+    chainIds,
+    primaryChainId,
+    mode: chainMode,
+    isHidden: chainSelectorHidden,
+    maxChains,
+  } = useChainSelection(activeTab, chainIdParam)
   const persistChains = usePersistChainSelection()
   const isMultiChain = chainMode === 'multi'
 
@@ -195,9 +220,7 @@ export function LenderTab() {
   // panels load their own, and the position tabs read metadata off the market
   // payload. Balances in particular are one request per chain.
   const earnDataEnabled = chainsReady && activeTab === 'earn'
-  const { data: tokensByChain } = useTokenListsMultiChain(
-    earnDataEnabled ? chainIds : EMPTY_CHAINS
-  )
+  const { data: tokensByChain } = useTokenListsMultiChain(earnDataEnabled ? chainIds : EMPTY_CHAINS)
   const {
     balances: lendingBalances,
     isLoading: isLendingBalancesLoading,
@@ -228,6 +251,17 @@ export function LenderTab() {
           >
             Earn
           </button>
+
+          {UNIFIED_EARN_ENABLED && (
+            <button
+              type="button"
+              role="tab"
+              className={`tab tab-sm ${activeTab === 'unified' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('unified')}
+            >
+              Unified
+            </button>
+          )}
 
           <button
             type="button"
@@ -319,6 +353,10 @@ export function LenderTab() {
         />
       )}
 
+      {UNIFIED_EARN_ENABLED && activeTab === 'unified' && (
+        <UnifiedEarnTab chainIds={chainIds} enabled={chainsReady} />
+      )}
+
       {activeTab === 'lending' && (
         <LendingDashboard
           lenderSummaries={lenderSummaries}
@@ -362,9 +400,7 @@ export function LenderTab() {
 
       {activeTab === 'swap' && <SpotSwapPanel chainId={effectiveChainId} />}
 
-      {BRIDGE_UI_ENABLED && activeTab === 'xswap' && (
-        <XChainSwapPanel chainId={effectiveChainId} />
-      )}
+      {BRIDGE_UI_ENABLED && activeTab === 'xswap' && <XChainSwapPanel chainId={effectiveChainId} />}
     </div>
   )
 }

@@ -5,6 +5,7 @@ export type { SubTab }
 /** URL slug → internal tab key */
 const SLUG_TO_TAB: Record<string, SubTab> = {
   earn: 'earn',
+  unified: 'unified',
   lending: 'lending',
   loop: 'trading',
   swap: 'swap',
@@ -15,6 +16,7 @@ const SLUG_TO_TAB: Record<string, SubTab> = {
 /** Internal tab key → URL slug */
 const TAB_TO_SLUG: Record<SubTab, string> = {
   earn: 'earn',
+  unified: 'unified',
   lending: 'lending',
   trading: 'loop',
   swap: 'swap',
@@ -55,6 +57,9 @@ export type ChainMode = 'single' | 'multi' | 'none'
 
 export const TAB_CHAIN_MODE: Record<SubTab, ChainMode> = {
   earn: 'multi',
+  // The earn endpoint merges across chains server-side in one request, so the
+  // multi-chain selector costs nothing extra here.
+  unified: 'multi',
   optimize: 'multi',
   lending: 'single',
   trading: 'single',

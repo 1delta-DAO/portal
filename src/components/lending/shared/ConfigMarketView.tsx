@@ -6,7 +6,12 @@ import type {
 } from '../../../hooks/lending/usePoolData'
 import type { UserPositionEntry } from '../../../hooks/lending/useUserData'
 import type { TableHighlight, PoolRole, PoolSide } from '../tabs/trading/types'
-import { abbreviateUsd, abbreviateNumber, formatUsd, formatTokenAmount } from '../../../utils/format'
+import {
+  abbreviateUsd,
+  abbreviateNumber,
+  formatUsd,
+  formatTokenAmount,
+} from '../../../utils/format'
 import { AssetPopover } from './AssetPopover'
 import { RiskBadge } from './RiskBadge'
 import { BrokeredAprCell } from './BrokeredAprCell'
@@ -84,7 +89,7 @@ function configBorrowLiquidity(g: PoolConfigGroup): number {
   for (const item of g.borrowables ?? []) {
     if (!seen.has(item.marketUid)) {
       seen.add(item.marketUid)
-      total += item.totalLiquidityUsd ?? (item.totalDepositsUsd - item.totalDebtUsd)
+      total += item.totalLiquidityUsd ?? item.totalDepositsUsd - item.totalDebtUsd
     }
   }
   return total
@@ -279,7 +284,8 @@ export const ConfigMarketView: React.FC<Props> = ({
   // changed), which would otherwise leave nothing selectable.
   React.useEffect(() => {
     if (!preferredConfigId) return
-    const selectionValid = !!selectedConfigId && sortedGroups.some((g) => g.configId === selectedConfigId)
+    const selectionValid =
+      !!selectedConfigId && sortedGroups.some((g) => g.configId === selectedConfigId)
     if (userTouched) {
       if (selectedConfigId && !selectionValid) setSelectedConfigId(preferredConfigId)
       return
@@ -356,13 +362,22 @@ export const ConfigMarketView: React.FC<Props> = ({
                   <th className="w-[20%]">Config</th>
                   <th className="w-[16%]">Collaterals</th>
                   <th className="w-[16%]">Borrowables</th>
-                  <th className="w-[8%] text-right" title="Highest LTV across this config's collateral assets">
+                  <th
+                    className="w-[8%] text-right"
+                    title="Highest LTV across this config's collateral assets"
+                  >
                     Max LTV
                   </th>
-                  <th className="w-[10%] text-right" title="Best deposit APR across this config's collateral assets (incl. intrinsic yield)">
+                  <th
+                    className="w-[10%] text-right"
+                    title="Best deposit APR across this config's collateral assets (incl. intrinsic yield)"
+                  >
                     Best APR
                   </th>
-                  <th className="w-[14%] text-right" title="Total available borrow liquidity across borrowables">
+                  <th
+                    className="w-[14%] text-right"
+                    title="Total available borrow liquidity across borrowables"
+                  >
                     Borrow Liq.
                   </th>
                   <th className="w-[10%]">Risk</th>
@@ -436,7 +451,10 @@ export const ConfigMarketView: React.FC<Props> = ({
                         </td>
                         <td>
                           {g.configRiskLabel ? (
-                            <RiskBadge label={g.configRiskLabel} breakdown={g.configRiskBreakdown ?? []} />
+                            <RiskBadge
+                              label={g.configRiskLabel}
+                              breakdown={g.configRiskBreakdown ?? []}
+                            />
                           ) : (
                             <span className="text-xs text-base-content/40">—</span>
                           )}
@@ -616,7 +634,7 @@ const AssetPreview: React.FC<{
 // CombinedDetailTable — single table with Side column, sortable
 // ---------------------------------------------------------------------------
 
-type DetailSide = 'all' | 'collateral' | 'borrowable'
+type DetailSide = 'all' | 'collateral' | 'borrowable' | 'supply'
 type DetailSortKey = 'side' | 'liquidity' | 'apr' | 'ltv'
 
 const DETAIL_PAGE_SIZE = 10
@@ -630,9 +648,67 @@ interface CombinedDetailTableProps {
   poolMap: Map<string, PoolDataItem>
 }
 
-interface DetailRow {
-  side: 'collateral' | 'borrowable'
+/**
+ * Map a display side onto the trade-leg side the action panel understands.
+ *
+ * `supply` is presentation only — it is the same (market, asset) as its
+ * borrowable row, shown from the lender's point of view. Selecting it therefore
+ * selects that asset, and `PoolSide` deliberately stays two-valued: a lend-only
+ * asset can never be a collateral leg, so widening it would let the loop
+ * builders be handed a leg the protocol cannot accept.
+ */
+const toPoolSide = (side: 'collateral' | 'borrowable' | 'supply'): PoolSide =>
+  side === 'collateral' ? 'collateral' : 'borrowable'
+
+export interface DetailRow {
+  /**
+   * `supply` is a DISPLAY side, not a third market role.
+   *
+   * The table used to assume an asset you can deposit is an asset you can post
+   * as collateral. That holds on a pooled lender, where the borrowable is also
+   * the supplied asset — but not on a one-sided market. A LlamaLend market
+   * borrows crvUSD against sreUSD: crvUSD is lent for yield and can NEVER be
+   * collateral, so it appears only in `borrowables` and its supply APR and
+   * deposit-side rewards had nowhere to render. Curve shows exactly these as
+   * "Net Supply APY" next to "Net Borrow APR"; we had neither.
+   */
+  side: 'collateral' | 'borrowable' | 'supply'
   item: ConfigMarketItem
+}
+
+/**
+ * Build the per-(asset, side) rows for one config group.
+ *
+ * Exported for testing: whether a lend-only asset gets its own supply row is
+ * the whole behaviour, and it is invisible from the rendered output when it is
+ * wrong — the row simply is not there.
+ */
+export function buildDetailRows(
+  group: Pick<PoolConfigGroup, 'collaterals' | 'borrowables'>,
+  poolMap: Map<string, PoolDataItem>
+): DetailRow[] {
+  const out: DetailRow[] = []
+  const collateralUids = new Set((group.collaterals ?? []).map((c) => c.marketUid))
+  for (const c of group.collaterals ?? []) out.push({ side: 'collateral', item: c })
+  for (const b of group.borrowables ?? []) {
+    out.push({ side: 'borrowable', item: b })
+    /**
+     * A borrowable that is NOT also collateral is a lend-only asset: you can
+     * supply it for yield, and that yield is invisible on a borrow row.
+     *
+     * Gated on the asset being absent from `collaterals` so pooled lenders
+     * are untouched — there the same asset sits in both arrays and its
+     * collateral row already carries the deposit APR. Gated on there being
+     * real deposit economics so a borrow-only market with no supply side
+     * (Inverse mints DOLA; nobody lends it) gains no empty row.
+     */
+    const pool = poolMap.get(b.marketUid)
+    const hasSupplySide = (b.depositRate ?? 0) > 0 || (pool?.depositRewardApr ?? 0) > 0
+    if (!collateralUids.has(b.marketUid) && hasSupplySide) {
+      out.push({ side: 'supply', item: b })
+    }
+  }
+  return out
 }
 
 const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
@@ -648,12 +724,21 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [filter, setFilter] = useState('')
 
-  const allRows = useMemo<DetailRow[]>(() => {
-    const out: DetailRow[] = []
-    for (const c of group.collaterals ?? []) out.push({ side: 'collateral', item: c })
-    for (const b of group.borrowables ?? []) out.push({ side: 'borrowable', item: b })
-    return out
-  }, [group])
+  const allRows = useMemo<DetailRow[]>(() => buildDetailRows(group, poolMap), [group, poolMap])
+
+  // Counts come from the ROWS, not from `group.collaterals/borrowables` — the
+  // supply rows are derived here, so the raw arrays no longer describe the table.
+  const sideCounts = useMemo(() => {
+    let collateral = 0
+    let borrowable = 0
+    let supply = 0
+    for (const r of allRows) {
+      if (r.side === 'collateral') collateral++
+      else if (r.side === 'supply') supply++
+      else borrowable++
+    }
+    return { collateral, borrowable, supply, all: allRows.length }
+  }, [allRows])
 
   const filteredSorted = useMemo(() => {
     let rows = allRows
@@ -672,18 +757,18 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
       const iy = it.intrinsicYield ?? 0
       switch (sortKey) {
         case 'side':
-          // Collateral < Borrowable so 'asc' puts collateral first
-          return r.side === 'collateral' ? 0 : 1
+          // Collateral < Supply < Borrowable so 'asc' groups the earn sides first
+          return r.side === 'collateral' ? 0 : r.side === 'supply' ? 1 : 2
         case 'liquidity':
           return r.side === 'borrowable'
-            ? it.totalLiquidityUsd ?? it.totalDepositsUsd - it.totalDebtUsd
+            ? (it.totalLiquidityUsd ?? it.totalDepositsUsd - it.totalDebtUsd)
             : it.totalDepositsUsd
         case 'apr':
-          return r.side === 'borrowable'
-            ? it.variableBorrowRate + iy
-            : it.depositRate + iy
+          // A supply row is rated on what it PAYS, not what it costs.
+          return r.side === 'borrowable' ? it.variableBorrowRate + iy : it.depositRate + iy
         case 'ltv':
-          return it.borrowCollateralFactor || 0
+          // Supplying is not collateral, so it has no LTV to sort on.
+          return r.side === 'collateral' ? it.borrowCollateralFactor || 0 : 0
       }
     }
 
@@ -762,7 +847,7 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
             className={`tab ${side === 'all' ? 'tab-active' : ''}`}
             onClick={() => setSide('all')}
           >
-            All <span className="text-base-content/50 ml-1">{collCount + borCount}</span>
+            All <span className="text-base-content/50 ml-1">{sideCounts.all}</span>
           </button>
           <button
             type="button"
@@ -770,15 +855,28 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
             className={`tab ${side === 'collateral' ? 'tab-active' : ''}`}
             onClick={() => setSide('collateral')}
           >
-            Collateral <span className="text-base-content/50 ml-1">{collCount}</span>
+            Collateral <span className="text-base-content/50 ml-1">{sideCounts.collateral}</span>
           </button>
+          {/* Only shown where lending is a distinct role from posting
+              collateral — on a pooled lender every supplied asset is already a
+              collateral row and this tab would duplicate it. */}
+          {sideCounts.supply > 0 && (
+            <button
+              type="button"
+              role="tab"
+              className={`tab ${side === 'supply' ? 'tab-active' : ''}`}
+              onClick={() => setSide('supply')}
+            >
+              Lend <span className="text-base-content/50 ml-1">{sideCounts.supply}</span>
+            </button>
+          )}
           <button
             type="button"
             role="tab"
             className={`tab ${side === 'borrowable' ? 'tab-active' : ''}`}
             onClick={() => setSide('borrowable')}
           >
-            Borrowable <span className="text-base-content/50 ml-1">{borCount}</span>
+            Borrowable <span className="text-base-content/50 ml-1">{sideCounts.borrowable}</span>
           </button>
         </div>
         <input
@@ -828,7 +926,10 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                     Liquidity{sortIndicator('liquidity')}
                   </th>
                   <th className="w-[11%] text-right">Debt</th>
-                  <th className="w-[12%]" title="Loop role: this row's slot in the active loop action">
+                  <th
+                    className="w-[12%]"
+                    title="Loop role: this row's slot in the active loop action"
+                  >
                     Role
                   </th>
                 </tr>
@@ -846,7 +947,8 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                   const liqUsd = item.totalLiquidityUsd ?? item.totalDepositsUsd - item.totalDebtUsd
                   const liqToken = item.totalLiquidity ?? pool?.totalLiquidity
                   const isBrokered =
-                    !!pool && (pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0)
+                    !!pool &&
+                    (pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0)
 
                   return (
                     <tr
@@ -854,7 +956,7 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                       className={`cursor-pointer transition-colors ${
                         isSelected ? 'bg-primary/10' : 'hover:bg-base-200'
                       } ${role ? ROLE_RAIL[role] : ''}`}
-                      onClick={() => onRowClick(item.marketUid, rowSide)}
+                      onClick={() => onRowClick(item.marketUid, toPoolSide(rowSide))}
                     >
                       <td>
                         <SideBadge side={rowSide} />
@@ -867,12 +969,24 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                         />
                       </td>
                       <td>
-                        {rowSide === 'collateral' ? (
-                          <AprCell rate={item.depositRate} iy={iy} color="success" reward={pool?.depositRewardApr} />
+                        {rowSide !== 'borrowable' ? (
+                          // Collateral and supply rows both show what the asset
+                          // PAYS, with the deposit-side reward attached.
+                          <AprCell
+                            rate={item.depositRate}
+                            iy={iy}
+                            color="success"
+                            reward={pool?.depositRewardApr}
+                          />
                         ) : isBrokered ? (
                           <BrokeredAprCell terms={pool?.terms} />
                         ) : (
-                          <AprCell rate={item.variableBorrowRate} iy={iy} color="warning" reward={pool?.borrowRewardApr} />
+                          <AprCell
+                            rate={item.variableBorrowRate}
+                            iy={iy}
+                            color="warning"
+                            reward={pool?.borrowRewardApr}
+                          />
                         )}
                       </td>
                       <td className="text-right">
@@ -881,6 +995,8 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                             {(item.borrowCollateralFactor * 100).toFixed(0)}%
                           </span>
                         ) : (
+                          // A supplied asset backs nothing, so it has no LTV —
+                          // same as a borrowable.
                           <span className="text-xs text-base-content/30">—</span>
                         )}
                       </td>
@@ -904,10 +1020,7 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                       </td>
                       <td className="text-right">
                         <div className="flex flex-col items-end">
-                          <span
-                            className="text-xs tabular-nums"
-                            title={`$${formatUsd(liqUsd)}`}
-                          >
+                          <span className="text-xs tabular-nums" title={`$${formatUsd(liqUsd)}`}>
                             {abbreviateUsd(liqUsd)}
                           </span>
                           {liqToken != null && (
@@ -970,39 +1083,43 @@ const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                   className={`p-3 cursor-pointer transition-colors ${
                     isSelected ? 'bg-primary/10' : 'active:bg-base-200'
                   } ${role ? ROLE_RAIL[role] : ''}`}
-                  onClick={() => onRowClick(item.marketUid, rowSide)}
+                  onClick={() => onRowClick(item.marketUid, toPoolSide(rowSide))}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <SideBadge side={rowSide} />
-                      <AssetCell
-                        item={item}
-                        hasPosition={!!hasPosition}
-                        entityName={pool?.name}
-                      />
+                      <AssetCell item={item} hasPosition={!!hasPosition} entityName={pool?.name} />
                     </div>
                     <div className="text-right shrink-0 flex flex-col items-end gap-1">
                       {role && <RoleChip role={role} />}
-                      {rowSide === 'collateral' ? (
+                      {rowSide !== 'borrowable' ? (
                         <>
-                          <AprCell rate={item.depositRate} iy={iy} color="success" reward={pool?.depositRewardApr} align="end" />
+                          <AprCell
+                            rate={item.depositRate}
+                            iy={iy}
+                            color="success"
+                            reward={pool?.depositRewardApr}
+                            align="end"
+                          />
                           <span className="text-[10px] text-base-content/50 block">
-                            Deposit APR
+                            {rowSide === 'supply' ? 'Supply APR' : 'Deposit APR'}
                           </span>
                         </>
                       ) : isBrokered ? (
                         <>
                           <BrokeredAprCell terms={pool?.terms} />
-                          <span className="text-[10px] text-base-content/50 block">
-                            Fixed-term
-                          </span>
+                          <span className="text-[10px] text-base-content/50 block">Fixed-term</span>
                         </>
                       ) : (
                         <>
-                          <AprCell rate={item.variableBorrowRate} iy={iy} color="warning" reward={pool?.borrowRewardApr} align="end" />
-                          <span className="text-[10px] text-base-content/50 block">
-                            Borrow APR
-                          </span>
+                          <AprCell
+                            rate={item.variableBorrowRate}
+                            iy={iy}
+                            color="warning"
+                            reward={pool?.borrowRewardApr}
+                            align="end"
+                          />
+                          <span className="text-[10px] text-base-content/50 block">Borrow APR</span>
                         </>
                       )}
                     </div>
@@ -1111,24 +1228,46 @@ const RoleChip: React.FC<{ role: PoolRole | undefined }> = ({ role }) => {
   )
 }
 
-const SideBadge: React.FC<{ side: 'collateral' | 'borrowable' }> = ({ side }) => {
-  const isColl = side === 'collateral'
+const SIDE_BADGE: Record<
+  'collateral' | 'borrowable' | 'supply',
+  { label: string; cls: string; title: string }
+> = {
+  collateral: {
+    label: 'Coll',
+    cls: 'bg-success/15 text-success',
+    title: 'Can be posted as collateral',
+  },
+  // Distinct from collateral on purpose: this asset earns the supply rate but
+  // backs no borrowing, which is the whole reason the row exists.
+  supply: {
+    label: 'Lend',
+    cls: 'bg-info/15 text-info',
+    title: 'Can be supplied to earn — not usable as collateral',
+  },
+  borrowable: {
+    label: 'Bor',
+    cls: 'bg-error/15 text-error',
+    title: 'Can be borrowed',
+  },
+}
+
+const SideBadge: React.FC<{ side: 'collateral' | 'borrowable' | 'supply' }> = ({ side }) => {
+  const cfg = SIDE_BADGE[side]
   return (
     <span
-      className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${
-        isColl ? 'bg-success/15 text-success' : 'bg-error/15 text-error'
-      }`}
+      title={cfg.title}
+      className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${cfg.cls}`}
     >
-      {isColl ? 'Coll' : 'Bor'}
+      {cfg.label}
     </span>
   )
 }
 
-const AssetCell: React.FC<{ item: ConfigMarketItem; hasPosition: boolean; entityName?: string }> = ({
-  item,
-  hasPosition,
-  entityName,
-}) => {
+const AssetCell: React.FC<{
+  item: ConfigMarketItem
+  hasPosition: boolean
+  entityName?: string
+}> = ({ item, hasPosition, entityName }) => {
   const asset = item.underlyingInfo.asset
   const iy = item.intrinsicYield ?? 0
   return (
