@@ -21,6 +21,7 @@ const lending = (over: Partial<any> = {}): EarnPosition =>
     account: '0xuser',
     health: 1.8,
     leverage: 1.5,
+    aprBreakdown: { market: 5, rewards: 0, intrinsic: 0 },
     depositApr: 4,
     borrowApr: 3,
     crossMargin: true,

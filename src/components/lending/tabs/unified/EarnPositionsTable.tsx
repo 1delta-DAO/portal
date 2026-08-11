@@ -479,9 +479,24 @@ const LendingRows: React.FC<{
         <td className="text-right text-xs font-medium">{usd(row.netUsd)}</td>
         <td
           className="text-right text-xs"
-          title={`supply ${pct(row.depositApr)} · borrow ${pct(row.borrowApr)}`}
+          title={
+            `market ${pct(row.aprBreakdown.market)} ` +
+            `· rewards ${pct(row.aprBreakdown.rewards)} ` +
+            `· intrinsic ${pct(row.aprBreakdown.intrinsic)}\n` +
+            `market legs: supply ${pct(row.depositApr)} · borrow ${pct(row.borrowApr)}`
+          }
         >
-          {pct(row.apr)}
+          <div>{pct(row.apr)}</div>
+          {/* The asset's OWN yield, called out when it is what carries the
+              position. On a levered carry trade the market leg is deeply
+              negative and this is the entire reason the trade exists — a bare
+              headline hides which of the two is doing the work. */}
+          {Math.abs(row.aprBreakdown.intrinsic) >= 0.005 && (
+            <div className="text-[10px] font-normal opacity-60">
+              {row.aprBreakdown.intrinsic > 0 ? '+' : ''}
+              {row.aprBreakdown.intrinsic.toFixed(2)}% intrinsic
+            </div>
+          )}
         </td>
         <td>
           <HealthBadge health={row.health} />

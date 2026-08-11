@@ -89,6 +89,24 @@ export interface EarnPositionSubAccount {
   legs: EarnPositionLeg[]
 }
 
+/**
+ * The three legs of a position's yield, each over NAV and in PERCENT, so they
+ * add. `market + rewards + intrinsic === apr`.
+ *
+ * They are separate upstream and none contains another — which is why a levered
+ * carry trade read as its market leg alone reports a large LOSS: the market leg
+ * is the cost side, and the collateral's own yield (the reason for the trade)
+ * is the `intrinsic` one.
+ */
+export interface EarnAprBreakdown {
+  /** Deposit interest less borrow interest, over NAV. */
+  market: number
+  /** Incentive emissions, over NAV. Can stop. */
+  rewards: number
+  /** What the ASSETS yield themselves, net of the borrowed asset's, over NAV. */
+  intrinsic: number
+}
+
 export interface EarnLendingPosition extends EarnPositionBase {
   venueKind: 'lending'
   lender: string
@@ -99,7 +117,11 @@ export interface EarnLendingPosition extends EarnPositionBase {
    */
   health: number | null
   leverage: number
+  /** What `apr` is made of; the three legs sum to it. */
+  aprBreakdown: EarnAprBreakdown
+  /** MARKET deposit interest only — see `aprBreakdown` for the other legs. */
   depositApr: number
+  /** MARKET borrow interest only, as a positive cost. */
   borrowApr: number
   /** FALSE ⇒ read `subAccounts`, and do NOT present `health` as the account's. */
   crossMargin: boolean
