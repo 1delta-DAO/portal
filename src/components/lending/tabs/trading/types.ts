@@ -1,5 +1,5 @@
-import type { PoolDataItem } from '../../../../hooks/lending/usePoolData'
-import type { UserPositionEntry, UserSubAccount } from '../../../../hooks/lending/useUserData'
+import type { PoolDataItem } from '../../../../sdk/lending-helper/marketTypes'
+import type { UserPositionEntry, UserSubAccount } from '../../../../sdk/lending-helper/userPositionTypes'
 import type { TokenBalance } from '../../../../hooks/lending/useTokenBalances'
 import type { RateImpactEntry } from '../../../../sdk/lending-helper/fetchLendingAction'
 

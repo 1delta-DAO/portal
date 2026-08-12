@@ -41,8 +41,6 @@ export interface FacetSelection {
   includeIlliquid: boolean
   /** Drop the server's TVL floor. */
   showLowTvl: boolean
-  /** Drop the server's risk ceiling. */
-  showHighRisk: boolean
 }
 
 interface FacetFiltersProps {
@@ -63,7 +61,6 @@ export const EMPTY_SELECTION: FacetSelection = {
   includePassthrough: false,
   includeIlliquid: false,
   showLowTvl: false,
-  showHighRisk: false,
 }
 
 /**
@@ -101,8 +98,7 @@ export const FacetFilters: React.FC<FacetFiltersProps> = ({
     selection.depositableOnly ||
     selection.includePassthrough ||
     selection.includeIlliquid ||
-    selection.showLowTvl ||
-    selection.showHighRisk
+    selection.showLowTvl
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -205,13 +201,19 @@ export const FacetFilters: React.FC<FacetFiltersProps> = ({
         onChange={(v) => set({ showLowTvl: v })}
         hint="Below the TVL floor. On a near-empty pool the APR is an artefact of rounding, not a rate anyone earns."
       />
-      <DefaultToggle
-        label="Show high risk"
-        count={excluded.highRisk}
-        checked={selection.showHighRisk}
-        onChange={(v) => set({ showHighRisk: v })}
-        hint="Above the risk ceiling the rest of the API also applies (chain, lender or collateral risk)."
-      />
+      {/* NOT a toggle. Risk tolerance is owned by the selector in the toolbar,
+          which every other tab reads too; a second control here meant the two
+          could disagree — and did, because this one was the only one the tab
+          actually applied, leaving the toolbar selector inert. The count still
+          renders, so the ceiling is never silently hiding rows. */}
+      {excluded.highRisk > 0 && (
+        <span
+          className="text-[11px] opacity-60"
+          title="Above your risk tolerance (chain, lender or collateral risk). Change it with the risk selector in the toolbar."
+        >
+          {excluded.highRisk} above risk tolerance
+        </span>
+      )}
 
       {isFetching && <span className="loading loading-spinner loading-xs opacity-60" />}
 

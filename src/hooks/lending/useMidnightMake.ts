@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useWalletClient } from 'wagmi'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Address, Hex } from 'viem'
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch, apiFetchEnvelope } from '../../sdk/http'
 import { getIndependentPublicClient } from '../../lib/lib-utils'
 import { useSendLendingTransaction } from '../useSendLendingTransaction'
 
@@ -83,12 +83,10 @@ export function useMidnightMake(chainId: string, account?: string) {
           expiry: String(Math.floor(p.expirySec)),
           account: p.account,
         })
-        const buildRes = await fetch(`${BACKEND_BASE_URL}/v1/actions/midnight/make?${sp}`)
-        const buildJson: any = await buildRes.json()
-        if (!buildRes.ok || !buildJson?.data?.typedData) {
-          throw new Error(buildJson?.error?.message ?? `Build failed (${buildRes.status})`)
-        }
-        const build: MakeBuild = buildJson.data
+        const build = await apiFetch<MakeBuild>('/v1/actions/midnight/make', {
+          params: Object.fromEntries(sp),
+        })
+        if (!build?.typedData) throw new Error('Build failed: no typed data returned')
 
         // 2. One-time ratifier authorization (only if not yet authorized).
         setStep('Checking authorization…')
@@ -122,16 +120,11 @@ export function useMidnightMake(chainId: string, account?: string) {
 
         // 4. Finalize → the mempool publish tx.
         setStep('Publishing offer…')
-        const finRes = await fetch(`${BACKEND_BASE_URL}/v1/actions/midnight/finalize`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ inputs: build.inputs, signature }),
+        const finalize = await apiFetchEnvelope<unknown>('/v1/actions/midnight/finalize', {
+          body: { inputs: build.inputs, signature },
         })
-        const finJson: any = await finRes.json()
-        const tx = finJson?.actions?.transactions?.[0]
-        if (!finRes.ok || !tx) {
-          throw new Error(finJson?.error?.message ?? `Finalize failed (${finRes.status})`)
-        }
+        const tx = finalize.actions?.transactions?.[0]
+        if (!tx) throw new Error('Finalize failed: no transaction returned')
         const r = await send(tx)
         if (!r.ok) throw new Error(r.error ?? 'Publish failed')
 
@@ -185,10 +178,11 @@ export function useMidnightOpenOffers(params: {
         lender: lender!,
         account: account!,
       })
-      const r = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/midnight/open-offers?${sp}`)
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const json: any = await r.json()
-      return { offers: (json?.data?.offers ?? []) as MidnightOpenOffer[] }
+      const data = await apiFetch<{ offers?: MidnightOpenOffer[] }>(
+        '/v1/data/lending/midnight/open-offers',
+        { params: Object.fromEntries(sp) }
+      )
+      return { offers: data?.offers ?? [] }
     },
     refetchInterval: 30_000,
     staleTime: 10_000,
@@ -211,11 +205,11 @@ export function useMidnightCancelOffer(chainId: string, account?: string) {
       if (!account) return false
       setCancelling(root)
       try {
-        const sp = new URLSearchParams({ chainId, account, root })
-        const res = await fetch(`${BACKEND_BASE_URL}/v1/actions/midnight/cancel?${sp}`)
-        const json: any = await res.json()
-        const tx = json?.actions?.transactions?.[0]
-        if (!res.ok || !tx) return false
+        const cancel = await apiFetchEnvelope<unknown>('/v1/actions/midnight/cancel', {
+          params: { chainId, account, root },
+        })
+        const tx = cancel.actions?.transactions?.[0]
+        if (!tx) return false
         const r = await send(tx)
         if (r.ok) {
           queryClient.invalidateQueries({
@@ -257,12 +251,11 @@ export function useMidnightSell(chainId: string, account?: string) {
           amount: amountUnits.toString(),
           account,
         })
-        const res = await fetch(`${BACKEND_BASE_URL}/v1/actions/midnight/sell?${sp}`)
-        const json: any = await res.json()
-        const tx = json?.actions?.transactions?.[0]
-        if (!res.ok || !tx) {
-          throw new Error(json?.error?.message ?? `Sell failed (${res.status})`)
-        }
+        const sell = await apiFetchEnvelope<unknown>('/v1/actions/midnight/sell', {
+          params: Object.fromEntries(sp),
+        })
+        const tx = sell.actions?.transactions?.[0]
+        if (!tx) throw new Error('Sell failed: no transaction returned')
         const r = await send(tx)
         if (!r.ok) throw new Error(r.error ?? 'Sell failed')
         return { ok: true, hash: r.hash }

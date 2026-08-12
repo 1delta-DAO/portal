@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { PoolTerm } from '../../../hooks/lending/useFlattenedPools'
+import type { PoolTerm } from '../../../sdk/lending-helper/poolTypes'
 
 /**
  * Borrow-side APR cell for brokered (Lista) markets. The raw `variableBorrowRate`

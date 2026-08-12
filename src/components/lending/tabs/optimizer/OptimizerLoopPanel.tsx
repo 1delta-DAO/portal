@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { OptimizerPairRow } from '../../../../hooks/lending/useOptimizerPairs'
 import { useLendingLatest } from '../../../../hooks/lending/usePoolData'
+import { useUserData } from '../../../../hooks/lending/useUserData'
 import {
-  useUserData,
   isAggregatePosition,
   type UserPositionEntry,
   type UserSubAccount,
-} from '../../../../hooks/lending/useUserData'
+} from '../../../../sdk/lending-helper/userPositionTypes'
 import { useTokenBalances } from '../../../../hooks/lending/useTokenBalances'
 import { LoopAction } from '../trading/actions/LoopAction'
 import { buildPath, OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'

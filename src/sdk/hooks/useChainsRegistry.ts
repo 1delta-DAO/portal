@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch } from '../../sdk/http'
 
 interface ChainData {
   nativeCurrency?: { symbol: string; name: string; decimals: number }
@@ -20,17 +20,13 @@ export function useChainsRegistry() {
   const { data, isLoading } = useQuery<ChainsRegistry>({
     queryKey: ['chainsRegistry'],
     queryFn: async () => {
-      const res = await fetch(`${BACKEND_BASE_URL}/v1/data/chains`)
-      const json = await res.json()
-      if (!json.success) return {}
+      const data = await apiFetch<{
+        items?: string[]
+        chainData?: Record<string, ChainData>
+      }>('/v1/data/chains')
       const registry: ChainsRegistry = {}
-      if (Array.isArray(json.data?.items)) {
-        for (const chainId of json.data.items) {
-          registry[chainId] = {
-            chainId,
-            data: json.data.chainData?.[chainId] ?? {},
-          }
-        }
+      for (const chainId of data?.items ?? []) {
+        registry[chainId] = { chainId, data: data.chainData?.[chainId] ?? {} }
       }
       return registry
     },

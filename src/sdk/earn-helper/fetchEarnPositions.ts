@@ -1,4 +1,4 @@
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetchLoose, errorMessage } from '../http'
 import {
   EMPTY_POSITION_TOTALS,
   type EarnPosition,
@@ -7,7 +7,7 @@ import {
   type EarnPositionsResponse,
 } from './positionTypes'
 
-const ENDPOINT = `${BACKEND_BASE_URL}/v1/data/earn/positions`
+const ENDPOINT = '/v1/data/earn/positions'
 
 export interface FetchEarnPositionsParams {
   /** One or more chains. Sent as a CSV — one request covers all of them. */
@@ -46,39 +46,23 @@ export async function fetchEarnPositions(
   params: FetchEarnPositionsParams
 ): Promise<FetchEarnPositionsResult> {
   try {
-    const qs = new URLSearchParams()
-    qs.set('chainIds', params.chainIds.join(','))
-    qs.set('account', params.account)
-    if (params.venueKind) qs.set('venueKind', params.venueKind)
-    if (params.includeZero) qs.set('includeZero', 'true')
-
-    const res = await fetch(`${ENDPOINT}?${qs}`)
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return {
-        success: false,
-        error: `HTTP ${res.status}: ${text || res.statusText}`,
-      }
-    }
-
-    const json = await res.json()
-    if (json.success === false) {
-      return {
-        success: false,
-        error: json.error?.message ?? 'Earn positions failed',
-      }
-    }
-
-    const body: EarnPositionsResponse = json.data ?? json
+    const body = await apiFetchLoose<EarnPositionsResponse>(ENDPOINT, {
+      params: {
+        chainIds: params.chainIds.join(','),
+        account: params.account,
+        venueKind: params.venueKind,
+        includeZero: params.includeZero ? 'true' : undefined,
+      },
+    })
     return {
       success: true,
-      items: Array.isArray(body.items) ? body.items : [],
-      totals: body.totals ?? EMPTY_POSITION_TOTALS,
-      sources: body.sources ?? [],
-      partial: body.partial,
-      stale: body.stale,
+      items: Array.isArray(body?.items) ? body.items : [],
+      totals: body?.totals ?? EMPTY_POSITION_TOTALS,
+      sources: body?.sources ?? [],
+      partial: body?.partial,
+      stale: body?.stale,
     }
-  } catch (err: any) {
-    return { success: false, error: err?.message ?? 'Unknown error' }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }

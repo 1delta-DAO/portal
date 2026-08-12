@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react'
-import type { PoolDataItem } from '../../../../hooks/lending/usePoolData'
-import type { UserPositionEntry } from '../../../../hooks/lending/useUserData'
+import type { PoolDataItem } from '../../../../sdk/lending-helper/marketTypes'
+import type { UserPositionEntry } from '../../../../sdk/lending-helper/userPositionTypes'
 import { Logo } from '../../../common/Logo'
 
 interface PoolSelectorDropdownProps {

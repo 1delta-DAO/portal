@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useSpyAccount } from '../../contexts/SpyMode'
 import { useRiskMode } from '../../contexts/RiskMode'
@@ -6,19 +6,38 @@ import { useChains } from '../../hooks/useChains'
 import { ChainFilterSelect, ChainMultiSelect } from './shared/ChainFilter'
 import { RiskSelect } from './shared/RiskSelect'
 import { useUserData } from '../../hooks/lending/useUserData'
-import { useLendingLatest, useLenders, type LenderInfoMap } from '../../hooks/lending/usePoolData'
+import { useLendingLatest, useLenders } from '../../hooks/lending/usePoolData'
+import type { LenderInfoMap } from '../../sdk/lending-helper/marketTypes'
 import { useLendingBalancesMultiChain } from '../../hooks/lending/useLendingBalances'
 import { useTokenListsMultiChain } from '../../hooks/useTokenLists'
-import { EarnTab } from './tabs/earn'
-import { UnifiedEarnTab } from './tabs/unified'
-import { LendingDashboard } from './tabs/lending'
-import { TradingDashboard } from './tabs/trading'
-import { OptimizerTab } from './tabs/optimizer'
-import { SpotSwapPanel } from '../swap/SpotSwapPanel'
-import { XChainSwapPanel } from '../swap/XChainSwapPanel'
 import { tabFromSlug, slugToLender, buildPath, TAB_CHAIN_MODE } from '../../utils/routes'
 import { useChainSelection, usePersistChainSelection } from '../../hooks/useChainSelection'
 import { Badge } from '../common/Badge'
+
+// Tab panels are code-split: only the tab you open is downloaded. This matters
+// most for the flag-gated ones — `lazy` doesn't call the importer until the
+// component actually renders, and the flag checks below sit *outside* the JSX,
+// so a build with the Optimizer disabled never requests its chunk at all.
+// Keep the flag test and the lazy element together when adding a tab.
+const EarnTab = lazy(() => import('./tabs/earn').then((m) => ({ default: m.EarnTab })))
+const UnifiedEarnTab = lazy(() =>
+  import('./tabs/unified').then((m) => ({ default: m.UnifiedEarnTab }))
+)
+const LendingDashboard = lazy(() =>
+  import('./tabs/lending').then((m) => ({ default: m.LendingDashboard }))
+)
+const TradingDashboard = lazy(() =>
+  import('./tabs/trading').then((m) => ({ default: m.TradingDashboard }))
+)
+const OptimizerTab = lazy(() =>
+  import('./tabs/optimizer').then((m) => ({ default: m.OptimizerTab }))
+)
+const SpotSwapPanel = lazy(() =>
+  import('../swap/SpotSwapPanel').then((m) => ({ default: m.SpotSwapPanel }))
+)
+const XChainSwapPanel = lazy(() =>
+  import('../swap/XChainSwapPanel').then((m) => ({ default: m.XChainSwapPanel }))
+)
 
 const OPTIMIZER_ENABLED = import.meta.env.VITE_OPTIMIZER_ENABLED === 'true'
 // Bridge / cross-chain swap UI ships enabled but is still flagged Beta in the
@@ -336,6 +355,7 @@ export function LenderTab() {
         </div>
       </div>
 
+      <Suspense fallback={<TabFallback />}>
       {activeTab === 'earn' && (
         <EarnTab
           account={account}
@@ -401,6 +421,18 @@ export function LenderTab() {
       {activeTab === 'swap' && <SpotSwapPanel chainId={effectiveChainId} />}
 
       {BRIDGE_UI_ENABLED && activeTab === 'xswap' && <XChainSwapPanel chainId={effectiveChainId} />}
+      </Suspense>
+    </div>
+  )
+}
+
+/** Shown while a tab's chunk is in flight. Matches the chains-loading state
+ *  above so switching tabs doesn't flash a different-looking spinner. */
+function TabFallback() {
+  return (
+    <div className="flex items-center justify-center gap-2 py-12 text-base-content/50">
+      <span className="loading loading-spinner loading-md" />
+      <span className="text-sm">Loading…</span>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch } from '../../sdk/http'
 
 /** How a book's levels compose into an executed rate. `marginal` = each level
  *  is an independent lot filled at its own APR (Midnight offers, Term
@@ -144,29 +144,30 @@ export function useLendingOffers(params: {
     queryKey: ['lendingOffers', chainId, lender, marketUid, side, count, minAssetsUsd, termId],
     enabled: enabled && isOrderBook && !!chainId && !!lender,
     queryFn: async () => {
-      const sp = new URLSearchParams()
-      sp.set('lender', lender!)
-      sp.set('chainId', chainId!)
-      // Carries the asset segment — the only way to pick a market on a
-      // cross-margin lender (Exactly).
-      if (marketUid) sp.set('marketUid', marketUid)
-      sp.set('side', side)
-      sp.set('count', String(count))
-      if (minAssetsUsd != null) sp.set('minAssetsUsd', String(minAssetsUsd))
-      if (termId != null) sp.set('termId', String(termId))
-      const r = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/book?${sp.toString()}`)
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const json = (await r.json()) as {
-        data?: { levels?: any[]; pricing?: BookPricing }
-      }
-      const raw = json.data?.levels ?? []
+      const data = await apiFetch<{ levels?: any[]; pricing?: BookPricing }>(
+        '/v1/data/lending/book',
+        {
+          params: {
+            lender,
+            chainId,
+            // Carries the asset segment — the only way to pick a market on a
+            // cross-margin lender (Exactly).
+            marketUid,
+            side,
+            count,
+            minAssetsUsd,
+            termId,
+          },
+        }
+      )
+      const raw = data?.levels ?? []
       // Levels without a tick (Term/Exactly) get a synthetic stable key so the
       // ladder's consumed-set / React keys keep working unchanged.
       const offers = raw.map((o: any, i: number) => ({
         ...o,
         tick: o.tick ?? `lvl-${i}`,
       })) as LendingOffer[]
-      return { offers, pricing: json.data?.pricing ?? 'marginal' }
+      return { offers, pricing: data?.pricing ?? 'marginal' }
     },
     // A live order book — refresh often, but let stale data serve instantly.
     refetchInterval: 30_000,
@@ -210,16 +211,17 @@ export function useMidnightBook(params: {
     enabled: enabled && isOrderBook && !!chainId && !!lender,
     queryFn: async () => {
       const sp = new URLSearchParams()
-      sp.set('chains', chainId!)
-      sp.set('lenders', lender!)
-      sp.set('includeOffers', 'true')
-      sp.set('count', String(count))
-      sp.set('maxRiskScore', '100')
-      if (minAssetsUsd != null) sp.set('minAssetsUsd', String(minAssetsUsd))
-      const r = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/latest?${sp.toString()}`)
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const json = (await r.json()) as { data?: { items?: any[] } }
-      const items = json.data?.items ?? []
+      const data = await apiFetch<{ items?: any[] }>('/v1/data/lending/latest', {
+        params: {
+          chains: chainId,
+          lenders: lender,
+          includeOffers: 'true',
+          count,
+          maxRiskScore: 100,
+          minAssetsUsd,
+        },
+      })
+      const items = data?.items ?? []
       const item = items.find(
         (it) => String(it?.lenderInfo?.key ?? '').toUpperCase() === lender!.toUpperCase()
       )

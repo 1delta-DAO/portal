@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch } from '../../sdk/http'
 import type { AnyTermSheet, TermSheet } from '../../components/lending/terms/types'
 import { isFullSheet } from '../../components/lending/terms/types'
 
@@ -16,14 +16,10 @@ import { isFullSheet } from '../../components/lending/terms/types'
  * so this is a small request rather than a second full page load.
  */
 
-interface LendingLatestApiResponse {
-  success: boolean
-  data?: {
-    items?: {
-      markets?: { marketUid?: string; termSheet?: AnyTermSheet }[]
-    }[]
-  }
-  error?: { message?: string }
+interface LendingLatestTermsData {
+  items?: {
+    markets?: { marketUid?: string; termSheet?: AnyTermSheet }[]
+  }[]
 }
 
 export function useTermSheet(params: {
@@ -78,14 +74,9 @@ export function useTermSheet(params: {
       // Note the parameter names differ between the two endpoints:
       // `/latest` takes `chains` + `lenders` (plural), `/pools` takes
       // `chainId` + `lender`. Getting that wrong 500s.
-      const url = new URL(`${BACKEND_BASE_URL}/v1/data/lending/latest`)
-      url.searchParams.set('chains', String(chainId))
-      url.searchParams.set('lenders', String(lender))
-      url.searchParams.set('terms', 'full')
-      const r = await fetch(url.toString())
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const json = (await r.json()) as LendingLatestApiResponse
-      if (!json.success) throw new Error(json.error?.message ?? 'terms fetch failed')
+      const data = await apiFetch<LendingLatestTermsData>('/v1/data/lending/latest', {
+        params: { chains: chainId, lenders: lender, terms: 'full' },
+      })
       // Only actual FULL sheets go in the map — a digest here would silently
       // replace the caller's fallback with something no richer.
       //
@@ -94,7 +85,7 @@ export function useTermSheet(params: {
       // undefined", so the old shape turned "this market has no full sheet"
       // into a retrying error rather than a quiet fallback.
       const out = new Map<string, TermSheet>()
-      for (const m of (json.data?.items ?? []).flatMap((i) => i.markets ?? [])) {
+      for (const m of (data?.items ?? []).flatMap((i) => i.markets ?? [])) {
         if (m.marketUid && isFullSheet(m.termSheet)) out.set(m.marketUid, m.termSheet)
       }
       return out

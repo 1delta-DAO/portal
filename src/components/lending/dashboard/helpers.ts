@@ -1,4 +1,4 @@
-import type { PoolConfig, PoolDataItem } from '../../../hooks/lending/usePoolData'
+import type { PoolConfig, PoolDataItem } from '../../../sdk/lending-helper/marketTypes'
 
 export type SortKey =
   | 'symbol'

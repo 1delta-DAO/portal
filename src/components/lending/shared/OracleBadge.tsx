@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { OracleBand, PoolOracleInfo, PoolOracleFeed } from '../../../hooks/lending/useFlattenedPools'
+import type { OracleBand, PoolOracleInfo, PoolOracleFeed } from '../../../sdk/lending-helper/poolTypes'
 import { useIsMobile } from '../../../hooks/useIsMobile'
 import { ModalHeader } from '../../common/ModalHeader'
 

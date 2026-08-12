@@ -17,11 +17,11 @@ import { isWNative } from '../../../../lib/lib-utils'
 import type { RawCurrency } from '../../../../types/currency'
 import { useTokenLists } from '../../../../hooks/useTokenLists'
 import { useTokenBalances, type TokenBalance } from '../../../../hooks/lending/useTokenBalances'
-import {
-  useUserData,
-  type UserSubAccount,
-  type UserPositionEntry,
-} from '../../../../hooks/lending/useUserData'
+import { useUserData } from '../../../../hooks/lending/useUserData'
+import type {
+  UserSubAccount,
+  UserPositionEntry,
+} from '../../../../sdk/lending-helper/userPositionTypes'
 import { UsdAmount } from '../../../common/UsdAmount'
 import { Logo } from '../../../common/Logo'
 import { OptimizerLoopPanel } from './OptimizerLoopPanel'

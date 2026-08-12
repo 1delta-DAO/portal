@@ -7,7 +7,7 @@
  * single per-loan `UserPositionEntry`.
  */
 import { parseUnits, formatUnits } from 'viem'
-import type { UserPositionEntry } from '../../../hooks/lending/useUserData'
+import type { UserPositionEntry } from '../../../sdk/lending-helper/userPositionTypes'
 import { addAmountStrings } from '../actions/format'
 
 /**

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { BACKEND_BASE_URL } from '../config/backend'
+import { apiFetch } from '../sdk/http'
 
 export interface BridgeStatusData {
   bridge: string
@@ -55,11 +55,9 @@ export function useBridgeStatus({
       })
       if (tokenIn) qs.set('tokenIn', tokenIn)
       if (tokenOut) qs.set('tokenOut', tokenOut)
-      const res = await fetch(`${BACKEND_BASE_URL}/v1/data/bridge/status?${qs}`)
-      if (!res.ok) throw new Error(`status HTTP ${res.status}`)
-      const json = await res.json()
-      if (!json.success) throw new Error(json.error?.message ?? 'status failed')
-      return json.data as BridgeStatusData
+      return apiFetch<BridgeStatusData>('/v1/data/bridge/status', {
+        params: { bridge, fromChainId, toChainId, txHash, tokenIn, tokenOut },
+      })
     },
   })
 }

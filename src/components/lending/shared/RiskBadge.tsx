@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { PoolOwnerShare, PoolRiskBreakdown } from '../../../hooks/lending/useFlattenedPools'
+import type { PoolOwnerShare, PoolRiskBreakdown } from '../../../sdk/lending-helper/poolTypes'
 import { riskDotColor } from '../tabs/earn/helpers'
 import { useIsMobile } from '../../../hooks/useIsMobile'
 import { ModalHeader } from '../../common/ModalHeader'

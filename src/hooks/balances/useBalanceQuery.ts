@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useSpyAccount } from '../../contexts/SpyMode'
 import type { RawCurrency } from '../../types/currency'
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch } from '../../sdk/http'
 
 export interface BalanceEntry {
   value: number
@@ -13,6 +13,15 @@ export interface BalanceEntry {
 }
 
 type BalanceData = Record<string, Record<string, BalanceEntry>>
+
+/** One row as the balances endpoint serves it. */
+interface BalanceItem {
+  address: string
+  balance?: string
+  balanceRaw?: string
+  balanceUSD?: number
+  priceUSD?: number
+}
 
 interface UseBalanceQueryParams {
   currencies: RawCurrency[]
@@ -47,20 +56,21 @@ export function useBalanceQuery({ currencies, enabled = true }: UseBalanceQueryP
 
       await Promise.all(
         Object.entries(byChain).map(async ([chainId, addresses]) => {
-          const url =
-            `${BACKEND_BASE_URL}/v1/data/token/balances` +
-            `?chainId=${chainId}` +
-            `&account=${account}` +
-            `&assets=${encodeURIComponent(addresses.join(','))}`
-
-          const res = await fetch(url)
-          if (!res.ok) return
-
-          const json = await res.json()
-          if (!json.success) return
+          // Partial results are useful here: one chain's RPC being down should
+          // not hide the balances we did get. Deliberate, unlike the silent
+          // `return` this replaced — see the same note in usePriceQuery.
+          let items: BalanceItem[] = []
+          try {
+            const data = await apiFetch<{ items?: BalanceItem[] }>('/v1/data/token/balances', {
+              params: { chainId, account, assets: addresses.join(',') },
+            })
+            items = data?.items ?? []
+          } catch {
+            return
+          }
 
           const chainBalances: Record<string, BalanceEntry> = {}
-          for (const item of json.data?.items ?? []) {
+          for (const item of items) {
             const balStr: string = item.balance || '0'
             const balVal = parseFloat(balStr)
             const balUSD = item.balanceUSD ?? 0

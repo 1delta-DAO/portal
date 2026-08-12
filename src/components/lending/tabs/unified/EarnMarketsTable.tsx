@@ -2,6 +2,7 @@ import React from 'react'
 import { Logo } from '../../../common/Logo'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { abbreviateNumber, abbreviateUsd } from '../../../../utils/format'
+import { riskBadgeClass, scoreToRiskLabel } from '../earn/helpers'
 import {
   vocabLabel,
   vocabDescription,
@@ -205,14 +206,10 @@ export const EarnMarketsTable: React.FC<Props> = ({
                       exit. */}
                   {row.risk?.score != null ? (
                     <span
-                      className={`badge badge-xs ${
-                        row.risk.score >= 5
-                          ? 'badge-error'
-                          : row.risk.score >= 4
-                            ? 'badge-warning'
-                            : 'badge-ghost'
-                      }`}
-                      title={row.risk.label ? `Risk: ${row.risk.label}` : undefined}
+                      className={`badge badge-xs ${riskBadgeClass(row.risk.score)}`}
+                      // The server's own label where it sent one, else the band
+                      // this score falls in — never a third opinion.
+                      title={`Risk: ${row.risk.label ?? scoreToRiskLabel(row.risk.score)}`}
                     >
                       {row.risk.score}
                     </span>

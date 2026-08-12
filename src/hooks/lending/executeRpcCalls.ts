@@ -51,6 +51,9 @@ async function executeCall(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
+      // Raw `fetch`, not `sdk/http.ts`: this talks JSON-RPC to a chain node,
+      // not to the 1delta backend, so it has no `{ success, data }` envelope
+      // and must not carry backend headers.
       const response = await fetch(rpcUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

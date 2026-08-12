@@ -1,4 +1,4 @@
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch, errorMessage } from '../http'
 
 // ============================================================================
 // Types — aligned with range endpoint docs
@@ -171,10 +171,10 @@ export interface LoopRangeSimulationBody {
 export type RangeOperation = 'leverage' | 'collateral-swap' | 'debt-swap' | 'close'
 
 const RANGE_ENDPOINTS: Record<RangeOperation, string> = {
-  'leverage': `${BACKEND_BASE_URL}/v1/data/loop/range/leverage`,
-  'collateral-swap': `${BACKEND_BASE_URL}/v1/data/loop/range/collateral-swap`,
-  'debt-swap': `${BACKEND_BASE_URL}/v1/data/loop/range/debt-swap`,
-  'close': `${BACKEND_BASE_URL}/v1/data/loop/range/close`,
+  'leverage': '/v1/data/loop/range/leverage',
+  'collateral-swap': '/v1/data/loop/range/collateral-swap',
+  'debt-swap': '/v1/data/loop/range/debt-swap',
+  'close': '/v1/data/loop/range/close',
 }
 
 // ============================================================================
@@ -202,20 +202,9 @@ export async function fetchLoopRange(params: {
     if (params.payAmount) qs.set('payAmount', params.payAmount)
 
     const endpoint = RANGE_ENDPOINTS[params.operation ?? 'leverage']
-    const res = await fetch(`${endpoint}?${qs}`)
+    const rows = await apiFetch<unknown[]>(endpoint, { params: Object.fromEntries(qs) })
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return { success: false, error: `HTTP ${res.status}: ${text || res.statusText}` }
-    }
-
-    const json = await res.json()
-
-    if (!json.success) {
-      return { success: false, error: json.error?.message ?? 'API error' }
-    }
-
-    const data: LoopRangeEntry[] = (json.data ?? []).map(resolveLoopRangeEntry)
+    const data: LoopRangeEntry[] = (rows ?? []).map(resolveLoopRangeEntry)
     return { success: true, data }
   } catch (err: any) {
     return { success: false, error: err?.message ?? 'Unknown error' }
@@ -246,24 +235,12 @@ export async function fetchLoopRangeWithSimulation(params: {
     if (params.payAmount) qs.set('payAmount', params.payAmount)
 
     const endpoint = RANGE_ENDPOINTS[params.operation ?? 'leverage']
-    const res = await fetch(`${endpoint}?${qs}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params.body),
+    const rows = await apiFetch<unknown[]>(endpoint, {
+      params: Object.fromEntries(qs),
+      body: params.body,
     })
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return { success: false, error: `HTTP ${res.status}: ${text || res.statusText}` }
-    }
-
-    const json = await res.json()
-
-    if (!json.success) {
-      return { success: false, error: json.error?.message ?? 'API error' }
-    }
-
-    const data: LoopRangeEntry[] = (json.data ?? []).map(resolveLoopRangeEntry)
+    const data: LoopRangeEntry[] = (rows ?? []).map(resolveLoopRangeEntry)
     return { success: true, data }
   } catch (err: any) {
     return { success: false, error: err?.message ?? 'Unknown error' }

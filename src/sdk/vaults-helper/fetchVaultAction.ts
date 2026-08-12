@@ -1,4 +1,4 @@
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetchEnvelope, errorMessage } from '../http'
 import {
   resolveVaultRoute,
   vaultFamily,
@@ -91,7 +91,7 @@ export interface VaultActionResult {
   error?: string
 }
 
-const VAULT_ACTIONS_BASE = `${BACKEND_BASE_URL}/v1/actions/vaults`
+const VAULT_ACTIONS_BASE = '/v1/actions/vaults'
 
 export async function fetchVaultAction(
   params: VaultActionParams
@@ -142,45 +142,26 @@ export async function fetchVaultAction(
       }
     }
 
-    const url = `${VAULT_ACTIONS_BASE}/${route.segment}?${qs}`
+    // A `body` switches the request to POST — the caller supplies `sharesRaw`
+    // for isAll withdraws so this works against any RPC. Without it the worker
+    // reads balanceOf from its own RPC over GET.
+    const { actions } = await apiFetchEnvelope<
+      unknown,
+      { permissions?: any[]; transactions?: any[]; postTransactions?: any[] }
+    >(`${VAULT_ACTIONS_BASE}/${route.segment}`, {
+      params: Object.fromEntries(qs),
+      body: params.isAll && params.sharesRaw != null ? { sharesRaw: params.sharesRaw } : undefined,
+    })
 
-    // POST path: caller supplied `sharesRaw` for isAll withdraws (works against
-    // any RPC). GET path: worker reads balanceOf from its own RPC.
-    const usePost = params.isAll && params.sharesRaw != null
-    const res = usePost
-      ? await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sharesRaw: params.sharesRaw }),
-        })
-      : await fetch(url)
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return {
-        success: false,
-        error: `HTTP ${res.status}: ${text || res.statusText}`,
-      }
-    }
-
-    const json = await res.json()
-    if (!json.success) {
-      return {
-        success: false,
-        error: json.error?.message ?? 'Vault action returned success: false',
-      }
-    }
-
-    const actions = json.actions ?? {}
     return {
       success: true,
       data: {
-        permissions: actions.permissions ?? [],
-        transactions: actions.transactions ?? [],
-        postTransactions: actions.postTransactions ?? [],
+        permissions: actions?.permissions ?? [],
+        transactions: actions?.transactions ?? [],
+        postTransactions: actions?.postTransactions ?? [],
       },
     }
-  } catch (err: any) {
-    return { success: false, error: err?.message ?? 'Unknown error' }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }

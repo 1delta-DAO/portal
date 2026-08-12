@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { LendingMode } from '../../../../../lib/lib-utils'
 import { parseUnits } from 'viem'
-import type { PoolDataItem } from '../../../../../hooks/lending/usePoolData'
+import type { PoolDataItem } from '../../../../../sdk/lending-helper/marketTypes'
 import type { TradingActionProps, SelectedPool } from '../types'
 import { PoolSelectorDropdown } from '../PoolSelectorDropdown'
 import { SlippageInput } from '../SlippageInput'
@@ -26,7 +26,7 @@ import {
   fetchLoopRange,
   type LoopRangeEntry,
 } from '../../../../../sdk/lending-helper/fetchLoopRange'
-import { loansForMarket } from '../../../../../hooks/lending/useUserData'
+import { loansForMarket } from '../../../../../sdk/lending-helper/userPositionTypes'
 import {
   termLabel,
   loanDebtString,

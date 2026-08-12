@@ -1,9 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { riskDotColor } from '../tabs/earn/helpers'
 
+/**
+ * Ceilings, one per risk band — see `scoreToRiskLabel`: 1–2 low, 3 medium,
+ * 4–5 high.
+ *
+ * "Up to medium" is 3, not 4. It was 4, which let a score-4 market through
+ * under a label promising medium risk — the same off-by-one band that made a
+ * 4 render amber in the tables.
+ */
 const OPTIONS = [
   { value: 2, label: 'Low', dropdownLabel: 'Low only', risk: 'low' },
-  { value: 4, label: 'Up to medium', dropdownLabel: 'Up to medium', risk: 'medium' },
+  { value: 3, label: 'Up to medium', dropdownLabel: 'Up to medium', risk: 'medium' },
   { value: 5, label: 'Up to high', dropdownLabel: 'Up to high', risk: 'high' },
 ] as const
 
@@ -25,7 +33,12 @@ export const RiskSelect: React.FC<RiskSelectProps> = ({ value, onChange }) => {
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  const current = OPTIONS.find((o) => o.value === value) ?? OPTIONS[1]
+  // The narrowest band that still ADMITS everything the current ceiling
+  // admits. A stored or URL-supplied 4 is not an option value, and falling
+  // back to a fixed entry (this used to be OPTIONS[1]) displayed "Up to
+  // medium" while high-risk rows were being served.
+  const current =
+    OPTIONS.find((o) => o.value >= value) ?? OPTIONS[OPTIONS.length - 1]
 
   return (
     <div className="relative" ref={ref}>

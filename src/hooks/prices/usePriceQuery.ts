@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import type { RawCurrency } from '../../types/currency'
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch } from '../../sdk/http'
 
 interface PriceEntry {
   usd: number
@@ -38,22 +38,24 @@ export function usePriceQuery({ currencies, enabled = true }: UsePriceQueryParam
 
       await Promise.all(
         Object.entries(byChain).map(async ([chainId, addresses]) => {
-          const url =
-            `${BACKEND_BASE_URL}/v1/data/token/prices` +
-            `?chainId=${chainId}` +
-            `&assets=${encodeURIComponent(addresses.join(','))}`
-
-          const res = await fetch(url)
-          if (!res.ok) return
-
-          const json = await res.json()
-          if (!json.success) return
+          // One chain failing must not blank the whole price map — the other
+          // chains' prices are still correct and still worth rendering. This
+          // is the one place a swallowed error is intended; everywhere else
+          // `apiFetch` throwing is what surfaces the failure.
+          let items: unknown
+          try {
+            const data = await apiFetch<{ items?: unknown }>('/v1/data/token/prices', {
+              params: { chainId, assets: addresses.join(',') },
+            })
+            items = data?.items
+          } catch {
+            return
+          }
 
           const chainPrices: Record<string, PriceEntry> = {}
-          const items = json.data?.items
           if (items && typeof items === 'object') {
             if (Array.isArray(items)) {
-              for (const item of items) {
+              for (const item of items as { address: string; priceUSD?: number; price?: number }[]) {
                 chainPrices[item.address.toLowerCase()] = { usd: item.priceUSD ?? item.price ?? 0 }
               }
             } else {

@@ -1,18 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getChainName, isWNative, SupportedChainId } from '../../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
-import {
-  useFlattenedPoolsMultiChain,
-  type PoolEntry,
-  type PoolsFilters,
-} from '../../../../hooks/lending/useFlattenedPools'
-import type { UserDataResult } from '../../../../hooks/lending/useUserData'
+import { useFlattenedPoolsMultiChain } from '../../../../hooks/lending/useFlattenedPools'
+import type { PoolEntry, PoolsFilters } from '../../../../sdk/lending-helper/poolTypes'
+import type { UserDataResult } from '../../../../sdk/lending-helper/userPositionTypes'
 import { useTokenBalances } from '../../../../hooks/lending/useTokenBalances'
 import { useTokenListsMultiChain } from '../../../../hooks/useTokenLists'
-import { computePoolMetrics, poolEntryToPoolDataItem, type SortKey } from './helpers'
+import {
+  computePoolMetrics,
+  poolEntryToPoolDataItem,
+  type PoolWithMetrics,
+  type SortKey,
+} from './helpers'
+import { filterAndSortPools } from './poolFilters'
 import { MarketsTable } from './MarketsTable'
 import { DepositPanel } from './DepositPanel'
 import { useIsMobile } from '../../../../hooks/useIsMobile'
+import { useDebounce } from '../../../../hooks/useDebounce'
+import { nextSort } from '../../../../hooks/useTableSort'
 import { usePersistedFilters } from '../../../../hooks/usePersistedFilters'
 import { useRiskMode } from '../../../../contexts/RiskMode'
 
@@ -166,6 +171,11 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
 
   // Transient UI state (not persisted)
   const [search, setSearch] = useState('')
+  // The filter+sort below runs over the WHOLE pool universe (this tab pulls it
+  // client-side on purpose — see the note on `serverFilters`), so re-running it
+  // on every keystroke is the one input worth debouncing here. The box itself
+  // stays uncontrolled-feeling because `search` still drives the value.
+  const debouncedSearch = useDebounce(search, 150)
   const [page, setPage] = useState<number>(1)
   const [showExtendedFilters, setShowExtendedFilters] = useState(false)
   const [popoverAbove, setPopoverAbove] = useState(false)
@@ -364,264 +374,72 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     return map
   }, [pools])
 
-  // Filtering + sorting
-  const filteredAndSortedPools = useMemo(() => {
-    // Some lenders (e.g. Fluid) don't populate the top-level `underlyingAddress`
-    // on pool entries — the canonical asset address only lives under
-    // `underlyingInfo.asset.address`. Use a small helper so address-based
-    // matches (search box, asset filter, parent-driven whitelist) treat both
-    // as equivalent and stop accidentally hiding those pools.
-    const poolUnderlying = (p: PoolEntry) =>
-      (p.underlyingAddress || p.underlyingInfo?.asset?.address || '').toLowerCase()
+  // Metrics are derived ONCE here, then carried through filtering, sorting and
+  // rendering as {pool, metrics} pairs. Deriving them inside the comparator
+  // instead cost `2·n·log n` computations per sort — and the table then
+  // recomputed the same values a third time, per visible row.
+  const decoratedPools = useMemo<PoolWithMetrics[]>(
+    () => pools.map((pool) => ({ pool, metrics: computePoolMetrics(pool) })),
+    [pools]
+  )
 
-    let result = pools
-
-    if (selectedLender !== 'all') {
-      result = result.filter((p) => p.lenderKey === selectedLender)
-    }
-
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      result = result.filter(
-        (p) =>
-          poolUnderlying(p).includes(q) ||
-          (p.lenderKey ?? '').toLowerCase().includes(q) ||
-          (p.lenderInfo?.name ?? '').toLowerCase().includes(q) ||
-          (p.underlyingInfo?.asset?.assetGroup ?? '').toLowerCase().includes(q) ||
-          (p.underlyingInfo?.asset?.symbol ?? '').toLowerCase().includes(q) ||
-          (p.name ?? '').toLowerCase().includes(q)
-      )
-    }
-
-    if (assetFilter.trim()) {
-      const q = assetFilter.toLowerCase()
-      result = result.filter(
-        (p) =>
-          (p.underlyingInfo?.asset?.assetGroup ?? '').toLowerCase().includes(q) ||
-          (p.underlyingInfo?.asset?.symbol ?? '').toLowerCase().includes(q) ||
-          poolUnderlying(p).includes(q)
-      )
-    }
-
-    // External (parent-driven) asset whitelist — used by "Your Assets" row
-    // clicks and the "Filter markets to owned assets" toggle. When this is
-    // active we want the user to see *all* matching markets, so we skip the
-    // numeric value-floor filters below (min APR / TVL / utilization / etc.)
-    // which would otherwise hide valid pools at default thresholds. Risk
-    // score is still enforced.
-    const hasExternalAssetFilter = !!externalAssetFilter?.trim()
-    if (hasExternalAssetFilter) {
-      const addrs = externalAssetFilter!.toLowerCase().split(',').filter(Boolean)
-      if (addrs.length > 0) {
-        const addrSet = new Set(addrs)
-        result = result.filter((p) => addrSet.has(poolUnderlying(p)))
-      }
-    }
-
-    // Deposit-only markets (e.g. Fluid "Collateral X" pools) have
-    // `borrowingEnabled: false`, which means 0% utilization and ~0% deposit
-    // APR are inherent — not a signal the market is junk. The util/APR
-    // floors are written for two-sided lending markets, so we exempt
-    // deposit-only pools rather than letting the defaults silently hide them.
-    const isDepositOnly = (p: PoolEntry) =>
-      p.flags?.borrowingEnabled === false && p.flags?.depositsEnabled !== false
-
-    // Fixed-rate earn markets (Midnight order book, Term repo listings,
-    // Exactly fixed pools) have structurally low/zero pool utilization (the
-    // yield is a book or a fixed pool, not a variable pool rate), so the
-    // util/APR floors — written for two-sided variable pools — would wrongly
-    // hide them even after the user opts in via the Fixed-rate switch.
-    // Exempt every fixed-term family the API can serve.
-    const FIXED_TERM_PREFIXES = ['MORPHO_MIDNIGHT', 'TERM_FINANCE', 'EXACTLY']
-    const isFloorExempt = (p: PoolEntry) =>
-      isDepositOnly(p) || FIXED_TERM_PREFIXES.some((pre) => !!p.lenderKey?.startsWith(pre))
-
-    // --- numeric range helpers ---
-    const applyMinMax = (
-      arr: PoolEntry[],
-      minStr: string,
-      maxStr: string,
-      getValue: (p: PoolEntry) => number
-    ) => {
-      const min = parseFloat(minStr)
-      const max = parseFloat(maxStr)
-      const hasMin = !Number.isNaN(min) && min > 0
-      const hasMax = !Number.isNaN(max) && max > 0
-      if (!hasMin && !hasMax) return arr
-      return arr.filter((p) => {
-        const v = getValue(p)
-        if (hasMin && v < min) return false
-        if (hasMax && v > max) return false
-        return true
-      })
-    }
-
-    // Risk score is always enforced (safety floor) — the effective max already
-    // folds in the app-wide ceiling, so the override can only ever narrow it.
-    result = result.filter((p) => (p.risk?.score ?? 0) <= effectiveMaxRisk)
-
-    // The remaining filters are value-floors meant to trim the universe of
-    // pools when browsing freely. When the user has explicitly narrowed via
-    // the parent (row click / "owned only"), we skip them so every market
-    // for those assets stays visible.
-    if (!hasExternalAssetFilter) {
-      // Utilization (percentage inputs). Deposit-only pools are exempt —
-      // see `isDepositOnly` above.
-      const minU = parseFloat(minUtilPct)
-      const maxU = parseFloat(maxUtilPct)
-      if (!Number.isNaN(minU) || !Number.isNaN(maxU)) {
-        result = result.filter((p) => {
-          if (isFloorExempt(p)) return true
-          const u = computePoolMetrics(p).utilization * 100
-          if (!Number.isNaN(minU) && u < minU) return false
-          if (!Number.isNaN(maxU) && u > maxU) return false
-          return true
-        })
-      }
-
-      // APR (percentage inputs). Deposit-only pools have structurally low
-      // deposit rates (no borrow demand), so they're exempt too.
-      const minApr = parseFloat(minAprPct)
-      const maxApr = parseFloat(maxAprPct)
-      if (!Number.isNaN(minApr) || !Number.isNaN(maxApr)) {
-        result = result.filter((p) => {
-          if (isFloorExempt(p)) return true
-          const apr = computePoolMetrics(p).apr
-          if (!Number.isNaN(minApr) && apr < minApr) return false
-          if (!Number.isNaN(maxApr) && apr > maxApr) return false
-          return true
-        })
-      }
-
-      // TVL / Deposits USD
-      result = applyMinMax(
-        result,
+  // Filtering + sorting. The pipeline itself is pure and lives in
+  // `poolFilters.ts` — it encodes which markets a user does and does not see,
+  // including several non-obvious exemptions, and is unit-tested there.
+  const filteredAndSortedPools = useMemo(
+    () =>
+      filterAndSortPools(decoratedPools, {
+        selectedLender,
+        search: debouncedSearch,
+        assetFilter,
+        externalAssetFilter,
+        effectiveMaxRisk,
+        minUtilPct,
+        maxUtilPct,
+        minAprPct,
+        maxAprPct,
         minDepositsUsd,
         maxDepositsUsd,
-        (p) => parseFloat(p.totalDepositsUsd) || 0
-      )
-
-      // Native deposits
-      result = applyMinMax(
-        result,
         minDepositsNative,
         maxDepositsNative,
-        (p) => parseFloat(p.totalDeposits) || 0
-      )
-      // Native debt
-      result = applyMinMax(
-        result,
         minDebtNative,
         maxDebtNative,
-        (p) => parseFloat(p.totalDebt) || 0
-      )
-      // Native liquidity
-      result = applyMinMax(
-        result,
         minLiquidityNative,
         maxLiquidityNative,
-        (p) => parseFloat(p.totalLiquidity) || 0
-      )
-      // USD debt
-      result = applyMinMax(result, minDebtUsd, maxDebtUsd, (p) => parseFloat(p.totalDebtUsd) || 0)
-      // USD liquidity
-      result = applyMinMax(
-        result,
+        minDebtUsd,
+        maxDebtUsd,
         minLiquidityUsd,
         maxLiquidityUsd,
-        (p) => parseFloat(p.totalLiquidityUsd) || 0
-      )
-    }
-
-    // --- sorting ---
-    result = [...result].sort((a, b) => {
-      const metricsA = computePoolMetrics(a)
-      const metricsB = computePoolMetrics(b)
-
-      let aVal: number
-      let bVal: number
-
-      switch (sortKey) {
-        case 'apr':
-          aVal = metricsA.apr
-          bVal = metricsB.apr
-          break
-        case 'borrowRate':
-          aVal = metricsA.borrowApr
-          bVal = metricsB.borrowApr
-          break
-        case 'intrinsicYield':
-          aVal = metricsA.intrinsicYield
-          bVal = metricsB.intrinsicYield
-          break
-        case 'utilization':
-          aVal = metricsA.utilization
-          bVal = metricsB.utilization
-          break
-        case 'totalDepositsUSD':
-          aVal = parseFloat(a.totalDepositsUsd) || 0
-          bVal = parseFloat(b.totalDepositsUsd) || 0
-          break
-        case 'totalDebtUSD':
-          aVal = parseFloat(a.totalDebtUsd) || 0
-          bVal = parseFloat(b.totalDebtUsd) || 0
-          break
-        case 'totalLiquidityUSD':
-          aVal = parseFloat(a.totalLiquidityUsd) || 0
-          bVal = parseFloat(b.totalLiquidityUsd) || 0
-          break
-        case 'totalDeposits':
-          aVal = parseFloat(a.totalDeposits) || 0
-          bVal = parseFloat(b.totalDeposits) || 0
-          break
-        case 'totalDebt':
-          aVal = parseFloat(a.totalDebt) || 0
-          bVal = parseFloat(b.totalDebt) || 0
-          break
-        case 'totalLiquidity':
-          aVal = parseFloat(a.totalLiquidity) || 0
-          bVal = parseFloat(b.totalLiquidity) || 0
-          break
-        case 'riskScore':
-          aVal = a.risk?.score ?? 0
-          bVal = b.risk?.score ?? 0
-          break
-        default:
-          aVal = 0
-          bVal = 0
-      }
-
-      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
-      return sortDir === 'asc' ? cmp : -cmp
-    })
-
-    return result
-  }, [
-    pools,
-    search,
-    selectedLender,
-    sortKey,
-    sortDir,
-    minUtilPct,
-    maxUtilPct,
-    minAprPct,
-    maxAprPct,
-    minDepositsUsd,
-    maxDepositsUsd,
-    minDepositsNative,
-    maxDepositsNative,
-    minDebtNative,
-    maxDebtNative,
-    minLiquidityNative,
-    maxLiquidityNative,
-    minDebtUsd,
-    maxDebtUsd,
-    minLiquidityUsd,
-    maxLiquidityUsd,
-    effectiveMaxRisk,
-    assetFilter,
-    externalAssetFilter,
-  ])
+        sortKey,
+        sortDir,
+      }),
+    [
+      decoratedPools,
+      debouncedSearch,
+      selectedLender,
+      sortKey,
+      sortDir,
+      minUtilPct,
+      maxUtilPct,
+      minAprPct,
+      maxAprPct,
+      minDepositsUsd,
+      maxDepositsUsd,
+      minDepositsNative,
+      maxDepositsNative,
+      minDebtNative,
+      maxDebtNative,
+      minLiquidityNative,
+      maxLiquidityNative,
+      minDebtUsd,
+      maxDebtUsd,
+      minLiquidityUsd,
+      maxLiquidityUsd,
+      effectiveMaxRisk,
+      assetFilter,
+      externalAssetFilter,
+    ]
+  )
 
   // Close extended filters on outside click
   useEffect(() => {
@@ -655,7 +473,9 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   useEffect(() => {
     setPage(1)
   }, [
-    search,
+    // Debounced, so the page reset lands with the new result set rather than
+    // one keystroke ahead of it.
+    debouncedSearch,
     selectedLender,
     sortKey,
     sortDir,
@@ -683,12 +503,9 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   ])
 
   const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortKey(key)
-      setSortDir('desc')
-    }
+    const next = nextSort({ sortKey, sortDir }, key)
+    setSortKey(next.sortKey)
+    setSortDir(next.sortDir)
   }
 
   const goToPage = (newPage: number) => {
@@ -1164,7 +981,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       {/* Desktop: two-column layout; Mobile: full-width card list */}
       <div className="flex gap-4 items-start">
         <MarketsTable
-          pools={paginatedPools}
+          rows={paginatedPools}
           chainTokens={chainTokens}
           showChain
           sortKey={sortKey}

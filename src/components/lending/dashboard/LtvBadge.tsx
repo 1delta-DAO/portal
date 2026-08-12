@@ -1,5 +1,5 @@
 import React from 'react'
-import type { PoolConfig } from '../../../hooks/lending/usePoolData'
+import type { PoolConfig } from '../../../sdk/lending-helper/marketTypes'
 import { getMaxLtv } from './helpers'
 
 interface Props {

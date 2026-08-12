@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import type { UserSubAccount } from '../../../hooks/lending/useUserData'
+import type { UserSubAccount } from '../../../sdk/lending-helper/userPositionTypes'
 import { usePoolConfigData } from '../../../hooks/lending/usePoolData'
 import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
 import {

@@ -1,4 +1,4 @@
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch, errorMessage } from '../http'
 import type { UserVaultItem } from './types'
 
 export interface FetchUserVaultsParams {
@@ -14,7 +14,7 @@ export interface FetchUserVaultsResult {
   error?: string
 }
 
-const ENDPOINT = `${BACKEND_BASE_URL}/v1/data/vaults/user`
+const ENDPOINT = '/v1/data/vaults/user'
 
 export async function fetchUserVaults(
   params: FetchUserVaultsParams
@@ -22,30 +22,15 @@ export async function fetchUserVaults(
   try {
     if (params.vaults.length === 0) return { success: true, items: [] }
 
-    const qs = new URLSearchParams()
-    qs.set('chainId', params.chainId)
-    qs.set('account', params.account)
-    qs.set('vaults', params.vaults.join(','))
-
-    const res = await fetch(`${ENDPOINT}?${qs}`)
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return {
-        success: false,
-        error: `HTTP ${res.status}: ${text || res.statusText}`,
-      }
-    }
-
-    const json = await res.json()
-    if (!json.success) {
-      return {
-        success: false,
-        error: json.error?.message ?? 'User vaults returned success: false',
-      }
-    }
-
-    return { success: true, items: (json.data?.items ?? []) as UserVaultItem[] }
-  } catch (err: any) {
-    return { success: false, error: err?.message ?? 'Unknown error' }
+    const data = await apiFetch<{ items?: UserVaultItem[] }>(ENDPOINT, {
+      params: {
+        chainId: params.chainId,
+        account: params.account,
+        vaults: params.vaults.join(','),
+      },
+    })
+    return { success: true, items: data?.items ?? [] }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }

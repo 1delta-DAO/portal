@@ -1,4 +1,4 @@
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch, errorMessage } from '../http'
 import {
   normalisePairRow,
   type OptimizerAssetRef,
@@ -115,25 +115,10 @@ export async function fetchMigrateTargets(
       qs.set('collateralPriceUsd', String(params.collateralPriceUsd))
     if (params.debtPriceUsd != null) qs.set('debtPriceUsd', String(params.debtPriceUsd))
 
-    const res = await fetch(`${BACKEND_BASE_URL}/v1/actions/loop/migrate/targets?${qs}`, { signal })
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return {
-        success: false,
-        ...EMPTY,
-        error: `HTTP ${res.status}: ${text || res.statusText}`,
-      }
-    }
-
-    const json = await res.json()
-    if (!json.success)
-      return {
-        success: false,
-        ...EMPTY,
-        error: json.error?.message ?? 'Failed to load migration targets',
-      }
-
-    const data = json.data ?? {}
+    const data = await apiFetch<any>('/v1/actions/loop/migrate/targets', {
+      params: Object.fromEntries(qs),
+      signal,
+    })
     return {
       success: true,
       targets: (data.targets ?? []).map((raw: any) => ({

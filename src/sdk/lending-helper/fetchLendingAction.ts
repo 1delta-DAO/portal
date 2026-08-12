@@ -117,9 +117,9 @@ export interface LendingActionResultWithSimulation {
   error?: string
 }
 
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetchEnvelope, errorMessage } from '../http'
 
-const LENDING_ACTIONS_BASE = `${BACKEND_BASE_URL}/v1/actions/lending`
+const LENDING_ACTIONS_BASE = '/v1/actions/lending'
 
 export async function fetchLendingAction(
   params: LendingActionParams
@@ -144,46 +144,27 @@ export async function fetchLendingAction(
       qs.set('interestRate', params.interestRate)
     if (params.simulate) qs.set('simulate', 'true')
 
-    const url = `${LENDING_ACTIONS_BASE}/${action}?${qs}`
-    const res = params.simulationBody
-      ? await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(params.simulationBody),
-        })
-      : await fetch(url)
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return {
-        success: false,
-        error: `HTTP ${res.status}: ${text || res.statusText}`,
-      }
-    }
-
-    const json = await res.json()
-
-    if (!json.success) {
-      return {
-        success: false,
-        error: json.error?.message ?? 'API error',
-      }
-    }
+    // A `simulationBody` switches the request to POST; without one this is a
+    // plain GET that only builds calldata.
+    const { data, actions } = await apiFetchEnvelope<{
+      simulation?: LendingActionResponseWithSimulation['simulation']
+      rateImpact?: LendingActionResponseWithSimulation['rateImpact']
+    }>(`${LENDING_ACTIONS_BASE}/${action}`, {
+      params: Object.fromEntries(qs),
+      body: params.simulationBody,
+    })
 
     return {
       success: true,
       data: {
-        transactions: json.actions?.transactions ?? [],
-        permissions: json.actions?.permissions ?? [],
-        simulation: json.data?.simulation,
-        rateImpact: json.data?.rateImpact,
+        transactions: actions?.transactions ?? [],
+        permissions: actions?.permissions ?? [],
+        simulation: data?.simulation,
+        rateImpact: data?.rateImpact,
       },
     }
-  } catch (err: any) {
-    return {
-      success: false,
-      error: err?.message ?? 'Unknown error',
-    }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }
 
@@ -206,38 +187,17 @@ export async function fetchCollateralToggle(
   params: CollateralToggleParams
 ): Promise<CollateralToggleResult> {
   try {
-    const qs = new URLSearchParams()
-    qs.set('marketUid', params.marketUid)
-    qs.set('enabled', String(params.enabled))
+    const { actions } = await apiFetchEnvelope<unknown>(
+      `${LENDING_ACTIONS_BASE}/enable-collateral`,
+      { params: { marketUid: params.marketUid, enabled: params.enabled } }
+    )
 
-    const res = await fetch(`${LENDING_ACTIONS_BASE}/enable-collateral?${qs}`)
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return {
-        success: false,
-        error: `HTTP ${res.status}: ${text || res.statusText}`,
-      }
-    }
-
-    const json = await res.json()
-
-    if (!json.success) {
-      return {
-        success: false,
-        error: json.error?.message ?? 'API error',
-      }
-    }
-
-    const tx = json.actions?.transactions?.[0]
+    const tx = actions?.transactions?.[0]
     return {
       success: true,
       data: tx ? { to: tx.to, data: tx.data, value: tx.value ?? '0' } : undefined,
     }
-  } catch (err: any) {
-    return {
-      success: false,
-      error: err?.message ?? 'Unknown error',
-    }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }

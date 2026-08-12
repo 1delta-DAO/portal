@@ -1,4 +1,4 @@
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch, errorMessage, type ApiParams } from '../http'
 
 // ============================================================================
 // Complement-range endpoints for the deposit-and-borrow / withdraw-and-repay
@@ -51,23 +51,15 @@ export interface RangeResult<T> {
 
 async function fetchRange<T>(
   path: 'deposit-borrow' | 'withdraw-repay',
-  qs: URLSearchParams
+  params: ApiParams
 ): Promise<RangeResult<T>> {
   try {
-    const res = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/range/${path}?${qs}`)
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return { success: false, error: `HTTP ${res.status}: ${text || res.statusText}` }
-    }
-    const json = await res.json()
-    if (!json.success) {
-      return { success: false, error: json.error?.message ?? 'API error' }
-    }
+    const data = await apiFetch<T | T[]>(`/v1/data/lending/range/${path}`, { params })
     // The endpoint returns `data` as a single-element array (range-family shape).
-    const row = Array.isArray(json.data) ? json.data[0] : json.data
+    const row = Array.isArray(data) ? data[0] : data
     return { success: true, data: (row ?? {}) as T }
-  } catch (err: any) {
-    return { success: false, error: err?.message ?? 'Unknown error' }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }
 
@@ -90,15 +82,15 @@ export interface DepositBorrowRangeParams {
 export async function fetchDepositBorrowRange(
   p: DepositBorrowRangeParams
 ): Promise<RangeResult<DepositBorrowRange>> {
-  const qs = new URLSearchParams()
-  qs.set('marketUidOut', p.marketUidOut)
-  qs.set('marketUidIn', p.marketUidIn)
-  qs.set('account', p.account)
-  if (p.depositAmount) qs.set('depositAmount', p.depositAmount)
-  if (p.borrowAmount) qs.set('borrowAmount', p.borrowAmount)
-  if (p.modeId) qs.set('modeId', p.modeId)
-  if (p.accountId) qs.set('accountId', p.accountId)
-  return fetchRange<DepositBorrowRange>('deposit-borrow', qs)
+  return fetchRange<DepositBorrowRange>('deposit-borrow', {
+    marketUidOut: p.marketUidOut,
+    marketUidIn: p.marketUidIn,
+    account: p.account,
+    depositAmount: p.depositAmount,
+    borrowAmount: p.borrowAmount,
+    modeId: p.modeId,
+    accountId: p.accountId,
+  })
 }
 
 export interface WithdrawRepayRangeParams {
@@ -119,13 +111,13 @@ export interface WithdrawRepayRangeParams {
 export async function fetchWithdrawRepayRange(
   p: WithdrawRepayRangeParams
 ): Promise<RangeResult<WithdrawRepayRange>> {
-  const qs = new URLSearchParams()
-  qs.set('marketUidOut', p.marketUidOut)
-  qs.set('marketUidIn', p.marketUidIn)
-  qs.set('account', p.account)
-  if (p.repayAmount) qs.set('repayAmount', p.repayAmount)
-  if (p.withdrawAmount) qs.set('withdrawAmount', p.withdrawAmount)
-  if (p.modeId) qs.set('modeId', p.modeId)
-  if (p.accountId) qs.set('accountId', p.accountId)
-  return fetchRange<WithdrawRepayRange>('withdraw-repay', qs)
+  return fetchRange<WithdrawRepayRange>('withdraw-repay', {
+    marketUidOut: p.marketUidOut,
+    marketUidIn: p.marketUidIn,
+    account: p.account,
+    repayAmount: p.repayAmount,
+    withdrawAmount: p.withdrawAmount,
+    modeId: p.modeId,
+    accountId: p.accountId,
+  })
 }

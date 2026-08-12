@@ -30,6 +30,38 @@ The UI talks to the 1delta backend at `https://portal.1delta.io`. The API refere
 
 Calling the public endpoint without a key (or exposing the key in client-side code) is not supported for production integrations.
 
+### How requests are made
+
+Every backend call in this app goes through **`src/sdk/http.ts`** — one module,
+two functions:
+
+```ts
+// Unwraps the `{ success, data }` envelope, throws ApiError on failure.
+const data = await apiFetch<PoolsData>('/v1/data/lending/pools', {
+  params: { chainId, count: 500 },   // undefined values are dropped
+})
+
+// Keeps the whole envelope, for /v1/actions/* endpoints whose payload
+// is under `actions`. A `body` switches the request to POST.
+const { data, actions } = await apiFetchEnvelope('/v1/actions/lending/deposit', {
+  params: { marketUid, amount },
+  body: simulationBody,
+})
+```
+
+That single choke point is what makes the proxy setup above a small change:
+
+- **Headers** — return them from `apiHeaders()` in `src/config/backend.ts`.
+  Every request picks them up. Do not put a secret API key there; anything it
+  returns ships in the client bundle. That is what the proxy is for.
+- **Errors** — both functions throw `ApiError` (with `status`, `code`, `path`)
+  on a transport failure, a non-2xx, or `success: false`. They never resolve
+  with a sentinel, so a failed query looks failed to React Query.
+
+Two `fetch` calls in the app deliberately bypass this, because they don't talk
+to the 1delta backend and don't speak its envelope: `hooks/lending/executeRpcCalls.ts`
+(a chain RPC) and `lib/data/tokenListsCache.ts` (third-party token lists).
+
 ## Tech Stack
 
 - **React 19** + **TypeScript 5.9** — UI framework
@@ -39,171 +71,67 @@ Calling the public endpoint without a key (or exposing the key in client-side co
 - **RainbowKit 2** — wallet connection modal
 - **TanStack Query 5** — async data fetching and caching
 - **react-router-dom 7** — URL-driven routing
-- **react-window 2** — virtualized tables
 - **1delta packages** (`@1delta/chain-registry`, `@1delta/providers`) — chain metadata and RPC providers
 
-## Features
+Tables paginate rather than virtualize; there is no virtualization dependency.
 
-### Earn (`/earn`)
+## Where things are
 
-Browse lending pools across all supported protocols and chains. Search, filter by risk, sort by APR/deposits/liquidity, and deposit directly from a side panel.
-
-**Location**: `src/components/lending/MarketsView/`
-
-| File | Purpose |
-|------|---------|
-| `MarketsView.tsx` | Main browse view, lender/chain selection |
-| `MarketsTable.tsx` | Searchable, sortable, paginated pool table |
-| `DepositPanel.tsx` | Side panel for one-click deposits |
-| `ExposureCell.tsx` | Market exposure indicator |
-
-### Lending (`/lending/:chainId/:lender`)
-
-Full position management dashboard. Select a lender, view positions (deposits, debt, health factor, APR), and execute deposit/withdraw/borrow/repay actions.
-
-**Location**: `src/components/lending/LendingDashboard/`
-
-| File | Purpose |
-|------|---------|
-| `LendingDashboard.tsx` | Main view: lender selector, positions, market table, action panel |
-| `LendingMarketTable.tsx` | Desktop table + mobile cards |
-| `ActionPanel.tsx` | Action form wrapper (desktop sidebar + mobile modal) |
-
-**Shared actions** in `src/components/lending/DashboardActions/`:
-
-| File | Purpose |
-|------|---------|
-| `DepositAction.tsx` | Deposit form with simulation |
-| `WithdrawAction.tsx` | Withdrawal form |
-| `BorrowAction.tsx` | Borrow against collateral |
-| `RepayAction.tsx` | Repay outstanding debt |
-| `useActionExecution.ts` | Hook: simulate + execute lending transactions |
-| `HealthFactorProjection.tsx` | Health factor preview before tx |
-| `RateImpactIndicator.tsx` | Projected borrow/supply rate impact |
-| `SimulationIndicator.tsx` | Simulation status pill |
-| `SubAccountSelector.tsx` | Sub-account picker (AAVE-style protocols) |
-| `NativeCurrencySelector.tsx` | Toggle native vs wrapped token |
-| `AmountQuickButtons.tsx` | 25%/50%/100% amount shortcuts |
-| `TransactionSuccess.tsx` | Post-tx confirmation view |
-
-### Looping (`/loop/:chainId/:lender`)
-
-Advanced leveraged operations executed in single transactions:
-
-| Operation | Description | File |
-|-----------|-------------|------|
-| **Loop** | Deposit → borrow → swap cycle for leveraged positions | `actions/LoopAction.tsx` |
-| **Collateral Swap** | Exchange one collateral asset for another | `actions/ColSwapAction.tsx` |
-| **Debt Swap** | Switch debt from one asset to another | `actions/DebtSwapAction.tsx` |
-| **Close** | Unwind a leveraged position | `actions/CloseAction.tsx` |
-
-**Location**: `src/components/lending/TradingDashboard/`
-
-| File | Purpose |
-|------|---------|
-| `TradingDashboard.tsx` | Main view: lender selector, pool selection, operation forms |
-| `TradingMarketTable.tsx` | Market table with role highlights (input/output/pay) |
-| `PoolSelectorDropdown.tsx` | Multi-pool picker for trade operations |
-| `useTradingQuotes.ts` | Quote fetching hook |
-| `QuoteCard.tsx` | Trade quote display |
-| `SlippageInput.tsx` | Slippage tolerance config |
-| `ErrorDisplay.tsx` | Trade error surfacing |
-| `TradingTransactionSuccess.tsx` | Post-trade confirmation |
-
-### Optimizer
-
-Pair-level allocation optimizer surfacing best supply/borrow routes.
-
-**Location**: `src/components/lending/Optimizer/`
-
-### Swap (`/swap`)
-
-Simple spot token swaps with route aggregation.
-
-**Location**: `src/components/swap/SpotSwapPanel.tsx`
-
-### Shared Lending Components (in `src/components/lending/`)
-
-| Component | Purpose |
-|-----------|---------|
-| `YourPositions.tsx` | Position summary: deposits, debt, NAV, health, APR |
-| `UserTable.tsx` | User's lending positions with collateral toggles |
-| `UserAssetsTable.tsx` | User's wallet assets table |
-| `RunningBlanacesOverview.tsx` | Running balances across positions |
-| `ConfigMarketView.tsx` | E-Mode category view |
-| `EModeAnalysisModal.tsx` | E-Mode switching impact analysis |
-| `IrmChart.tsx` / `IrmDock.tsx` | Interest rate model curve visualization + draggable dock |
-| `AssetPopover.tsx` | Asset detail hover card (oracle price, utilization, rates) |
-| `LendingPoolSelectionModal.tsx` | Modal for picking a lending pool |
-| `LenderSelector.tsx` / `LenderBadge.tsx` | Lender selection controls |
-| `SearchableSelect.tsx` | Reusable searchable dropdown |
-| `ChainFilter.tsx` | Chain selector dropdown |
-| `RiskBadge.tsx` / `RiskSelect.tsx` | Risk score display and filter |
-| `Pill.tsx` / `UsdAmount.tsx` | Small display primitives |
-| `Dashboard/` | `sortPools()` helper, `LtvBadge`, `SortKey` type |
-
-### Common UI Primitives (`src/components/common/`)
-
-`AmountInput`, `EmptyState`, `ErrorAlert`, `ErrorBoundary`, `HealthBadge`, `Logo`, `ModalHeader`, `PresetButton`, `SortableHeader`, `TableEmptyRow`, `TablePagination`, `ToastHost`.
-
-## Project Structure
+Feature code lives under `src/components/lending/`. Each directory has its own
+`README.md` next to the code — those are the accurate map, because they move
+with the files they describe. This section only names the directories.
 
 ```
 src/
-├── components/
-│   ├── lending/                      # Core application views
-│   │   ├── LendingTab.tsx            # Top-level tab router
-│   │   ├── LendingActionTab.tsx      # Action tab wrapper
-│   │   ├── LendingDashboard/         # Lending tab
-│   │   ├── TradingDashboard/         # Looping tab (+ actions/)
-│   │   ├── DashboardActions/         # Shared lending action forms
-│   │   ├── MarketsView/              # Earn tab
-│   │   ├── Optimizer/                # Pair optimizer
-│   │   ├── Dashboard/                # Shared helpers (sortPools, LtvBadge)
-│   │   └── *.tsx                     # YourPositions, IrmChart, AssetPopover, ...
-│   ├── swap/SpotSwapPanel.tsx        # Spot swap
-│   ├── token-selection/              # Token picker modal
-│   ├── connect/                      # Wallet connect button
-│   ├── common/                       # Shared UI primitives
-│   ├── themeSwitcher/                # Light/dark toggle
-│   └── PortalLogo.tsx
+├── App.tsx                      # Root layout: navbar, providers, router
+├── main.tsx                     # Entry: Wagmi → QueryClient → RainbowKit → Router
+├── wagmi.ts                     # Chain config, transports, polling intervals
+│
+├── sdk/                         # Everything that talks to the backend
+│   ├── http.ts                  # ← the ONE place requests are made. Start here.
+│   ├── lending-helper/          # Action builders + the data model:
+│   │                            #   poolTypes.ts        /lending/pools (PoolEntry)
+│   │                            #   marketTypes.ts      /lending/latest (PoolDataItem)
+│   │                            #   userPositionTypes.ts /lending/user-positions
+│   ├── earn-helper/             # Earn listing + positions
+│   ├── vaults-helper/           # Vault catalog, actions, withdrawals
+│   └── hooks/                   # Chain registry
+│
+├── components/lending/
+│   ├── LendingTab.tsx           # Tab bar + router; tab panels are lazy-loaded
+│   ├── tabs/earn/               # Earn — browse pools, deposit (+ vaults/)
+│   ├── tabs/lending/            # Lending — position management
+│   ├── tabs/trading/            # Looping — loop / collateral-swap / debt-swap / close
+│   ├── tabs/optimizer/          # Pair-level allocation optimizer (flag-gated)
+│   ├── tabs/unified/            # Unified Earn (flag-gated)
+│   ├── actions/                 # Deposit / Withdraw / Borrow / Repay forms
+│   ├── shared/                  # Cross-tab components (positions, modals, badges)
+│   ├── dashboard/               # Sort helpers, LtvBadge
+│   └── terms/                   # Term sheets: rendering + formatting
+│
+├── components/swap/             # Spot swap + cross-chain swap panels
+├── components/token-selection/  # Token picker modal
+├── components/common/           # UI primitives (AmountInput, Logo, pagination, toasts…)
 │
 ├── hooks/
-│   ├── lending/                      # Pool/user/IRM data, RPC multicall
-│   ├── balances/useBalanceQuery.ts
-│   ├── prices/usePriceQuery.ts
-│   ├── useChains.ts                  # Available chains from API
-│   ├── useTokenLists.ts              # Token metadata (globally cached)
-│   ├── useSendLendingTransaction.ts  # Tx submission with permit support
-│   ├── useSpotSwapQuote.ts           # Swap quote fetching
-│   ├── useSyncChain.ts               # Sync wagmi chain with selected chain
-│   ├── useTablePagination.ts / useTableSort.ts
-│   ├── usePersistedFilters.ts
-│   └── useDebounce.ts / useIsMobile.ts
+│   ├── lending/                 # Pool/user/IRM data, order books, RPC multicall
+│   ├── balances/ prices/        # Wallet balances, token prices
+│   ├── earn/ vaults/            # Earn + vault queries
+│   └── use*.ts                  # Chains, token lists, debounce, table sort/pagination
 │
-├── sdk/
-│   ├── lending-helper/               # Backend API calls (actions, EMode, loop range, ...)
-│   ├── hooks/useChainsRegistry.ts
-│   └── types/
-│
-├── lib/
-│   ├── assetLists.ts
-│   ├── userTokens.ts
-│   ├── data/tokenListsCache.ts
-│   ├── trade-helpers/utils.ts
-│   ├── lib-utils/                    # Local utilities
-│   └── types/
-│
-├── utils/                            # format, routes, explorer, price, validation
-├── contexts/SpyMode.tsx              # View-as-address context
-├── config/backend.ts                 # Backend API base URL
-├── types/currency.ts
-├── styles/globals.css                # Tailwind directives
-├── wagmi.ts                          # Wagmi + RainbowKit chain/transport config
-├── rainbowkitTheme.ts                # RainbowKit DaisyUI theme
-├── App.tsx                           # Root layout — navbar, providers, router
-└── main.tsx                          # Entry
+├── contexts/                    # Spy mode (view-as-address), risk mode, batch mode
+├── config/backend.ts            # Base URL + the header hook for a fork's auth
+├── utils/                       # format, routes, explorer, price, validation
+└── types/ lib/ styles/
 ```
+
+### The two files to read first
+
+- **`src/sdk/http.ts`** — every backend request goes through `apiFetch` /
+  `apiFetchEnvelope`. Response-envelope handling, error semantics and header
+  injection all live there, so a fork changes them in one place.
+- **`src/sdk/lending-helper/poolTypes.ts`** — `PoolEntry`, the shape of a
+  lending market, which every table row and action panel is built from.
 
 ## Architecture
 
@@ -229,10 +157,17 @@ URL helpers in `src/utils/routes.ts`.
 | Global UI | React Context | IRM dock panels, toast notifications, spy mode |
 | Local state | useState | Form inputs, filters, selections, pagination |
 
+### Code splitting
+
+Tab panels are lazy-loaded in `LendingTab.tsx`. The flag checks sit outside the
+JSX, so a build with a tab disabled never requests its chunk — the Optimizer
+(~3,400 lines, default off) costs nothing when it is off. Adding a tab means
+adding both a `lazy()` element and its flag test.
+
 ### Data Flow (Lending Transaction)
 
 1. User fills form in action component (e.g. `DepositAction`)
-2. `useActionExecution` calls `fetchLendingAction()` → backend API builds tx + simulates
+2. `useActionExecution` calls `fetchLendingAction()` → `apiFetchEnvelope` builds tx + simulates
 3. Backend returns simulated health factor and balance changes
 4. User confirms → `useSendLendingTransaction` handles EIP-2612 permit + tx submission
 5. On success → React Query invalidates `userData` + `tokenBalances` queries
@@ -246,6 +181,7 @@ URL helpers in `src/utils/routes.ts`.
 | `pnpm build` | Production build |
 | `pnpm preview` | Preview production build |
 | `pnpm format` | Format code with Prettier |
+| `pnpm test` | Run the unit tests (vitest) |
 
 ## Supported Protocols
 

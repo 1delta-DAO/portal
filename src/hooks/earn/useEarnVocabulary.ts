@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch } from '../../sdk/http'
 import { EMPTY_VOCABULARY, type EarnVocabulary } from '../../sdk/earn-helper'
 
-const ENDPOINT = `${BACKEND_BASE_URL}/v1/data/earn/facets`
+const ENDPOINT = '/v1/data/earn/facets'
 
 /**
  * The server's display vocabulary — labels for exit modes, venue kinds,
@@ -15,12 +15,7 @@ const ENDPOINT = `${BACKEND_BASE_URL}/v1/data/earn/facets`
 export function useEarnVocabulary(): EarnVocabulary {
   const { data } = useQuery<EarnVocabulary>({
     queryKey: ['earnVocabulary'],
-    queryFn: async () => {
-      const res = await fetch(ENDPOINT)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json()
-      return (json.data ?? json) as EarnVocabulary
-    },
+    queryFn: () => apiFetch<EarnVocabulary>(ENDPOINT),
     // Constants — no reason to refetch while the tab is open.
     staleTime: Infinity,
     gcTime: Infinity,

@@ -2,7 +2,7 @@
  * Shared formatting utilities for USD values, token amounts, etc.
  */
 
-import type { PoolDataItem } from '../hooks/lending/usePoolData'
+import type { PoolDataItem } from '../sdk/lending-helper/marketTypes'
 
 /** Sum deposits - debt across all markets for a lender to get TVL. */
 export function computeLenderTvl(markets: PoolDataItem[]): number {
@@ -120,4 +120,25 @@ export function formatPrice(v: number): string {
   if (abs >= 1) return `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
   if (abs >= 0.01) return `$${v.toFixed(4)}`
   return `$${v.toPrecision(4)}`
+}
+
+/**
+ * Band a risk score (1 best … 5 worst): **1–2 low · 3 medium · 4–5 high**.
+ *
+ * Four is HIGH, not medium. The app carried both conventions at once —
+ * `riskScoreClass` in `lending/terms/format.ts` already banded it this way
+ * while the earn and optimizer helpers put 4 in `medium`, so the same score
+ * rendered amber in one table and red in another. This is the single
+ * definition; everything that bands a score calls it.
+ *
+ * Lives here, in the dependency-free formatter module, so a HOOK can band a
+ * score without importing a component-tree helper.
+ */
+export function riskBand(
+  score: number | null | undefined,
+): 'low' | 'medium' | 'high' | 'unknown' {
+  if (score == null || score === 0) return 'unknown'
+  if (score <= 2) return 'low'
+  if (score === 3) return 'medium'
+  return 'high'
 }

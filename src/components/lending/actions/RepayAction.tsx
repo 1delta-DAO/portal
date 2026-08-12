@@ -19,7 +19,7 @@ import { isExactlyMarket, lenderSupportsSubAccounts, lenderSupportsNative } from
 import { HealthFactorProjection } from './HealthFactorProjection'
 import { RateImpactIndicator } from './RateImpactIndicator'
 import { TransactionSuccess } from './TransactionSuccess'
-import { loansForMarket } from '../../../hooks/lending/useUserData'
+import { loansForMarket } from '../../../sdk/lending-helper/userPositionTypes'
 import {
   loanDebtString,
   closeNowAmountString,

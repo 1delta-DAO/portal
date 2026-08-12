@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useSpyAccount } from '../../contexts/SpyMode'
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch } from '../../sdk/http'
 import { executeRpcCallsWithRetry, type RpcCall } from '../lending/executeRpcCalls'
 
 export interface XChainBalanceItem {
@@ -63,16 +63,10 @@ export function useXChainBalances({
     staleTime: 60_000,
     queryFn: async () => {
       // 1. prepare
-      const prepRes = await fetch(
-        `${BACKEND_BASE_URL}/v1/data/token/balances/rpc-call?chains=${chainsKey}&account=${account}`
-      )
-      if (!prepRes.ok) throw new Error(`rpc-call HTTP ${prepRes.status}`)
-      const prep = await prepRes.json()
-      if (!prep.success) throw new Error(prep.error?.message ?? 'rpc-call failed')
-      const { rpcCallId, rpcCalls } = prep.data as {
+      const { rpcCallId, rpcCalls } = await apiFetch<{
         rpcCallId: string
         rpcCalls: RpcCallEntry[]
-      }
+      }>('/v1/data/token/balances/rpc-call', { params: { chains: chainsKey, account } })
 
       // 2. execute per chain in parallel; tolerate individual chain failures
       const settled = await Promise.allSettled(
@@ -91,17 +85,13 @@ export function useXChainBalances({
       if (rawResponses.length === 0) throw new Error('All chain RPCs failed')
 
       // 3. parse
-      const parseRes = await fetch(`${BACKEND_BASE_URL}/v1/data/token/balances/parse`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rpcCallId, rawResponses }),
-      })
-      if (!parseRes.ok) throw new Error(`parse HTTP ${parseRes.status}`)
-      const parsed = await parseRes.json()
-      if (!parsed.success) throw new Error(parsed.error?.message ?? 'parse failed')
+      const parsed = await apiFetch<{
+        chains?: { chainId: string; items: XChainBalanceItem[] }[]
+        missingChains?: string[]
+      }>('/v1/data/token/balances/parse', { body: { rpcCallId, rawResponses } })
 
       const result: XChainBalances = { chains: {}, missingChains: [], totalUSD: 0 }
-      for (const chain of parsed.data.chains ?? []) {
+      for (const chain of parsed.chains ?? []) {
         const items = (chain.items as XChainBalanceItem[])
           .filter((i) => i.balanceRaw !== '0')
           .sort((a, b) => (b.balanceUSD ?? 0) - (a.balanceUSD ?? 0))
@@ -110,7 +100,7 @@ export function useXChainBalances({
           result.totalUSD += items.reduce((a, i) => a + (i.balanceUSD ?? 0), 0)
         }
       }
-      result.missingChains = parsed.data.missingChains ?? []
+      result.missingChains = parsed.missingChains ?? []
       return result
     },
   })

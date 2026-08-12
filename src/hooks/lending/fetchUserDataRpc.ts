@@ -1,30 +1,25 @@
-import type { RawLenderUserDataEntry, UserDataSummary } from './useUserData'
+import type {
+  RawLenderUserDataEntry,
+  UserDataSummary,
+} from '../../sdk/lending-helper/userPositionTypes'
 import { executeRpcCallsMultiChain, type RpcCall } from './executeRpcCalls'
 
 // ============================================================================
 // Types for the rpc-call endpoint
 // ============================================================================
 
-interface RpcCallApiResponse {
-  success: boolean
-  data: {
-    rpcCallId: string
-    rpcCalls: RpcCall[]
-  }
-  error?: { code: string; message: string }
+interface RpcCallData {
+  rpcCallId: string
+  rpcCalls: RpcCall[]
 }
 
 // ============================================================================
 // Types for the parse endpoint
 // ============================================================================
 
-interface ParseApiResponse {
-  success: boolean
-  data: {
-    items: RawLenderUserDataEntry[]
-    summary: UserDataSummary
-  }
-  error?: { code: string; message: string }
+interface ParseData {
+  items: RawLenderUserDataEntry[]
+  summary: UserDataSummary
 }
 
 // ============================================================================
@@ -40,32 +35,7 @@ export interface FetchUserDataResult {
   missingChains: string[]
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
-import { BACKEND_BASE_URL } from '../../config/backend'
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-async function fetchApi<T extends { success: boolean; error?: { code: string; message: string } }>(
-  label: string,
-  url: string,
-  init?: RequestInit
-): Promise<T> {
-  const res = await fetch(url, init)
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`${label} HTTP ${res.status}: ${text || res.statusText}`)
-  }
-  const json = (await res.json()) as T
-  if (!json.success) {
-    throw new Error(json.error?.message ?? `${label} API returned success: false`)
-  }
-  return json
-}
+import { apiFetch } from '../../sdk/http'
 
 // ============================================================================
 // Main function
@@ -101,27 +71,27 @@ export async function fetchUserDataViaRpc(
   if (chains.length === 0) throw new Error('fetchUserDataViaRpc: no chains requested')
 
   // Step 1: Get RPC call descriptors from backend
-  const batches = chains.some((c) => SMALL_BATCH_CHAINS.has(c)) ? `&batchSize=500` : ''
-  const lendersParam = lenders && lenders.length > 0 ? `&lenders=${lenders.join(',')}` : ''
-  const rpcCallUrl =
-    `${BACKEND_BASE_URL}/v1/data/lending/user-positions/rpc-call` +
-    `?chains=${chains.join(',')}&account=${account}${batches}${lendersParam}`
-
-  const {
-    data: { rpcCallId, rpcCalls },
-  } = await fetchApi<RpcCallApiResponse>('rpc-call', rpcCallUrl)
+  const { rpcCallId, rpcCalls } = await apiFetch<RpcCallData>(
+    '/v1/data/lending/user-positions/rpc-call',
+    {
+      params: {
+        chains: chains.join(','),
+        account,
+        // Chains whose public RPCs choke on large multicalls get a smaller batch.
+        batchSize: chains.some((c) => SMALL_BATCH_CHAINS.has(c)) ? 500 : undefined,
+        lenders: lenders?.length ? lenders.join(',') : undefined,
+      },
+    }
+  )
 
   // Step 2: Execute each call as eth_call via the user's own RPC provider,
   // grouped per chain so one dead RPC only costs that chain.
   const { rawResponses, missingChains } = await executeRpcCallsMultiChain(rpcCalls, chains[0])
 
   // Step 3: Send results to parse endpoint
-  const parseUrl = `${BACKEND_BASE_URL}/v1/data/lending/user-positions/parse`
-  const parseResult = await fetchApi<ParseApiResponse>('parse', parseUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rpcCallId, rawResponses }),
+  const parsed = await apiFetch<ParseData>('/v1/data/lending/user-positions/parse', {
+    body: { rpcCallId, rawResponses },
   })
 
-  return { data: parseResult.data.items, summary: parseResult.data.summary, missingChains }
+  return { data: parsed.items, summary: parsed.summary, missingChains }
 }

@@ -1,9 +1,9 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { PoolEntry } from '../../../../hooks/lending/useFlattenedPools'
+import type { PoolEntry } from '../../../../sdk/lending-helper/poolTypes'
 import { abbreviateUsd, formatUsd } from '../../../../utils/format'
 import { getFormattedPrice } from '../../../../utils/price'
-import { computePoolMetrics, type SortKey } from './helpers'
+import type { PoolWithMetrics, SortKey } from './helpers'
 import { ExposureCell } from './ExposureCell'
 import { AssetPopover } from '../../shared/AssetPopover'
 import { RiskBadge } from '../../shared/RiskBadge'
@@ -76,7 +76,12 @@ const UtilCircle: React.FC<{ pct: number }> = ({ pct }) => {
 }
 
 interface MarketsTableProps {
-  pools: PoolEntry[]
+  /**
+   * Rows to render, each already paired with its derived metrics.
+   * `MarketsView` computes those once for the whole set; recomputing them here
+   * per row would undo that — see {@link PoolWithMetrics}.
+   */
+  rows: PoolWithMetrics[]
   chainTokens: Record<string, any>
   /** Tag rows with their chain. Defaults on — this tab is multi-chain. */
   showChain?: boolean
@@ -95,7 +100,7 @@ interface MarketsTableProps {
 }
 
 export const MarketsTable: React.FC<MarketsTableProps> = ({
-  pools,
+  rows,
   chainTokens,
   showChain = true,
   sortKey,
@@ -231,9 +236,9 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {pools.map((p) => {
+            {rows.map(({ pool: p, metrics }) => {
               const { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr } =
-                computePoolMetrics(p)
+                metrics
               const utilPct = utilization * 100
               const totalDepositsUSD = parseFloat(p.totalDepositsUsd) || 0
               const totalDebtUSD = parseFloat(p.totalDebtUsd) || 0
@@ -392,14 +397,14 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
 
       {/* ── Mobile card list ── */}
       <div className="md:hidden divide-y divide-base-300">
-        {pools.length === 0 && totalItems === 0 && (
+        {rows.length === 0 && totalItems === 0 && (
           <div className="text-center py-6 text-sm text-base-content/60">
             No pools match your filters.
           </div>
         )}
 
         {/* Sort controls for mobile */}
-        {pools.length > 0 && (
+        {rows.length > 0 && (
           <div className="flex gap-1 p-2 overflow-x-auto">
             {(['apr', 'utilization', 'totalDepositsUSD', 'totalLiquidityUSD'] as SortKey[]).map(
               (key) => {
@@ -434,9 +439,8 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
           </div>
         )}
 
-        {pools.map((p) => {
-          const { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr } =
-            computePoolMetrics(p)
+        {rows.map(({ pool: p, metrics }) => {
+          const { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr } = metrics
           const utilPct = utilization * 100
           const totalDepositsUSD = parseFloat(p.totalDepositsUsd) || 0
           const totalLiquidityUSD = parseFloat(p.totalLiquidityUsd) || 0

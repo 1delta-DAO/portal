@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch } from '../../sdk/http'
 
 export interface TokenBalance {
   address: string
@@ -12,15 +12,11 @@ export interface TokenBalance {
   balanceUSD: number
 }
 
-interface BalancesApiResponse {
-  success: boolean
-  data: {
-    chainId: string
-    account: string
-    count: number
-    items: TokenBalance[]
-  }
-  error?: { code: string; message: string }
+interface BalancesData {
+  chainId: string
+  account: string
+  count: number
+  items: TokenBalance[]
 }
 
 /**
@@ -50,24 +46,12 @@ export function useTokenBalances(params: {
         return new Map<string, TokenBalance>()
       }
 
-      const url =
-        `${BACKEND_BASE_URL}/v1/data/token/balances` +
-        `?chainId=${chainId}` +
-        `&account=${account}` +
-        `&assets=${encodeURIComponent(assets.join(','))}`
-
-      const res = await fetch(url)
-      if (!res.ok) {
-        const text = await res.text().catch(() => '')
-        throw new Error(`Balances HTTP ${res.status}: ${text || res.statusText}`)
-      }
-      const json = (await res.json()) as BalancesApiResponse
-      if (!json.success) {
-        throw new Error(json.error?.message ?? 'Balances API returned success: false')
-      }
+      const data = await apiFetch<BalancesData>('/v1/data/token/balances', {
+        params: { chainId, account, assets: assets.join(',') },
+      })
 
       const map = new Map<string, TokenBalance>()
-      for (const bal of json.data.items) {
+      for (const bal of data.items) {
         map.set(bal.address.toLowerCase(), bal)
       }
       return map

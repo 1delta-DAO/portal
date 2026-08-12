@@ -1,226 +1,9 @@
-import { useEffect, useMemo } from 'react'
-import { useInfiniteQuery, useQueries } from '@tanstack/react-query'
+import { useCallback, useMemo } from 'react'
+import { useQueries, type UseQueryResult } from '@tanstack/react-query'
+import { apiFetch, type ApiParams } from '../../sdk/http'
+import type { PoolEntry, PoolsFilters } from '../../sdk/lending-helper/poolTypes'
 
-// ============================================================================
-// Types for the /lending/pools API response
-// ============================================================================
-
-export interface PoolExposure {
-  debts: string[] | null
-  label: string
-  configId: string
-  collaterals: string[] | null
-}
-
-export interface PoolAssetInfo {
-  chainId: string
-  address: string
-  symbol: string
-  name: string
-  decimals: number
-  logoURI: string
-  assetGroup: string
-  currencyId: string
-  props?: Record<string, unknown>
-}
-
-export interface PoolPriceInfo {
-  priceUsd: number
-  priceTs: string
-  priceUsd24h: number
-  priceTs24h: string
-  priceChange24h: number
-}
-
-export interface PoolOraclePrice {
-  oraclePrice: number | null
-  oraclePriceUsd: number | null
-}
-
-export interface PoolUnderlyingInfo {
-  asset: PoolAssetInfo
-  prices: PoolPriceInfo
-  oraclePrice: PoolOraclePrice
-}
-
-/** Oracle risk band, ordered low→high. */
-export type OracleBand = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
-
-/**
- * One oracle feed classification for a market, from the risk-data pipeline.
- * Distinct from `risk.breakdown[oracle]` (price-staleness): this describes
- * whether the feed prices the *intended* asset/numeraire. `score` is 0–100.
- */
-export interface PoolOracleFeed {
-  /** Priced asset symbol (the reported numerator). */
-  asset: string | null
-  /** Oracle / feed / adapter address (lowercased). */
-  oracle: string | null
-  /** Oracle type: `chainlink`, `redstone`, `composite`, `constant`, … */
-  provider: string | null
-  /** Decoded reported pair, e.g. "ETH / USD"; null/"UNKNOWN" when undecoded. */
-  priceDescription: string | null
-  /** What the feed *should* report, "<asset> / <numeraire>". null for Morpho. */
-  intendedPair: string | null
-  /** Does the source price the intended asset? null = unverifiable. */
-  correctOracle: boolean | null
-  /** Denominated in the right numeraire? null = unknown (always null for Morpho). */
-  denominatorMatch: boolean | null
-  /** Hardcoded/constant price feed. */
-  fixedRate: boolean
-  /** Risk score 0–100. */
-  score: number
-  band: OracleBand
-  /** e.g. `wrong-asset`, `cross-numeraire`, `undecoded-source`, `fixed-rate`. */
-  flags: string[]
-}
-
-/**
- * Top-level oracle classification for a market. A market can have several
- * feeds (Compound comets price each asset; Fluid prices each side), so `feeds`
- * is an array; `worstScore`/`worstBand` summarize the riskiest feed. `null`
- * when the market has no oracle classification.
- */
-export interface PoolOracleInfo {
-  feeds: PoolOracleFeed[]
-  worstScore: number
-  worstBand: OracleBand
-}
-
-export interface LenderInfo {
-  key: string
-  name: string
-  logoURI: string
-}
-
-export interface PoolFlags {
-  isActive?: boolean
-  isFrozen?: boolean
-  hasStable?: boolean
-  borrowingEnabled?: boolean
-  collateralActive?: boolean
-  depositsEnabled?: boolean
-  /**
-   * Brokered (Lista) markets: variable borrowing isn't offered through the
-   * 1delta composer — borrowers pick a fixed term from `terms[]`. The raw
-   * `variableBorrowRate` is 0 here and should not be ranked. See BROKERED_MARKETS.md.
-   */
-  variableBorrowDisabled?: boolean
-}
-
-/**
- * One fixed-term option from a brokered market's rate card. `apr` is a percent
- * (e.g. 3.85 = 3.85%), same unit as the pool's other rates. See BROKERED_MARKETS.md §2.
- */
-export interface PoolTerm {
-  /** Broker term identifier — passed to the borrow builder as `termId`. */
-  termId: number
-  /** How long the position is locked at the fixed rate. */
-  durationDays: number
-  /** Annualised fixed borrow rate, percent. */
-  apr: number
-}
-
-export interface PoolEntry {
-  chainId: string
-  marketUid: string
-  name: string
-  lenderKey: string
-  lenderInfo?: LenderInfo
-  flags?: PoolFlags
-  underlyingAddress: string
-  depositRate: string
-  variableBorrowRate: string
-  stableBorrowRate: string
-  intrinsicYield: string | null
-  totalDeposits: string
-  totalDebt: string
-  totalLiquidity: string
-  totalDepositsUsd: string
-  totalDebtUsd: string
-  totalLiquidityUsd: string
-  borrowLiquidity: string
-  withdrawLiquidity: string
-  depositable: string
-  utilization: string
-  configIds: string[]
-  exposures: PoolExposure[]
-  rewards: unknown | null
-  underlyingInfo: PoolUnderlyingInfo
-  risk: PoolRisk | null
-  /**
-   * Oracle feed-correctness classification (top-level, sibling of `risk`).
-   * `null`/absent ⇒ no oracle data for this market. See {@link PoolOracleInfo}.
-   */
-  oracleInfo: PoolOracleInfo | null
-  /**
-   * Brokered (Lista) rate card — termId/durationDays/apr serialized as strings.
-   * `null`/absent ⇒ not brokered; `[]` ⇒ the broker pruned the menu (treat as
-   * inactive). See BROKERED_MARKETS.md §2-3.
-   */
-  terms?: Array<{
-    termId: number | string
-    durationDays: number | string
-    apr: number | string
-  }> | null
-  /** Mirror of `flags.variableBorrowDisabled`, surfaced top-level by `/pools`. */
-  variableBorrowDisabled?: boolean
-}
-
-export interface PoolOwnerShare {
-  /** Owner address, or the literal "others" for the tail bucket */
-  owner: string
-  /** Fraction of the pool held by this owner, 0–1 */
-  share: number
-}
-
-export interface PoolRiskBreakdown {
-  category: string
-  score: number | null
-  label: string
-  curatorValidated?: boolean
-  curatorIds?: string[] | null
-  /** Oracle risk: human-readable description */
-  description?: string | null
-  /** Oracle risk: whether the oracle has a static base price */
-  staticBase?: boolean | null
-  /** Oracle risk: base asset symbol or address */
-  baseAsset?: string | null
-  /** Concentration risk: per-owner share of the pool (shares are fractions 0–1) */
-  ownerDistribution?: PoolOwnerShare[] | null
-  /** Governance risk: coarse tier label (low/medium/high/unknown) */
-  tier?: string | null
-  /** Governance risk: who can upgrade/re-parametrize the market
-   *  (EOA, SAFE, TIMELOCK, GOVERNANCE, IMMUTABLE, FINALIZED, CUSTOM, UNKNOWN). */
-  ownerKind?: string | null
-  /** Governance risk: multisig signer threshold / owner count when ownerKind is SAFE. */
-  signerThreshold?: number | null
-  signerCount?: number | null
-}
-
-export interface PoolRisk {
-  score: number
-  label: string
-  breakdown: PoolRiskBreakdown[]
-}
-
-interface PoolsApiResponse {
-  success: boolean
-  data: {
-    start: number
-    count: number
-    items: PoolEntry[]
-  }
-  error?: { code: string; message: string }
-}
-
-// ============================================================================
-// Endpoint
-// ============================================================================
-
-import { BACKEND_BASE_URL } from '../../config/backend'
-
-const endpointPools = `${BACKEND_BASE_URL}/v1/data/lending/pools`
+const endpointPools = '/v1/data/lending/pools'
 
 /**
  * Default page size requested from the API. The backend caps `count` at 1000;
@@ -229,196 +12,56 @@ const endpointPools = `${BACKEND_BASE_URL}/v1/data/lending/pools`
  */
 const DEFAULT_PAGE_SIZE = 500
 
-/**
- * Optional server-side filters supported by `/v1/data/lending/pools`. All
- * fields are passed straight through to the backend; see the OpenAPI spec for
- * semantics. Numeric rates (`minYield`, `maxYield`, `minUtil`, `maxUtil`) are
- * decimals (0–1), not percentages.
- */
-export interface PoolsFilters {
-  lender?: string
-  underlyings?: string[]
-  assetGroups?: string[]
-  /** Include fixed-rate / order-book earn markets (Morpho Midnight), hidden by
-   *  default because their yield lives in an order book, not a pool rate. */
-  includeFixedTerm?: boolean
-  minYield?: number
-  maxYield?: number
-  minUtil?: number
-  maxUtil?: number
-  minTvlUsd?: number
-  maxTvlUsd?: number
-  minDeposits?: number
-  maxDeposits?: number
-  minDebt?: number
-  maxDebt?: number
-  minDebtUsd?: number
-  maxDebtUsd?: number
-  minLiquidity?: number
-  maxLiquidity?: number
-  minLiquidityUsd?: number
-  maxLiquidityUsd?: number
-  sortBy?: string
-  sortDir?: 'asc' | 'desc' | 'ASC' | 'DESC'
-}
+/** Numeric filters that pass straight through as query params. */
+const NUMERIC_FILTER_KEYS = [
+  'minYield',
+  'maxYield',
+  'minUtil',
+  'maxUtil',
+  'minTvlUsd',
+  'maxTvlUsd',
+  'minDeposits',
+  'maxDeposits',
+  'minDebt',
+  'maxDebt',
+  'minDebtUsd',
+  'maxDebtUsd',
+  'minLiquidity',
+  'maxLiquidity',
+  'minLiquidityUsd',
+  'maxLiquidityUsd',
+] as const satisfies readonly (keyof PoolsFilters)[]
 
-function buildPoolsUrl(
-  base: string,
-  chainIds: (number | string)[] | undefined,
+function buildPoolsParams(
+  chainId: string,
   lender: string | undefined,
   start: number,
   count: number,
   maxRiskScore: number | undefined,
   filters: PoolsFilters | undefined
-) {
-  const url = new URL(base)
-
-  if (chainIds && chainIds.length > 0) {
-    chainIds.forEach((v) => url.searchParams.append('chainId', String(v)))
-  }
-  if (lender) {
-    url.searchParams.append('lender', lender)
-  }
-  url.searchParams.set('start', String(start))
-  url.searchParams.set('count', String(count))
-  if (maxRiskScore !== undefined) url.searchParams.set('maxRiskScore', String(maxRiskScore))
-  url.searchParams.set('includeExposures', 'true')
-
-  if (filters) {
-    if (filters.lender && !lender) url.searchParams.append('lender', filters.lender)
-    if (filters.underlyings?.length) {
-      url.searchParams.set('underlyings', filters.underlyings.join(','))
-    }
-    if (filters.assetGroups?.length) {
-      url.searchParams.set('assetGroups', filters.assetGroups.join(','))
-    }
-    const numericKeys: (keyof PoolsFilters)[] = [
-      'minYield',
-      'maxYield',
-      'minUtil',
-      'maxUtil',
-      'minTvlUsd',
-      'maxTvlUsd',
-      'minDeposits',
-      'maxDeposits',
-      'minDebt',
-      'maxDebt',
-      'minDebtUsd',
-      'maxDebtUsd',
-      'minLiquidity',
-      'maxLiquidity',
-      'minLiquidityUsd',
-      'maxLiquidityUsd',
-    ]
-    for (const k of numericKeys) {
-      const v = filters[k] as number | undefined
-      if (v !== undefined && Number.isFinite(v)) url.searchParams.set(k, String(v))
-    }
-    if (filters.sortBy) url.searchParams.set('sortBy', filters.sortBy)
-    if (filters.sortDir) url.searchParams.set('sortDir', String(filters.sortDir).toUpperCase())
-    if (filters.includeFixedTerm) url.searchParams.set('includeFixedTerm', 'true')
+): ApiParams {
+  const params: ApiParams = {
+    chainId,
+    // `filters.lender` is the fallback for callers that pass it inside the
+    // filter bag rather than as the dedicated argument.
+    lender: lender || filters?.lender,
+    start,
+    count,
+    maxRiskScore,
+    includeExposures: 'true',
+    underlyings: filters?.underlyings?.length ? filters.underlyings.join(',') : undefined,
+    assetGroups: filters?.assetGroups?.length ? filters.assetGroups.join(',') : undefined,
+    sortBy: filters?.sortBy,
+    sortDir: filters?.sortDir ? String(filters.sortDir).toUpperCase() : undefined,
+    includeFixedTerm: filters?.includeFixedTerm ? 'true' : undefined,
   }
 
-  return url.toString()
-}
-
-// ============================================================================
-// Hook
-// ============================================================================
-
-/**
- * useFlattenedPools
- *
- * Fetches from `/v1/data/lending/pools`, paging until the server runs out of
- * results. Optional `filters` are passed straight through as query params so
- * the backend can do the filtering work — see {@link PoolsFilters}.
- *
- * Note: the backend's response field `data.count` is the *page* item count,
- * not a grand total, so end-of-stream is detected purely by "page returned
- * fewer than `pageSize` rows". Client `count` returned from the hook is the
- * cumulative number of fetched rows.
- */
-export function useFlattenedPools(params: {
-  chainId?: string
-  lender?: string
-  maxRiskScore?: number
-  enabled?: boolean
-  pageSize?: number
-  filters?: PoolsFilters
-}) {
-  const chainId = params?.chainId
-  const lender = params?.lender
-  const maxRiskScore = params?.maxRiskScore ?? 4
-  const enabled = params?.enabled ?? true
-  const pageSize = params?.pageSize ?? DEFAULT_PAGE_SIZE
-  const filters = params?.filters
-
-  // Stable serialization so the queryKey only changes when filter values change.
-  const filtersKey = useMemo(() => (filters ? JSON.stringify(filters) : ''), [filters])
-
-  const { data, isLoading, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage, error } =
-    useInfiniteQuery<PoolsApiResponse>({
-      queryKey: ['flattenedPools', chainId ?? '', lender ?? '', maxRiskScore, pageSize, filtersKey],
-      enabled,
-      initialPageParam: 0 as number,
-      queryFn: async ({ pageParam }) => {
-        const url = buildPoolsUrl(
-          endpointPools,
-          chainId ? [chainId] : [],
-          lender,
-          pageParam as number,
-          pageSize,
-          maxRiskScore,
-          filters
-        )
-        const r = await fetch(url)
-        if (!r.ok) {
-          const text = await r.text().catch(() => '')
-          throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
-        }
-        const json = (await r.json()) as PoolsApiResponse
-
-        if (!json.success) {
-          throw new Error(json.error?.message ?? 'Pools API returned success: false')
-        }
-
-        return json
-      },
-      getNextPageParam: (lastPage, allPages) => {
-        // The backend returns `data.count = items.length` (page count, not
-        // total), so the only reliable end-of-stream signal is "the last page
-        // came back smaller than the requested page size".
-        if (lastPage.data.items.length < pageSize) return undefined
-        return allPages.reduce((sum, p) => sum + p.data.items.length, 0)
-      },
-      refetchInterval: 8 * 60 * 1000,
-      staleTime: 30_000,
-      retry: 1,
-      refetchOnWindowFocus: false,
-    })
-
-  // Auto-fetch remaining pages so all data is available for client-side filtering
-  useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage) {
-      fetchNextPage()
-    }
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
-
-  // Flatten all pages into a single array
-  const pools = useMemo(() => {
-    if (!data?.pages) return []
-    return data.pages.flatMap((page) => page.data.items)
-  }, [data])
-
-  return {
-    pools,
-    count: pools.length,
-    isPoolsLoading: isLoading,
-    isPoolsFetching: isFetching,
-    isFetchingMore: isFetchingNextPage,
-    hasMore: !!hasNextPage,
-    error,
+  for (const key of NUMERIC_FILTER_KEYS) {
+    const value = filters?.[key]
+    if (typeof value === 'number' && Number.isFinite(value)) params[key] = value
   }
+
+  return params
 }
 
 // ============================================================================
@@ -433,6 +76,12 @@ export function useFlattenedPools(params: {
  */
 const MAX_PAGES_PER_CHAIN = 4
 
+/** One chain's merged pages, plus whether the page budget cut it short. */
+interface ChainPoolsPage {
+  items: PoolEntry[]
+  truncated: boolean
+}
+
 /** Fetch every page for one chain, up to {@link MAX_PAGES_PER_CHAIN}. */
 async function fetchAllPoolsForChain(
   chainId: string,
@@ -440,31 +89,16 @@ async function fetchAllPoolsForChain(
   maxRiskScore: number | undefined,
   pageSize: number,
   filters: PoolsFilters | undefined
-): Promise<{ items: PoolEntry[]; truncated: boolean }> {
+): Promise<ChainPoolsPage> {
   const items: PoolEntry[] = []
 
   for (let page = 0; page < MAX_PAGES_PER_CHAIN; page++) {
-    const url = buildPoolsUrl(
-      endpointPools,
-      [chainId],
-      lender,
-      items.length,
-      pageSize,
-      maxRiskScore,
-      filters
-    )
-    const r = await fetch(url)
-    if (!r.ok) {
-      const text = await r.text().catch(() => '')
-      throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
-    }
-    const json = (await r.json()) as PoolsApiResponse
-    if (!json.success) {
-      throw new Error(json.error?.message ?? 'Pools API returned success: false')
-    }
+    const data = await apiFetch<{ items: PoolEntry[] }>(endpointPools, {
+      params: buildPoolsParams(chainId, lender, items.length, pageSize, maxRiskScore, filters),
+    })
 
-    items.push(...json.data.items)
-    if (json.data.items.length < pageSize) return { items, truncated: false }
+    items.push(...data.items)
+    if (data.items.length < pageSize) return { items, truncated: false }
   }
 
   return { items, truncated: true }
@@ -513,7 +147,44 @@ export function useFlattenedPoolsMultiChain(params: {
   // Sorted so a reordered selection reuses the same cache entries.
   const sortedChainIds = useMemo(() => [...chainIds].sort(), [chainIds])
 
-  const results = useQueries({
+  // Merge inside `combine` rather than a `useMemo` over the results array:
+  // `useQueries` returns a NEW array identity every render, so a
+  // `useMemo(..., [results])` never actually caches and the merge (which
+  // concatenates thousands of pools) re-ran on every unrelated re-render.
+  // `combine` is memoised against the underlying query state instead.
+  const combine = useCallback(
+    (results: UseQueryResult<ChainPoolsPage>[]): MultiChainPoolsResult => {
+      const pools: PoolEntry[] = []
+      const failedChains: string[] = []
+      const truncatedChains: string[] = []
+
+      results.forEach((r, i) => {
+        const chainId = sortedChainIds[i]
+        if (r.error) {
+          failedChains.push(chainId)
+          return
+        }
+        if (!r.data) return
+        pools.push(...r.data.items)
+        if (r.data.truncated) truncatedChains.push(chainId)
+      })
+
+      return {
+        pools,
+        count: pools.length,
+        // Loading only while nothing is renderable; once one chain lands the
+        // table shows partial data rather than a spinner over the whole view.
+        isPoolsLoading: results.length > 0 && results.every((r) => r.isLoading),
+        isPoolsFetching: results.some((r) => r.isFetching),
+        failedChains,
+        truncatedChains,
+        error: failedChains.length === sortedChainIds.length ? results[0]?.error : undefined,
+      }
+    },
+    [sortedChainIds]
+  )
+
+  return useQueries({
     queries: sortedChainIds.map((chainId) => ({
       queryKey: ['flattenedPoolsChain', chainId, lender ?? '', maxRiskScore, pageSize, filtersKey],
       enabled,
@@ -523,34 +194,6 @@ export function useFlattenedPoolsMultiChain(params: {
       retry: 1,
       refetchOnWindowFocus: false,
     })),
+    combine,
   })
-
-  return useMemo(() => {
-    const pools: PoolEntry[] = []
-    const failedChains: string[] = []
-    const truncatedChains: string[] = []
-
-    results.forEach((r, i) => {
-      const chainId = sortedChainIds[i]
-      if (r.error) {
-        failedChains.push(chainId)
-        return
-      }
-      if (!r.data) return
-      pools.push(...r.data.items)
-      if (r.data.truncated) truncatedChains.push(chainId)
-    })
-
-    return {
-      pools,
-      count: pools.length,
-      // Loading only while nothing is renderable; once one chain lands the
-      // table shows partial data rather than a spinner over the whole view.
-      isPoolsLoading: results.length > 0 && results.every((r) => r.isLoading),
-      isPoolsFetching: results.some((r) => r.isFetching),
-      failedChains,
-      truncatedChains,
-      error: failedChains.length === sortedChainIds.length ? results[0]?.error : undefined,
-    }
-  }, [results, sortedChainIds])
 }

@@ -9,7 +9,7 @@ import type { AnyTermSheet } from '../terms/types'
 import { fetchLiquityOpen } from '../../../sdk/lending-helper/fetchLiquityRate'
 import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
 import { formatTokenAmount } from './format'
-import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
+import type { PoolDataItem } from '../../../sdk/lending-helper/marketTypes'
 
 /**
  * Opening a Liquity-family position.

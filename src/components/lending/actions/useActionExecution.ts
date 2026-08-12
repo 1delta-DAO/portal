@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { parseUnits } from 'viem'
-import type { PoolDataItem } from '../../../hooks/lending/usePoolData'
-import type { UserSubAccount } from '../../../hooks/lending/useUserData'
+import type { PoolDataItem } from '../../../sdk/lending-helper/marketTypes'
+import type { UserSubAccount } from '../../../sdk/lending-helper/userPositionTypes'
 import {
   fetchLendingAction,
   type LendingActionResponseWithSimulation,

@@ -3,9 +3,9 @@ import { useSendLendingTransaction } from '../../../../hooks/useSendLendingTrans
 import { useAtomicBatch } from '../../../../hooks/useAtomicBatch'
 import type { TradingOperation, TradingQuote, QuotePositionDelta, Tx } from './types'
 import type { RateImpactEntry } from '../../../../sdk/lending-helper/fetchLendingAction'
-import { BACKEND_BASE_URL } from '../../../../config/backend'
+import { apiFetchEnvelope } from '../../../../sdk/http'
 import type { LoopRangeSimulationBody } from '../../../../sdk/lending-helper/fetchLoopRange'
-import type { UserSubAccount } from '../../../../hooks/lending/useUserData'
+import type { UserSubAccount } from '../../../../sdk/lending-helper/userPositionTypes'
 
 export function buildSimulationBody(sub: UserSubAccount): LoopRangeSimulationBody {
   return {
@@ -35,10 +35,10 @@ export function buildSimulationBody(sub: UserSubAccount): LoopRangeSimulationBod
 }
 
 const ENDPOINTS: Record<TradingOperation, string> = {
-  Loop: `${BACKEND_BASE_URL}/v1/actions/loop/leverage`,
-  ColSwap: `${BACKEND_BASE_URL}/v1/actions/loop/collateral-swap`,
-  DebtSwap: `${BACKEND_BASE_URL}/v1/actions/loop/debt-swap`,
-  Close: `${BACKEND_BASE_URL}/v1/actions/loop/close`,
+  Loop: '/v1/actions/loop/leverage',
+  ColSwap: '/v1/actions/loop/collateral-swap',
+  DebtSwap: '/v1/actions/loop/debt-swap',
+  Close: '/v1/actions/loop/close',
 }
 
 interface QuoteDeltaItem {
@@ -204,6 +204,29 @@ export interface SimulationResult {
   }
 }
 
+/** `data` half of a `/v1/actions/loop/*` response. */
+interface QuoteEnvelopeData {
+  quotes?: unknown[]
+  rateImpact?: RateImpactEntry[]
+  simulation?: {
+    pre?: { healthFactor?: number; borrowCapacity?: number }
+    post?: { healthFactor?: number; borrowCapacity?: number }
+  }
+  /**
+   * Some lenders return permissions and collateral-toggle transactions under
+   * `data` instead of `actions`. Both are read, `actions` first.
+   */
+  permissions?: Tx[]
+  transactions?: Tx[]
+}
+
+/** `actions` half — `alternatives` is one executable transaction per quote. */
+interface QuoteEnvelopeActions {
+  alternatives?: Tx[]
+  permissions?: Tx[]
+  transactions?: Tx[]
+}
+
 interface TxSuccessState {
   operation: TradingOperation
   hash?: string
@@ -281,22 +304,11 @@ export function useTradingQuotes(params: { chainId: string; account?: string }) 
         const allParams = account ? { ...params, account } : params
         const qs = new URLSearchParams(Object.entries(allParams).map(([k, v]) => [k, String(v)]))
 
-        const res = body
-          ? await fetch(`${ENDPOINTS[operation]}?${qs}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(body),
-            })
-          : await fetch(`${ENDPOINTS[operation]}?${qs}`)
-        if (!res.ok) {
-          const text = await res.text().catch(() => '')
-          throw new Error(`HTTP ${res.status}: ${text || res.statusText}`)
-        }
-
-        const envelope = await res.json()
-        if (!envelope.success) {
-          throw new Error(envelope.error?.message ?? 'API error')
-        }
+        // A `body` switches this to POST (the simulation path).
+        const envelope = await apiFetchEnvelope<QuoteEnvelopeData, QuoteEnvelopeActions>(
+          ENDPOINTS[operation],
+          { params: Object.fromEntries(qs), body }
+        )
         const alternatives: Tx[] = envelope.actions?.alternatives ?? []
         const quotes = normalizeQuotes(
           operation,

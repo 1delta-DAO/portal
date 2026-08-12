@@ -4,7 +4,7 @@ import {
   type ComparableRate,
   type ComparableRatesParams,
 } from '../../../hooks/lending/useComparableRates'
-import type { LenderInfo } from '../../../hooks/lending/useFlattenedPools'
+import type { LenderInfo } from '../../../sdk/lending-helper/poolTypes'
 import { LenderBadge } from './LenderBadge'
 
 /**

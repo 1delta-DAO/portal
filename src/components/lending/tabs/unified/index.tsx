@@ -3,6 +3,7 @@ import { useEarnCatalog } from '../../../../hooks/earn/useEarnCatalog'
 import { useEarnPositions } from '../../../../hooks/earn/useEarnPositions'
 import { useEarnVocabulary } from '../../../../hooks/earn/useEarnVocabulary'
 import { useSpyAccount } from '../../../../contexts/SpyMode'
+import { useRiskMode } from '../../../../contexts/RiskMode'
 import { useTokenListsMultiChain } from '../../../../hooks/useTokenLists'
 import { FacetFilters, EMPTY_SELECTION, type FacetSelection } from './FacetFilters'
 import { EarnMarketsTable, type EarnSortKey } from './EarnMarketsTable'
@@ -53,6 +54,11 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
 
   const { address: account } = useSpyAccount()
 
+  // The SHARED risk tolerance — the toolbar selector every other tab obeys.
+  // Read from the context rather than taken as a prop so there is one value,
+  // not a copy that drifts.
+  const { maxRiskScore } = useRiskMode()
+
   // Labels for every server enum — fetched, never embedded.
   const vocab = useEarnVocabulary()
 
@@ -71,7 +77,7 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
       includeIlliquid: selection.includeIlliquid,
       // `0` disables the server's floor; undefined keeps the default.
       minTvlUsd: selection.showLowTvl ? 0 : undefined,
-      maxRiskScore: selection.showHighRisk ? 99 : undefined,
+      maxRiskScore,
       sort: sortKey,
       // The panel renders prose and counterparty terms the digest omits.
       terms: 'full',

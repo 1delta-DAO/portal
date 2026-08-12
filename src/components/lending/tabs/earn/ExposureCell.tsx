@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { PoolExposure } from '../../../../hooks/lending/useFlattenedPools'
+import type { PoolExposure } from '../../../../sdk/lending-helper/poolTypes'
 import { Logo } from '../../../common/Logo'
 
 interface ExposureCellProps {

@@ -1,4 +1,4 @@
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetchEnvelope, errorMessage } from '../http'
 import type { LendingActionResponse } from './fetchLendingAction'
 
 /**
@@ -156,32 +156,18 @@ export async function fetchMigrate(params: MigrateParams): Promise<MigrateResult
       qs.set('sourceDebtDecimals', String(params.sourceDebtDecimals))
     if (params.slippage != null) qs.set('slippage', String(params.slippage))
 
-    const res = await fetch(`${BACKEND_BASE_URL}/v1/actions/loop/migrate?${qs}`)
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return {
-        success: false,
-        error: `HTTP ${res.status}: ${text || res.statusText}`,
-      }
-    }
-
-    const json = await res.json()
-
-    if (!json.success) {
-      return {
-        success: false,
-        error: json.error?.message ?? 'API error',
-      }
-    }
+    const { data, actions } = await apiFetchEnvelope<{ result?: any }>(
+      '/v1/actions/loop/migrate',
+      { params: Object.fromEntries(qs) }
+    )
 
     return {
       success: true,
       data: {
-        transactions: json.actions?.transactions ?? [],
-        permissions: json.actions?.permissions ?? [],
+        transactions: actions?.transactions ?? [],
+        permissions: actions?.permissions ?? [],
       },
-      result: json.data?.result,
+      result: data?.result,
     }
   } catch (err: any) {
     return {

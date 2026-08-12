@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { BACKEND_BASE_URL } from '../config/backend'
+import { apiFetchEnvelope } from '../sdk/http'
 import { useSendLendingTransaction, type LendingTx } from './useSendLendingTransaction'
 import type { RawCurrency } from '../types/currency'
 import type { SpotSwapTx } from './useSpotSwapQuote'
@@ -15,6 +15,29 @@ export interface XChainSwapQuote {
   approvalTarget?: string
   approvalRequired?: boolean
   tx: SpotSwapTx
+}
+
+/** `data` half of the `/v1/actions/swap/x-chain` response. */
+interface XChainQuoteData {
+  /** `'spot'` when the backend fell back to the same-chain meta-aggregator. */
+  fallback?: string
+  quotes?: Array<{
+    bridge?: string
+    aggregator?: string
+    tradeInput: number
+    tradeOutput: number
+    estimatedDuration?: number
+    approvalTarget?: string
+    approvalRequired?: boolean
+  }>
+  currencyIn?: RawCurrency
+  currencyOut?: RawCurrency
+}
+
+/** `actions` half — one transaction per route, matched positionally to `data.quotes`. */
+interface XChainQuoteActions {
+  alternatives?: SpotSwapTx[]
+  permissions?: SpotSwapTx[]
 }
 
 interface XChainSwapState {
@@ -102,18 +125,15 @@ export function useXChainSwapQuote(params: { fromChainId: string; account?: stri
       if (swapParams.receiver) qs.set('receiver', swapParams.receiver)
       if (swapParams.order) qs.set('order', swapParams.order)
 
-      const res = await fetch(`${BACKEND_BASE_URL}/v1/actions/swap/x-chain?${qs}`)
-      if (!res.ok) {
-        const text = await res.text().catch(() => '')
-        throw new Error(`HTTP ${res.status}: ${text || res.statusText}`)
-      }
+      // Envelope, not `apiFetch`: one executable transaction per bridge route
+      // comes back under `actions.alternatives`, positionally matched to
+      // `data.quotes`. Same shape as the spot quote.
+      const envelope = await apiFetchEnvelope<XChainQuoteData, XChainQuoteActions>(
+        '/v1/actions/swap/x-chain',
+        { params: Object.fromEntries(qs) }
+      )
 
-      const envelope = await res.json()
-      if (!envelope.success) {
-        throw new Error(envelope.error?.message ?? 'API error')
-      }
-
-      const data = envelope.data ?? {}
+      const data = envelope.data ?? ({} as XChainQuoteData)
       const isSpotFallback = data.fallback === 'spot'
       const rawQuotes: Array<{
         bridge?: string

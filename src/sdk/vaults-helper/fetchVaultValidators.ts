@@ -1,4 +1,4 @@
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch, errorMessage } from '../http'
 import type { VaultValidatorItem, VaultValidatorsResponse } from './types'
 
 export interface FetchVaultValidatorsParams {
@@ -13,7 +13,7 @@ export interface FetchVaultValidatorsResult {
   error?: string
 }
 
-const ENDPOINT = `${BACKEND_BASE_URL}/v1/data/vaults/validators`
+const ENDPOINT = '/v1/data/vaults/validators'
 
 /**
  * Lists the selectable delegation targets (validators / groups / pools) for an
@@ -25,29 +25,11 @@ export async function fetchVaultValidators(
   params: FetchVaultValidatorsParams
 ): Promise<FetchVaultValidatorsResult> {
   try {
-    const qs = new URLSearchParams()
-    qs.set('chainId', params.chainId)
-    qs.set('shareToken', params.shareToken)
-
-    const res = await fetch(`${ENDPOINT}?${qs}`)
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return {
-        success: false,
-        error: `HTTP ${res.status}: ${text || res.statusText}`,
-      }
-    }
-
-    const json = await res.json()
-    if (!json.success) {
-      return {
-        success: false,
-        error: json.error?.message ?? 'Validators reader returned success: false',
-      }
-    }
-    const payload: VaultValidatorsResponse = json.data ?? {}
-    return { success: true, items: payload.items ?? [] }
-  } catch (err: any) {
-    return { success: false, error: err?.message ?? 'Unknown error' }
+    const payload = await apiFetch<VaultValidatorsResponse>(ENDPOINT, {
+      params: { chainId: params.chainId, shareToken: params.shareToken },
+    })
+    return { success: true, items: payload?.items ?? [] }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }

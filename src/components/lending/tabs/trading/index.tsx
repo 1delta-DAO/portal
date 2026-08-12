@@ -12,7 +12,7 @@ import type {
   LenderInfoMap,
   LenderSummary,
   PoolDataItem,
-} from '../../../../hooks/lending/usePoolData'
+} from '../../../../sdk/lending-helper/marketTypes'
 import { usePoolConfigData } from '../../../../hooks/lending/usePoolData'
 import { ConfigMarketView } from '../../shared/ConfigMarketView'
 import { useRiskMode } from '../../../../contexts/RiskMode'
@@ -20,8 +20,8 @@ import type {
   UserDataResult,
   UserPositionEntry,
   UserSubAccount,
-} from '../../../../hooks/lending/useUserData'
-import { isAggregatePosition, isLoanPosition } from '../../../../hooks/lending/useUserData'
+} from '../../../../sdk/lending-helper/userPositionTypes'
+import { isAggregatePosition, isLoanPosition } from '../../../../sdk/lending-helper/userPositionTypes'
 import { useTokenBalances } from '../../../../hooks/lending/useTokenBalances'
 import { useLenderAccounts } from '../../../../hooks/lending/useLenderAccounts'
 import { useSyncChain } from '../../../../hooks/useSyncChain'

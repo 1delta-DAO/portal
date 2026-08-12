@@ -134,18 +134,27 @@ Fetches pool data grouped by e-mode / configuration for a chain + lender.
 
 ---
 
-### `useFlattenedPools`
+### `useFlattenedPoolsMultiChain`
 
-Fetches all pools for a chain/lender with automatic pagination (100 items per page, auto-fetches all pages).
+Fetches every pool for each selected chain, paging until the server runs short
+(capped at 4 pages × 500 per chain). One query per chain, so adding a chain
+refetches only that chain and one chain failing degrades to a partial result
+rather than blanking the table.
 
-|              |                                                                                                  |
-| ------------ | ------------------------------------------------------------------------------------------------ |
-| **Endpoint** | `GET /v1/data/lending/pools?chainId=&lender=&start=&count=&includeExposures=true`                |
-| **Params**   | `chainId?`, `lender?`, `enabled?`                                                                |
-| **Returns**  | `{ pools: PoolEntry[], count, isPoolsLoading, isPoolsFetching, isFetchingMore, hasMore, error }` |
-| **Caching**  | `staleTime: 30s`, `refetchInterval: 8 min`                                                       |
+|              |                                                                                                       |
+| ------------ | ----------------------------------------------------------------------------------------------------- |
+| **Endpoint** | `GET /v1/data/lending/pools?chainId=&lender=&start=&count=&includeExposures=true`                     |
+| **Params**   | `chainIds`, `lender?`, `maxRiskScore?`, `pageSize?`, `filters?`, `enabled?`                           |
+| **Returns**  | `{ pools: PoolEntry[], count, isPoolsLoading, isPoolsFetching, failedChains, truncatedChains, error }` |
+| **Caching**  | `staleTime: 30s`, `refetchInterval: 8 min`                                                            |
 
-Uses `useInfiniteQuery` under the hood.
+Merging happens in `useQueries({ combine })`, not a `useMemo` over the results
+array — `useQueries` returns a new array identity every render, so a memo keyed
+on it never caches.
+
+`PoolEntry` and the rest of the response types live in
+[`sdk/lending-helper/poolTypes.ts`](../sdk/lending-helper/poolTypes.ts), not in
+this hook.
 
 ---
 

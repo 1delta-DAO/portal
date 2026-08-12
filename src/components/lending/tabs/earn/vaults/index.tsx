@@ -18,6 +18,7 @@ import { VaultsTable } from './VaultsTable'
 import { VaultActionPanel } from './VaultActionPanel'
 import { UserVaultsTable } from './UserVaultsTable'
 import { PendingWithdrawals } from './PendingWithdrawals'
+import { nextSort } from '../../../../../hooks/useTableSort'
 import {
   PROVIDER_LABELS,
   baseApr,
@@ -287,12 +288,9 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
   ])
 
   const toggleSort = (key: VaultSortKey) => {
-    if (sortKey === key) {
-      setFilter('sortDir', sortDir === 'asc' ? 'desc' : 'asc')
-    } else {
-      setFilter('sortKey', key)
-      setFilter('sortDir', 'desc')
-    }
+    const next = nextSort({ sortKey, sortDir }, key)
+    setFilter('sortKey', next.sortKey)
+    setFilter('sortDir', next.sortDir)
   }
 
   const handleRowClick = (entry: VaultEntry) => {

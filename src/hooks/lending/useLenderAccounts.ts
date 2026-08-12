@@ -10,7 +10,7 @@ import type {
   UserBalanceData,
   UserAprData,
   UserConfigEntry,
-} from './useUserData'
+} from '../../sdk/lending-helper/userPositionTypes'
 
 const ZERO_BALANCE_DATA: UserBalanceData = {
   collateral: 0,

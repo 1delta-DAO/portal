@@ -6,8 +6,8 @@ import {
   type OptimizerSortKey,
 } from '../../../../hooks/lending/useOptimizerPairs'
 import { useLenders } from '../../../../hooks/lending/usePoolData'
-import type { LenderInfo } from '../../../../hooks/lending/useFlattenedPools'
-import type { UserDataResult } from '../../../../hooks/lending/useUserData'
+import type { LenderInfo } from '../../../../sdk/lending-helper/poolTypes'
+import type { UserDataResult } from '../../../../sdk/lending-helper/userPositionTypes'
 import { useDebounce } from '../../../../hooks/useDebounce'
 import { useRiskMode } from '../../../../contexts/RiskMode'
 import { TokenMultiPicker } from './TokenMultiPicker'

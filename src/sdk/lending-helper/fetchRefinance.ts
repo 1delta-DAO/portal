@@ -1,4 +1,4 @@
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetchEnvelope, errorMessage } from '../http'
 import type { LendingActionResponse } from './fetchLendingAction'
 
 /**
@@ -59,40 +59,22 @@ export async function fetchRefinance(params: RefinanceParams): Promise<Refinance
 
     // When the caller supplies the borrow balance, POST it so the server sizes the
     // full close from real position data instead of (only) its own RPC read.
-    const url = `${BACKEND_BASE_URL}/v1/actions/loop/refinance?${qs}`
-    const res = params.borrowBalance
-      ? await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+    // A `body` is what switches `apiFetchEnvelope` from GET to POST.
+    const { actions } = await apiFetchEnvelope<unknown>('/v1/actions/loop/refinance', {
+      params: Object.fromEntries(qs),
+      body: params.borrowBalance
+        ? {
             borrowBalance: params.borrowBalance,
             earlyRepayPenalty: params.earlyRepayPenalty,
-          }),
-        })
-      : await fetch(url)
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return {
-        success: false,
-        error: `HTTP ${res.status}: ${text || res.statusText}`,
-      }
-    }
-
-    const json = await res.json()
-
-    if (!json.success) {
-      return {
-        success: false,
-        error: json.error?.message ?? 'API error',
-      }
-    }
+          }
+        : undefined,
+    })
 
     return {
       success: true,
       data: {
-        transactions: json.actions?.transactions ?? [],
-        permissions: json.actions?.permissions ?? [],
+        transactions: actions?.transactions ?? [],
+        permissions: actions?.permissions ?? [],
       },
     }
   } catch (err: any) {

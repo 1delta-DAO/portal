@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch } from '../../sdk/http'
 
 export interface EarnHistoryPoint {
   /** ISO timestamp. */
@@ -35,16 +35,10 @@ export function useEarnHistory(earnUid: string | undefined, days = 30): EarnHist
   const { data, isLoading, error } = useQuery({
     queryKey: ['earnHistory', earnUid ?? '', days],
     enabled: !!earnUid,
-    queryFn: async () => {
-      const qs = new URLSearchParams({ earnUid: earnUid!, days: String(days) })
-      const res = await fetch(`${BACKEND_BASE_URL}/v1/data/earn/history?${qs}`)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json()
-      return (json.data ?? json) as {
-        points: EarnHistoryPoint[]
-        hasSharePrice: boolean
-      }
-    },
+    queryFn: () =>
+      apiFetch<{ points: EarnHistoryPoint[]; hasSharePrice: boolean }>('/v1/data/earn/history', {
+        params: { earnUid, days },
+      }),
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     retry: 1,

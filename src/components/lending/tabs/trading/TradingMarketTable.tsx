@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { RewardBadge } from '../../shared/RewardBadge'
-import type { PoolDataItem } from '../../../../hooks/lending/usePoolData'
-import type { UserPositionEntry } from '../../../../hooks/lending/useUserData'
+import type { PoolDataItem } from '../../../../sdk/lending-helper/marketTypes'
+import type { UserPositionEntry } from '../../../../sdk/lending-helper/userPositionTypes'
 import type { TableHighlight, PoolRole } from './types'
 import {
   abbreviateUsd,

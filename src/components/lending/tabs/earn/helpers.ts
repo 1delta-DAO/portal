@@ -1,6 +1,7 @@
-import type { PoolEntry } from '../../../../hooks/lending/useFlattenedPools'
+import { riskBand } from '../../../../utils/format'
+import type { PoolEntry } from '../../../../sdk/lending-helper/poolTypes'
 import { totalRewardApr } from '../../shared/rewards'
-import type { PoolDataItem } from '../../../../hooks/lending/usePoolData'
+import type { PoolDataItem } from '../../../../sdk/lending-helper/marketTypes'
 
 export type SortKey =
   | 'apr'
@@ -15,12 +16,36 @@ export type SortKey =
   | 'intrinsicYield'
   | 'riskScore'
 
-/** Derive a risk label from a numeric score (1–5) */
+/**
+ * Derive a risk band from a numeric score (1 best … 5 worst).
+ *
+ * **1–2 low · 3 medium · 4–5 high.** Four is HIGH, not medium — it was the
+ * other way round here while `riskScoreClass` in `terms/format.ts` already
+ * used these bands, so the same score rendered amber in one place and red in
+ * another. This is now the single definition; everything that bands a score
+ * calls it.
+ */
 export function scoreToRiskLabel(score: number | null | undefined): string {
   if (score == null) return '—'
-  if (score <= 2) return 'low'
-  if (score <= 4) return 'medium'
-  return 'high'
+  return riskBand(score)
+}
+
+/**
+ * Badge classes for a raw score, banded by {@link scoreToRiskLabel}.
+ *
+ * Low is deliberately neutral rather than green: most of the book scores 1–2,
+ * and a wall of green badges reads as an endorsement of every row rather than
+ * as the absence of a warning.
+ */
+export function riskBadgeClass(score: number | null | undefined): string {
+  switch (scoreToRiskLabel(score)) {
+    case 'high':
+      return 'badge-error'
+    case 'medium':
+      return 'badge-warning'
+    default:
+      return 'badge-ghost'
+  }
 }
 
 export function riskDotColor(label: string): string {
@@ -36,8 +61,33 @@ export function riskDotColor(label: string): string {
   }
 }
 
+/** Derived values from one pool row. See {@link computePoolMetrics}. */
+export interface PoolMetrics {
+  utilization: number
+  apr: number
+  borrowApr: number
+  intrinsicYield: number
+  price: number
+  depositRewardApr: number
+  borrowRewardApr: number
+}
+
+/**
+ * A pool paired with its derived metrics.
+ *
+ * The metrics are computed ONCE per pool, in `MarketsView`, and then carried
+ * through filtering, sorting and rendering. They used to be recomputed inside
+ * the sort comparator — which meant `2·n·log n` calls instead of `n` — and
+ * again per visible row in `MarketsTable`. Keep them paired; don't re-derive
+ * downstream.
+ */
+export interface PoolWithMetrics {
+  pool: PoolEntry
+  metrics: PoolMetrics
+}
+
 /** Compute derived values from pool data */
-export function computePoolMetrics(pool: PoolEntry) {
+export function computePoolMetrics(pool: PoolEntry): PoolMetrics {
   const totalDeposits = parseFloat(pool.totalDeposits) || 0
   const totalDebt = parseFloat(pool.totalDebt) || 0
 

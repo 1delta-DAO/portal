@@ -5,8 +5,8 @@ import type {
   UserDataResult,
   LenderUserDataEntry,
   UserPositionEntry,
-} from './useUserData'
-import { LenderData, PoolDataItem } from './usePoolData'
+} from '../../sdk/lending-helper/userPositionTypes'
+import type { LenderData, PoolDataItem } from '../../sdk/lending-helper/marketTypes'
 
 /**
  * One flattened entry: a single pool for a specific chain & lender,

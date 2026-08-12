@@ -1,4 +1,4 @@
-import type { UserPositionEntry } from '../../../hooks/lending/useUserData'
+import type { UserPositionEntry } from '../../../sdk/lending-helper/userPositionTypes'
 import { formatTokenAmount } from '../../../utils/format'
 import { hasEarlyRepayPenalty } from './brokeredLoans'
 

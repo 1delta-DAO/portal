@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildDetailRows } from './ConfigMarketView'
-import type { ConfigMarketItem, PoolDataItem } from '../../../hooks/lending/usePoolData'
+import type { ConfigMarketItem, PoolDataItem } from '../../../sdk/lending-helper/marketTypes'
 
 /**
  * Which rows a config group produces.

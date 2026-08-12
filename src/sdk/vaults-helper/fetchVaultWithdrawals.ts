@@ -1,4 +1,4 @@
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetchLoose, errorMessage } from '../http'
 import type {
   VaultWithdrawalRequest,
   VaultWithdrawalsResponse,
@@ -16,7 +16,7 @@ export interface FetchVaultWithdrawalsResult {
   error?: string
 }
 
-const ENDPOINT = `${BACKEND_BASE_URL}/v1/data/vaults/withdrawals`
+const ENDPOINT = '/v1/data/vaults/withdrawals'
 
 /**
  * Lists a user's pending/claimable withdrawal requests across every async
@@ -29,33 +29,18 @@ export async function fetchVaultWithdrawals(
   params: FetchVaultWithdrawalsParams
 ): Promise<FetchVaultWithdrawalsResult> {
   try {
-    const qs = new URLSearchParams()
-    qs.set('chainId', params.chainId)
-    // The guide spells this both `account` and `user`; send both to be safe.
-    qs.set('account', params.account)
-    qs.set('user', params.account)
-
-    const res = await fetch(`${ENDPOINT}?${qs}`)
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return {
-        success: false,
-        error: `HTTP ${res.status}: ${text || res.statusText}`,
-      }
-    }
-
-    const json = await res.json()
-    // Gateway wraps as { success, data }; the raw worker returns the payload
-    // at the top level. Tolerate both.
-    if ('success' in json && json.success === false) {
-      return {
-        success: false,
-        error: json.error?.message ?? 'Withdrawals reader returned success: false',
-      }
-    }
-    const payload: VaultWithdrawalsResponse = json.data ?? json
-    return { success: true, requests: payload.requests ?? [] }
-  } catch (err: any) {
-    return { success: false, error: err?.message ?? 'Unknown error' }
+    // `apiFetchLoose`: the gateway wraps this as `{ success, data }` but the
+    // raw worker returns the payload at the top level. Tolerate both.
+    const payload = await apiFetchLoose<VaultWithdrawalsResponse>(ENDPOINT, {
+      params: {
+        chainId: params.chainId,
+        // The guide spells this both `account` and `user`; send both to be safe.
+        account: params.account,
+        user: params.account,
+      },
+    })
+    return { success: true, requests: payload?.requests ?? [] }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }

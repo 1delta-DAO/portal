@@ -1,4 +1,4 @@
-import type { PoolConfigGroup, PoolDataItem } from '../../../hooks/lending/usePoolData'
+import type { PoolConfigGroup, PoolDataItem } from '../../../sdk/lending-helper/marketTypes'
 import { OPTIMIZER_DEEPLINK_KEYS } from '../../../utils/routes'
 
 /**

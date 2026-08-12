@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { BACKEND_BASE_URL } from '../config/backend'
+import { apiFetchEnvelope } from '../sdk/http'
 import { useSendLendingTransaction, type LendingTx } from './useSendLendingTransaction'
 import { useAtomicBatch } from './useAtomicBatch'
 import type { RawCurrency } from '../types/currency'
@@ -18,6 +18,23 @@ export interface SpotSwapTx {
   description?: string
   /** ERC-20 approve spender (present on x-chain permission entries) */
   spender?: string
+}
+
+/** `data` half of the `/v1/actions/swap/spot` response. */
+interface SpotQuoteData {
+  quotes?: Array<{ aggregator: string; tradeInput: number; tradeOutput: number }>
+  currencyIn?: RawCurrency
+  currencyOut?: RawCurrency
+}
+
+/**
+ * `actions` half. Note `alternatives` rather than `transactions`: the quote
+ * endpoint returns one executable transaction *per aggregator*, positionally
+ * matched to `data.quotes`, so the user can pick a route.
+ */
+interface SpotQuoteActions {
+  alternatives?: SpotSwapTx[]
+  permissions?: SpotSwapTx[]
 }
 
 interface SwapSuccess {
@@ -93,18 +110,16 @@ export function useSpotSwapQuote(params: { chainId: string; account?: string }) 
       if (swapParams.receiver) qs.set('receiver', swapParams.receiver)
       if (swapParams.usePendleMintRedeem) qs.set('usePendleMintRedeem', 'true')
 
-      const res = await fetch(`${BACKEND_BASE_URL}/v1/actions/swap/spot?${qs}`)
-      if (!res.ok) {
-        const text = await res.text().catch(() => '')
-        throw new Error(`HTTP ${res.status}: ${text || res.statusText}`)
-      }
+      // Envelope, not `apiFetch`: the executable transactions come back under
+      // `actions`, alongside the quote numbers in `data`.
+      const envelope = await apiFetchEnvelope<SpotQuoteData, SpotQuoteActions>(
+        '/v1/actions/swap/spot',
+        {
+          params: Object.fromEntries(qs),
+        }
+      )
 
-      const envelope = await res.json()
-      if (!envelope.success) {
-        throw new Error(envelope.error?.message ?? 'API error')
-      }
-
-      const data = envelope.data ?? {}
+      const data = envelope.data ?? ({} as SpotQuoteData)
       const rawQuotes: Array<{ aggregator: string; tradeInput: number; tradeOutput: number }> =
         data.quotes ?? []
       const alternatives: SpotSwapTx[] = envelope.actions?.alternatives ?? []

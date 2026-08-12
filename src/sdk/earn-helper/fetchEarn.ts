@@ -1,7 +1,7 @@
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetchLoose, errorMessage } from '../http'
 import { EMPTY_FACETS, type EarnFacets, type EarnMarket, type EarnResponse } from './types'
 
-const ENDPOINT = `${BACKEND_BASE_URL}/v1/data/earn`
+const ENDPOINT = '/v1/data/earn'
 
 /** Server caps `limit` at 1000; page until a short page comes back. */
 const PAGE_SIZE = 1000
@@ -78,51 +78,41 @@ export async function fetchEarn(params: FetchEarnParams): Promise<FetchEarnResul
     let start = 0
 
     for (;;) {
-      const qs = new URLSearchParams()
-      qs.set('chainId', params.chainIds.join(','))
-      qs.set('start', String(start))
-      qs.set('limit', String(PAGE_SIZE))
-      if (params.sort) qs.set('sort', params.sort)
-      if (params.venueKind) qs.set('venueKind', params.venueKind)
-      if (params.brand?.length) qs.set('brand', params.brand.join(','))
-      if (params.protocol?.length) qs.set('protocol', params.protocol.join(','))
-      if (params.curator?.length) qs.set('curator', params.curator.join(','))
-      if (params.venue?.length) qs.set('venue', params.venue.join(','))
-      if (params.assetGroup) qs.set('assetGroup', params.assetGroup)
-      if (params.assetSymbol) qs.set('assetSymbol', params.assetSymbol)
-      if (params.terms) qs.set('terms', params.terms)
-      if (params.depositableOnly) qs.set('depositable', 'true')
-      if (params.includePassthrough) qs.set('passthrough', 'include')
-      if (params.includeIlliquid) qs.set('illiquid', 'include')
-      if (params.maxRiskScore != null) qs.set('maxRiskScore', String(params.maxRiskScore))
-      if (params.minTvlUsd != null) qs.set('minTvlUsd', String(params.minTvlUsd))
-
-      const res = await fetch(`${ENDPOINT}?${qs}`)
-      if (!res.ok) {
-        const text = await res.text().catch(() => '')
-        return { success: false, error: `HTTP ${res.status}: ${text || res.statusText}` }
-      }
-
-      const json = await res.json()
-      if (json.success === false) {
-        return { success: false, error: json.error?.message ?? 'Earn listing failed' }
-      }
-
-      const page: EarnResponse = json.data ?? json
-      const pageItems = Array.isArray(page.items) ? page.items : []
+      const page = await apiFetchLoose<EarnResponse>(ENDPOINT, {
+        params: {
+          chainId: params.chainIds.join(','),
+          start,
+          limit: PAGE_SIZE,
+          sort: params.sort,
+          venueKind: params.venueKind,
+          brand: params.brand?.length ? params.brand.join(',') : undefined,
+          protocol: params.protocol?.length ? params.protocol.join(',') : undefined,
+          curator: params.curator?.length ? params.curator.join(',') : undefined,
+          venue: params.venue?.length ? params.venue.join(',') : undefined,
+          assetGroup: params.assetGroup,
+          assetSymbol: params.assetSymbol,
+          terms: params.terms,
+          depositable: params.depositableOnly ? 'true' : undefined,
+          passthrough: params.includePassthrough ? 'include' : undefined,
+          illiquid: params.includeIlliquid ? 'include' : undefined,
+          maxRiskScore: params.maxRiskScore,
+          minTvlUsd: params.minTvlUsd,
+        },
+      })
+      const pageItems = Array.isArray(page?.items) ? page.items : []
       items.push(...pageItems)
       // Facets and source health describe the whole listing, not the page —
       // the last page's copy is as good as the first's.
-      facets = page.facets ?? facets
-      sources = page.sources ?? sources
-      excluded = page.excluded ?? excluded
+      facets = page?.facets ?? facets
+      sources = page?.sources ?? sources
+      excluded = page?.excluded ?? excluded
 
       if (pageItems.length < PAGE_SIZE) break
       start += PAGE_SIZE
     }
 
     return { success: true, items, facets, sources, excluded }
-  } catch (err: any) {
-    return { success: false, error: err?.message ?? 'Unknown error' }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }

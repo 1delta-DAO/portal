@@ -1,4 +1,4 @@
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch, apiFetchEnvelope, errorMessage } from '../http'
 
 // ============================================================================
 // E-Mode List
@@ -26,24 +26,11 @@ export async function fetchEModeList(params: {
   chain: string
 }): Promise<EModeListResult> {
   try {
-    const qs = new URLSearchParams()
-    qs.append('lenders', params.lender)
-    qs.append('chains', params.chain)
+    const payload = await apiFetch<{ items?: any[]; data?: any[] }>('/v1/data/lending/e-mode', {
+      params: { lenders: params.lender, chains: params.chain },
+    })
 
-    const res = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/e-mode?${qs}`)
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return { success: false, error: `HTTP ${res.status}: ${text || res.statusText}` }
-    }
-
-    const json = await res.json()
-
-    if (!json.success) {
-      return { success: false, error: json.error?.message ?? 'API error' }
-    }
-
-    const rawEntries: any[] = json.data?.items ?? json.data?.data ?? []
+    const rawEntries: any[] = payload?.items ?? payload?.data ?? []
 
     // Normalize from API shape (lenderKey/eModes/category) to our types
     const data: EModeLenderEntry[] = rawEntries.map((entry: any) => ({
@@ -56,8 +43,8 @@ export async function fetchEModeList(params: {
     }))
 
     return { success: true, data }
-  } catch (err: any) {
-    return { success: false, error: err?.message ?? 'Unknown error' }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }
 
@@ -93,20 +80,12 @@ export async function fetchEModeAnalysis(params: {
     qs.set('simulate', 'true')
     if (params.accountId) qs.set('accountId', params.accountId)
 
-    const res = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/e-mode/analysis?${qs}`)
+    const payload = await apiFetch<{ data?: any[] } | any[]>(
+      '/v1/data/lending/e-mode/analysis',
+      { params: Object.fromEntries(qs) }
+    )
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return { success: false, error: `HTTP ${res.status}: ${text || res.statusText}` }
-    }
-
-    const json = await res.json()
-
-    if (!json.success) {
-      return { success: false, error: json.error?.message ?? 'API error' }
-    }
-
-    const rawAnalysis: any[] = json.data?.data ?? json.data ?? []
+    const rawAnalysis: any[] = Array.isArray(payload) ? payload : (payload?.data ?? [])
 
     // Normalize from API shape (category → modeId)
     const data: EModeAnalysisEntry[] = rawAnalysis.map((e: any) => ({
@@ -118,8 +97,8 @@ export async function fetchEModeAnalysis(params: {
     }))
 
     return { success: true, data }
-  } catch (err: any) {
-    return { success: false, error: err?.message ?? 'Unknown error' }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }
 
@@ -145,30 +124,16 @@ export async function fetchEModeSwitch(params: {
   eMode: number
 }): Promise<EModeSwitchResult> {
   try {
-    const qs = new URLSearchParams()
-    qs.set('chainId', params.chainId)
-    qs.set('lender', params.lender)
-    qs.set('eMode', String(params.eMode))
+    const envelope = await apiFetchEnvelope<unknown>('/v1/actions/lending/e-mode', {
+      params: { chainId: params.chainId, lender: params.lender, eMode: params.eMode },
+    })
 
-    const res = await fetch(`${BACKEND_BASE_URL}/v1/actions/lending/e-mode?${qs}`)
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return { success: false, error: `HTTP ${res.status}: ${text || res.statusText}` }
-    }
-
-    const json = await res.json()
-
-    if (!json.success) {
-      return { success: false, error: json.error?.message ?? 'API error' }
-    }
-
-    const tx = json.actions?.transactions?.[0]
+    const tx = envelope.actions?.transactions?.[0]
     return {
       success: true,
       data: tx ? { to: tx.to, data: tx.data, value: tx.value ?? '0' } : undefined,
     }
-  } catch (err: any) {
-    return { success: false, error: err?.message ?? 'Unknown error' }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }

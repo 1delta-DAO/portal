@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch, apiUrl } from '../../sdk/http'
 
 /**
  * Client for `GET /v1/data/token/available` — the canonical list of assets
@@ -21,12 +21,6 @@ export interface AvailableAsset {
   [extra: string]: unknown
 }
 
-interface ApiResponse {
-  success: boolean
-  data: { count: number; items: AvailableAsset[] }
-  error?: { code: string; message: string }
-}
-
 export interface AvailableAssetsParams {
   chainId?: string
   chainIds?: string[]
@@ -35,13 +29,16 @@ export interface AvailableAssetsParams {
 }
 
 export function useAvailableLendingAssets(params: AvailableAssetsParams, enabled = true) {
-  const search = new URLSearchParams()
-  if (params.chainIds?.length) search.set('chainIds', params.chainIds.join(','))
-  else if (params.chainId) search.set('chainId', params.chainId)
-  if (params.lender) search.set('lender', params.lender)
-  if (params.assetGroup) search.set('assetGroup', params.assetGroup)
+  const query_params = {
+    // chainIds wins when both are supplied — the plural form is the wider ask.
+    chainIds: params.chainIds?.length ? params.chainIds.join(',') : undefined,
+    chainId: params.chainIds?.length ? undefined : params.chainId,
+    lender: params.lender,
+    assetGroup: params.assetGroup,
+  }
 
-  const url = `${BACKEND_BASE_URL}/v1/data/token/available?${search.toString()}`
+  // The URL doubles as the query key, so a param change refetches.
+  const url = apiUrl('/v1/data/token/available', query_params)
   const canQuery = enabled && (!!params.chainId || !!params.chainIds?.length)
 
   const query = useQuery<{ count: number; items: AvailableAsset[] }>({
@@ -50,16 +47,10 @@ export function useAvailableLendingAssets(params: AvailableAssetsParams, enabled
     staleTime: 60 * 60 * 1000, // backend cache is 1h — match it
     refetchOnWindowFocus: false,
     retry: 1,
-    queryFn: async () => {
-      const r = await fetch(url)
-      if (!r.ok) {
-        const text = await r.text().catch(() => '')
-        throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
-      }
-      const json = (await r.json()) as ApiResponse
-      if (!json.success) throw new Error(json.error?.message ?? 'API returned success: false')
-      return json.data
-    },
+    queryFn: () =>
+      apiFetch<{ count: number; items: AvailableAsset[] }>('/v1/data/token/available', {
+        params: query_params,
+      }),
   })
 
   return {

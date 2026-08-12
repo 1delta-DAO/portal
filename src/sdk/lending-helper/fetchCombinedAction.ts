@@ -1,4 +1,4 @@
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetchEnvelope, errorMessage } from '../http'
 import type { LendingActionSimulation, RateImpactEntry } from './fetchLendingAction'
 
 // ============================================================================
@@ -65,37 +65,32 @@ export interface CombinedActionResult {
   error?: string
 }
 
-const LENDING_ACTIONS_BASE = `${BACKEND_BASE_URL}/v1/actions/lending`
+const LENDING_ACTIONS_BASE = '/v1/actions/lending'
 
 async function callCombined(
   path: 'deposit-and-borrow' | 'withdraw-and-repay',
   qs: URLSearchParams
 ): Promise<CombinedActionResult> {
   try {
-    const res = await fetch(`${LENDING_ACTIONS_BASE}/${path}?${qs}`)
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return { success: false, error: `HTTP ${res.status}: ${text || res.statusText}` }
-    }
-    const json = await res.json()
-    if (!json.success) {
-      return { success: false, error: json.error?.message ?? 'API error' }
-    }
+    const { data, actions } = await apiFetchEnvelope<Partial<CombinedActionResponse>>(
+      `${LENDING_ACTIONS_BASE}/${path}`,
+      { params: Object.fromEntries(qs) }
+    )
     return {
       success: true,
       data: {
-        transactions: json.actions?.transactions ?? [],
-        permissions: json.actions?.permissions ?? [],
-        route: json.data?.route,
-        atomic: json.data?.atomic,
-        simulation: json.data?.simulation,
-        rateImpact: json.data?.rateImpact,
-        reveals: json.data?.reveals,
-        dbr: json.data?.dbr,
+        transactions: actions?.transactions ?? [],
+        permissions: actions?.permissions ?? [],
+        route: data?.route,
+        atomic: data?.atomic,
+        simulation: data?.simulation,
+        rateImpact: data?.rateImpact,
+        reveals: data?.reveals,
+        dbr: data?.dbr,
       },
     }
-  } catch (err: any) {
-    return { success: false, error: err?.message ?? 'Unknown error' }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }
 

@@ -30,10 +30,11 @@ the top-level [../README.md](../README.md).
     data grouped by e-mode / configuration from
     `/v1/data/lending/pools/by-config`. Defines `PoolConfigGroup`,
     `ConfigMarketItem`.
-- [useFlattenedPools.ts](useFlattenedPools.ts) — Paginated
-  (`useInfiniteQuery`) fetch of all pools for a chain/lender from
-  `/v1/data/lending/pools`. Defines `PoolEntry`, `PoolRisk`,
-  `LenderInfo`.
+- [useFlattenedPools.ts](useFlattenedPools.ts) — `useFlattenedPoolsMultiChain`:
+  one query per selected chain against `/v1/data/lending/pools`, paged and
+  merged, degrading to a partial result when a chain fails. The response types
+  (`PoolEntry`, `PoolRisk`, `LenderInfo`, …) live in
+  [`sdk/lending-helper/poolTypes.ts`](../../sdk/lending-helper/poolTypes.ts).
 - [useIrmData.ts](useIrmData.ts) — Interest-rate-model curves for a
   market (`/v1/data/lending/irm`).
 

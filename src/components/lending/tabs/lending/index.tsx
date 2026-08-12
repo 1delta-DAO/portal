@@ -14,7 +14,7 @@ import type {
   LenderInfoMap,
   LenderSummary,
   PoolDataItem,
-} from '../../../../hooks/lending/usePoolData'
+} from '../../../../sdk/lending-helper/marketTypes'
 import { usePoolConfigData } from '../../../../hooks/lending/usePoolData'
 import { ConfigMarketView } from '../../shared/ConfigMarketView'
 import { useRiskMode } from '../../../../contexts/RiskMode'
@@ -22,8 +22,8 @@ import type {
   UserDataResult,
   UserPositionEntry,
   UserSubAccount,
-} from '../../../../hooks/lending/useUserData'
-import { isAggregatePosition, isLoanPosition } from '../../../../hooks/lending/useUserData'
+} from '../../../../sdk/lending-helper/userPositionTypes'
+import { isAggregatePosition, isLoanPosition } from '../../../../sdk/lending-helper/userPositionTypes'
 import { useTokenBalances } from '../../../../hooks/lending/useTokenBalances'
 import { useLenderAccounts } from '../../../../hooks/lending/useLenderAccounts'
 import { useTokenLists } from '../../../../hooks/useTokenLists'
@@ -36,6 +36,7 @@ import { useLenderSelector, LenderSelector } from '../../shared/LenderSelector'
 import { LendingMarketTable } from './LendingMarketTable'
 import { ActionPanel, MobileActionModal } from './ActionPanel'
 import { usePersistedFilters } from '../../../../hooks/usePersistedFilters'
+import { nextSort } from '../../../../hooks/useTableSort'
 
 interface Props {
   /**
@@ -282,12 +283,9 @@ export function LendingDashboard({
   )
 
   const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortKey(key)
-      setSortDir('desc')
-    }
+    const next = nextSort({ sortKey, sortDir }, key)
+    setSortKey(next.sortKey)
+    setSortDir(next.sortDir)
   }
 
   // User positions scoped to the selected sub-account, keyed by marketUid

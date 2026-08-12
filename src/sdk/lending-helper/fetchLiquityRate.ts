@@ -1,5 +1,5 @@
 import { parseUnits } from 'viem'
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch, errorMessage } from '../http'
 import type { LendingActionResult } from './fetchLendingAction'
 
 /**
@@ -129,28 +129,20 @@ async function postLiquity(
   body: Record<string, unknown>
 ): Promise<LendingActionResult> {
   try {
-    const res = await fetch(`${BACKEND_BASE_URL}/v1/actions/liquity/${action}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    const json = (await res.json().catch(() => null)) as {
-      success?: boolean
-      data?: { transactions?: unknown[]; permissions?: unknown[] }
-      error?: { message?: string } | string
-    } | null
-    if (!res.ok || json?.success === false) {
-      const err = typeof json?.error === 'string' ? json?.error : json?.error?.message
-      return { success: false, error: err ?? `HTTP ${res.status}` }
-    }
+    // Note: the Liquity routes put the transactions under `data`, not under
+    // the usual `actions` envelope key.
+    const data = await apiFetch<{ transactions?: unknown[]; permissions?: unknown[] }>(
+      `/v1/actions/liquity/${action}`,
+      { body }
+    )
     return {
       success: true,
       data: {
-        transactions: (json?.data?.transactions ?? []) as never,
-        permissions: (json?.data?.permissions ?? []) as never,
+        transactions: (data?.transactions ?? []) as never,
+        permissions: (data?.permissions ?? []) as never,
       },
     }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }

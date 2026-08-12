@@ -1,17 +1,20 @@
-import type { AnyTermSheet } from '../../components/lending/terms/types'
 import { RewardEntry, totalRewardApr } from '../../components/lending/shared/rewards'
 import { useQuery } from '@tanstack/react-query'
+import type { PoolRisk, PoolOracleInfo, LenderInfo } from '../../sdk/lending-helper/poolTypes'
+import type { AnyTermSheet } from '../../components/lending/terms/types'
 import type {
-  PoolRiskBreakdown,
-  PoolRisk,
-  PoolTerm,
-  LenderInfo,
-  PoolOracleInfo,
-} from './useFlattenedPools'
-import { BACKEND_BASE_URL } from '../../config/backend'
+  LenderData,
+  LenderInfoMap,
+  LenderSummary,
+  PendleAssetData,
+  PoolConfig,
+  PoolConfigGroup,
+  PoolDataItem,
+} from '../../sdk/lending-helper/marketTypes'
+import { apiFetch } from '../../sdk/http'
 
-const endpointLendingLatest = `${BACKEND_BASE_URL}/v1/data/lending/latest`
-const endpointLendingLenders = `${BACKEND_BASE_URL}/v1/data/lending/lenders`
+const endpointLendingLatest = '/v1/data/lending/latest'
+const endpointLendingLenders = '/v1/data/lending/lenders'
 
 /** Backend cap on the `lenders` query parameter for /lending/latest. */
 const LENDERS_PER_REQUEST = 20
@@ -20,11 +23,9 @@ const LENDERS_PER_REQUEST = 20
 // Types for the /lending/latest API response
 // ============================================================================
 
-interface LendingLatestApiResponse {
-  success: boolean
-  data: { count: number; items: LenderEntryRaw[] }
-  actions?: unknown
-  error?: { code: string; message: string }
+interface LendingLatestData {
+  count: number
+  items: LenderEntryRaw[]
 }
 
 interface LenderEntryRaw {
@@ -105,146 +106,6 @@ interface RawMarket {
 // Transformed types for internal use
 // ============================================================================
 
-/** Pools grouped by lender key. One level — no chainId wrapping. */
-export type LenderData = {
-  [lender: string]: PoolDataItem[]
-}
-
-/** Lender info map keyed by lender key. */
-export type LenderInfoMap = {
-  [lender: string]: LenderInfo
-}
-
-/**
- * Lightweight per-(chain, lender) summary returned by /lending/lenders.
- * Used to drive the lender dropdown without paying the cost of fetching
- * full per-market data for every lender.
- */
-export interface LenderSummary {
-  chainId: string
-  lenderInfo: LenderInfo
-  /** TVL in USD across all of this lender's markets on this chain. */
-  tvlUsd: number
-  /** Server-side timestamp the underlying data was last refreshed. */
-  lastFetched: number
-}
-
-interface LendingLendersApiResponse {
-  success: boolean
-  data: { count: number; items: LenderSummary[] }
-  actions?: unknown
-  error?: { code: string; message: string }
-}
-
-export interface PoolDataItem {
-  marketUid: string
-  name: string
-  underlying: string
-  asset: PoolAsset
-  totalDeposits: number
-  totalDebtStable: number
-  totalDebt: number
-  totalLiquidity: number
-  totalDepositsUSD: number
-  totalDebtStableUSD: number
-  totalDebtUSD: number
-  totalLiquidityUSD: number
-  depositRate: number
-  variableBorrowRate: number
-  stableBorrowRate: number
-  intrinsicYield: number
-  /**
-   * Reward programs as the API serves them: one entry per (reward token,
-   * source), carrying symbol / logo / sourceLabel / link / endsAt. An ARRAY —
-   * it used to be defaulted to `{}`, which discarded all provenance.
-   */
-  rewards: RewardEntry[]
-  /** Summed deposit-side reward APR (percent) from incentive campaigns. */
-  depositRewardApr: number
-  /** Summed borrow-side reward APR (percent) — a rebate that lowers borrow cost. */
-  borrowRewardApr: number
-  /** Distinct reward sources (e.g. "merkle", "native") for tooltip display. */
-  rewardSources: string[]
-  config: Record<string, PoolConfig>
-  borrowCap: number
-  supplyCap: number
-  debtCeiling: number
-  collateralActive: boolean
-  borrowingEnabled: boolean
-  hasStable: boolean
-  isActive: boolean
-  isFrozen: boolean
-  oraclePrice?: number
-  oraclePriceUSD?: number
-  risk?: PoolRisk | null
-  /** Oracle feed-correctness classification (top-level, sibling of `risk`). */
-  oracleInfo?: PoolOracleInfo | null
-  params?: any
-  /**
-   * Brokered (Lista) rate card. Non-empty ⇒ fixed-term-only borrowing; offer
-   * these terms instead of a variable borrow. See BROKERED_MARKETS.md.
-   */
-  terms?: PoolTerm[] | null
-  /** True when variable borrowing isn't offered (brokered markets). */
-  variableBorrowDisabled?: boolean
-  /**
-   * Structured description of this market's lend and borrow offer — rate,
-   * maturity, fees, exit terms, liquidation, governance, oracle, exposures.
-   * One shape for every lender we serve. See `components/lending/terms/`.
-   *
-   * Typed as `AnyTermSheet` on purpose: the list endpoints default to
-   * `?terms=digest`, whose sides hoist `headline`/`tags` to the root and carry
-   * NO `info` object — so a `sheet.supply.info.tags` read is a runtime crash,
-   * not a type error, once the value crosses the network. Always read it
-   * through `sideInfo()` / `isFullSheet()`.
-   */
-  termSheet?: AnyTermSheet
-}
-
-export interface PoolAsset {
-  chainId: string
-  decimals: number
-  name: string
-  address: string
-  symbol: string
-  logoURI: string
-  assetGroup: string
-  currencyId: string
-  pendle?: PendleAssetData
-  props?: { [key: string]: any }
-}
-
-export interface PendleAssetData {
-  expiry: number
-  syAddress: string
-  tokenType: string
-  ytAddress: string
-  marketAddress: string
-}
-
-export interface PoolConfig {
-  label: string
-  category: number
-  borrowFactor: number
-  debtDisabled: boolean
-  collateralFactor: number
-  collateralDisabled: boolean
-  borrowCollateralFactor: number
-  /**
-   * Present when `collateralFactor` above is ONE POINT on a curve the borrower
-   * picks from at open (LlamaLend band count) rather than a constant. Quoting a
-   * different value means recomputing — not reusing `collateralFactor`.
-   */
-  openParameter?: {
-    kind: 'llamalend-bands' | 'interest-rate'
-    dimension: 'collateralFactor' | 'rate'
-    domain: { min: number; max: number } | { values: number[] }
-    default: number
-    immutableAfterOpen: boolean
-    adjustCooldownSeconds?: number
-  }
-}
-
 // ============================================================================
 // Transform
 // ============================================================================
@@ -324,72 +185,6 @@ function rawMarketToPoolDataItem(raw: RawMarket): PoolDataItem {
 }
 
 // ============================================================================
-// Types for the /pools/by-config API response
-// ============================================================================
-
-interface PoolsByConfigApiResponse {
-  success: boolean
-  data: { count: number; items: PoolConfigGroup[] }
-  error?: { code: string; message: string }
-}
-
-export interface PoolConfigGroup {
-  lenderKey: string
-  chainId: string
-  configId: string
-  label: string
-  category: string
-  collaterals: ConfigMarketItem[] | null
-  borrowables: ConfigMarketItem[] | null
-  configRiskScore: number | null
-  configRiskLabel: string | null
-  configRiskBreakdown?: PoolRiskBreakdown[]
-}
-
-export interface ConfigMarketItem {
-  marketUid: string
-  depositRate: number
-  borrowFactor: number
-  totalDebtUsd: number
-  intrinsicYield: number | null
-  underlyingInfo: {
-    asset: {
-      name: string
-      symbol: string
-      address: string
-      chainId: string
-      logoURI: string
-      decimals: number
-      assetGroup: string
-      currencyId: string
-      intrinsicYield: number | null
-      props?: Record<string, unknown> | null
-    }
-    prices: {
-      priceUsd: number
-      priceUsd24h: number
-      priceTs: string
-      priceTs24h: string
-    } | null
-    tokenRisk?: {
-      riskLabel: string
-      riskScore: number
-    } | null
-    oraclePrice: {
-      oraclePrice: number
-      oraclePriceUsd: number
-    } | null
-  }
-  collateralFactor: number
-  stableBorrowRate: number
-  totalDepositsUsd: number
-  variableBorrowRate: number
-  borrowCollateralFactor: number
-  totalLiquidity?: number
-  totalLiquidityUsd?: number
-}
-
-// ============================================================================
 // Hooks
 // ============================================================================
 
@@ -406,18 +201,11 @@ export function useLenders(chainId: string, enabled = true, maxRiskScore = 6) {
     queryKey: ['lendingLenders', chainId],
     enabled: enabled && !!chainId,
     queryFn: async () => {
-      const url = `${endpointLendingLenders}?chains=${chainId}&maxRiskScore=${maxRiskScore}`
-      const r = await fetch(url)
-      if (!r.ok) {
-        const text = await r.text().catch(() => '')
-        throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
-      }
-      const json = (await r.json()) as LendingLendersApiResponse
-      if (!json.success) {
-        throw new Error(json.error?.message ?? 'API returned success: false')
-      }
+      const data = await apiFetch<{ items: LenderSummary[] }>(endpointLendingLenders, {
+        params: { chains: chainId, maxRiskScore },
+      })
       // Defensively drop any item missing lenderInfo.key.
-      return json.data.items.filter((it) => !!it.lenderInfo?.key)
+      return data.items.filter((it) => !!it.lenderInfo?.key)
     },
     refetchInterval: 5 * 60 * 1000,
     staleTime: 30_000,
@@ -472,25 +260,17 @@ export function useLendingLatest(
       // Fire all chunks in parallel — the backend handles them independently
       // and we merge the results into a single keyed map.
       const responses = await Promise.all(
-        chunks.map(async (chunk) => {
-          const url = `${endpointLendingLatest}?chains=${chainId}&lenders=${chunk.join(',')}&maxRiskScore=${maxRiskScore}`
-          const r = await fetch(url)
-          if (!r.ok) {
-            const text = await r.text().catch(() => '')
-            throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
-          }
-          const json = (await r.json()) as LendingLatestApiResponse
-          if (!json.success) {
-            throw new Error(json.error?.message ?? 'API returned success: false')
-          }
-          return json
-        })
+        chunks.map((chunk) =>
+          apiFetch<LendingLatestData>(endpointLendingLatest, {
+            params: { chains: chainId, lenders: chunk.join(','), maxRiskScore },
+          })
+        )
       )
 
       // The lender key now lives on `entry.lenderInfo.key`. Skip any entry
       // that's missing it defensively rather than crashing the whole query.
-      for (const json of responses) {
-        for (const entry of json.data.items) {
+      for (const data of responses) {
+        for (const entry of data.items) {
           const key = entry.lenderInfo?.key
           if (!key) continue
           lenderData[key] = entry.markets.map(rawMarketToPoolDataItem)
@@ -521,17 +301,11 @@ export function usePoolConfigData(chainId: string, lenderKey: string, maxRiskSco
   return useQuery<PoolConfigGroup[]>({
     queryKey: ['poolsByConfig', chainId, lenderKey, maxRiskScore],
     queryFn: async () => {
-      const url = `${BACKEND_BASE_URL}/v1/data/lending/pools/by-config?chains=${chainId}&lenders=${lenderKey}&maxRiskScore=${maxRiskScore}`
-      const r = await fetch(url)
-      if (!r.ok) {
-        const text = await r.text().catch(() => '')
-        throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
-      }
-      const json = (await r.json()) as PoolsByConfigApiResponse
-      if (!json.success) {
-        throw new Error(json.error?.message ?? 'API returned success: false')
-      }
-      return json.data.items
+      const data = await apiFetch<{ items: PoolConfigGroup[] }>(
+        '/v1/data/lending/pools/by-config',
+        { params: { chains: chainId, lenders: lenderKey, maxRiskScore } }
+      )
+      return data.items
     },
     enabled: !!chainId && !!lenderKey,
     refetchInterval: 5 * 60 * 1000,

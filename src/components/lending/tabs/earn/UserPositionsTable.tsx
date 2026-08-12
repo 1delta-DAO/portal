@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { RawCurrency } from '../../../../types/currency'
-import type { LenderInfoMap } from '../../../../hooks/lending/usePoolData'
+import type { LenderInfoMap } from '../../../../sdk/lending-helper/marketTypes'
 import { buildPath } from '../../../../utils/routes'
 import { useSendLendingTransaction } from '../../../../hooks/useSendLendingTransaction'
 import type {
@@ -9,7 +9,7 @@ import type {
   LenderUserDataEntry,
   UserSubAccount,
   UserPositionEntry,
-} from '../../../../hooks/lending/useUserData'
+} from '../../../../sdk/lending-helper/userPositionTypes'
 import { useTokenListsMultiChain } from '../../../../hooks/useTokenLists'
 import { abbreviateUsd } from '../../../../utils/format'
 import { fetchCollateralToggle } from '../../../../sdk/lending-helper/fetchLendingAction'

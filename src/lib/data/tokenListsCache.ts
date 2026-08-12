@@ -22,6 +22,8 @@ const getListUrl = (chainId: string) =>
 async function fetchList(chainId: string): Promise<DeltaTokenList | null> {
   try {
     const url = getListUrl(chainId)
+    // Raw `fetch`, not `sdk/http.ts`: a third-party token list on GitHub, not
+    // a 1delta backend endpoint — no envelope, no backend headers.
     const response = await fetch(url)
     if (!response.ok) {
       console.warn(

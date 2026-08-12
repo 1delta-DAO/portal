@@ -1,4 +1,4 @@
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch, errorMessage } from '../http'
 import {
   VAULT_PROVIDERS,
   type RawVault,
@@ -22,7 +22,7 @@ export interface FetchVaultsCatalogResult {
   error?: string
 }
 
-const ENDPOINT = `${BACKEND_BASE_URL}/v1/data/vaults`
+const ENDPOINT = '/v1/data/vaults'
 
 /** Backend caps `count` at 1000; we page until a short page is returned. */
 const PAGE_SIZE = 1000
@@ -41,31 +41,15 @@ export async function fetchVaultsCatalog(
     // The endpoint paginates (default 100, max 1000). Walk the cursor so the
     // catalog never silently truncates when a chain has more vaults than a page.
     for (;;) {
-      const qs = new URLSearchParams()
-      qs.set('chainId', params.chainId)
-      qs.set('providers', providers.join(','))
-      qs.set('start', String(start))
-      qs.set('count', String(PAGE_SIZE))
-
-      const res = await fetch(`${ENDPOINT}?${qs}`)
-      if (!res.ok) {
-        const text = await res.text().catch(() => '')
-        return {
-          success: false,
-          error: `HTTP ${res.status}: ${text || res.statusText}`,
-        }
-      }
-
-      const json = await res.json()
-      if (!json.success) {
-        return {
-          success: false,
-          error: json.error?.message ?? 'Vaults catalog returned success: false',
-        }
-      }
-
-      const page: VaultsCatalogResponse = json.data ?? {}
-      const pageItems = Array.isArray(page.items) ? page.items : []
+      const page = await apiFetch<VaultsCatalogResponse>(ENDPOINT, {
+        params: {
+          chainId: params.chainId,
+          providers: providers.join(','),
+          start,
+          count: PAGE_SIZE,
+        },
+      })
+      const pageItems = Array.isArray(page?.items) ? page.items : []
       items.push(...pageItems)
 
       if (pageItems.length < PAGE_SIZE) break
@@ -75,8 +59,8 @@ export async function fetchVaultsCatalog(
     const raw: VaultsCatalogResponse = { start: 0, count: items.length, items }
     const vaults = flattenCatalog(raw)
     return { success: true, raw, vaults }
-  } catch (err: any) {
-    return { success: false, error: err?.message ?? 'Unknown error' }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }
 

@@ -1,5 +1,5 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetchLoose } from '../../sdk/http'
 
 /**
  * Client for the comparable-rates endpoint:
@@ -152,12 +152,6 @@ export interface ComparableRatesResult {
   items: ComparableRate[]
 }
 
-interface Envelope {
-  data?: Partial<ComparableRatesResult>
-  success?: boolean
-  ok?: boolean
-}
-
 export interface ComparableRatesParams {
   chainId?: string
   /** Debt asset address — required for `side: 'borrow'`. */
@@ -192,23 +186,21 @@ const EMPTY: ComparableRatesResult = {
 }
 
 async function fetchComparables(p: ComparableRatesParams): Promise<ComparableRatesResult> {
-  const qs = new URLSearchParams()
-  if (p.chainId) qs.set('chainId', p.chainId)
-  if (p.debt) qs.set('debt', p.debt)
-  if (p.collateral) qs.set('collateral', p.collateral)
-  if (p.side) qs.set('side', p.side)
-  if (p.amount != null && p.amount > 0) qs.set('amount', String(p.amount))
-  if (p.horizonDays != null) qs.set('horizonDays', String(p.horizonDays))
-  if (p.rateType && p.rateType !== 'all') qs.set('rateType', p.rateType)
-  if (p.limit != null) qs.set('limit', String(p.limit))
-  if (p.referenceMarketUid) qs.set('referenceMarketUid', p.referenceMarketUid)
-  if (p.referenceTermId) qs.set('referenceTermId', p.referenceTermId)
-  if (p.includeUnobtainable) qs.set('includeUnobtainable', 'true')
-
-  const res = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/comparables?${qs.toString()}`)
-  if (!res.ok) throw new Error(`comparables request failed (${res.status})`)
-  const body = (await res.json()) as Envelope
-  const d = body.data ?? (body as Partial<ComparableRatesResult>)
+  const d = await apiFetchLoose<Partial<ComparableRatesResult>>('/v1/data/lending/comparables', {
+    params: {
+      chainId: p.chainId,
+      debt: p.debt,
+      collateral: p.collateral,
+      side: p.side,
+      amount: p.amount != null && p.amount > 0 ? p.amount : undefined,
+      horizonDays: p.horizonDays,
+      rateType: p.rateType && p.rateType !== 'all' ? p.rateType : undefined,
+      limit: p.limit,
+      referenceMarketUid: p.referenceMarketUid,
+      referenceTermId: p.referenceTermId,
+      includeUnobtainable: p.includeUnobtainable ? 'true' : undefined,
+    },
+  })
   return {
     side: d.side ?? 'borrow',
     horizonDays: d.horizonDays ?? 365,

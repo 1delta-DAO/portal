@@ -5,7 +5,7 @@ import {
   type OptimizerAuction,
   type OptimizerPairRow,
 } from '../../../../hooks/lending/useOptimizerPairs'
-import type { LenderInfo } from '../../../../hooks/lending/useFlattenedPools'
+import type { LenderInfo } from '../../../../sdk/lending-helper/poolTypes'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { TablePagination } from '../../../common/TablePagination'
 import { buildPath, OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'

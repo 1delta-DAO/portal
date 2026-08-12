@@ -1,5 +1,5 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetch } from '../../sdk/http'
 
 /**
  * Client for the rate-at-depth endpoint:
@@ -42,23 +42,15 @@ export interface MarketDepthItem {
   supply?: DepthGrid
 }
 
-interface DepthEnvelope {
-  data?: { items?: MarketDepthItem[] }
-  items?: MarketDepthItem[]
-  success?: boolean
-  ok?: boolean
-}
-
 async function fetchMarketDepth(
   marketUids: string[],
   side: 'borrow' | 'supply' | 'both',
 ): Promise<MarketDepthItem[]> {
   if (marketUids.length === 0) return []
-  const qs = new URLSearchParams({ marketUids: marketUids.join(','), side })
-  const res = await fetch(`${BACKEND_BASE_URL}/v1/data/lending/irm/depth?${qs.toString()}`)
-  if (!res.ok) throw new Error(`depth request failed (${res.status})`)
-  const body = (await res.json()) as DepthEnvelope
-  return body.data?.items ?? body.items ?? []
+  const data = await apiFetch<{ items?: MarketDepthItem[] }>('/v1/data/lending/irm/depth', {
+    params: { marketUids: marketUids.join(','), side },
+  })
+  return data?.items ?? []
 }
 
 /**

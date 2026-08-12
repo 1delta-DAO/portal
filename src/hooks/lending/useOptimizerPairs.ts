@@ -1,5 +1,6 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { BACKEND_BASE_URL } from '../../config/backend'
+import { apiFetchLoose, apiUrl, type ApiParams } from '../../sdk/http'
+import { riskBand } from '../../utils/format'
 
 /**
  * Client for the optimizer endpoint:
@@ -73,10 +74,9 @@ export interface OptimizerAssetRef {
  * missing.
  */
 export function riskLabelFromScore(score: number | null | undefined): string {
-  if (score == null || score === 0) return 'unknown'
-  if (score <= 2) return 'low'
-  if (score <= 4) return 'medium'
-  return 'high'
+  // Banded in ONE place — a second copy here is how 4 came to be amber in the
+  // optimizer and red in the terms panel at the same time.
+  return riskBand(score)
 }
 
 /**
@@ -239,17 +239,6 @@ interface EnvelopeBody {
   pairs?: RawOptimizerPair[]
   /** Legacy key — older deployments returned `items` instead of `pairs`. */
   items?: RawOptimizerPair[]
-}
-
-interface OptimizerApiResponse extends EnvelopeBody {
-  // The backend wraps the envelope inside `{ success, data }` to match the
-  // rest of /v1/data/lending/*, but the swagger shows the body fields at
-  // the top level. Tolerate either layout.
-  ok?: boolean
-  success?: boolean
-  data?: EnvelopeBody
-  // Error in either shape
-  error?: string | { code?: string; message?: string }
 }
 
 // ---------------------------------------------------------------------------
@@ -688,7 +677,10 @@ export interface OptimizerFilters {
   sortDir?: 'ASC' | 'DESC'
 }
 
-function buildUrl(filters: OptimizerFilters): string {
+const OPTIMIZE_PATH = '/v1/data/lending/pairs/optimize'
+
+/** Query params for {@link OPTIMIZE_PATH}. Also feeds the query key, via `apiUrl`. */
+function optimizerParams(filters: OptimizerFilters): ApiParams {
   const params = new URLSearchParams()
 
   const csv = (key: string, v: string[] | undefined) => {
@@ -746,7 +738,7 @@ function buildUrl(filters: OptimizerFilters): string {
   maybe('sortBy', filters.sortBy)
   maybe('sortDir', filters.sortDir)
 
-  return `${BACKEND_BASE_URL}/v1/data/lending/pairs/optimize?${params.toString()}`
+  return Object.fromEntries(params)
 }
 
 export function useOptimizerPairs(filters: OptimizerFilters, enabled = true) {
@@ -758,7 +750,7 @@ export function useOptimizerPairs(filters: OptimizerFilters, enabled = true) {
     !!filters.collateralTags?.length ||
     !!filters.debtTags?.length
   const canQuery = enabled && hasAnyAssetFilter
-  const url = canQuery ? buildUrl(filters) : ''
+  const url = canQuery ? apiUrl(OPTIMIZE_PATH, optimizerParams(filters)) : ''
 
   const query = useQuery<{ total: number; rows: OptimizerPairRow[] }>({
     queryKey: ['optimizerPairs', url],
@@ -768,24 +760,12 @@ export function useOptimizerPairs(filters: OptimizerFilters, enabled = true) {
     refetchInterval: 2 * 60 * 1000,
     retry: 1,
     queryFn: async () => {
-      const r = await fetch(url)
-      if (!r.ok) {
-        const text = await r.text().catch(() => '')
-        throw new Error(`HTTP ${r.status}: ${text || r.statusText}`)
-      }
-      const json = (await r.json()) as OptimizerApiResponse
-      const ok = json.ok ?? json.success
-      if (ok === false) {
-        const errMsg =
-          typeof json.error === 'string'
-            ? json.error
-            : (json.error?.message ?? 'API returned ok: false')
-        throw new Error(errMsg)
-      }
-      // The envelope body may live at the top level *or* under `data`
-      // depending on deployment. Merge them, preferring whichever side has
-      // the row list populated.
-      const body: EnvelopeBody = json.data ?? json
+      // `apiFetchLoose` because this endpoint puts its body at the top level on
+      // some deployments and under `data` on others, and reports status as
+      // `ok` rather than `success`.
+      const body = await apiFetchLoose<EnvelopeBody>(OPTIMIZE_PATH, {
+        params: optimizerParams(filters),
+      })
       const rawItems = body.pairs ?? body.items ?? []
       const rows = rawItems
         .map(normalisePair)
