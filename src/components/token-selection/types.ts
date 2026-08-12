@@ -8,4 +8,8 @@ export interface TokenRowData {
   balanceAmount: number
   category: number
   isRelevant: boolean
+  /** Search relevance tier — see `tokenSearch.ts`. 0 when not searching. */
+  matchScore: number
+  /** On the chain's curated list, or imported by the user. */
+  isMainOrUser: boolean
 }

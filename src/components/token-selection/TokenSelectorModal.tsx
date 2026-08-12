@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { Address } from 'viem'
 import { ChainFilterSelect } from '../lending/shared/ChainFilter'
 import { TokenSelector } from './index'
@@ -37,6 +37,13 @@ export function TokenSelectorModal({
     initialChainId ?? currency?.chainId ?? '137'
   )
 
+  // Callers own the query (both swap panels share one string across the in and
+  // out modals) and only clear it on *selection*. Held through a ref so the
+  // reset effect can depend on `open` alone — an inline `onQueryChange` from a
+  // caller would otherwise re-fire it on every keystroke and wipe the input.
+  const onQueryChangeRef = useRef(onQueryChange)
+  onQueryChangeRef.current = onQueryChange
+
   useEffect(() => {
     if (open) {
       if (initialChainId) {
@@ -46,6 +53,12 @@ export function TokenSelectorModal({
       }
     }
   }, [open, initialChainId, currency?.chainId])
+
+  // Dismissing the modal leaves the last query behind; reopening then shows a
+  // list still filtered by a search the user has forgotten typing.
+  useEffect(() => {
+    if (open) onQueryChangeRef.current('')
+  }, [open])
 
   const tokenValue = useMemo(() => currency?.address as Address | undefined, [currency?.address])
 

@@ -15,8 +15,20 @@ import { useSpyAccount } from '../../contexts/SpyMode'
 import { getMainTokensCache, isMainToken } from '../../lib/assetLists'
 import { getUserTokensForChain, addUserToken, isUserToken } from '../../lib/userTokens'
 import { useDebounce } from '../../hooks/useDebounce'
+import {
+  NO_MATCH,
+  compareTokenMatches,
+  normalizeTokenQuery,
+  scoreTokenMatch,
+} from './tokenSearch'
 
 const MAX_SEARCH_RESULTS = 100
+/**
+ * Cap for the fallback list shown when a chain's token list carries no
+ * `mainTokens` — without a curated set there is nothing to trim by, and the
+ * full list can run to thousands of entries.
+ */
+const MAX_FALLBACK_RESULTS = 100
 
 type TokenSelectorProps = {
   chainId: string
@@ -70,10 +82,17 @@ export function TokenSelector({
   const allAddrs = useMemo(() => Object.keys(tokensMap) as Address[], [tokensMap])
   const nativeCurrencySymbol = chains?.[chainId]?.data?.nativeCurrency?.symbol?.toUpperCase() || ''
 
+  // `getMainTokensCache()` is a plain module-level object, populated as a side
+  // effect of the token-list fetch — it is not reactive. Keying this on chainId
+  // alone read it *before* the newly selected chain had loaded and then never
+  // recomputed, leaving the set empty for the rest of the chain's lifetime:
+  // the unsearched list filters by this set, so switching chains showed an
+  // empty selector until a search bypassed the filter. `lists` changes identity
+  // when the fetch lands, which is the signal that the cache is now filled.
   const mainTokensSet = useMemo(() => {
     const mainTokensCache = getMainTokensCache()
     return mainTokensCache?.[chainId] || new Set<string>()
-  }, [chainId])
+  }, [chainId, lists])
 
   const [userTokensVersion, setUserTokensVersion] = useState(0)
   const userTokensForChain = useMemo(() => {
@@ -236,26 +255,44 @@ export function TokenSelector({
   // Debounce search query to avoid blocking the UI on large token lists
   const debouncedQuery = useDebounce(searchQuery, 200)
 
-  // Compute visible addresses (filtered by search + main/user set)
-  const visibleAddresses: Address[] = useMemo(() => {
-    const q = debouncedQuery.trim().toLowerCase()
+  // Compute visible addresses (filtered by search + main/user set), plus the
+  // relevance score of each one so the row sort can honour it.
+  const { visibleAddresses, searchScores } = useMemo((): {
+    visibleAddresses: Address[]
+    searchScores: Map<string, number> | null
+  } => {
+    const q = normalizeTokenQuery(debouncedQuery)
     const excludeSet = excludeAddresses
       ? new Set(excludeAddresses.map((a) => a.toLowerCase()))
       : null
+    const notExcluded = (addrLower: string) => !excludeSet || !excludeSet.has(addrLower)
 
     if (!q) {
-      return allAddrs.filter((addr) => {
+      const curated = allAddrs.filter((addr) => {
         const addrLower = addr.toLowerCase()
-        return mainAndUserTokensSet.has(addrLower) && (!excludeSet || !excludeSet.has(addrLower))
+        return mainAndUserTokensSet.has(addrLower) && notExcluded(addrLower)
       })
+      // A chain whose list ships without `mainTokens` would otherwise render an
+      // empty selector that only fills in once the user types. Show the head of
+      // the list instead — degraded, but never dead.
+      if (curated.length === 0 && allAddrs.length > 0) {
+        return {
+          visibleAddresses: allAddrs
+            .filter((addr) => notExcluded(addr.toLowerCase()))
+            .slice(0, MAX_FALLBACK_RESULTS),
+          searchScores: null,
+        }
+      }
+      return { visibleAddresses: curated, searchScores: null }
     }
 
-    const mainAndUserMatches: Address[] = []
-    const otherMatches: Address[] = []
+    // Score every candidate before trimming. The old code broke out of the loop
+    // at the cap, so the 100 kept were the first 100 in list order rather than
+    // the 100 best — an exact match late in the list never surfaced at all.
+    const scored: { addr: Address; score: number; isMainOrUser: boolean; symbol?: string }[] = []
     const seen = new Set<string>()
 
     for (const addr of allAddrs) {
-      if (mainAndUserMatches.length + otherMatches.length >= MAX_SEARCH_RESULTS) break
       const addrLower = addr.toLowerCase()
       if (seen.has(addrLower)) continue
       if (excludeSet?.has(addrLower)) continue
@@ -263,19 +300,25 @@ export function TokenSelector({
       const token = tokensMap[addr]
       if (!token) continue
 
-      const symbolLower = (token.symbol ?? '').toLowerCase()
-      const nameLower = (token.name ?? '').toLowerCase()
-      if (symbolLower.includes(q) || nameLower.includes(q) || addrLower.includes(q)) {
-        seen.add(addrLower)
-        if (mainAndUserTokensSet.has(addrLower)) {
-          mainAndUserMatches.push(addr)
-        } else {
-          otherMatches.push(addr)
-        }
-      }
+      const score = scoreTokenMatch(q, token, addrLower)
+      if (score === NO_MATCH) continue
+
+      seen.add(addrLower)
+      scored.push({
+        addr,
+        score,
+        isMainOrUser: mainAndUserTokensSet.has(addrLower),
+        symbol: token.symbol,
+      })
     }
 
-    return [...mainAndUserMatches, ...otherMatches]
+    scored.sort(compareTokenMatches)
+    const top = scored.slice(0, MAX_SEARCH_RESULTS)
+
+    return {
+      visibleAddresses: top.map((entry) => entry.addr),
+      searchScores: new Map(top.map((entry) => [entry.addr.toLowerCase(), entry.score])),
+    }
   }, [allAddrs, tokensMap, debouncedQuery, excludeAddresses, mainAndUserTokensSet])
 
   // Build price query currencies from visible addresses (debounced to avoid rapid refetches)
@@ -324,10 +367,21 @@ export function TokenSelector({
         balanceAmount,
         category: getTokenCategory(token),
         isRelevant,
+        matchScore: searchScores?.get(addrLower) ?? 0,
+        isMainOrUser: mainAndUserTokensSet.has(addrLower),
       }
     })
 
     return mapped.sort((a, b) => {
+      // While searching, relevance outranks holdings: this sort used to run
+      // unconditionally and threw the search ordering away, so a big PT-USDe
+      // balance buried the USDe the user typed. Balance still breaks ties
+      // *within* a tier.
+      if (searchScores) {
+        if (a.matchScore !== b.matchScore) return a.matchScore - b.matchScore
+        if (a.isMainOrUser !== b.isMainOrUser) return a.isMainOrUser ? -1 : 1
+      }
+
       // Primary: USD balance value (highest first)
       const usdValueDiff = b.usdValue - a.usdValue
       if (Math.abs(usdValueDiff) > 0.01) return usdValueDiff
@@ -339,6 +393,12 @@ export function TokenSelector({
       // Tertiary: category (native/wrapped first)
       if (a.category !== b.category) return a.category - b.category
 
+      if (searchScores) {
+        // Plainer symbol first: USDC before USDC-LP-ABC.
+        const lengthDiff = (a.token.symbol ?? '').length - (b.token.symbol ?? '').length
+        if (lengthDiff !== 0) return lengthDiff
+      }
+
       return (a.token.symbol ?? '').localeCompare(b.token.symbol ?? '')
     })
   }, [
@@ -349,6 +409,8 @@ export function TokenSelector({
     chainId,
     getTokenCategory,
     relevant,
+    searchScores,
+    mainAndUserTokensSet,
   ])
 
   const selected = value ? tokensMap[value.toLowerCase()] : undefined
@@ -378,6 +440,7 @@ export function TokenSelector({
         balancesLoading={balancesLoading}
         pricesLoading={pricesLoading}
         userAddress={userAddress}
+        listsLoading={listsLoading}
         onChange={handleTokenChange}
       />
     )

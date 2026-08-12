@@ -31,16 +31,30 @@ export function useTokenLists(chainId?: string) {
       return
     }
 
+    // Nothing cached for the new chain: drop the previous chain's map rather
+    // than keeping it on screen under the new chainId, where every row would
+    // resolve to the wrong token.
+    setData(undefined)
     setIsLoading(true)
+
+    let cancelled = false
     loadTokenListForChain(chainId)
       .then((result) => {
+        // Chain switches are faster than the fetch; without this a slow earlier
+        // chain lands last and overwrites the one the user is looking at.
+        if (cancelled) return
         setData(result ?? undefined)
         setIsLoading(false)
       })
       .catch((e) => {
+        if (cancelled) return
         console.error(`Failed to load token list for chain ${chainId}:`, e)
         setIsLoading(false)
       })
+
+    return () => {
+      cancelled = true
+    }
   }, [chainId])
 
   return useMemo(

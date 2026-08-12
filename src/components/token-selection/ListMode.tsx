@@ -15,13 +15,25 @@ interface TokenSelectorListModeProps {
   balancesLoading: boolean
   pricesLoading: boolean
   userAddress?: string
+  listsLoading?: boolean
   onChange: (address: Address) => void
 }
 
 export const TokenSelectorListMode: React.FC<TokenSelectorListModeProps> = ({
   rows,
+  listsLoading,
   onChange,
 }) => {
+  // A chain whose list is still being fetched has no rows yet — saying "no
+  // tokens found" there reads as an empty chain rather than a pending one.
+  if (listsLoading && rows.length === 0) {
+    return (
+      <div className="flex justify-center py-6">
+        <span className="loading loading-spinner loading-sm" />
+      </div>
+    )
+  }
+
   if (rows.length === 0) {
     return (
       <div className="text-center py-6 text-base-content/50 text-sm">
