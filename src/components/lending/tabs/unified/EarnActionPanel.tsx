@@ -6,7 +6,9 @@ import { TokenSelector } from '../../../token-selection'
 import { WalletConnect } from '../../../connect'
 import { useSpyAccount } from '../../../../contexts/SpyMode'
 import { useBalanceQuery, type BalanceEntry } from '../../../../hooks/balances/useBalanceQuery'
+import { parseUnits } from 'viem'
 import { formatTokenAmount } from '../../../../utils/format'
+import { useEarnAction } from '../../../../hooks/earn/useEarnAction'
 import { getCurrency } from '../../../../lib/trade-helpers/utils'
 import { UsdAmount } from '../../../common/UsdAmount'
 import {
@@ -202,6 +204,60 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
   const needsSlippage = boundNeeds.length > 0
   const unsupported = requires.filter((r) => r !== 'slippage' && !isBoundNeed(r))
 
+  /**
+   * The amount in BASE UNITS, or undefined when the field cannot be parsed.
+   *
+   * `parseUnits` throws on partial input ("0.", "1.2.3"), which a user
+   * produces constantly while typing — a throw here would blank the panel
+   * mid-keystroke, so it degrades to "not ready to build" instead.
+   */
+  const amountRaw = useMemo(() => {
+    if (!amount) return undefined
+    try {
+      const raw = parseUnits(amount, spendDecimals)
+      return raw > 0n ? raw.toString() : undefined
+    } catch {
+      return undefined
+    }
+  }, [amount, spendDecimals])
+
+  const exec = useEarnAction({
+    chainId: row.chainId,
+    earnUid: row.earnUid,
+    action: (action || 'deposit') as any,
+    operator: account,
+    amount: amountRaw,
+    // Deposits spend the pay asset; exits are denominated in the share token
+    // where one exists, which is what `isShares` tells the builder.
+    payAsset: isExit ? undefined : isCustomSpend ? payAsset : undefined,
+    receiveAsset: isExit && isCustomSpend ? payAsset : undefined,
+    isShares: isExit && !!row.shareToken,
+    // Sent ONLY where the server said a bound is required. Sending it
+    // unasked would look harmless but sets a limit on venues that price
+    // deterministically, where any bound is noise the builder must interpret.
+    slippage: needsSlippage ? Number(slippage) : undefined,
+    // Blocked while a required param exists that this UI cannot collect —
+    // building anyway produces a call that reverts or fills at any price.
+    enabled: unsupported.length === 0 && row.capabilities.length > 0,
+  })
+
+  // Everything that must be true before the wallet is asked for anything.
+  const submitBlockedReason = !capability
+    ? 'Pick an action'
+    : unsupported.length > 0
+      ? `Needs ${unsupported.join(', ')}`
+      : amountExceedsBalance
+        ? `More than your ${spendSymbol} balance`
+        : exec.loading
+          ? 'Building the transaction…'
+          : !exec.result
+            ? 'Enter an amount'
+            : !exec.allPermissionsDone
+              ? 'Approve first'
+              : undefined
+
+  const canSubmit = !submitBlockedReason && !exec.executing
+
   if (row.capabilities.length === 0) {
     return (
       <div className="text-xs opacity-60">
@@ -395,21 +451,70 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
         </div>
       )}
 
+      {exec.error && (
+        <div className="alert alert-error py-2">
+          <span className="break-words text-[11px]">{exec.error}</span>
+        </div>
+      )}
+
       {!account ? (
         <WalletConnect />
       ) : (
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          // Execution lands with `/v1/actions/earn/{action}` (plan §5.2). Every
-          // parameter it needs is already collected here — earnUid, the verb,
-          // the amount, the pay asset — so this is wiring, not design.
-          disabled
-          title="Transaction building lands with the earn action dispatcher"
-        >
-          {vocabLabel(vocab, 'action', action)}
-          {amount ? ` ${amount}` : ''}
-        </button>
+        <div className="flex flex-col gap-1.5">
+          {/* Approvals first, one at a time and in order. Showing them as
+              their own steps rather than folding them into the action button
+              is what lets a user see WHY a wallet prompt appeared — the
+              backend labels each one. */}
+          {exec.result && exec.result.permissions.length > 0 && !exec.allPermissionsDone && (
+            <>
+              <span className="text-[11px] opacity-60">
+                Approvals ({exec.permissionsCompleted}/{exec.result.permissions.length})
+              </span>
+              {exec.result.permissions.map((perm, i) => {
+                const done = i < exec.permissionsCompleted
+                const current = i === exec.permissionsCompleted
+                return (
+                  <button
+                    key={`${perm.to}-${i}`}
+                    type="button"
+                    className={`btn btn-xs ${
+                      done
+                        ? 'btn-outline btn-success btn-disabled'
+                        : current
+                          ? 'btn-warning'
+                          : 'btn-outline btn-ghost'
+                    }`}
+                    disabled={!current || exec.executing}
+                    onClick={current ? exec.executeNextPermission : undefined}
+                  >
+                    {done ? '✓ ' : ''}
+                    {perm.description || `Approval ${i + 1}`}
+                  </button>
+                )
+              })}
+            </>
+          )}
+
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={!canSubmit}
+            title={submitBlockedReason}
+            onClick={exec.executeMain}
+          >
+            {exec.loading
+              ? 'Building…'
+              : exec.executing
+                ? 'Confirm in wallet…'
+                : `${vocabLabel(vocab, 'action', action)}${amount ? ` ${amount}` : ''}`}
+          </button>
+
+          {exec.txHash && (
+            <span className="text-[11px] opacity-60">
+              Submitted · {exec.txHash.slice(0, 10)}…
+            </span>
+          )}
+        </div>
       )}
     </div>
   )

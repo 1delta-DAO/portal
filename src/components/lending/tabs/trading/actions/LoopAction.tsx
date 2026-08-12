@@ -9,6 +9,7 @@ import { SlippageInput } from '../SlippageInput'
 import { QuoteCard } from '../QuoteCard'
 import { AmountQuickButtons } from '../../../actions/AmountQuickButtons'
 import {
+  compareAmountStrings,
   formatTokenAmount,
   formatUsd,
   parseAmount,
@@ -106,6 +107,50 @@ function LoopRangeInfo({
           </span>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Advisory banner for a margin amount the wallet cannot cover.
+ *
+ * Deliberately NOT a blocker: the user can still quote to see what the loop
+ * would look like and top up before executing — the wallet transfer is the real
+ * guardrail. But it has to be loud enough to be seen, because the failure it
+ * predicts happens at signing time, after the user has already committed
+ * attention to a quote.
+ */
+function InsufficientPayBalance({
+  symbol: rawSymbol,
+  balanceStr,
+  shortfall,
+}: {
+  symbol?: string
+  balanceStr: string
+  shortfall: number
+}) {
+  const symbol = rawSymbol ?? 'token'
+  return (
+    <div className="rounded-lg border border-error/40 bg-error/10 px-2 py-1.5 text-[11px] text-error flex items-start gap-1.5">
+      <svg
+        className="w-3.5 h-3.5 shrink-0 mt-px"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        <path d="M12 9v4" />
+        <path d="M12 17h.01" />
+      </svg>
+      <span>
+        <span className="font-medium">Insufficient {symbol} balance.</span> You hold{' '}
+        {formatTokenAmount(balanceStr)} {symbol} — {formatTokenAmount(shortfall)} {symbol} short.
+        Quoting still works, but the transaction will fail unless you top up or lower the pay
+        amount.
+      </span>
     </div>
   )
 }
@@ -403,13 +448,26 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   // Max amounts
   const debtPos = debtPool ? userPositions.get(debtPool.marketUid) : null
 
-  // Pay wallet balance + overMax
+  // Pay wallet balance + overMax.
+  //
+  // The PRESENCE of a balance entry — not a non-zero one — is what makes the
+  // balance known. Gating the comparison on `balance > 0` drops the warning in
+  // the one case where it matters most: a zero balance, where EVERY pay amount
+  // is unaffordable. That is why the panel showed "0 sfrxUSD" next to a pay
+  // amount of 100 without complaint.
+  //
+  // String comparison, not floats: "Max" writes the balance string verbatim, so
+  // an exact-max pay amount must compare equal rather than land inside an
+  // epsilon fudge at 18 decimals.
   const payWalletBalance = selectedPayCurrency
     ? (walletBalances.get(selectedPayCurrency.address.toLowerCase()) ?? null)
     : null
   const payWalletStr = payWalletBalance?.balance ?? '0'
   const payOverMax =
-    parseAmount(payWalletStr) > 0 && parseAmount(payAmount) > parseAmount(payWalletStr) + 1e-9
+    !!payWalletBalance &&
+    parseAmount(payAmount) > 0 &&
+    compareAmountStrings(payAmount, payWalletStr) > 0
+  const payShortfall = payOverMax ? parseAmount(payAmount) - parseAmount(payWalletStr) : 0
 
   // USD value of the paid-in margin — used to correct the loop price impact so
   // the margin isn't booked as a swap penalty. Prefer the wallet balance's
@@ -743,7 +801,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
             <input
               type="text"
               inputMode="decimal"
-              className="input input-bordered input-sm w-full"
+              className={`input input-bordered input-sm w-full ${payOverMax ? 'input-error' : ''}`}
               placeholder="0.0"
               value={payAmount}
               onChange={(e) => {
@@ -754,8 +812,12 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               }}
             />
             {payOverMax && (
-              <div className="text-[10px] text-error mt-0.5">
-                Exceeds wallet balance ({formatTokenAmount(payWalletStr)}).
+              <div className="mt-1">
+                <InsufficientPayBalance
+                  symbol={selectedPayCurrency.symbol}
+                  balanceStr={payWalletStr}
+                  shortfall={payShortfall}
+                />
               </div>
             )}
           </div>
@@ -926,7 +988,23 @@ export const LoopAction: React.FC<TradingActionProps> = ({
       {/* Permissions, transactions, and execute. Shown once a quote is selected;
           the wallet-balance warning stays advisory (see the quotes button). */}
       {selectedIndex !== null && (
-        <TradingExecuteBlock quotes={tradingQuotes} operation="Loop" executeLabel="Execute Loop" />
+        <>
+          {/* Repeated at the point of signing: the pay field sits several
+              sections up and is easily scrolled out of view by the time a quote
+              has been picked. */}
+          {payOverMax && (
+            <InsufficientPayBalance
+              symbol={selectedPayCurrency?.symbol}
+              balanceStr={payWalletStr}
+              shortfall={payShortfall}
+            />
+          )}
+          <TradingExecuteBlock
+            quotes={tradingQuotes}
+            operation="Loop"
+            executeLabel="Execute Loop"
+          />
+        </>
       )}
     </div>
   )

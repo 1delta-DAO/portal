@@ -166,8 +166,11 @@ export function useCombinedAction({
   const nativeBal = walletBalances.get(zeroAddress) ?? null
   const primaryBal = primaryCanUseNative && payNative ? nativeBal : primaryWrappedBal
   const primaryMax = primaryBal?.balance ?? '0'
-  const primaryOverMax =
-    Number(primaryMax) > 0 && gt0(primary) && Number(primary) > Number(primaryMax) + 1e-9
+  // A ZERO balance still warns: the old `primaryMax > 0` gate meant the one
+  // balance where nothing is affordable was the one balance that never
+  // complained. Presence of the balance entry — not its size — is what makes
+  // the ceiling known. Display-only; it gates no button.
+  const primaryOverMax = !!primaryBal && gt0(primary) && Number(primary) > Number(primaryMax) + 1e-9
 
   const payAsset = primaryCanUseNative && payNative ? zeroAddress : undefined
   const receiveAsset = secondaryCanUseNative && receiveNative ? zeroAddress : undefined

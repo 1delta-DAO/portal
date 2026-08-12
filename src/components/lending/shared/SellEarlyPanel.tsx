@@ -56,9 +56,15 @@ export function SellEarlyPanel({
   const amountNum = parseAmount(amount)
   const eff = computeEffectiveBorrow(bids, amountNum)
 
-  const overMax =
-    !!maxAmount && parseAmount(maxAmount) > 0 && amountNum > parseAmount(maxAmount) + 1e-9
-  const canSell = !!account && amountNum > 0 && !overMax && !pending
+  // Warn whenever the amount exceeds the sellable position — a position of
+  // exactly 0 included, which the old `maxAmount > 0` gate skipped. Knowing the
+  // ceiling is `maxAmount` being SUPPLIED, not its being positive.
+  const overMax = maxAmount != null && amountNum > parseAmount(maxAmount) + 1e-9
+  // The button gate stays exactly where it was — only a NON-ZERO position that
+  // gets overspent blocks the sell. Widening the warning must not widen the
+  // block, so a zero position warns loudly and still lets the user try.
+  const blocksSell = overMax && parseAmount(maxAmount ?? '0') > 0
+  const canSell = !!account && amountNum > 0 && !blocksSell && !pending
 
   const onSell = async () => {
     if (!canSell) return

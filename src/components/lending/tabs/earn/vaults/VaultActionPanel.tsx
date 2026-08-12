@@ -230,10 +230,17 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
         ? userPosition?.shares ?? '0'
         : userPosition?.assets ?? '0'
 
-  const overMax =
-    !isAll &&
-    parseAmount(maxAmountStr) > 0 &&
-    parseAmount(amount) > parseAmount(maxAmountStr) + 1e-9
+  // Warn whenever the amount exceeds the ceiling — a ceiling of exactly ZERO
+  // included (empty wallet on Deposit, no position on Withdraw), which the old
+  // `max > 0` gate silently skipped. What makes the ceiling KNOWN is the
+  // balance/position object existing, not its being positive.
+  const maxKnown = tab === 'Deposit' ? !!activeBal : !!userPosition
+  const overMax = !isAll && maxKnown && parseAmount(amount) > parseAmount(maxAmountStr) + 1e-9
+
+  // The execute/approval block below hides on over-max. That gate keeps its old
+  // reach — only a NON-ZERO ceiling being overspent hides it — so widening the
+  // warning stays a warning and never becomes a new disabler.
+  const overMaxBlocksExecute = overMax && parseAmount(maxAmountStr) > 0
 
   // ---- Success state ----
   if (exec.txSuccess) {
@@ -715,7 +722,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
           )}
 
           {/* Atomic path — approvals + the action itself in one confirmation. */}
-          {exec.result && !overMax && delegationReady && useAtomicPath && (
+          {exec.result && !overMaxBlocksExecute && delegationReady && useAtomicPath && (
             <BatchExecuteButton
               steps={[
                 ...exec.permissions.map((p, i) => p.description || `Approval ${i + 1}`),
@@ -729,7 +736,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
           )}
 
           {/* Permissions */}
-          {exec.result && !overMax && delegationReady && !useAtomicPath && exec.hasPermissions && !exec.allPermissionsDone && (
+          {exec.result && !overMaxBlocksExecute && delegationReady && !useAtomicPath && exec.hasPermissions && !exec.allPermissionsDone && (
             <div className="space-y-1">
               <span className="text-xs text-base-content/60">
                 Approvals ({exec.permissionsCompleted}/{exec.permissions.length})
@@ -770,7 +777,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
 
           {/* Execute */}
           {exec.result &&
-            !overMax &&
+            !overMaxBlocksExecute &&
             delegationReady &&
             !useAtomicPath &&
             (!exec.hasPermissions || exec.allPermissionsDone) && (

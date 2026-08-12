@@ -131,9 +131,16 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   const repayTargetStr = isBrokered ? closeNowStr : debtStr
   const repayMaxStr = hasDebt && hasBal ? minAmountString(repayTargetStr, activeBalStr) : '0'
 
-  const overWallet = !isAll && hasBal && compareAmountStrings(amount || '0', activeBalStr) > 0
+  // Both warnings gate on whether the ceiling is KNOWN, not on whether it is
+  // non-zero: a zero wallet balance (or a zero debt) makes every typed amount
+  // invalid, which is exactly when the user most needs telling. `hasBal` /
+  // `hasDebt` used to swallow those two cases entirely. Advisory only — neither
+  // disables the action.
+  const balKnown = !!activeBal
+  const debtKnown = isBrokered ? !!selectedLoan : !!userPosition
+  const overWallet = !isAll && balKnown && compareAmountStrings(amount || '0', activeBalStr) > 0
   // For brokered loans the ceiling is the full-close amount (debt + penalty).
-  const overDebt = !isAll && hasDebt && compareAmountStrings(amount || '0', repayTargetStr) > 0
+  const overDebt = !isAll && debtKnown && compareAmountStrings(amount || '0', repayTargetStr) > 0
 
   // Estimated monthly interest saved by this repayment. variableBorrowRate
   // is in percent units. Prefer the simulation's projected borrow rate

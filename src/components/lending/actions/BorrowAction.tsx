@@ -4,7 +4,7 @@ import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
 import { ActionExecuteBlock } from './ActionExecuteBlock'
-import { formatTokenAmount, formatUsd, parseAmount } from './format'
+import { compareAmountStrings, formatTokenAmount, formatUsd, parseAmount } from './format'
 import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
@@ -152,8 +152,13 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   const debtStableStr = String(userPosition?.debtStable ?? '0')
   const borrowableStr = String(userPosition?.borrowable ?? '0')
   const debtTotal = parseAmount(debtStr) + parseAmount(debtStableStr)
-  const overMax =
-    parseAmount(borrowableStr) > 0 && parseAmount(amount) > parseAmount(borrowableStr) + 1e-9
+  // Warn whenever the typed amount exceeds what's borrowable — including the
+  // case where borrowable is exactly 0 (no free collateral), which the old
+  // `borrowable > 0` gate silently swallowed. Gate on `userPosition` (as
+  // WithdrawAction does) so the warning waits for the position rather than
+  // firing on a not-yet-loaded — or genuinely absent — one. Advisory only: it
+  // never disables the action.
+  const overMax = !!userPosition && compareAmountStrings(amount || '0', borrowableStr) > 0
 
   // Estimated monthly interest: variableBorrowRate is in percent units.
   // Prefer the simulation's projected borrow rate (post-tx) when available —

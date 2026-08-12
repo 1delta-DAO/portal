@@ -64,6 +64,27 @@ export interface FetchEarnResult {
  * not branch on venue, and does not decide which rows are vaults. It sends the
  * chains, pages until done, and returns what came back.
  */
+/**
+ * Guarantee every facet dimension is an ARRAY.
+ *
+ * The server owns this vocabulary and may serve fewer dimensions than this
+ * client knows about — an older worker, or the origin's SQL route, which
+ * groups a different set than the edge merge does. A missing dimension then
+ * arrives as `undefined`, and one `facets.assets.length` downstream takes the
+ * whole tab out with a render error rather than dropping one dropdown.
+ *
+ * Unknown dimensions are kept, not stripped: a NEW server-side facet must
+ * reach the UI without a release here, which is the entire point of publishing
+ * the vocabulary.
+ */
+function withEveryDimension(raw: EarnResponse['facets'] | undefined): EarnFacets | undefined {
+  if (!raw) return undefined
+  const merged = { ...EMPTY_FACETS, ...raw } as Record<string, unknown>
+  for (const key of Object.keys(merged))
+    if (!Array.isArray(merged[key])) merged[key] = []
+  return merged as unknown as EarnFacets
+}
+
 export async function fetchEarn(params: FetchEarnParams): Promise<FetchEarnResult> {
   try {
     const items: EarnMarket[] = []
@@ -103,7 +124,7 @@ export async function fetchEarn(params: FetchEarnParams): Promise<FetchEarnResul
       items.push(...pageItems)
       // Facets and source health describe the whole listing, not the page —
       // the last page's copy is as good as the first's.
-      facets = page?.facets ?? facets
+      facets = withEveryDimension(page?.facets) ?? facets
       sources = page?.sources ?? sources
       excluded = page?.excluded ?? excluded
 
