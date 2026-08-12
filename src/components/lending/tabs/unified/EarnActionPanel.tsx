@@ -252,9 +252,11 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
           ? 'Building the transaction…'
           : !exec.result
             ? 'Enter an amount'
-            : !exec.allPermissionsDone
-              ? 'Approve first'
-              : undefined
+            : exec.needsSignature
+              ? 'Needs an off-chain signature, which this panel cannot collect yet'
+              : !exec.allPermissionsDone
+                ? 'Approve first'
+                : undefined
 
   const canSubmit = !submitBlockedReason && !exec.executing
 

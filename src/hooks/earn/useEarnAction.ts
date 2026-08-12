@@ -25,6 +25,8 @@ export interface EarnActionExecution {
   permissionsCompleted: number
   allPermissionsDone: boolean
   executing: boolean
+  /** The action needs an EIP-712 signature this app cannot collect. */
+  needsSignature: boolean
   txHash: string | null
   executeNextPermission: () => Promise<void>
   executeMain: () => Promise<void>
@@ -124,6 +126,14 @@ export function useEarnAction(params: UseEarnActionParams): EarnActionExecution 
   const permissions = result?.permissions ?? []
   const allPermissionsDone = permissionsCompleted >= permissions.length
 
+  /**
+   * A signature request stands IN PLACE OF an approval — the backend leaves the
+   * approval out of `permissions` when it offers a permit instead. This app has
+   * no typed-data round-trip, so sending the action anyway would submit it with
+   * no allowance in place and revert. Refuse, and say why.
+   */
+  const needsSignature = (result?.signatures.length ?? 0) > 0
+
   const executeNextPermission = useCallback(async () => {
     const next = permissions[permissionsCompleted]
     if (!next) return
@@ -136,14 +146,15 @@ export function useEarnAction(params: UseEarnActionParams): EarnActionExecution 
   }, [permissions, permissionsCompleted, send])
 
   const executeMain = useCallback(async () => {
-    if (!result || !allPermissionsDone) return
+    if (!result || !allPermissionsDone || needsSignature) return
     setExecuting(true)
     setError(null)
     // Multi-step actions come back as an ORDERED array (an LST that mints then
-    // wraps, a vault that settles then claims). Stopping on the first failure
-    // is deliberate: step two on top of a failed step one is not a partial
-    // success, it is a different transaction.
-    for (const tx of result.transactions) {
+    // wraps, a vault that settles then claims), and `postTransactions` runs
+    // after them (unwrapping the WETH a close freed). Stopping on the first
+    // failure is deliberate: step two on top of a failed step one is not a
+    // partial success, it is a different transaction.
+    for (const tx of [...result.transactions, ...result.postTransactions]) {
       const res = await send(tx)
       if (!res.ok) {
         setExecuting(false)
@@ -157,7 +168,7 @@ export function useEarnAction(params: UseEarnActionParams): EarnActionExecution 
     // exists. Clearing forces a rebuild rather than leaving a stale one armed.
     setResult(null)
     setPermissionsCompleted(0)
-  }, [result, allPermissionsDone, send])
+  }, [result, allPermissionsDone, needsSignature, send])
 
   return {
     result,
@@ -166,6 +177,7 @@ export function useEarnAction(params: UseEarnActionParams): EarnActionExecution 
     permissionsCompleted,
     allPermissionsDone,
     executing,
+    needsSignature,
     txHash,
     executeNextPermission,
     executeMain,

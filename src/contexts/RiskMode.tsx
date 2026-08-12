@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   type ReactNode,
 } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -71,6 +72,11 @@ const RiskModeContext = createContext<RiskModeState>({
 export function RiskModeProvider({ children }: { children: ReactNode }) {
   const [maxRiskScore, setMaxRiskScoreState] = useState<number>(readInitialMaxRisk)
   const [searchParams, setSearchParams] = useSearchParams()
+  // Raw `riskTolerance` string this provider has already reacted to. Anything
+  // different is an *external* URL change (shared link, back/forward, manual
+  // edit) and may drive state; an unchanged param is stale and must not
+  // override a selection the user just made in the UI.
+  const seenUrlRef = useRef<string | null | undefined>(undefined)
 
   const persist = useCallback((value: number) => {
     try {
@@ -89,24 +95,38 @@ export function RiskModeProvider({ children }: { children: ReactNode }) {
   )
 
   // Keep state and the `riskTolerance` URL param in sync, both directions:
-  //  - an external URL (shared link, back/forward, manual edit) drives state;
-  //  - a non-default state is mirrored back into the URL so links stay
-  //    shareable. Path-based navigation elsewhere drops the query string, so
-  //    this effect re-adds it after each navigation. The default value is kept
-  //    out of the URL to avoid noise.
+  //  - a *newly seen* URL value (shared link, back/forward, manual edit) drives
+  //    state;
+  //  - state is otherwise mirrored back into the URL so links stay shareable.
+  //    Path-based navigation elsewhere drops the query string, so this effect
+  //    re-adds it after each navigation. The default value is kept out of the
+  //    URL to avoid noise.
+  //
+  // The URL→state branch only fires when the raw param actually changed. It
+  // used to fire on every run, so picking a value in the RiskSelect was undone
+  // on the very next render: state moved, the param had not been rewritten
+  // yet, and the stale param was replayed back over the fresh selection —
+  // making the dropdown appear stuck at whatever `?riskTolerance=` said.
   useEffect(() => {
-    const fromUrl = parseRiskTolerance(searchParams.get(URL_PARAM))
-    if (fromUrl != null && fromUrl !== maxRiskScore) {
-      setMaxRiskScoreState(fromUrl)
-      persist(fromUrl)
-      return
-    }
-    const desired = maxRiskScore === DEFAULT_MAX_RISK ? null : String(maxRiskScore)
     const current = searchParams.get(URL_PARAM)
+    const urlChanged = current !== seenUrlRef.current
+    seenUrlRef.current = current
+
+    if (urlChanged) {
+      const fromUrl = parseRiskTolerance(current)
+      if (fromUrl != null && fromUrl !== maxRiskScore) {
+        setMaxRiskScoreState(fromUrl)
+        persist(fromUrl)
+        return
+      }
+    }
+
+    const desired = maxRiskScore === DEFAULT_MAX_RISK ? null : String(maxRiskScore)
     if (current !== desired) {
       const next = new URLSearchParams(searchParams)
       if (desired == null) next.delete(URL_PARAM)
       else next.set(URL_PARAM, desired)
+      seenUrlRef.current = desired
       setSearchParams(next, { replace: true })
     }
   }, [searchParams, maxRiskScore, persist, setSearchParams])

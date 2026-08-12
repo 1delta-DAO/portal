@@ -1,4 +1,4 @@
-import { apiFetchLoose } from '../http'
+import { apiFetchEnvelope } from '../http'
 import type { EarnActionKind } from './types'
 
 /** One call the wallet has to make. Matches the worker's `Transaction`. */
@@ -18,6 +18,35 @@ export interface EarnActionResult {
   permissions: EarnTx[]
   /** The action, as one or more ordered calls. */
   transactions: EarnTx[]
+  /**
+   * Calls that run AFTER the main action — e.g. unwrapping the WETH a close
+   * freed. Ordered, and only meaningful once `transactions` has landed.
+   */
+  postTransactions: EarnTx[]
+  /**
+   * EIP-712 requests standing in for `permissions` entries.
+   *
+   * Surfaced rather than dropped: a permit that replaces an approval means the
+   * approval is NOT in `permissions`, so ignoring these would send the action
+   * with no allowance in place and revert.
+   */
+  signatures: unknown[]
+}
+
+/**
+ * The `actions` block, as the worker's `successAction` builds it.
+ *
+ * **Not `data`.** The envelope carries informational fields under `data` and
+ * every call under a sibling `actions` — so `apiFetchLoose`, which returns
+ * `json.data ?? json`, silently discards the entire transaction machinery. It
+ * produced an empty `transactions` on every row, which reads as "the builder
+ * declined" rather than "the client looked in the wrong place".
+ */
+interface EarnActionEnvelope {
+  transactions?: EarnTx[]
+  permissions?: EarnTx[] | null
+  postTransactions?: EarnTx[]
+  signatures?: unknown[]
 }
 
 export interface FetchEarnActionParams {
@@ -62,7 +91,7 @@ export async function fetchEarnAction(
   { success: true; result: EarnActionResult } | { success: false; error: string }
 > {
   try {
-    const body = await apiFetchLoose<any>(
+    const { actions } = await apiFetchEnvelope<unknown, EarnActionEnvelope>(
       `/v1/actions/earn/${params.action}`,
       {
         params: {
@@ -80,11 +109,7 @@ export async function fetchEarnAction(
       },
     )
 
-    const transactions: EarnTx[] = Array.isArray(body?.transactions)
-      ? body.transactions
-      : body?.transaction
-        ? [body.transaction]
-        : []
+    const transactions = actions?.transactions ?? []
 
     if (transactions.length === 0) {
       // A 200 with nothing to send is not success — it is a builder that
@@ -96,8 +121,10 @@ export async function fetchEarnAction(
     return {
       success: true,
       result: {
-        permissions: Array.isArray(body?.permissions) ? body.permissions : [],
+        permissions: actions?.permissions ?? [],
         transactions,
+        postTransactions: actions?.postTransactions ?? [],
+        signatures: actions?.signatures ?? [],
       },
     }
   } catch (err: any) {
