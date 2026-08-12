@@ -45,6 +45,12 @@ across the lending UI.
 - [HealthBadge.tsx](HealthBadge.tsx) — Health-factor badge with the
   standard tone scale (red < 1.1, yellow < 1.3, green ≥ 1.3). Pass
   `size` for the DaisyUI badge sizing token.
+- [Chevron.tsx](Chevron.tsx) — Disclosure chevron for anything that
+  expands: points down when `open`, right when closed, rotating between
+  the two. Use it instead of a `▸` / `▾` text glyph — those render at
+  the font's weight, sit off the baseline, and are too small to read as
+  a control. Pair it with a full-width click target and, where the
+  header is otherwise ambiguous, a "Show / Hide X" label.
 - [PresetButton.tsx](PresetButton.tsx) — Compact ghost button used for
   preset values (amount %, slippage %). Replaces the duplicated
   `btn btn-ghost btn-xs px-1.5 py-0 h-5 min-h-0 text-[10px]` recipe in

@@ -11,6 +11,7 @@ import { formatTokenAmount } from '../../../../utils/format'
 import { useEarnAction } from '../../../../hooks/earn/useEarnAction'
 import { getCurrency } from '../../../../lib/trade-helpers/utils'
 import { UsdAmount } from '../../../common/UsdAmount'
+import { ErrorAlert } from '../../../common/ErrorAlert'
 import {
   vocabLabel,
   type EarnActionInput,
@@ -95,8 +96,7 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
     isExit && row.shareToken ? row.shareToken.address : row.asset.address
   ) as Address
   const spendToken = (payAsset ?? defaultToken) as Address
-  const isCustomSpend =
-    !!payAsset && payAsset.toLowerCase() !== defaultToken.toLowerCase()
+  const isCustomSpend = !!payAsset && payAsset.toLowerCase() !== defaultToken.toLowerCase()
   const spendDecimals = isCustomSpend
     ? // Real decimals where the token list has them, so a 50 % preset on USDC
       // produces 6 places and not 18. The quote re-derives them regardless.
@@ -117,8 +117,7 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
         wanted.set(key, { chainId: row.chainId, address, decimals } as RawCurrency)
     }
     add(spendToken, spendDecimals)
-    for (const c of row.capabilities)
-      for (const i of c.inputs ?? []) add(inputAddress(i.asset), 18)
+    for (const c of row.capabilities) for (const i of c.inputs ?? []) add(inputAddress(i.asset), 18)
     return [...wanted.values()]
   }, [row.chainId, row.capabilities, spendToken, spendDecimals])
 
@@ -161,10 +160,7 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
   // Typing more than you hold is worth catching before the button, not after
   // the wallet rejects it.
   const amountExceedsBalance =
-    walletBounds &&
-    !!account &&
-    !!amount &&
-    Number(amount) > Number(entry?.balance ?? '0')
+    walletBounds && !!account && !!amount && Number(amount) > Number(entry?.balance ?? '0')
 
   const usdValue = useMemo(() => {
     const n = Number(amount)
@@ -262,7 +258,7 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
 
   if (row.capabilities.length === 0) {
     return (
-      <div className="text-xs opacity-60">
+      <div className="text-xs text-base-content/50">
         {row.availability.reason ?? 'No actions available for this market'}
       </div>
     )
@@ -290,7 +286,7 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
           token picker would offer assets its mint reverts on. */}
       {action === 'deposit' && inputs && inputs.length > 0 && (
         <div>
-          <div className="mb-1 text-[11px] opacity-60">Pay with</div>
+          <div className="mb-1 text-xs text-base-content/50">Pay with</div>
           <div className="join">
             {inputs.map((i) => {
               const active = selectedInput?.asset === i.asset
@@ -307,7 +303,7 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
                       made without selecting each one in turn. Silent when the
                       balance is zero — a row of "0"s is noise. */}
                   {(balanceFor(inputAddress(i.asset))?.value ?? 0) > 0 && (
-                    <span className="ml-1 opacity-50">
+                    <span className="ml-1 tabular-nums text-base-content/50">
                       {formatTokenAmount(balanceFor(inputAddress(i.asset))!.value)}
                     </span>
                   )}
@@ -316,7 +312,7 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
             })}
           </div>
           {selectedInput?.mode === 'submit-wrap' && (
-            <div className="mt-1 text-[10px] opacity-60">
+            <div className="mt-1 text-[10px] text-base-content/50">
               Two legs: mints the base token, then wraps it.
             </div>
           )}
@@ -326,14 +322,14 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
       {/* Free selection only where the server says any asset is acceptable. */}
       {action === 'deposit' && !inputs?.length && capability?.acceptsPayAsset && (
         <div>
-          <div className="mb-1 text-[11px] opacity-60">Pay with</div>
+          <div className="mb-1 text-xs text-base-content/50">Pay with</div>
           <TokenSelector
             chainId={row.chainId}
             value={spendToken}
             onChange={(a) => setPayAsset(a)}
           />
           {payAsset && payAsset.toLowerCase() !== row.asset.address.toLowerCase() && (
-            <div className="mt-1 text-[10px] opacity-60">
+            <div className="mt-1 text-[10px] text-base-content/50">
               Swapped to {row.asset.symbol} on deposit.
             </div>
           )}
@@ -347,10 +343,10 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
           load. Its own row rather than the input's label, so it can occupy the
           full width without competing with the 25/50/75 presets. */}
       {account && walletBounds && (
-        <div className="-mb-1 flex items-baseline justify-between text-[11px]">
-          <span className="opacity-60">Your balance</span>
+        <div className="-mb-1 flex items-baseline justify-between text-xs">
+          <span className="text-base-content/50">Your balance</span>
           {balancesFetching && !entry ? (
-            <span className="loading loading-spinner h-3 w-3 opacity-40" />
+            <span className="loading loading-spinner h-3 w-3 text-base-content/40" />
           ) : (
             <button
               type="button"
@@ -362,7 +358,7 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
                 {formatTokenAmount(entry?.value ?? 0)} {spendSymbol}
               </span>
               {(entry?.balanceUSD ?? 0) > 0 && (
-                <UsdAmount value={entry!.balanceUSD} plain className="opacity-60" />
+                <UsdAmount value={entry!.balanceUSD} plain className="text-base-content/50" />
               )}
             </button>
           )}
@@ -373,7 +369,7 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
           row does not carry — so no wallet number is shown rather than a
           plausible wrong one. */}
       {account && !walletBounds && (
-        <div className="text-[11px] opacity-60">
+        <div className="text-xs text-base-content/50">
           Bounded by your supplied position, not your wallet balance.
         </div>
       )}
@@ -387,7 +383,7 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
         usdValue={usdValue}
         error={amountExceedsBalance ? `Exceeds your ${spendSymbol} balance` : null}
         label={
-          <span className="text-[11px] opacity-60">
+          <span className="text-xs text-base-content/50">
             {isExit && row.shareToken
               ? `${row.shareToken.symbol} to redeem`
               : `${row.asset.symbol} amount`}
@@ -401,7 +397,7 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
       {needsSlippage && (
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <span className="text-[11px] opacity-60">
+            <span className="text-xs text-base-content/50">
               Max slippage
               {capability?.via === 'swap'
                 ? ' · traded on a market'
@@ -436,28 +432,24 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
       {/* Params the server says this action needs but the UI cannot supply
           yet — surfaced rather than silently omitted. */}
       {unsupported.length > 0 && (
-        <div className="alert alert-warning py-2">
-          <span className="text-[11px]">
-            This action needs {unsupported.join(', ')} — not yet selectable here.
-          </span>
+        <div className="rounded-lg border border-warning/30 bg-warning/5 px-2 py-1.5 text-xs text-warning">
+          This action needs {unsupported.join(', ')} — not yet selectable here.
         </div>
       )}
 
       {capability?.feeBps != null && capability.feeBps > 0 && (
-        <div className="text-[11px] opacity-70">Instant-exit fee: {capability.feeBps} bps</div>
+        <div className="text-xs text-base-content/70">
+          Instant-exit fee: {capability.feeBps} bps
+        </div>
       )}
 
       {capability?.async && (
-        <div className="text-[11px] opacity-70">
+        <div className="text-xs text-base-content/70">
           Settles later — track it under pending withdrawals after submitting.
         </div>
       )}
 
-      {exec.error && (
-        <div className="alert alert-error py-2">
-          <span className="break-words text-[11px]">{exec.error}</span>
-        </div>
-      )}
+      {exec.error && <ErrorAlert error={exec.error} title="Transaction error" />}
 
       {!account ? (
         <WalletConnect />
@@ -469,7 +461,7 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
               backend labels each one. */}
           {exec.result && exec.result.permissions.length > 0 && !exec.allPermissionsDone && (
             <>
-              <span className="text-[11px] opacity-60">
+              <span className="text-xs text-base-content/50">
                 Approvals ({exec.permissionsCompleted}/{exec.result.permissions.length})
               </span>
               {exec.result.permissions.map((perm, i) => {
@@ -512,7 +504,7 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
           </button>
 
           {exec.txHash && (
-            <span className="text-[11px] opacity-60">
+            <span className="text-xs text-base-content/50">
               Submitted · {exec.txHash.slice(0, 10)}…
             </span>
           )}
@@ -532,7 +524,7 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
 function selectedInputSymbol(
   row: EarnMarket,
   chainId: string,
-  payAsset: Address,
+  payAsset: Address
 ): string | undefined {
   const want = payAsset.toLowerCase()
   for (const c of row.capabilities)

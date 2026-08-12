@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
 import { Logo } from '../../../common/Logo'
+import { Badge } from '../../../common/Badge'
+import { Chevron } from '../../../common/Chevron'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
-import { abbreviateUsd } from '../../../../utils/format'
+import { abbreviateUsd, EMPTY_VALUE, formatPercent, formatLeverage } from '../../../../utils/format'
 import type { RawCurrency } from '../../../../types/currency'
 import {
   vocabLabel,
@@ -10,14 +12,13 @@ import {
   type EarnLendingPosition,
   type EarnPosition,
   type EarnPositionLeg,
-  type EarnPositionTotals,
   type EarnVaultPosition,
   type EarnVocabulary,
 } from '../../../../sdk/earn-helper'
 
 interface Props {
+  /** Already paginated by the container — this component does not slice. */
   items: EarnPosition[]
-  totals: EarnPositionTotals
   vocab: EarnVocabulary
   /**
    * Token lists per chain, used only as a FALLBACK icon source. The server
@@ -25,26 +26,15 @@ interface Props {
    * field, and some lender metadata carries a null logo.
    */
   tokensByChain?: Record<string, Record<string, RawCurrency>>
-  /** Reads were incomplete — every total is a lower bound. */
-  partial?: boolean
-  /** Something came from a snapshot rather than a live read. */
-  stale?: boolean
-  /**
-   * Chains that have not answered yet.
-   *
-   * Non-empty ⇒ `totals` covers only the chains present. Because positions are
-   * fetched per chain, adding a chain leaves the rest on screen — which is the
-   * point, but it means the header figure is momentarily NOT the user's net
-   * worth, and a money view may not let that pass silently.
-   */
-  pendingChains?: string[]
   /** Called with a vault row's `earnUid`, or a lending leg's, to open it. */
   onSelectEarnUid?: (earnUid: string) => void
+  /** The row currently open in the detail rail, so the table shows it. */
+  selectedEarnUid?: string
 }
 
-const pct = (n?: number) => (n == null || !Number.isFinite(n) ? '—' : `${n.toFixed(2)}%`)
+const pct = (n?: number) => (n == null || !Number.isFinite(n) ? EMPTY_VALUE : formatPercent(n))
 
-const usd = (n?: number) => (n == null || !Number.isFinite(n) ? '—' : abbreviateUsd(n))
+const usd = (n?: number) => (n == null || !Number.isFinite(n) ? EMPTY_VALUE : abbreviateUsd(n))
 
 const tokenAmount = (v: string) => Number(v).toLocaleString(undefined, { maximumFractionDigits: 4 })
 
@@ -56,12 +46,13 @@ const tokenAmount = (v: string) => Number(v).toLocaleString(undefined, { maximum
  * it — printing `∞` for both makes an unread value look safe.
  */
 const HealthBadge: React.FC<{ health: number | null }> = ({ health }) => {
-  if (health == null) return <span className="text-xs opacity-40">—</span>
-  const cls = health < 1.05 ? 'badge-error' : health < 1.3 ? 'badge-warning' : 'badge-ghost'
+  if (health == null) return <span className="text-xs text-base-content/40">{EMPTY_VALUE}</span>
+  // DESIGN.md bands: < 1.1 error, 1.1–1.3 warning, >= 1.3 success.
+  const tone = health < 1.1 ? 'error' : health < 1.3 ? 'warning' : 'success'
   return (
-    <span className={`badge badge-xs ${cls}`} title="Health factor">
+    <Badge tone={tone} title="Health factor">
       {health > 100 ? '>100' : health.toFixed(2)}
-    </span>
+    </Badge>
   )
 }
 
@@ -86,8 +77,8 @@ const PositionTile: React.FC<{
   const isDebt = amountUsd != null && amountUsd < 0
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] leading-tight ${
-        isDebt ? 'bg-error/10 text-error' : 'bg-base-300/60'
+      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] leading-tight ${
+        isDebt ? 'bg-error/15 text-error' : 'bg-base-content/10'
       } ${onClick ? 'cursor-pointer hover:brightness-125' : ''}`}
       title={title}
       onClick={
@@ -106,7 +97,7 @@ const PositionTile: React.FC<{
         className="token-logo h-3.5 w-3.5 shrink-0 rounded-full object-contain"
       />
       <span className="font-medium">{symbol}</span>
-      <span className="font-mono tabular-nums opacity-80">
+      <span className="font-mono tabular-nums">
         {amountUsd != null
           ? `${isDebt ? '−' : ''}${abbreviateUsd(Math.abs(amountUsd))}`
           : (fallbackAmount ?? '')}
@@ -116,15 +107,6 @@ const PositionTile: React.FC<{
 }
 
 const shortAddr = (a: string) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '??')
-
-/**
- * Positions per page.
- *
- * Smaller than the markets table's 50: a portfolio is scanned, not searched,
- * and a lending row can expand into several sub-account rows, so a page of 50
- * is far taller here than 50 market rows.
- */
-const PAGE_SIZE = 25
 
 /**
  * The legs of a lending account, as tiles.
@@ -141,7 +123,7 @@ const LegTiles: React.FC<{
   onSelect?: (uid: string) => void
 }> = ({ legs, tokens, onSelect }) => {
   const held = legs.filter((l) => l.side !== 'none')
-  if (held.length === 0) return <span className="text-xs opacity-40">—</span>
+  if (held.length === 0) return <span className="text-xs text-base-content/40">{EMPTY_VALUE}</span>
 
   const tiles: React.ReactNode[] = []
   for (const leg of held) {
@@ -204,19 +186,19 @@ const LegTiles: React.FC<{
  * columns either — those numbers are per-position, so they live on the tiles
  * where they say WHICH asset they refer to, and the row keeps only the Net that
  * is genuinely one figure per position.
+ *
+ * Totals, partial/stale qualifiers and pagination live in the container: they
+ * describe the WHOLE portfolio, not the page, and the summary strip that
+ * carries them stays on screen while the user is browsing opportunities.
  */
 export const EarnPositionsTable: React.FC<Props> = ({
   items,
-  totals,
   vocab,
   tokensByChain,
-  partial,
-  stale,
-  pendingChains,
   onSelectEarnUid,
+  selectedEarnUid,
 }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [page, setPage] = useState(0)
 
   const toggle = (uid: string) =>
     setExpanded((cur) => {
@@ -226,135 +208,44 @@ export const EarnPositionsTable: React.FC<Props> = ({
       return next
     })
 
-  // Pages count POSITIONS, not rendered rows — an expanded multi-account lender
-  // adds `<tr>`s without becoming more than one position, and paging on
-  // rendered rows would make the page size jump around as the user expands.
-  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE))
-  // CLAMPED, not stored back: the list refetches every 30s and can shrink under
-  // the reader (an exit, a failed source). Holding a stale page index in state
-  // would show an empty table on a portfolio that still has rows.
-  const safePage = Math.min(page, totalPages - 1)
-  const pageItems = items.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
-
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-baseline gap-3 text-xs">
-        <span className="opacity-70">Net</span>
-        <span className="text-sm font-semibold">{usd(totals.netUsd)}</span>
-        {/* The header is a sum over the rows PRESENT. While a chain is still in
-            flight that is not the user's net worth, and a figure that quietly
-            grows as chains land is worse than one that says it is incomplete. */}
-        {pendingChains && pendingChains.length > 0 && (
-          <span
-            className="inline-flex items-center gap-1 text-warning"
-            title={`Still loading chain ${pendingChains.join(', ')} — these totals cover the chains that have answered.`}
-          >
-            <span className="loading loading-spinner loading-xs" />+{pendingChains.length} chain
-            {pendingChains.length === 1 ? '' : 's'} loading
-          </span>
-        )}
-        <span className="opacity-60">
-          supplied {usd(totals.suppliedUsd)}
-          {totals.borrowedUsd > 0 ? ` · borrowed ${usd(totals.borrowedUsd)}` : ''}
-        </span>
-        <span className="opacity-60">
-          lending {usd(totals.lendingUsd)} · vaults {usd(totals.vaultUsd)}
-        </span>
-      </div>
-
-      {/* An incomplete read is a LOWER BOUND, and saying so is the difference
-          between a partial portfolio and a wrong one. */}
-      {partial && (
-        <div className="alert alert-warning py-2">
-          <span className="text-xs">
-            Some lender reads did not complete — positions shown are at least this much, and the
-            totals, APR and health factors below them are not reliable.
-          </span>
-        </div>
-      )}
-      {stale && !partial && (
-        <div className="alert py-2">
-          <span className="text-xs">
-            Some rows were served from the last complete snapshot rather than a live read —
-            internally consistent, but not current.
-          </span>
-        </div>
-      )}
-
-      <div className="overflow-x-auto">
-        <table className="table table-sm">
-          <thead>
-            <tr>
-              <th>Venue</th>
-              <th className="text-right">Net</th>
-              <th className="text-right">APR</th>
-              <th>Health</th>
-              <th>Positions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.length === 0 && <TableEmptyRow colSpan={5}>No open positions</TableEmptyRow>}
-            {pageItems.map((row) =>
-              isVaultPosition(row) ? (
-                <VaultRow
-                  key={row.positionUid}
-                  row={row}
-                  vocab={vocab}
-                  tokens={tokensByChain?.[row.chainId]}
-                  onSelectEarnUid={onSelectEarnUid}
-                />
-              ) : (
-                <LendingRows
-                  key={row.positionUid}
-                  row={row}
-                  vocab={vocab}
-                  tokens={tokensByChain?.[row.chainId]}
-                  expanded={expanded.has(row.positionUid)}
-                  onToggle={() => toggle(row.positionUid)}
-                  onSelectEarnUid={onSelectEarnUid}
-                />
-              )
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {items.length > 0 && (
-        <div className="flex items-center justify-between text-xs opacity-70">
-          <span>
-            {items.length} position{items.length === 1 ? '' : 's'}
-            {/* Say WHICH rows are on screen. Without it a paged portfolio and a
-                short one look identical, and the totals above — which are
-                always over the WHOLE portfolio, never the page — appear not to
-                match the rows underneath them. */}
-            {totalPages > 1 &&
-              ` · showing ${safePage * PAGE_SIZE + 1}–${safePage * PAGE_SIZE + pageItems.length}`}
-          </span>
-          {totalPages > 1 && (
-            <div className="join">
-              <button
-                type="button"
-                className="btn join-item btn-xs"
-                disabled={safePage === 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                «
-              </button>
-              <span className="btn no-animation join-item btn-xs">
-                {safePage + 1} / {totalPages}
-              </span>
-              <button
-                type="button"
-                className="btn join-item btn-xs"
-                disabled={safePage >= totalPages - 1}
-                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              >
-                »
-              </button>
-            </div>
+    <div className="overflow-x-auto">
+      <table className="table table-sm w-full table-fixed [&_td]:overflow-hidden [&_th]:overflow-hidden [&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:border-b [&_th]:border-base-300 [&_th]:bg-base-100">
+        <thead>
+          <tr>
+            <th className="w-[30%]">Venue</th>
+            <th className="w-[14%] text-right">Net</th>
+            <th className="w-[12%] text-right">APR</th>
+            <th className="w-[10%]">Health</th>
+            <th className="w-[34%]">Positions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.length === 0 && <TableEmptyRow colSpan={5}>No open positions</TableEmptyRow>}
+          {items.map((row) =>
+            isVaultPosition(row) ? (
+              <VaultRow
+                key={row.positionUid}
+                row={row}
+                vocab={vocab}
+                tokens={tokensByChain?.[row.chainId]}
+                onSelectEarnUid={onSelectEarnUid}
+                selected={!!selectedEarnUid && selectedEarnUid === row.earnUid}
+              />
+            ) : (
+              <LendingRows
+                key={row.positionUid}
+                row={row}
+                vocab={vocab}
+                tokens={tokensByChain?.[row.chainId]}
+                expanded={expanded.has(row.positionUid)}
+                onToggle={() => toggle(row.positionUid)}
+                onSelectEarnUid={onSelectEarnUid}
+              />
+            )
           )}
-        </div>
-      )}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -365,23 +256,24 @@ const VaultRow: React.FC<{
   vocab: EarnVocabulary
   tokens?: Record<string, RawCurrency>
   onSelectEarnUid?: (earnUid: string) => void
-}> = ({ row, vocab, tokens, onSelectEarnUid }) => {
+  selected?: boolean
+}> = ({ row, vocab, tokens, onSelectEarnUid, selected }) => {
   const token = tokens?.[row.asset.address?.toLowerCase() ?? '']
   const symbol = row.asset.symbol ?? token?.symbol ?? shortAddr(row.asset.address)
   const unpriced = (row.asset.priceUsd ?? 0) === 0
 
   return (
     <tr
-      className={onSelectEarnUid ? 'hover cursor-pointer' : ''}
+      className={`${onSelectEarnUid ? 'hover cursor-pointer' : ''} ${selected ? 'bg-primary/10' : ''}`}
       onClick={() => onSelectEarnUid?.(row.earnUid)}
     >
-      <td className="max-w-[18rem]">
+      <td>
         <div className="flex items-center gap-2">
           <span className="shrink-0 overflow-hidden rounded-full">
             <Logo
               src={row.logoURI}
               alt={row.venue}
-              size={26}
+              size={24}
               fallbackText={row.brand ?? row.venue}
               className="rounded-full"
             />
@@ -390,7 +282,7 @@ const VaultRow: React.FC<{
             <div className="truncate text-xs font-medium" title={row.name}>
               {row.name || row.brand || row.venue}
             </div>
-            <div className="truncate text-[10px] opacity-60">
+            <div className="truncate text-[10px] text-base-content/50">
               {row.brand && row.name ? `${row.brand} · ` : ''}
               {vocabLabel(vocab, 'venueKind', row.venueKind)}
               {row.exit ? ' · ' : ''}
@@ -403,19 +295,22 @@ const VaultRow: React.FC<{
           </div>
         </div>
       </td>
-      <td className="text-right text-xs font-medium">
+      <td className="text-right text-xs font-medium tabular-nums">
         {/* An unpriced row shows its TOKEN balance rather than $0 — a vault we
             could not price is unknown, not empty. */}
         {unpriced ? (
-          <span className="opacity-60" title="Underlying is not priced — showing the token balance">
+          <span
+            className="text-base-content/50"
+            title="Underlying is not priced — showing the token balance"
+          >
             {tokenAmount(row.assets)}
           </span>
         ) : (
           usd(row.netUsd)
         )}
       </td>
-      <td className="text-right text-xs">{pct(row.apr)}</td>
-      <td className="text-xs opacity-40">—</td>
+      <td className="text-right text-xs tabular-nums">{pct(row.apr)}</td>
+      <td className="text-xs text-base-content/40">{EMPTY_VALUE}</td>
       <td>
         <PositionTile
           logoURI={row.asset.logoURI ?? token?.logoURI}
@@ -451,13 +346,13 @@ const LendingRows: React.FC<{
   return (
     <>
       <tr className={multi ? 'hover cursor-pointer' : ''} onClick={multi ? onToggle : undefined}>
-        <td className="max-w-[18rem]">
+        <td>
           <div className="flex items-center gap-2">
             <span className="shrink-0 overflow-hidden rounded-full">
               <Logo
                 src={row.logoURI}
                 alt={row.venue}
-                size={26}
+                size={24}
                 fallbackText={row.brand ?? row.lender}
                 className="rounded-full"
               />
@@ -466,19 +361,26 @@ const LendingRows: React.FC<{
               <div className="truncate text-xs font-medium" title={row.lender}>
                 {row.name || row.brand || row.lender}
               </div>
-              <div className="truncate text-[10px] opacity-60">
+              <div className="truncate text-[10px] text-base-content/50">
                 {vocabLabel(vocab, 'venueKind', row.venueKind)}
-                {row.leverage > 1.01 ? ` · ${row.leverage.toFixed(2)}x` : ''}
-                {multi ? ` · ${row.subAccounts.length} accounts ${expanded ? '▾' : '▸'}` : ''}
+                {row.leverage > 1.01 ? ` · ${formatLeverage(row.leverage)}` : ''}
+                {/* A real chevron, not a `▾` glyph — this is the only thing on
+                    the row that says it opens. */}
+                {multi && (
+                  <span className="ml-1 inline-flex items-center gap-0.5 align-middle text-base-content/70">
+                    · {row.subAccounts.length} accounts
+                    <Chevron open={expanded} className="h-3 w-3" />
+                  </span>
+                )}
                 {row.incomplete ? ' · partial' : ''}
                 {row.stale ? ' · stale' : ''}
               </div>
             </div>
           </div>
         </td>
-        <td className="text-right text-xs font-medium">{usd(row.netUsd)}</td>
+        <td className="text-right text-xs font-medium tabular-nums">{usd(row.netUsd)}</td>
         <td
-          className="text-right text-xs"
+          className="text-right text-xs tabular-nums"
           title={
             `market ${pct(row.aprBreakdown.market)} ` +
             `· rewards ${pct(row.aprBreakdown.rewards)} ` +
@@ -492,9 +394,9 @@ const LendingRows: React.FC<{
               negative and this is the entire reason the trade exists — a bare
               headline hides which of the two is doing the work. */}
           {Math.abs(row.aprBreakdown.intrinsic) >= 0.005 && (
-            <div className="text-[10px] font-normal opacity-60">
+            <div className="text-[10px] font-normal text-base-content/50">
               {row.aprBreakdown.intrinsic > 0 ? '+' : ''}
-              {row.aprBreakdown.intrinsic.toFixed(2)}% intrinsic
+              {formatPercent(row.aprBreakdown.intrinsic)} intrinsic
             </div>
           )}
         </td>
@@ -506,7 +408,9 @@ const LendingRows: React.FC<{
               share a solvency calculation, so its tiles would imply a single
               position that is not one. Point at the rows instead. */}
           {multi ? (
-            <span className="text-[10px] opacity-60">{expanded ? 'see below' : 'expand'}</span>
+            <span className="text-[10px] text-base-content/50">
+              {expanded ? 'see below' : 'expand'}
+            </span>
           ) : (
             <LegTiles legs={row.legs} tokens={tokens} onSelect={onSelectEarnUid} />
           )}
@@ -517,13 +421,13 @@ const LendingRows: React.FC<{
         expanded &&
         row.subAccounts.map((sub) => (
           <tr key={`${row.positionUid}:${sub.accountId}`} className="bg-base-200/40">
-            <td className="pl-8 text-[10px] opacity-70" title={sub.accountId}>
+            <td className="pl-8 text-[10px] text-base-content/70" title={sub.accountId}>
               {sub.accountId.length > 14
                 ? `${sub.accountId.slice(0, 8)}…${sub.accountId.slice(-4)}`
                 : sub.accountId}
             </td>
-            <td className="text-right text-xs">{usd(sub.netUsd)}</td>
-            <td className="text-right text-xs opacity-40">—</td>
+            <td className="text-right text-xs tabular-nums">{usd(sub.netUsd)}</td>
+            <td className="text-right text-xs text-base-content/40">{EMPTY_VALUE}</td>
             <td>
               <HealthBadge health={sub.health} />
             </td>

@@ -8,6 +8,23 @@ interface Props {
   hasSharePrice: boolean
   isLoading?: boolean
   error?: Error | null
+  /**
+   * `lg` for the wide band above the table, where the extra height is what the
+   * horizontal room buys you; `sm` in the rail / mobile sheet.
+   */
+  size?: 'sm' | 'lg'
+  /**
+   * Rendered beside the metric tabs — the time-window picker lives here rather
+   * than in a header row of its own, so a chart costs one row of chrome and not
+   * two.
+   */
+  controls?: React.ReactNode
+  /**
+   * What stands in for the plot when there is no series. Defaults to the
+   * "nothing recorded yet" wording; the band above the table overrides it with
+   * "nothing selected", which is a different fact.
+   */
+  emptyMessage?: string
 }
 
 const METRIC_LABEL: Record<Metric, string> = {
@@ -34,9 +51,20 @@ const METRIC_LABEL: Record<Metric, string> = {
  *  - **Fewer than two points renders no line**, with a message, rather than a
  *    dot that suggests a series exists.
  */
-export const HistoryChart: React.FC<Props> = ({ points, hasSharePrice, isLoading, error }) => {
+export const HistoryChart: React.FC<Props> = ({
+  points,
+  hasSharePrice,
+  isLoading,
+  error,
+  size = 'sm',
+  controls,
+  emptyMessage = 'Not enough history recorded for this market yet',
+}) => {
   const [metric, setMetric] = useState<Metric>('apr')
   const [hover, setHover] = useState<number | null>(null)
+  // One height for the plot and for every state that stands in for it, so
+  // loading → empty → drawn never changes the block's size.
+  const plotH = size === 'lg' ? 'h-56' : 'h-40'
 
   const metrics: Metric[] = hasSharePrice ? ['apr', 'tvlUsd', 'sharePrice'] : ['apr', 'tvlUsd']
 
@@ -93,51 +121,60 @@ export const HistoryChart: React.FC<Props> = ({ points, hasSharePrice, isLoading
   const hovered = hover != null ? series[hover] : undefined
 
   return (
-    <div className="flex min-h-[13rem] flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <div role="tablist" className="tabs tabs-boxed tabs-xs">
-          {metrics.map((m) => (
-            <button
-              key={m}
-              type="button"
-              role="tab"
-              className={`tab ${metric === m ? 'tab-active' : ''}`}
-              onClick={() => setMetric(m)}
-            >
-              {METRIC_LABEL[m]}
-            </button>
-          ))}
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div role="tablist" className="tabs tabs-boxed tabs-xs">
+            {metrics.map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                className={`tab ${metric === m ? 'tab-active' : ''}`}
+                onClick={() => setMetric(m)}
+              >
+                {METRIC_LABEL[m]}
+              </button>
+            ))}
+          </div>
+          {controls}
         </div>
         <div className="text-xs tabular-nums">
           {hovered ? (
             <>
               <span className="font-medium">{fmt(hovered.v)}</span>
-              <span className="ml-2 opacity-50">{new Date(hovered.t).toLocaleDateString()}</span>
+              <span className="ml-2 text-base-content/50">
+                {new Date(hovered.t).toLocaleDateString()}
+              </span>
             </>
           ) : (
-            <span className="opacity-50">{values.length ? `${values.length} points` : ''}</span>
+            <span className="text-base-content/50">
+              {values.length ? `${values.length} points` : ''}
+            </span>
           )}
         </div>
       </div>
 
       {isLoading ? (
-        <div className="flex h-40 items-center justify-center">
+        <div className={`flex ${plotH} items-center justify-center`}>
           <span className="loading loading-spinner loading-sm" />
         </div>
       ) : error ? (
-        <div className="flex h-40 items-center justify-center text-xs opacity-60">
+        <div className={`flex ${plotH} items-center justify-center text-xs text-base-content/50`}>
           History unavailable
         </div>
       ) : !geom ? (
-        <div className="flex h-40 items-center justify-center text-xs opacity-60">
+        <div
+          className={`flex ${plotH} items-center justify-center px-4 text-center text-xs text-base-content/50`}
+        >
           {/* Not "no data" — the recorder may simply not have this row yet. */}
-          Not enough history recorded for this market yet
+          {emptyMessage}
         </div>
       ) : (
         <div className="relative">
           <svg
             viewBox={`0 0 ${W} ${H}`}
-            className="h-40 w-full"
+            className={`${plotH} w-full`}
             preserveAspectRatio="none"
             onMouseLeave={() => setHover(null)}
             onMouseMove={(e) => {
@@ -170,7 +207,7 @@ export const HistoryChart: React.FC<Props> = ({ points, hasSharePrice, isLoading
           </svg>
           {/* The axis is NOT zero-based, so both ends are labelled — an
               unlabelled non-zero baseline overstates the movement. */}
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex flex-col justify-between py-1 text-[10px] opacity-50">
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex flex-col justify-between py-1 text-[10px] text-base-content/50">
             <span>{fmt(geom.max)}</span>
             <span>{fmt(geom.min)}</span>
           </div>

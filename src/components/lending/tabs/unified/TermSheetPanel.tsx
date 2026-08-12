@@ -1,4 +1,5 @@
 import React from 'react'
+import { Badge } from '../../../common/Badge'
 
 /**
  * The term sheet, as the earn row carries it.
@@ -47,20 +48,17 @@ export const TermSheetPanel: React.FC<Props> = ({ termSheet }) => {
   const availability = supply.availability
 
   return (
-    <div className="mt-3 border-t border-base-300 pt-3">
-      <div className="mb-1 flex items-baseline justify-between">
-        <span className="text-xs font-medium">Terms</span>
-        {termSheet?.profileId && (
-          <span className="text-[10px] opacity-40">{termSheet.profileId}</span>
-        )}
-      </div>
-
+    // No heading of its own: the panel that mounts this already labels the
+    // section, and a second "Terms" line inside it read as a nested block.
+    <div>
       {headline && <div className="text-xs font-medium">{headline}</div>}
 
-      {description && <p className="mt-1 text-[11px] leading-relaxed opacity-70">{description}</p>}
+      {description && (
+        <p className="mt-1 text-xs leading-relaxed text-base-content/70">{description}</p>
+      )}
 
       {implications.length > 0 && (
-        <ul className="mt-1 list-disc pl-4 text-[11px] opacity-70">
+        <ul className="mt-1 list-disc pl-4 text-xs text-base-content/70">
           {implications.map((i) => (
             <li key={i}>{i}</li>
           ))}
@@ -70,24 +68,21 @@ export const TermSheetPanel: React.FC<Props> = ({ termSheet }) => {
       {(tags.length > 0 || risks.length > 0) && (
         <div className="mt-2 flex flex-wrap gap-1">
           {tags.map((t) => (
-            <span
-              key={t}
-              className={`badge badge-xs ${WARN_TAGS.has(t) ? 'badge-warning' : 'badge-ghost'}`}
-            >
+            <Badge key={t} tone={WARN_TAGS.has(t) ? 'warning' : 'neutral'}>
               {tagLabel(t)}
-            </span>
+            </Badge>
           ))}
           {/* Principal risks are always warnings — they describe ways the
               deposit itself can shrink, not merely how the deal is shaped. */}
           {risks.map((r) => (
-            <span key={r} className="badge badge-error badge-xs">
+            <Badge key={r} tone="error">
               {tagLabel(r)}
-            </span>
+            </Badge>
           ))}
         </div>
       )}
 
-      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
         {counterparty?.solvency && (
           <Row
             label="Backing"
@@ -113,6 +108,10 @@ export const TermSheetPanel: React.FC<Props> = ({ termSheet }) => {
           <Row label="Principal" value="not protected" warn />
         )}
       </div>
+
+      {termSheet?.profileId && (
+        <div className="mt-2 text-[10px] text-base-content/40">{termSheet.profileId}</div>
+      )}
     </div>
   )
 }
@@ -120,7 +119,7 @@ export const TermSheetPanel: React.FC<Props> = ({ termSheet }) => {
 function Row({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
   return (
     <div>
-      <span className="opacity-50">{label}: </span>
+      <span className="text-base-content/50">{label}: </span>
       <span className={warn ? 'text-warning' : ''}>{value}</span>
     </div>
   )

@@ -127,7 +127,7 @@ export const FacetFilters: React.FC<FacetFiltersProps> = ({
               }
             >
               <span className="max-w-[9rem] truncate">{b.label ?? b.key}</span>
-              <span className="ml-1 opacity-60">{b.count}</span>
+              <span className="ml-1 tabular-nums text-base-content/50">{b.count}</span>
             </button>
           ))}
         </div>
@@ -208,19 +208,19 @@ export const FacetFilters: React.FC<FacetFiltersProps> = ({
           renders, so the ceiling is never silently hiding rows. */}
       {excluded.highRisk > 0 && (
         <span
-          className="text-[11px] opacity-60"
+          className="text-xs text-base-content/50"
           title="Above your risk tolerance (chain, lender or collateral risk). Change it with the risk selector in the toolbar."
         >
           {excluded.highRisk} above risk tolerance
         </span>
       )}
 
-      {isFetching && <span className="loading loading-spinner loading-xs opacity-60" />}
+      {isFetching && <span className="loading loading-spinner loading-xs text-base-content/50" />}
 
       {hasFilters && (
         <button
           type="button"
-          className="btn btn-ghost btn-xs"
+          className="btn btn-ghost btn-xs text-base-content/50"
           onClick={() => onChange(EMPTY_SELECTION)}
         >
           Clear
