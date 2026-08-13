@@ -17,6 +17,7 @@ import {
   type EarnActionInput,
   type EarnCapability,
   type EarnMarket,
+  type EarnVaultPosition,
   type EarnVocabulary,
 } from '../../../../sdk/earn-helper'
 
@@ -49,6 +50,14 @@ const inputAddress = (asset: string): Address =>
 interface Props {
   row: EarnMarket
   vocab: EarnVocabulary
+  /**
+   * The user's position in THIS row, when they hold one.
+   *
+   * Only load-bearing for an exit from a vault with no share token, where the
+   * wallet cannot supply the bound — see `positionBounds` below. Absent for
+   * every other shape, which stays wallet-bounded exactly as before.
+   */
+  position?: EarnVaultPosition
 }
 
 /**
@@ -66,7 +75,7 @@ interface Props {
  * vault half, whose zap lands with phase 3. Rendering the selector everywhere
  * would build an input that 400s on submit.
  */
-export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
+export const EarnActionPanel: React.FC<Props> = ({ row, vocab, position }) => {
   const { address: account } = useSpyAccount()
 
   const [action, setAction] = useState<string>(() => row.capabilities[0]?.action ?? '')
@@ -136,14 +145,34 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
    *
    * For a deposit, and for redeeming a vault share the user holds as an ERC-20,
    * yes. For a LENDING withdrawal it is not: the bound is the supplied
-   * position, and this row carries no position (plan §7). Offering the wallet
-   * balance of USDC as the withdrawable amount would present a number that is
-   * both wrong and confidently wrong — a user holding 5,000 USDC and supplying
-   * none would be shown 5,000 as their max.
+   * position. Offering the wallet balance of USDC as the withdrawable amount
+   * would present a number that is both wrong and confidently wrong — a user
+   * holding 5,000 USDC and supplying none would be shown 5,000 as their max.
    */
   const walletBounds = !isExit || !!row.shareToken
 
-  const maxAmount = walletBounds ? (entry?.balance ?? '0') : '0'
+  /**
+   * A vault position that has NO share token — the exit bound the wallet
+   * cannot supply.
+   *
+   * Frankencoin's savings module is the case that forced this: it mints no
+   * token, so `row.shareToken` is absent and `balanceOf` reverts on the module
+   * address. The panel therefore fell to `maxAmount = '0'`, which disabled
+   * Withdraw entirely for a funded account and told them the bound was "your
+   * supplied position" while showing none of it.
+   *
+   * The position IS known — the Unified tab already fetched it — so it is
+   * passed in rather than re-read. Denominated in the underlying (the module
+   * has no shares and its exchange rate is pinned at par), which is exactly
+   * what `withdraw(target, amount)` takes.
+   */
+  const positionBounds = isExit && !row.shareToken && !!position
+
+  const maxAmount = walletBounds
+    ? (entry?.balance ?? '0')
+    : positionBounds
+      ? (position!.assets ?? '0')
+      : '0'
 
   /**
    * What the amount field is denominated in — the pay asset where the user
@@ -365,12 +394,24 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab }) => {
         </div>
       )}
 
-      {/* A lending withdrawal is bounded by the SUPPLIED position, which this
-          row does not carry — so no wallet number is shown rather than a
-          plausible wrong one. */}
+      {/* Bounded by the SUPPLIED position, not the wallet. Where the position
+          is known (a share-less vault) the number is shown — saying "bounded
+          by your position" while offering no figure and a Max of 0 reads as
+          "you have nothing", which is how a funded savings account looked.
+          A lending row still carries no position here, so it stays a bare
+          note rather than a plausible wrong number. */}
       {account && !walletBounds && (
-        <div className="text-xs text-base-content/50">
-          Bounded by your supplied position, not your wallet balance.
+        <div className="flex items-center justify-between gap-2 text-xs text-base-content/50">
+          <span>Bounded by your supplied position, not your wallet balance.</span>
+          {positionBounds && (
+            <button
+              type="button"
+              className="font-medium text-base-content/70 hover:text-base-content"
+              onClick={() => setAmount(maxAmount)}
+            >
+              {formatTokenAmount(Number(position!.assets ?? 0))} {spendSymbol}
+            </button>
+          )}
         </div>
       )}
 

@@ -62,16 +62,20 @@ const QUERY_OPTIONS = {
  * every vault position off `chainIds[0]`) and it cannot DISCOVER, so it has to
  * be handed each chain's whole catalogue as a query string.
  *
- * **One query PER CHAIN, though the endpoint accepts a CSV.** Chain selection
- * is a thing users change constantly, and a single multi-chain query makes the
- * selection part of the cache key — so adding a fourth chain would throw away
- * the three already on screen and re-read every position on all four. Keyed per
- * chain instead:
+ * **One query per chain AND per half, though the endpoint accepts a CSV and
+ * both halves at once.** Chain selection is a thing users change constantly,
+ * and a single multi-chain query makes the selection part of the cache key — so
+ * adding a fourth chain would throw away the three already on screen and
+ * re-read every position on all four. Keyed per chain instead:
  *
  *  - **removing a chain costs no network at all** — its rows simply leave;
  *  - **adding one fetches only that chain**, the rest render from cache;
  *  - a slow or failing chain degrades to a named row rather than blocking the
  *    portfolio or emptying the table.
+ *
+ * Splitting the HALVES on top of that is about latency, not caching: the two
+ * are wildly unequal and one request runs at the pace of the slower one — see
+ * the note on `requests` below.
  *
  * The cost is that totals are re-derived client-side over the rows present.
  * That is deliberate: while a chain is still loading, the server's own totals
@@ -90,19 +94,42 @@ export function useEarnPositions(params: UseEarnPositionsParams): UseEarnPositio
 
   const queryEnabled = enabled && !!account && chains.length > 0
 
+  /**
+   * One request per (chain, HALF) — not per chain.
+   *
+   * The two halves are wildly unequal and the combined request runs at the pace
+   * of the slower one. Measured on the hosted API for one account on chain 1:
+   * the vault half answers in ~2.8 s, the lending half in ~11.5 s, and asking
+   * for both in one request takes ~11.9 s. Split, the vault positions are on
+   * screen four times sooner and the lending half lands when it lands.
+   *
+   * A caller that asked for one half gets exactly that one — the split is only
+   * ours to make when the caller wanted everything.
+   */
+  const requests = useMemo(
+    () =>
+      chains.flatMap((chainId) =>
+        (venueKind ? [venueKind] : (['lending', 'vault'] as const)).map((half) => ({
+          chainId,
+          half,
+        }))
+      ),
+    [chains, venueKind]
+  )
+
   const results = useQueries({
-    queries: chains.map((chainId) => ({
-      queryKey: ['earnPositions', chainId, account ?? '', venueKind ?? '', includeZero ? '1' : '0'],
+    queries: requests.map(({ chainId, half }) => ({
+      queryKey: ['earnPositions', chainId, account ?? '', half, includeZero ? '1' : '0'],
       enabled: queryEnabled,
       queryFn: async () => {
         const res = await fetchEarnPositions({
           chainIds: [chainId],
           account: account!,
-          venueKind,
+          venueKind: half,
           includeZero,
         })
         if (!res.success) {
-          throw new Error(res.error ?? `Failed to load positions on ${chainId}`)
+          throw new Error(res.error ?? `Failed to load ${half} positions on ${chainId}`)
         }
         return res
       },
@@ -113,14 +140,23 @@ export function useEarnPositions(params: UseEarnPositionsParams): UseEarnPositio
   return useMemo(() => {
     const merged = mergeEarnPositions(results.map((r) => r.data))
 
-    const pendingChains: string[] = []
-    const failedChains: string[] = []
+    // Per CHAIN, though the queries are per half: the caller reports chains,
+    // and a chain is only fully read once both of its halves are in.
+    const pending = new Set<string>()
+    const failed = new Set<string>()
     results.forEach((r, i) => {
-      if (r.error) failedChains.push(chains[i])
+      const { chainId } = requests[i]
+      if (r.error) failed.add(chainId)
       // Pending means "has never resolved". A background refetch over data we
       // already hold is `isFetching`, not a hole in the portfolio.
-      else if (r.data === undefined) pendingChains.push(chains[i])
+      //
+      // ONE half outstanding still counts: `totals` would be missing every
+      // lending position, and this flag is what tells the caller the sum on
+      // screen is not the user's net worth.
+      else if (r.data === undefined) pending.add(chainId)
     })
+    const pendingChains = chains.filter((c) => pending.has(c))
+    const failedChains = chains.filter((c) => failed.has(c))
 
     return {
       ...merged,
@@ -132,13 +168,14 @@ export function useEarnPositions(params: UseEarnPositionsParams): UseEarnPositio
       isLoading: queryEnabled && results.length > 0 && results.every((r) => r.isLoading),
       isFetching: results.some((r) => r.isFetching),
       // A per-chain failure is reported per chain, not as a dead hook — the
-      // rest of the portfolio is still true.
+      // rest of the portfolio is still true. Only EVERY request failing is a
+      // dead hook, which with split halves means both halves of every chain.
       error:
-        chains.length > 0 && failedChains.length === chains.length
+        results.length > 0 && results.every((r) => r.error)
           ? ((results[0]?.error as Error) ?? null)
           : null,
       refetch: () => results.forEach((r) => r.refetch()),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [results, chains, queryEnabled])
+  }, [results, chains, requests, queryEnabled])
 }

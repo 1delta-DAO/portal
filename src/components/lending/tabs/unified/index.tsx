@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useEarnCatalog } from '../../../../hooks/earn/useEarnCatalog'
 import { useEarnPositions } from '../../../../hooks/earn/useEarnPositions'
 import { useEarnVocabulary } from '../../../../hooks/earn/useEarnVocabulary'
@@ -20,7 +20,8 @@ import { EarnPositionsTable } from './EarnPositionsTable'
 import { PortfolioSummary } from './PortfolioSummary'
 import { HistoryPanel } from './HistoryPanel'
 import { DetailPanel, DetailPlaceholder } from './DetailPanel'
-import type { EarnMarket } from '../../../../sdk/earn-helper'
+import { isVaultPosition, portfolioNetApr } from '../../../../sdk/earn-helper'
+import type { EarnMarket, EarnVaultPosition } from '../../../../sdk/earn-helper'
 
 interface UnifiedTabProps {
   chainIds: string[]
@@ -137,27 +138,38 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
   // Labels for every server enum — fetched, never embedded.
   const vocab = useEarnVocabulary()
 
-  const { items, facets, sources, excluded, isLoading, isFetching, error, refetch } =
-    useEarnCatalog({
-      chainIds,
-      protocol: selection.protocols.length ? selection.protocols : undefined,
-      curator: selection.curators.length ? selection.curators : undefined,
-      brand: selection.brands.length ? selection.brands : undefined,
-      venue: selection.venues.length ? selection.venues : undefined,
-      venueKind: selection.venueKind,
-      assetGroup: selection.assetGroup,
-      assetSymbol: selection.assetSymbol,
-      depositableOnly: selection.depositableOnly,
-      includePassthrough: selection.includePassthrough,
-      includeIlliquid: selection.includeIlliquid,
-      // `0` disables the server's floor; undefined keeps the default.
-      minTvlUsd: selection.showLowTvl ? 0 : undefined,
-      maxRiskScore,
-      sort: sortKey,
-      // The panel renders prose and counterparty terms the digest omits.
-      terms: 'full',
-      enabled,
-    })
+  const {
+    items,
+    facets,
+    sources,
+    excluded,
+    total,
+    pendingChains,
+    failedChains,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useEarnCatalog({
+    chainIds,
+    protocol: selection.protocols.length ? selection.protocols : undefined,
+    curator: selection.curators.length ? selection.curators : undefined,
+    brand: selection.brands.length ? selection.brands : undefined,
+    venue: selection.venues.length ? selection.venues : undefined,
+    venueKind: selection.venueKind,
+    assetGroup: selection.assetGroup,
+    assetSymbol: selection.assetSymbol,
+    depositableOnly: selection.depositableOnly,
+    includePassthrough: selection.includePassthrough,
+    includeIlliquid: selection.includeIlliquid,
+    // `0` disables the server's floor; undefined keeps the default.
+    minTvlUsd: selection.showLowTvl ? 0 : undefined,
+    maxRiskScore,
+    sort: sortKey,
+    // The panel renders prose and counterparty terms the digest omits.
+    terms: 'full',
+    enabled,
+  })
 
   // The portfolio. Deliberately NOT filtered by the facet selection above:
   // filters are for finding somewhere to deposit, and a user who narrows the
@@ -246,10 +258,29 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
     )
   }
 
+  /**
+   * The user's position in the selected row, if any.
+   *
+   * A vault position's `positionUid` IS its `earnUid` (one vault is one market
+   * is one position), so the join is direct. A LENDING position deliberately
+   * has no `earnUid` — it spans every market in the account — so this only
+   * ever resolves for vault rows, which is exactly where it is needed.
+   */
+  /** Blended net APR across lending AND vaults — see `portfolioNetApr`. */
+  const netApr = useMemo(() => portfolioNetApr(positions.items), [positions.items])
+
+  const selectedPosition = useMemo(() => {
+    if (!selected) return undefined
+    return positions.items.find(
+      (p): p is EarnVaultPosition => isVaultPosition(p) && p.positionUid === selected.earnUid
+    )
+  }, [selected, positions.items])
+
   const panelBody = selected ? (
     <DetailPanel
       row={selected}
       vocab={vocab}
+      position={selectedPosition}
       onClose={() => openRow(null)}
       // Only the mobile sheet carries the chart; on desktop it is the band
       // above the table, where it has the width a series needs.
@@ -286,6 +317,7 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
       {account && (
         <PortfolioSummary
           totals={positions.totals}
+          netApr={netApr}
           positionCount={positions.items.length}
           isLoading={positions.isLoading}
           isFetching={positions.isFetching}
@@ -407,6 +439,27 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
                 {partial
                   .map((s) => `${s.source}: ${s.status}${s.error ? ` (${s.error})` : ''}`)
                   .join('; ')}
+              </div>
+            )}
+
+            {/* The listing is shown while it is still filling: chains resolve
+                independently and each one's pages stream in. Say so — a table
+                that is quietly still growing reads as a complete answer, and
+                "no results on Base" is a different statement from "Base hasn't
+                answered yet". */}
+            {view === 'markets' && (pendingChains.length > 0 || items.length < total) && (
+              <div className="flex items-center gap-2 border-b border-base-300 px-3 py-1.5 text-xs text-base-content/60">
+                <span className="loading loading-spinner loading-xs" />
+                {pendingChains.length > 0
+                  ? `Loading ${pendingChains.length} more chain${pendingChains.length > 1 ? 's' : ''}…`
+                  : `Loading ${total - items.length} more opportunities…`}
+              </div>
+            )}
+
+            {view === 'markets' && failedChains.length > 0 && (
+              <div className="border-b border-base-300 px-3 py-1.5 text-xs text-warning">
+                No results from chain {failedChains.join(', ')} — rows from{' '}
+                {failedChains.length > 1 ? 'those chains are' : 'that chain is'} missing.
               </div>
             )}
 

@@ -1,11 +1,17 @@
 import React from 'react'
 import { abbreviateUsd, EMPTY_VALUE } from '../../../../utils/format'
-import type { EarnPositionTotals } from '../../../../sdk/earn-helper'
+import type { EarnPositionTotals, PortfolioAprResult } from '../../../../sdk/earn-helper'
 
 const usd = (n?: number) => (n == null || !Number.isFinite(n) ? EMPTY_VALUE : abbreviateUsd(n))
 
 interface Props {
   totals: EarnPositionTotals
+  /**
+   * Blended net APR across BOTH halves — see `portfolioNetApr`. Weighted by
+   * each position's equity, so it is a return on net value rather than on
+   * gross supply.
+   */
+  netApr?: PortfolioAprResult
   /** Rows behind the totals — the strip says so rather than only the money. */
   positionCount: number
   isLoading?: boolean
@@ -34,6 +40,7 @@ interface Props {
  */
 export const PortfolioSummary: React.FC<Props> = ({
   totals,
+  netApr,
   positionCount,
   isLoading,
   isFetching,
@@ -64,6 +71,26 @@ export const PortfolioSummary: React.FC<Props> = ({
         )}
         <Stat label="Lending" value={isLoading ? EMPTY_VALUE : usd(totals.lendingUsd)} />
         <Stat label="Vaults" value={isLoading ? EMPTY_VALUE : usd(totals.vaultUsd)} />
+        {/* Sits beside Net value because it is a return ON that number: the
+            weighting is each position's EQUITY, so a levered position
+            legitimately reads high. Rendered only when something was
+            computable — a blank is honest, a 0 % is not. */}
+        {netApr?.apr != null && (
+          <Stat
+            label="Net APR"
+            value={isLoading ? EMPTY_VALUE : `${netApr.apr.toFixed(2)}%`}
+            hint={
+              `Blended across lending and vaults, weighted by each position's net value ` +
+              `(supplied − borrowed). Because the weight is equity, leverage raises it.` +
+              (netApr.excludedCount > 0
+                ? ` ${netApr.excludedCount} position${netApr.excludedCount === 1 ? '' : 's'} ` +
+                  `publish no rate and ${netApr.excludedCount === 1 ? 'is' : 'are'} left out ` +
+                  `entirely rather than counted as 0 %, so this covers ` +
+                  `${usd(netApr.coveredUsd)} of ${usd(netApr.totalUsd)}.`
+                : '')
+            }
+          />
+        )}
         <Stat label="Positions" value={isLoading ? EMPTY_VALUE : String(positionCount)} />
 
         <div className="ml-auto flex flex-wrap items-center gap-2 text-xs">

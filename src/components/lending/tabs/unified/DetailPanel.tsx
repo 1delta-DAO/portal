@@ -12,12 +12,16 @@ import {
   vocabDescription,
   vocabLabel,
   type EarnMarket,
+  type EarnVaultPosition,
   type EarnVocabulary,
 } from '../../../../sdk/earn-helper'
 
 interface Props {
   row: EarnMarket
   vocab: EarnVocabulary
+  /** The user's position in this row, when they hold one — forwarded to the
+   *  action panel so a share-less vault exit knows its bound. */
+  position?: EarnVaultPosition
   onClose: () => void
   /**
    * Render the history section inside the panel.
@@ -59,7 +63,13 @@ const RISK_TONE = { low: 'neutral', medium: 'warning', high: 'error', unknown: '
  *  5. **the fine print** — terms and the raw decomposition, collapsed by
  *     default so the common path is short.
  */
-export const DetailPanel: React.FC<Props> = ({ row, vocab, onClose, showHistory = false }) => {
+export const DetailPanel: React.FC<Props> = ({
+  row,
+  vocab,
+  position,
+  onClose,
+  showHistory = false,
+}) => {
   const [days, setDays] = useState<(typeof WINDOWS)[number]>(30)
   // Not requested at all where the band above the table is already charting it
   // — the same series twice is one HTTP request too many, not just one chart.
@@ -176,7 +186,8 @@ export const DetailPanel: React.FC<Props> = ({ row, vocab, onClose, showHistory 
           {row.risk.lostAssets.pct != null && row.risk.lostAssets.pct >= 0.999
             ? 'This vault reports assets it does not hold — its entire reported value is unbacked.'
             : `${formatPercent(row.risk.lostAssets.pct ?? 0, 1, true)} of this vault's reported value is not backed by any position.`}{' '}
-          The share price does not fall when this happens, so the TVL and price above still look normal.
+          The share price does not fall when this happens, so the TVL and price above still look
+          normal.
         </div>
       )}
 
@@ -203,8 +214,10 @@ export const DetailPanel: React.FC<Props> = ({ row, vocab, onClose, showHistory 
       {row.risk?.stale != null && (
         <div className="rounded-lg border border-warning/30 bg-warning/5 px-2 py-1.5 text-xs text-warning">
           Last observed{' '}
-          {row.risk.stale.ageDays != null ? `${Math.round(row.risk.stale.ageDays)} days ago` : 'a long time ago'} —
-          the rate, TVL and liquidity above describe this vault as it was, not as it is.
+          {row.risk.stale.ageDays != null
+            ? `${Math.round(row.risk.stale.ageDays)} days ago`
+            : 'a long time ago'}{' '}
+          — the rate, TVL and liquidity above describe this vault as it was, not as it is.
         </div>
       )}
 
@@ -215,7 +228,7 @@ export const DetailPanel: React.FC<Props> = ({ row, vocab, onClose, showHistory 
       )}
 
       {/* ── The action ───────────────────────────────────────────────── */}
-      <EarnActionPanel row={row} vocab={vocab} />
+      <EarnActionPanel row={row} vocab={vocab} position={position} />
 
       {/* ── The evidence ─────────────────────────────────────────────── */}
       {showHistory && (
