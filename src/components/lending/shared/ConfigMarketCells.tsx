@@ -28,14 +28,13 @@ export const ExpandChevron: React.FC<{ expanded: boolean }> = ({ expanded }) => 
 )
 
 /**
- * Trailing role chip — pairs with the colored left rail to signal which
- * Loop slot this row is currently filling. Renders an empty placeholder
- * when no role is assigned so the column doesn't visually collapse.
+ * Role chip — pairs with the colored left rail to signal which Loop slot this
+ * row is currently filling. Renders nothing when no role is assigned: it no
+ * longer backs a column that would collapse, it sits at the row's top-right
+ * corner, so an unassigned row should show no artifact at all.
  */
 export const RoleChip: React.FC<{ role: PoolRole | undefined }> = ({ role }) => {
-  if (!role) {
-    return <span className="text-[10px] text-base-content/30">—</span>
-  }
+  if (!role) return null
   return (
     <span
       className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${ROLE_CHIP_CLASS[role]}`}

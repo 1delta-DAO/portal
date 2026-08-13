@@ -18,7 +18,7 @@ export const DETAIL_PAGE_SIZE = 10
 
 /** Thin left-rail accent that signals a Loop role on the row. No background
  *  tint — that lane is reserved for hover / inspect-selected state, so role
- *  selection (rail + trailing chip) doesn't collide with side type or row
+ *  selection (rail + top-right chip) doesn't collide with side type or row
  *  selection state. */
 export const ROLE_RAIL: Record<PoolRole, string> = {
   input: 'border-l-[3px] border-l-error',

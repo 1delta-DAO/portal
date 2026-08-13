@@ -276,40 +276,34 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
               <thead className="[&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
                 <tr>
                   <th
-                    className="w-[7%] cursor-pointer select-none"
+                    className="w-[8%] cursor-pointer select-none"
                     onClick={() => toggleSort('side')}
                   >
                     Side{sortIndicator('side')}
                   </th>
-                  <th className="w-[22%]">Asset</th>
+                  <th className="w-[27%]">Asset</th>
                   <th
-                    className="w-[9%] cursor-pointer select-none"
+                    className="w-[11%] cursor-pointer select-none"
                     onClick={() => toggleSort('apr')}
                   >
                     APR{sortIndicator('apr')}
                   </th>
                   <th
-                    className="w-[7%] cursor-pointer select-none text-right"
+                    className="w-[8%] cursor-pointer select-none text-right"
                     onClick={() => toggleSort('ltv')}
                     title="Loan-to-value (collateral only)"
                   >
                     LTV{sortIndicator('ltv')}
                   </th>
-                  <th className="w-[11%] text-right">Deposits</th>
+                  <th className="w-[12%] text-right">Deposits</th>
                   <th
-                    className="w-[11%] cursor-pointer select-none text-right"
+                    className="w-[12%] cursor-pointer select-none text-right"
                     onClick={() => toggleSort('liquidity')}
                     title="Borrow liquidity (borrowable) / Deposits (collateral)"
                   >
                     Liquidity{sortIndicator('liquidity')}
                   </th>
-                  <th className="w-[11%] text-right">Debt</th>
-                  <th
-                    className="w-[12%]"
-                    title="Loop role: this row's slot in the active loop action"
-                  >
-                    Role
-                  </th>
+                  <th className="w-[12%] text-right">Debt</th>
                 </tr>
               </thead>
               <tbody>
@@ -413,12 +407,22 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                       </td>
                       <td className="text-right">
                         <div className="flex flex-col items-end">
-                          <span
-                            className="text-xs tabular-nums"
-                            title={`$${formatUsd(item.totalDebtUsd)}`}
-                          >
-                            {abbreviateUsd(item.totalDebtUsd)}
-                          </span>
+                          {/* The Loop role rides the top line of the last cell —
+                              the row's top-right corner — instead of owning a
+                              column. A column costs width on EVERY row of every
+                              consumer, and the lending tab passes no highlights
+                              at all, so it rendered a full column of "—". Inline
+                              here it also adds no height: at most one or two
+                              rows per config carry a role. */}
+                          <div className="flex items-center justify-end gap-1.5">
+                            {role && <RoleChip role={role} />}
+                            <span
+                              className="text-xs tabular-nums"
+                              title={`$${formatUsd(item.totalDebtUsd)}`}
+                            >
+                              {abbreviateUsd(item.totalDebtUsd)}
+                            </span>
+                          </div>
                           {pool && (
                             <span
                               className="text-[10px] text-base-content/50 tabular-nums"
@@ -428,9 +432,6 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                             </span>
                           )}
                         </div>
-                      </td>
-                      <td>
-                        <RoleChip role={role} />
                       </td>
                     </tr>
                   )
