@@ -7,7 +7,7 @@ import { useEarnHistory } from '../../../../hooks/earn/useEarnHistory'
 import { HistoryChart } from './HistoryChart'
 import { EarnActionPanel } from './EarnActionPanel'
 import { TermSheetPanel } from './TermSheetPanel'
-import { EMPTY_VALUE, formatPercent, riskBand } from '../../../../utils/format'
+import { EMPTY_VALUE, abbreviateUsd, formatPercent, riskBand } from '../../../../utils/format'
 import {
   vocabDescription,
   vocabLabel,
@@ -173,6 +173,45 @@ export const DetailPanel: React.FC<Props> = ({ row, vocab, onClose, showHistory 
         </div>
       )}
 
+      {/* Loss of principal that already happened — the score cannot say this,
+          so it gets its own banner ABOVE the deposit action. */}
+      {row.risk?.lostAssets != null && (
+        <div className="rounded-lg border border-error/30 bg-error/5 px-2 py-1.5 text-xs text-error">
+          {row.risk.lostAssets.pct != null && row.risk.lostAssets.pct >= 0.999
+            ? 'This vault reports assets it does not hold — its entire reported value is unbacked.'
+            : `${formatPercent(row.risk.lostAssets.pct ?? 0, 1, true)} of this vault's reported value is not backed by any position.`}{' '}
+          The share price does not fall when this happens, so the TVL and price above still look normal.
+        </div>
+      )}
+
+      {row.risk?.badDebt != null &&
+        row.risk.badDebt.material !== false &&
+        (row.risk.badDebt.ratio ?? 0) > 0 && (
+          <div className="rounded-lg border border-error/30 bg-error/5 px-2 py-1.5 text-xs text-error">
+            {row.risk.badDebt.attributed
+              ? "This vault's share of the markets it supplies carries bad debt: "
+              : 'This market carries bad debt: '}
+            {formatPercent(row.risk.badDebt.ratio ?? 0, 1, true)} of size
+            {!row.risk.badDebt.nominal && row.risk.badDebt.usd != null
+              ? ` (${abbreviateUsd(row.risk.badDebt.usd)})`
+              : ''}
+            .
+            {row.risk.badDebt.nominal
+              ? ' The dollar amount is withheld: this market sits at full utilization, so its' +
+                ' interest compounds at the rate-model ceiling and the book value is accrued' +
+                ' interest rather than deposits.'
+              : ''}
+          </div>
+        )}
+
+      {row.risk?.stale != null && (
+        <div className="rounded-lg border border-warning/30 bg-warning/5 px-2 py-1.5 text-xs text-warning">
+          Last observed{' '}
+          {row.risk.stale.ageDays != null ? `${Math.round(row.risk.stale.ageDays)} days ago` : 'a long time ago'} —
+          the rate, TVL and liquidity above describe this vault as it was, not as it is.
+        </div>
+      )}
+
       {!row.availability.canDeposit && (
         <div className="rounded-lg border border-warning/30 bg-warning/5 px-2 py-1.5 text-xs text-warning">
           {row.availability.reason ?? vocabLabel(vocab, 'gating', row.availability.gating)}
@@ -248,6 +287,39 @@ export const DetailPanel: React.FC<Props> = ({ row, vocab, onClose, showHistory 
               value={`${row.risk.score}${row.risk.label ? ` · ${row.risk.label}` : ''}`}
               warn={row.risk.score >= 4}
               hint="Worst of chain, lender and collateral risk. Higher is worse; the API lists <= 4 by default."
+            />
+          )}
+          {row.risk?.vault?.score != null && (
+            <Field
+              label="Vault rating"
+              value={`${row.risk.vault.score}${row.risk.vault.level ? ` · ${row.risk.vault.level}` : ''}`}
+              warn={(row.risk.vault.score ?? 0) >= 4}
+              hint="The vault's own rating — curator, the markets it holds, withdrawability and whether its reported value is real. Separate from the venue risk score above."
+            />
+          )}
+          {row.risk?.badDebt != null && (row.risk.badDebt.ratio ?? 0) > 0 && (
+            <Field
+              label="Bad debt"
+              // Never the dollars when the book is rate-pinned — see the banner.
+              value={`${formatPercent(row.risk.badDebt.ratio ?? 0, 1, true)}${
+                !row.risk.badDebt.nominal && row.risk.badDebt.usd != null
+                  ? ` · ${abbreviateUsd(row.risk.badDebt.usd)}`
+                  : ''
+              }`}
+              warn
+              hint={
+                row.risk.badDebt.nominal
+                  ? 'Share of the market book that is bad debt. The dollar figure is accrued interest on a defaulted, fully-utilized market, not capital, so it is not shown.'
+                  : 'Share of size that is bad debt, and the amount.'
+              }
+            />
+          )}
+          {row.risk?.lostAssets != null && (
+            <Field
+              label="Unbacked NAV"
+              value={formatPercent(row.risk.lostAssets.pct ?? 0, 1, true)}
+              warn
+              hint="Reported value the vault cannot account for in any position. The share price does not drop when this happens."
             />
           )}
           <Field

@@ -223,7 +223,15 @@ export function LendingDashboard({
     // keep any unrelated params intact (notably `riskTolerance`, which
     // RiskMode owns). The pin now lives in component state, so stripping the
     // URL doesn't undo it.
-    setSearchParams(stripDeepLinkParams(searchParams), { replace: true })
+    //
+    // FUNCTIONAL form, not the `searchParams` snapshot this effect closed
+    // over: that snapshot can predate a `riskTolerance` write RiskMode made
+    // while this effect was waiting on `allPools`, and writing it back put the
+    // OLD risk value in the URL — which RiskMode then read as an external
+    // change and adopted, snapping the risk selector back to its previous
+    // value. This tab and Looping were the only two that wrote the query
+    // string, which is why the Unified tab never showed the bug.
+    setSearchParams((prev) => stripDeepLinkParams(prev), { replace: true })
     // `setViewMode` is a fresh closure every render (it wraps the persisted-
     // filter setter), so listing it here would re-run this effect constantly;
     // the signature guard above absorbs that, but the dependency is noise.

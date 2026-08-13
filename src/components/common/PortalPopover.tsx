@@ -79,6 +79,196 @@ export function CopyRow({ label, value }: { label: string; value: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// PopoverShell — the anchoring mechanics, with no opinion about content
+// ---------------------------------------------------------------------------
+
+interface PopoverShellProps {
+  /** The clickable anchor. Rendered inside a wrapper that owns the click. */
+  trigger: React.ReactNode
+  /** Header content (left of the close button). */
+  header: React.ReactNode
+  /** Hover title on the trigger. */
+  triggerTitle?: string
+  /**
+   * Layout classes for the trigger wrapper. REPLACES the default row layout —
+   * an icon-only trigger inside a table cell needs `inline-flex`, and passing
+   * it alongside the default `flex` would leave which one wins up to stylesheet
+   * order rather than to the caller.
+   */
+  triggerClassName?: string
+  /** Popover width class. Keep in step with `widthPx` so the flip math holds. */
+  widthClassName?: string
+  widthPx?: number
+  /** Accessible name for the trigger when its content is icon-only. */
+  ariaLabel?: string
+  /**
+   * Keep the trigger's click to itself instead of letting it bubble.
+   *
+   * Default `false` preserves the identity-cell behaviour: the asset/vault
+   * popover IS the row's subject, so opening it and selecting the row at the
+   * same time is what a user means. A SECONDARY control in a cell — the risk
+   * icon — means the opposite: bubbling there hits the row handler and toggles
+   * the selection off underneath the popover that just opened.
+   */
+  stopPropagation?: boolean
+  children: React.ReactNode
+}
+
+/**
+ * Click-triggered popover rendered through a React portal, so it escapes
+ * `overflow:hidden` containers (tables, cards) and flips above the trigger when
+ * there isn't room below.
+ *
+ * Everything visual is the caller's: this owns positioning, outside-click,
+ * scroll/resize tracking and the frame. {@link PortalPopover} is the
+ * logo+symbol flavour of it; icon-only callers (risk findings) use it directly
+ * rather than carrying a token identity they don't have.
+ */
+export const PopoverShell: React.FC<PopoverShellProps> = ({
+  trigger,
+  header,
+  triggerTitle = 'Click for details',
+  triggerClassName = 'flex items-center gap-2 min-w-0',
+  widthClassName = 'w-60',
+  widthPx = 240,
+  ariaLabel,
+  stopPropagation = false,
+  children,
+}) => {
+  const [visible, setVisible] = useState(false)
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null)
+
+  const triggerRef = useRef<HTMLDivElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
+
+  const reposition = useCallback(() => {
+    if (!triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    const popH = popoverRef.current?.offsetHeight ?? 300
+    const gap = 6
+    const top =
+      rect.bottom + gap + popH > window.innerHeight ? rect.top - gap - popH : rect.bottom + gap
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - widthPx - 8))
+    setCoords({ top, left })
+  }, [widthPx])
+
+  const toggle = useCallback(
+    (e: React.MouseEvent | React.KeyboardEvent) => {
+      // By default the click bubbles on purpose, so the parent row handler
+      // (e.g. market/vault selection) still fires — see `stopPropagation`.
+      if (stopPropagation) e.stopPropagation()
+      if (visible) {
+        setVisible(false)
+        return
+      }
+      reposition()
+      setVisible(true)
+    },
+    [visible, reposition, stopPropagation]
+  )
+
+  // Close on outside click
+  useEffect(() => {
+    if (!visible) return
+    const handler = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (!triggerRef.current?.contains(t) && !popoverRef.current?.contains(t)) {
+        setVisible(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [visible])
+
+  // Reposition on scroll / resize while visible
+  useEffect(() => {
+    if (!visible) return
+    window.addEventListener('scroll', reposition, true)
+    window.addEventListener('resize', reposition)
+    return () => {
+      window.removeEventListener('scroll', reposition, true)
+      window.removeEventListener('resize', reposition)
+    }
+  }, [visible, reposition])
+
+  // Re-measure once mounted so the flip logic uses the actual height
+  useEffect(() => {
+    if (visible && popoverRef.current) reposition()
+  }, [visible, reposition])
+
+  return (
+    <>
+      <div
+        ref={triggerRef}
+        role="button"
+        tabIndex={0}
+        aria-label={ariaLabel}
+        aria-expanded={visible}
+        className={`relative cursor-pointer select-none group ${triggerClassName}`}
+        onClick={toggle}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            toggle(e)
+          }
+        }}
+        title={triggerTitle}
+      >
+        {trigger}
+      </div>
+
+      {visible &&
+        coords &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            className={`fixed z-9999 shadow-xl bg-base-200 rounded-box ${widthClassName} border border-base-300 animate-in fade-in zoom-in-95 duration-100 origin-top-left`}
+            style={{ top: coords.top, left: coords.left }}
+            // A portal escapes the DOM tree but NOT the React tree: events raised
+            // inside it still bubble to this component's ancestors, so reading
+            // the panel would otherwise click the row sitting behind it. This is
+            // unconditional — no caller wants a click on a floating panel to
+            // count as a click on what it covers.
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2 border-b border-base-300">
+              <div className="flex items-center gap-2 min-w-0">{header}</div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs btn-circle -mr-1"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setVisible(false)
+                }}
+                aria-label="Close"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-3 h-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-3 py-2 space-y-1.5 text-xs">{children}</div>
+          </div>,
+          document.body
+        )}
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // PortalPopover
 // ---------------------------------------------------------------------------
 
@@ -115,73 +305,23 @@ export const PortalPopover: React.FC<PortalPopoverProps> = ({
   triggerTitle = 'Click for details',
   trigger,
   children,
-}) => {
-  const [visible, setVisible] = useState(false)
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null)
-
-  const triggerRef = useRef<HTMLDivElement>(null)
-  const popoverRef = useRef<HTMLDivElement>(null)
-
-  const reposition = useCallback(() => {
-    if (!triggerRef.current) return
-    const rect = triggerRef.current.getBoundingClientRect()
-    const popH = popoverRef.current?.offsetHeight ?? 300
-    const popW = 240 // w-60 = 15rem = 240px
-    const gap = 6
-    const top =
-      rect.bottom + gap + popH > window.innerHeight ? rect.top - gap - popH : rect.bottom + gap
-    const left = Math.min(rect.left, window.innerWidth - popW - 8)
-    setCoords({ top, left })
-  }, [])
-
-  const toggle = useCallback(() => {
-    // Don't stop propagation — let the click bubble so the parent row handler
-    // (e.g. market/vault selection) still fires.
-    if (visible) {
-      setVisible(false)
-      return
+}) => (
+  <PopoverShell
+    triggerTitle={triggerTitle}
+    ariaLabel={symbol}
+    header={
+      <>
+        <Logo
+          src={logoURI}
+          alt={symbol}
+          fallbackText={fallbackText ?? symbol}
+          className="rounded-full w-5 h-5 shrink-0 token-logo"
+        />
+        <span className="font-semibold text-sm truncate">{symbol}</span>
+      </>
     }
-    reposition()
-    setVisible(true)
-  }, [visible, reposition])
-
-  // Close on outside click
-  useEffect(() => {
-    if (!visible) return
-    const handler = (e: MouseEvent) => {
-      const t = e.target as Node
-      if (!triggerRef.current?.contains(t) && !popoverRef.current?.contains(t)) {
-        setVisible(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [visible])
-
-  // Reposition on scroll / resize while visible
-  useEffect(() => {
-    if (!visible) return
-    window.addEventListener('scroll', reposition, true)
-    window.addEventListener('resize', reposition)
-    return () => {
-      window.removeEventListener('scroll', reposition, true)
-      window.removeEventListener('resize', reposition)
-    }
-  }, [visible, reposition])
-
-  // Re-measure once mounted so the flip logic uses the actual height
-  useEffect(() => {
-    if (visible && popoverRef.current) reposition()
-  }, [visible, reposition])
-
-  return (
-    <>
-      <div
-        ref={triggerRef}
-        className="relative flex items-center gap-2 min-w-0 cursor-pointer select-none group"
-        onClick={toggle}
-        title={triggerTitle}
-      >
+    trigger={
+      <>
         <div className="relative shrink-0 group-hover:opacity-75 transition-opacity">
           <Logo
             src={logoURI}
@@ -194,57 +334,9 @@ export const PortalPopover: React.FC<PortalPopoverProps> = ({
           )}
         </div>
         <div className="min-w-0 flex-1 group-hover:opacity-75 transition-opacity">{trigger}</div>
-      </div>
-
-      {visible &&
-        coords &&
-        createPortal(
-          <div
-            ref={popoverRef}
-            className="fixed z-9999 shadow-xl bg-base-200 rounded-box w-60 border border-base-300 animate-in fade-in zoom-in-95 duration-100 origin-top-left"
-            style={{ top: coords.top, left: coords.left }}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2 border-b border-base-300">
-              <div className="flex items-center gap-2 min-w-0">
-                <Logo
-                  src={logoURI}
-                  alt={symbol}
-                  fallbackText={fallbackText ?? symbol}
-                  className="rounded-full w-5 h-5 shrink-0 token-logo"
-                />
-                <span className="font-semibold text-sm truncate">{symbol}</span>
-              </div>
-              <button
-                type="button"
-                className="btn btn-ghost btn-xs btn-circle -mr-1"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setVisible(false)
-                }}
-                aria-label="Close"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-3 h-3"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="px-3 py-2 space-y-1.5 text-xs">{children}</div>
-          </div>,
-          document.body
-        )}
-    </>
-  )
-}
+      </>
+    }
+  >
+    {children}
+  </PopoverShell>
+)

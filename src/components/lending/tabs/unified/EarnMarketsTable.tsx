@@ -1,6 +1,8 @@
 import React from 'react'
+import { Link } from 'react-router-dom'
 import { Logo } from '../../../common/Logo'
 import { Badge } from '../../../common/Badge'
+import { RiskFindings } from '../../shared/RiskFindings'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { SortableHeader } from '../../../common/SortableHeader'
 import {
@@ -16,6 +18,7 @@ import {
   type EarnMarket,
   type EarnVocabulary,
 } from '../../../../sdk/earn-helper'
+import { buildPath, OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'
 
 export type EarnSortKey = 'rate' | 'marketRate' | 'tvl' | 'liquidity'
 
@@ -32,6 +35,57 @@ interface Props {
 const pct = (n?: number) => (n == null || !Number.isFinite(n) ? EMPTY_VALUE : formatPercent(n))
 
 const RISK_TONE = { low: 'neutral', medium: 'warning', high: 'error', unknown: 'neutral' } as const
+
+/**
+ * Deep link into the Lending tab for rows that ARE a lending market.
+ *
+ * `refs.marketUid` is the uid when the server sends one — but it does not
+ * always: the hosted API returns `refs`, the local worker omits it entirely,
+ * and gating on it made the icon vanish against a local backend. So compose the
+ * fallback from fields that are always present. `venue` IS the lender key
+ * (`MORPHO_BLUE_E7B3…`, matching `lenderInfo.key` on `/v1/data/lending/latest`)
+ * and a market uid is `LENDER:chainId:asset`, so the three documented fields
+ * rebuild it exactly — verified against the lending endpoint's own uids.
+ *
+ * Composing beats splitting `earnUid`, which is identical for these rows but
+ * documented as opaque ("pass back verbatim; never split it").
+ *
+ * Vault rows are excluded by `venueKind`, which is the only thing that
+ * separates them: their uid is well-formed too (`vault.savings:1:0x…`), it just
+ * names no lending market. Fail-safe direction — if that value is ever renamed
+ * the icon disappears rather than pointing at a market that isn't there.
+ */
+function lendingPathForRow(row: EarnMarket): string | null {
+  if (row.venueKind !== 'lending') return null
+  const asset = row.asset.address
+  if (!asset || !row.venue) return null
+  const uid = row.refs?.marketUid ?? `${row.venue}:${row.chainId}:${asset}`
+  return buildPath('lending', row.chainId, row.venue, {
+    [OPTIMIZER_DEEPLINK_KEYS.colMarket]: uid,
+    [OPTIMIZER_DEEPLINK_KEYS.collateral]: asset,
+    [OPTIMIZER_DEEPLINK_KEYS.action]: 'deposit',
+  })
+}
+
+/** Arrow-out-of-box — the same "opens elsewhere" mark the Earn table uses. */
+function OpenInIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M7 17L17 7" />
+      <path d="M7 7h10v10" />
+    </svg>
+  )
+}
 
 /**
  * The sub-line under the headline APR.
@@ -103,6 +157,7 @@ export const EarnMarketsTable: React.FC<Props> = ({
         {items.map((row) => {
           const isSel = selected?.earnUid === row.earnUid
           const note = venueNote(row)
+          const lendingPath = lendingPathForRow(row)
           return (
             <tr
               key={row.earnUid}
@@ -131,8 +186,27 @@ export const EarnMarketsTable: React.FC<Props> = ({
                         underneath in small grey text. Falls back to the brand
                         when a row has no market name, so the primary line is
                         never empty. */}
-                    <div className="truncate text-xs font-medium" title={row.name ?? row.venue}>
-                      {row.name || row.brand || row.venue}
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="truncate text-xs font-medium" title={row.name ?? row.venue}>
+                        {row.name || row.brand || row.venue}
+                      </span>
+                      {/* Lending markets only — a vault has no entry there. A
+                          real <Link>, so cmd/middle-click opens a tab instead
+                          of swallowing the modifier the way an onClick-only
+                          anchor does. */}
+                      {lendingPath && (
+                        <Link
+                          to={lendingPath}
+                          className="shrink-0 text-base-content/30 hover:text-primary transition-colors"
+                          title={`Open ${
+                            row.name || row.asset.symbol || 'this market'
+                          } in the Lending tab`}
+                          aria-label="Open in the Lending tab"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <OpenInIcon />
+                        </Link>
+                      )}
                     </div>
                     {/* Curator · protocol · kind. The protocol is the part that
                         distinguishes a Morpho vault from a Euler one — both
@@ -220,30 +294,27 @@ export const EarnMarketsTable: React.FC<Props> = ({
                 )}
               </td>
               <td>
-                {/* Higher is worse. `illiquid` is a separate axis: a market can
-                    be low-risk on collateral and still be one you cannot
-                    exit. */}
-                {row.risk?.score != null ? (
-                  <Badge
-                    tone={RISK_TONE[riskBand(row.risk.score)]}
-                    // The server's own label where it sent one, else the band
-                    // this score falls in — never a third opinion.
-                    title={`Risk: ${row.risk.label ?? riskBand(row.risk.score)}`}
-                  >
-                    {row.risk.score}
-                  </Badge>
-                ) : (
-                  <span className="text-xs text-base-content/40">{EMPTY_VALUE}</span>
-                )}
-                {row.risk?.illiquid && (
-                  <Badge
-                    tone="error"
-                    className="ml-1"
-                    title="Claims a same-block exit but reports zero liquidity — enterable, not exitable."
-                  >
-                    illiquid
-                  </Badge>
-                )}
+                {/* Score (higher is worse) plus ONE icon for everything the
+                    score doesn't cover — losses already taken, an exit that
+                    doesn't work, a stale rating. Those are separate axes: a
+                    market can be low-risk on collateral and still be one you
+                    cannot exit, or one whose money is already gone. Details
+                    live in the icon's popover so the column stays one line. */}
+                <div className="flex items-center gap-1">
+                  {row.risk?.score != null ? (
+                    <Badge
+                      tone={RISK_TONE[riskBand(row.risk.score)]}
+                      // The server's own label where it sent one, else the band
+                      // this score falls in — never a third opinion.
+                      title={`Risk: ${row.risk.label ?? riskBand(row.risk.score)}`}
+                    >
+                      {row.risk.score}
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-base-content/40">{EMPTY_VALUE}</span>
+                  )}
+                  <RiskFindings risk={row.risk} />
+                </div>
               </td>
               <td className="truncate">
                 <Badge title={vocabDescription(vocab, 'exitMode', row.exit.mode)}>

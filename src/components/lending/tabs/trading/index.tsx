@@ -228,7 +228,10 @@ export function TradingDashboard({
       setViewMode('config')
     }
 
-    setSearchParams(stripDeepLinkParams(searchParams), { replace: true })
+    // Functional form — see the matching note in the Lending tab's consumer:
+    // writing back this effect's `searchParams` snapshot could resurrect a
+    // stale `riskTolerance` and reset the risk selector.
+    setSearchParams((prev) => stripDeepLinkParams(prev), { replace: true })
     // `setViewMode` wraps the persisted-filter setter and is a fresh closure
     // every render — see the matching note in the Lending tab's consumer.
     // eslint-disable-next-line react-hooks/exhaustive-deps

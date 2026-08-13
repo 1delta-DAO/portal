@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { riskSyncStep } from './riskUrlSync'
 
 /**
  * App-wide risk ceiling. A single `maxRiskScore` (2 = low, 4 = up to medium,
@@ -77,6 +78,18 @@ export function RiskModeProvider({ children }: { children: ReactNode }) {
   // edit) and may drive state; an unchanged param is stale and must not
   // override a selection the user just made in the UI.
   const seenUrlRef = useRef<string | null | undefined>(undefined)
+  // The value of our own most recent write that has NOT yet been observed back
+  // in the URL. `undefined` means nothing is outstanding (`null` is a real
+  // value — it means "param deleted").
+  //
+  // While a write is outstanding, ANY other value showing up in the URL came
+  // from a different writer, not from the user: some other component replaced
+  // the query string from a snapshot taken before our write. Adopting it is how
+  // the selector snapped back to its previous value on the tabs that write the
+  // URL themselves (Lending and Looping strip their optimizer hand-off params;
+  // the Unified tab writes nothing, which is why it looked fixed and they did
+  // not). Re-assert instead — a click is newer than any value already in the URL.
+  const pendingWriteRef = useRef<string | null | undefined>(undefined)
 
   const persist = useCallback((value: number) => {
     try {
@@ -102,32 +115,44 @@ export function RiskModeProvider({ children }: { children: ReactNode }) {
   //    re-adds it after each navigation. The default value is kept out of the
   //    URL to avoid noise.
   //
-  // The URL→state branch only fires when the raw param actually changed. It
-  // used to fire on every run, so picking a value in the RiskSelect was undone
-  // on the very next render: state moved, the param had not been rewritten
-  // yet, and the stale param was replayed back over the fresh selection —
-  // making the dropdown appear stuck at whatever `?riskTolerance=` said.
+  // Which reading wins is decided by `riskSyncStep` — a pure step, unit-tested
+  // in riskUrlSync.test.ts, because this is the part that keeps regressing. Two
+  // rules there, both from bug reports: the URL→state branch fires only when
+  // the raw param actually CHANGED (it used to fire on every run, replaying the
+  // stale param over a selection the user had just made), and it stands down
+  // entirely while a write of ours is still in flight (another writer's replace
+  // is the one carrying stale data at that point, not us).
   useEffect(() => {
-    const current = searchParams.get(URL_PARAM)
-    const urlChanged = current !== seenUrlRef.current
-    seenUrlRef.current = current
+    const { effect, memory } = riskSyncStep({
+      current: searchParams.get(URL_PARAM),
+      maxRiskScore,
+      defaultMaxRisk: DEFAULT_MAX_RISK,
+      memory: { seen: seenUrlRef.current, pending: pendingWriteRef.current },
+      parse: parseRiskTolerance,
+    })
+    seenUrlRef.current = memory.seen
+    pendingWriteRef.current = memory.pending
 
-    if (urlChanged) {
-      const fromUrl = parseRiskTolerance(current)
-      if (fromUrl != null && fromUrl !== maxRiskScore) {
-        setMaxRiskScoreState(fromUrl)
-        persist(fromUrl)
-        return
-      }
+    if (effect.kind === 'adopt') {
+      setMaxRiskScoreState(effect.score)
+      persist(effect.score)
+      return
     }
-
-    const desired = maxRiskScore === DEFAULT_MAX_RISK ? null : String(maxRiskScore)
-    if (current !== desired) {
-      const next = new URLSearchParams(searchParams)
-      if (desired == null) next.delete(URL_PARAM)
-      else next.set(URL_PARAM, desired)
-      seenUrlRef.current = desired
-      setSearchParams(next, { replace: true })
+    if (effect.kind === 'write') {
+      const { value } = effect
+      // Functional form on purpose: it receives the params as they are AT WRITE
+      // TIME. Building from the `searchParams` snapshot this effect closed over
+      // would resurrect whatever another writer removed in between — the same
+      // stale-snapshot clobber this file defends against from the other side.
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          if (value == null) next.delete(URL_PARAM)
+          else next.set(URL_PARAM, value)
+          return next
+        },
+        { replace: true }
+      )
     }
   }, [searchParams, maxRiskScore, persist, setSearchParams])
 

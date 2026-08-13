@@ -96,6 +96,49 @@ export interface EarnAvailability {
   reason?: string
 }
 
+/**
+ * Loss of principal that has ALREADY HAPPENED.
+ *
+ * `usd` is the amount, but a defaulted market is pinned at 100% utilization, so
+ * its interest rate sits at the IRM ceiling (~297,996% APY) and BOTH sides of
+ * its book inflate exponentially on a debt nobody will repay. When `nominal` is
+ * true that figure is accrued book value, not capital: one market reports $3.7B
+ * against a protocol holding $1.76M on that chain.
+ *
+ * SO: when `nominal`, render `ratio` ("84% of book impaired") and never the
+ * dollars. The ratio is scale-invariant and stays true either way.
+ */
+export interface EarnBadDebt {
+  usd?: number
+  realizedUsd?: number
+  /** Bad debt over size. Always safe to render. */
+  ratio?: number
+  /** 1-5, higher is worse (market rows only). */
+  score?: number
+  level?: 'green' | 'yellow' | 'red'
+  /** false = dust in a near-empty market: reported, never scored. */
+  material?: boolean
+  /** true = book value, not capital. Show `ratio`, suppress `usd`. */
+  nominal?: boolean
+  /** Vault rows: this vault's SHARE of its markets' loss, not their total. */
+  attributed?: boolean
+  borrowApy?: number
+}
+
+/**
+ * NAV the vault reports but cannot account for in any market.
+ *
+ * MetaMorpho V1.1 and Euler Earn absorb a loss into `lostAssets` so that
+ * `totalAssets()` and the SHARE PRICE STAY FLAT. A vault that lost everything
+ * keeps advertising its old TVL at a healthy share price — nothing else in this
+ * payload moves, which is exactly why it needs its own field.
+ */
+export interface EarnLostAssets {
+  usd?: number
+  /** Share of reported NAV backed by nothing. 1 = a total loss. */
+  pct?: number
+}
+
 export interface EarnRisk {
   yieldProfile?: 'yield-bearing' | 'volatile'
   denomination?: 'stable' | 'volatile'
@@ -110,6 +153,24 @@ export interface EarnRisk {
    * is never flagged.
    */
   illiquid?: boolean
+  /**
+   * The vault's own rating (curator / markets / liquidity / integrity), kept
+   * APART from `score`, which rates the venue in the abstract. A vault can sit
+   * on a low-risk chain and lender and still have lost the money.
+   */
+  vault?: {
+    level?: 'green' | 'yellow' | 'red'
+    score?: number
+    /** `bad-debt` | `lost-assets` | `lost-assets+bad-debt` | … */
+    integrityFlag?: string
+  }
+  badDebt?: EarnBadDebt
+  lostAssets?: EarnLostAssets
+  /**
+   * The snapshot the rating was computed from is old, so the TVL / APR /
+   * liquidity behind it describe the vault as it WAS. Seen at 100 days.
+   */
+  stale?: { ageDays?: number }
 }
 
 /**
