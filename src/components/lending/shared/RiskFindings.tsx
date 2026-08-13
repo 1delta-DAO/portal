@@ -43,7 +43,7 @@ interface Finding {
 /** The findings on a row, worst first. Empty when there is nothing to say. */
 export function riskFindings(risk?: EarnRisk): Finding[] {
   if (!risk) return []
-  const { badDebt, lostAssets, stale, illiquid, vault } = risk
+  const { badDebt, lostAssets, stale, illiquid, vault, governance } = risk
   const out: Finding[] = []
 
   if (lostAssets != null) {
@@ -114,6 +114,39 @@ export function riskFindings(risk?: EarnRisk): Finding[] {
           '. This is separate from the venue score next to it.',
       })
     }
+  }
+
+  // Governance is a finding only when it is HIGH: every position has governance,
+  // so listing the sound ones would bury the rest. One ladder for both grains —
+  // a vault's own timelock (or the markets it lends into) and a market's admin
+  // are the same question asked twice: who can change this, and how fast.
+  if (governance != null && governance.score >= 4) {
+    const noTimelock = governance.grain === 'vault' && governance.timelockSecs === 0
+    out.push({
+      key: 'governance',
+      severity: governance.score >= 5 ? 'error' : 'warning',
+      label: noTimelock ? 'No timelock' : 'Governance',
+      value:
+        governance.grain === 'vault' && governance.timelockSecs
+          ? `${Math.round(governance.timelockSecs / 3600)}h`
+          : (governance.tier ?? undefined),
+      detail: noTimelock
+        ? 'No notice period: the curator can change this vault — caps, markets, allocator — ' +
+          'in a single transaction, with no window to withdraw first.'
+        : governance.grain === 'vault'
+          ? (governance.timelockSecs != null
+              ? `Only ${Math.round(governance.timelockSecs / 3600)}h notice before the curator ` +
+                'can change this vault. '
+              : 'The markets this vault lends into are weakly governed. ') +
+            'Parameters can change under you.'
+          : `Weak market governance${
+              governance.ownerKind ? ` (${governance.ownerKind.toLowerCase()})` : ''
+            }${
+              governance.delaySecs
+                ? `, ${Math.round(governance.delaySecs / 3600)}h delay`
+                : ', no enforced delay'
+            }. Parameters can change under you.`,
+    })
   }
 
   if (stale != null) {

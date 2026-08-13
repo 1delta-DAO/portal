@@ -5,7 +5,7 @@ import { Chevron } from '../../../common/Chevron'
 import { useEarnHistory } from '../../../../hooks/earn/useEarnHistory'
 import { HistoryChart } from './HistoryChart'
 import { EMPTY_VALUE, formatPercent, riskBand } from '../../../../utils/format'
-import { vocabLabel, type EarnMarket, type EarnVocabulary } from '../../../../sdk/earn-helper'
+import type { EarnMarket, EarnVocabulary } from '../../../../sdk/earn-helper'
 
 const WINDOWS = [7, 30, 90] as const
 
@@ -75,11 +75,7 @@ export const HistoryPanel: React.FC<Props> = ({ row, vocab, open, onToggleOpen }
                 {row.name || row.brand || row.venue}
               </div>
               <div className="truncate text-[10px] text-base-content/50">
-                {row.curator?.name ? `${row.curator.name} · ` : ''}
-                {row.protocol?.name ?? (row.name && row.brand ? row.brand : '')}
-                {row.protocol?.name ? ' · ' : ''}
-                {vocabLabel(vocab, 'venueKind', row.venueKind)}
-                {row.asset.symbol ? ` · ${row.asset.symbol}` : ''}
+                {row.subtitle ?? row.brand ?? row.venue}
               </div>
             </div>
 

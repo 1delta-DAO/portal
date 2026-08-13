@@ -139,6 +139,36 @@ export interface EarnLostAssets {
   pct?: number
 }
 
+/**
+ * Who can change this position, and how fast — on ONE 1-5 ladder for vaults and
+ * lending markets alike, so the unified list can be ranked without branching on
+ * row kind. Higher is worse; absent means UNKNOWN, never "well governed".
+ *
+ * `grain` says what it was measured on:
+ *   'vault'  — the vault's own timelock, or the governance of the markets it
+ *              lends into, whichever is worse. A zero timelock means the curator
+ *              can repoint it in one transaction, with no window to withdraw.
+ *   'market' — the market's admin / oracle / immutability.
+ */
+export interface EarnGovernance {
+  score: number
+  grain: 'vault' | 'market'
+  /** vault: `timelock` | `market-governance` | both. */
+  flag?: string
+  /** vault: notice period in seconds. 0 is a finding; absent = no such param. */
+  timelockSecs?: number
+  ownScore?: number
+  marketsScore?: number
+  /** market: 'low' | 'medium' | 'high' | 'unknown'. */
+  tier?: string
+  ownerKind?: string
+  /** market: admin | oracle | immutable — how the score was measured. */
+  mode?: string
+  delaySecs?: number
+  signerThreshold?: number
+  signerCount?: number
+}
+
 export interface EarnRisk {
   yieldProfile?: 'yield-bearing' | 'volatile'
   denomination?: 'stable' | 'volatile'
@@ -164,6 +194,7 @@ export interface EarnRisk {
     /** `bad-debt` | `lost-assets` | `lost-assets+bad-debt` | … */
     integrityFlag?: string
   }
+  governance?: EarnGovernance
   badDebt?: EarnBadDebt
   lostAssets?: EarnLostAssets
   /**
@@ -246,6 +277,16 @@ export interface EarnMarket {
   venueKind: EarnVenueKind
   /** Curator where one exists, else the protocol. One string for display. */
   brand?: string
+  /**
+   * The row's provenance, ready to render: `Gauntlet · Morpho · Vaults`.
+   *
+   * **Do not compose this from `curator` / `brand` / `venueKind` here.** That
+   * is what this app used to do, and it broke when `protocol.name` became
+   * version-free for grouping — Aave V2 and Aave V3 rows started reading
+   * identically, and nothing client-side could catch it because the rule lives
+   * on the server.
+   */
+  subtitle?: string
   /**
    * What the venue is BUILT ON. A MetaMorpho vault and a Euler Earn vault both
    * display as their curator, so without this nothing says which lending stack

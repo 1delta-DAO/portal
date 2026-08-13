@@ -208,16 +208,11 @@ export const EarnMarketsTable: React.FC<Props> = ({
                         </Link>
                       )}
                     </div>
-                    {/* Curator · protocol · kind. The protocol is the part that
-                        distinguishes a Morpho vault from a Euler one — both
-                        otherwise render as their curator. The brand is skipped
-                        when it is already the primary line, rather than
-                        rendering "Pendle · Pendle". */}
+                    {/* Who runs it · what it runs on · kind — see venueLabel.ts
+                        for why the second segment is not always the same
+                        field. */}
                     <div className="truncate text-[10px] text-base-content/50" title={row.venue}>
-                      {row.curator?.name ? `${row.curator.name} · ` : ''}
-                      {row.protocol?.name ?? (row.name && row.brand ? row.brand : '')}
-                      {row.protocol?.name ? ' · ' : ''}
-                      {vocabLabel(vocab, 'venueKind', row.venueKind)}
+                      {row.subtitle ?? row.brand ?? row.venue}
                     </div>
                   </div>
                 </div>

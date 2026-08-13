@@ -105,11 +105,7 @@ export const DetailPanel: React.FC<Props> = ({ row, vocab, onClose, showHistory 
               {row.name || row.brand || row.venue}
             </div>
             <div className="truncate text-[10px] text-base-content/50" title={row.venue}>
-              {row.curator?.name ? `${row.curator.name} · ` : ''}
-              {row.protocol?.name ?? (row.name && row.brand ? row.brand : '')}
-              {row.protocol?.name ? ' · ' : ''}
-              {vocabLabel(vocab, 'venueKind', row.venueKind)}
-              {row.asset.symbol ? ` · ${row.asset.symbol}` : ''}
+              {row.subtitle ?? row.brand ?? row.venue}
             </div>
           </div>
         </div>

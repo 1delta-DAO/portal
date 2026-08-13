@@ -28,7 +28,16 @@ interface RiskModeState {
 
 const STORAGE_KEY = 'maxRiskScore'
 const URL_PARAM = 'riskTolerance'
-const DEFAULT_MAX_RISK = 4
+/**
+ * Show everything by default.
+ *
+ * At 4 the earn listing lost 46 % of chain 1 — `riskScore` is
+ * `GREATEST(chain, lender, propagated_token)`, so every isolated market
+ * inherits its collateral's score and the whole Morpho Blue / Euler V2 half of
+ * the book (including a $2.7B USDC market) sat above the ceiling. The selector
+ * still offers "Low only" and "Up to medium" for anyone who wants the guard.
+ */
+const DEFAULT_MAX_RISK = 5
 
 /** Parse a `riskTolerance` value (numeric 1-5, or low/medium/high) → score, or null. */
 function parseRiskTolerance(raw: string | null | undefined): number | null {
