@@ -23,9 +23,8 @@ import {
   PROVIDER_LABELS,
   baseApr,
   compareVaults,
-  hasTvl,
   isSupplyRateMeaningful,
-  tvlUsd,
+  passesSizeGate,
   type VaultSortKey,
 } from './helpers'
 
@@ -182,6 +181,40 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
     setFilter('providers', next.join(','))
   }
 
+  /**
+   * Vaults the user actually holds. Built from `items` rather than `byVault`,
+   * which carries zero-balance rows too.
+   */
+  const heldVaults = useMemo(
+    () => new Set(userVaultItems.map((it) => it.vault.toLowerCase())),
+    [userVaultItems]
+  )
+
+  /** True once the user has named something, by free-text or asset filter. */
+  const hasExplicitQuery = search.trim().length > 0 || assetFilter.trim().length > 0
+
+  /**
+   * The size floor is a NOISE filter — it exists to keep a long tail of dust
+   * and dead deployments out of an unranked list. Two cases are not noise and
+   * must survive it:
+   *
+   *  - **a vault the user holds.** Otherwise depositing makes the row vanish
+   *    from the catalogue, which is precisely what happened with Frankencoin's
+   *    svZCHF: ~3.5 ZCHF (~$4) against a 10k default, so a real position had
+   *    nowhere to appear and the filter is PERSISTED, so restarting did not
+   *    clear it.
+   *  - **a vault the user explicitly asked for.** Once they type a name or an
+   *    asset they have done the narrowing themselves; answering "no results"
+   *    for a vault that exists is worse than showing a small one.
+   *
+   * Size still ranks — the default sort is by TVL, so dust sorts last. It just
+   * no longer disappears.
+   */
+  const exemptFromSizeFloor = React.useCallback(
+    (v: VaultEntry) => hasExplicitQuery || heldVaults.has(v.address.toLowerCase()),
+    [hasExplicitQuery, heldVaults]
+  )
+
   // ---- Filtering + sorting + pagination ----
   const filtered = useMemo(() => {
     let arr = vaults
@@ -191,17 +224,18 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
       arr = arr.filter((v) => set.has(v.provider))
     }
 
-    if (requiresTvl) arr = arr.filter(hasTvl)
-
-    if (Number.isFinite(minTvlUsd) && minTvlUsd > 0) {
-      // Use the derived USD fallback so Euler Earn vaults (no totalAssetsUsd
-      // from the backend) aren't always filtered out the moment a min-TVL is
-      // set. Underlying decimals come from the chain token list when known.
-      arr = arr.filter((v) => {
-        const decimals = chainTokens[v.underlying.toLowerCase()]?.decimals ?? v.decimals
-        return tvlUsd(v, decimals) >= minTvlUsd
+    // Empty-deployment and min-TVL culling, with the held/searched exemptions.
+    // Derived USD is used inside, so Euler Earn vaults (no `totalAssetsUsd`
+    // from the backend) aren't dropped the moment a floor is set.
+    arr = arr.filter((v) =>
+      passesSizeGate(v, {
+        minTvlUsd,
+        requiresTvl,
+        isExempt: exemptFromSizeFloor,
+        decimalsFor: (e) =>
+          chainTokens[e.underlying.toLowerCase()]?.decimals ?? e.decimals,
       })
-    }
+    )
 
     if (Number.isFinite(minSupplyRatePct) && minSupplyRatePct > 0) {
       // Keep vaults whose rate the backend didn't expose (rendered as "—") so a
@@ -263,6 +297,7 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
     chainTokens,
     sortKey,
     sortDir,
+    exemptFromSizeFloor,
   ])
 
   const totalItems = filtered.length

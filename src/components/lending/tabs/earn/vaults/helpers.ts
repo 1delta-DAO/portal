@@ -153,12 +153,74 @@ export function tvlNative(entry: VaultEntry, underlyingDecimals: number): number
  * and let the caller decide how to render "unknown".
  */
 export function tvlUsd(entry: VaultEntry, underlyingDecimals: number): number {
+  return tvlUsdKnown(entry, underlyingDecimals) ?? 0
+}
+
+/**
+ * The same figure, but `undefined` when it genuinely cannot be computed — no
+ * backend USD and no underlying price.
+ *
+ * {@link tvlUsd} collapses that case to `0` so sorting and rendering have a
+ * number to work with, which is right for display and WRONG for filtering: a
+ * `>= minTvl` test then reads "we could not price this" as "this is worth
+ * nothing" and culls the row. That is the same NULL-is-not-zero mistake the
+ * recorder's SQL made (`total_assets_usd >= 0` dropped 27 of 78 chain-1
+ * savings vaults, Hastra PRIME at $364M among them). Filters call this and
+ * keep `undefined`; everything else can keep calling `tvlUsd`.
+ */
+export function tvlUsdKnown(
+  entry: VaultEntry,
+  underlyingDecimals: number
+): number | undefined {
   if (typeof entry.totalAssetsUsd === 'number' && entry.totalAssetsUsd > 0) {
     return entry.totalAssetsUsd
   }
   const price = entry.underlyingPriceUsd ?? 0
-  if (price <= 0) return 0
+  if (price <= 0) return undefined
   return tvlNative(entry, underlyingDecimals) * price
+}
+
+/** Inputs to {@link passesSizeGate}. */
+export interface SizeGate {
+  /** USD floor; `0` or non-finite means no floor. */
+  minTvlUsd: number
+  /** Drop vaults with no positive TVL signal at all (empty deployments). */
+  requiresTvl: boolean
+  /** Vaults that must never be culled by size, whatever the floor says. */
+  isExempt: (entry: VaultEntry) => boolean
+  /** Underlying decimals, from the chain token list where known. */
+  decimalsFor: (entry: VaultEntry) => number
+}
+
+/**
+ * The catalogue's size gate — the whole "is this vault too small to list"
+ * decision in one place, because it has been wrong in three distinct ways and
+ * every one of them presented as an empty table rather than an error.
+ *
+ * The rules:
+ *
+ *  1. **Exempt wins outright.** A vault the user holds, or one they named in a
+ *     search, is never noise. Without this, depositing makes a row vanish from
+ *     the catalogue it was deposited from — svZCHF holds ~3.5 ZCHF (~$4)
+ *     against a 10,000 default, and the filter is persisted, so the row stayed
+ *     gone across restarts.
+ *  2. **Unknown is not zero.** An unpriced vault has no size to compare, so a
+ *     floor cannot be applied to it and it is kept. Culling it is the same
+ *     NULL-is-not-zero mistake that made `total_assets_usd >= 0` drop 27 of 78
+ *     chain-1 savings vaults server-side, Hastra PRIME at $364M among them.
+ *  3. **Empty is genuinely empty.** `requiresTvl` still removes deployments
+ *     with no TVL signal whatsoever — that is a different claim from unpriced,
+ *     and the one thing the floor is actually for.
+ *
+ * Size still RANKS: the default sort is by TVL, so anything small sorts last.
+ * It just no longer disappears.
+ */
+export function passesSizeGate(entry: VaultEntry, gate: SizeGate): boolean {
+  if (gate.isExempt(entry)) return true
+  if (gate.requiresTvl && !hasTvl(entry)) return false
+  if (!Number.isFinite(gate.minTvlUsd) || gate.minTvlUsd <= 0) return true
+  const usd = tvlUsdKnown(entry, gate.decimalsFor(entry))
+  return usd === undefined || usd >= gate.minTvlUsd
 }
 
 /**
