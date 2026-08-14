@@ -1,60 +1,44 @@
 import type { EarnFacetBucket } from '../../../../sdk/earn-helper'
 
 /**
- * What an asset query resolved to.
- *
- * `kind: 'none'` clears the filter; `'unmatched'` is reported to the user
- * rather than sent, because the server matches symbols EXACTLY — a query it
- * cannot match returns an empty table that looks identical to "this asset has
- * no markets", which is the wrong answer to a typo.
+ * What the search box resolved to. `none` clears it; everything else searches.
  */
-export type AssetFilter =
-  | { kind: 'none' }
-  | { kind: 'address'; asset: string }
-  | { kind: 'symbol'; assetSymbol: string }
-  | { kind: 'search'; search: string }
+export type AssetFilter = { kind: 'none' } | { kind: 'search'; search: string }
 
 /**
- * Resolve free text to an asset filter.
+ * Resolve the search box to a filter.
  *
- * An ADDRESS is taken verbatim — it names exactly one token on one chain, and
- * that is the whole reason this accepts addresses at all: three unrelated
- * tokens ship as `USD3` and three more as `USDP`, so a symbol cannot always
- * name the thing the user means, and a token whose ticker they do not know
- * cannot be named by symbol at all.
+ * It SEARCHES, and it never quietly becomes something else. That sounds like a
+ * non-decision; it is the fix for a real failure.
  *
- * A SYMBOL is resolved against the facet list — the server's own vocabulary
- * for this listing — with an exact case-insensitive hit preferred over a
- * unique substring, because `assetSymbol` is an exact server-side equality and
- * sending `usdc` verbatim would return nothing.
+ * This used to convert a query into an exact `assetSymbol` filter whenever the
+ * text matched an asset in the facet list — `usdc` → asset USDC — and fell back
+ * to search otherwise. The conversion is invisible: the box still reads
+ * "svZCHF" while the listing is now filtered by a *different* question. And the
+ * two questions genuinely differ, because a row's ASSET is what you deposit,
+ * not what the row is called:
  *
- * ANYTHING ELSE becomes a full-text `search`, which the server matches across
- * a row's name, brand, curator, protocol and asset and ranks exact-first. That
- * used to be `unmatched` — a dead end that reported "no match" for every query
- * naming something other than a deposit asset, so a listing full of vaults
- * could not be searched by vault name. A query is only unresolvable now if it
- * is empty.
+ *   - the Frankencoin svZCHF vault has asset **ZCHF** — you deposit ZCHF;
+ *   - two lending markets take **svZCHF** as collateral, so `svZCHF` is a real
+ *     entry in the asset facet list.
+ *
+ * So typing `svZCHF` narrowed to asset = svZCHF, which is exactly the two
+ * collateral legs — both holding no supply, both rendering $0 — while the vault
+ * the user was looking for was filtered out for being an svZCHF vault over
+ * ZCHF. The listing said "1 opportunity, $0" about a vault holding 1,731 svZCHF.
+ *
+ * The server's search already covers this: it matches name, brand, curator,
+ * protocol, asset symbol, assetGroup, SHARE TOKEN symbol and address, and ranks
+ * exact hits first. It runs on the merged catalogue, so it is complete across
+ * pages — narrowing to a symbol bought nothing it does not already do better.
+ *
+ * Exact asset filtering still exists and is still useful. It lives on the
+ * dropdown beside this box, where picking `USDC` is an explicit act rather than
+ * a side effect of typing.
  */
-export function resolveAssetFilter(raw: string, options: EarnFacetBucket[]): AssetFilter {
+export function resolveAssetFilter(raw: string, _options?: EarnFacetBucket[]): AssetFilter {
   const t = raw.trim()
-  if (!t) return { kind: 'none' }
-
-  if (/^0x[0-9a-fA-F]{40}$/.test(t)) {
-    return { kind: 'address', asset: t.toLowerCase() }
-  }
-
-  const q = t.toLowerCase()
-  const exact = options.find((o) => o.key.toLowerCase() === q)
-  if (exact) return { kind: 'symbol', assetSymbol: exact.key }
-
-  const partial = options.filter((o) => o.key.toLowerCase().includes(q))
-  if (partial.length === 1) return { kind: 'symbol', assetSymbol: partial[0].key }
-
-  // Two or more assets match, or none does. Either way the honest reading is
-  // "the user is searching", not "the user meant one asset and mistyped it" —
-  // and the server can rank a search where an exact-equality filter cannot
-  // express one at all.
-  return { kind: 'search', search: t }
+  return t ? { kind: 'search', search: t } : { kind: 'none' }
 }
 
 /**

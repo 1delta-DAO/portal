@@ -414,18 +414,17 @@ function AssetInput({
     setDraft(current)
   }, [current])
 
-  // The three are mutually exclusive by construction: each commit sets exactly
-  // one and clears the other two. Sending two would AND them, and a user who
-  // pasted an address did not also mean a symbol.
+  // Searching CLEARS the asset filters rather than setting one. They are
+  // different questions — a row's asset is what you deposit, not what the row
+  // is called — and letting the box set an asset filter is what hid the
+  // svZCHF vault behind the two markets that take svZCHF as collateral.
   const commit = () => {
-    const r = resolveAssetFilter(draft, options)
-    if (r.kind === 'address')
-      return onChange({ asset: r.asset, assetSymbol: undefined, search: undefined })
-    if (r.kind === 'symbol')
-      return onChange({ assetSymbol: r.assetSymbol, asset: undefined, search: undefined })
-    if (r.kind === 'search')
-      return onChange({ search: r.search, asset: undefined, assetSymbol: undefined })
-    return onChange({ asset: undefined, assetSymbol: undefined, search: undefined })
+    const r = resolveAssetFilter(draft)
+    onChange({
+      search: r.kind === 'search' ? r.search : undefined,
+      asset: undefined,
+      assetSymbol: undefined,
+    })
   }
 
   return (

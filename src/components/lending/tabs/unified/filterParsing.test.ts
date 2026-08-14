@@ -34,67 +34,57 @@ describe('parseMinTvl — three states, not two', () => {
   })
 })
 
-describe('resolveAssetFilter', () => {
+describe('resolveAssetFilter — the box SEARCHES, and only searches', () => {
   const list = opts('USDC', 'USDT', 'WETH', 'ZCHF', 'svZCHF')
 
   it('clears on empty input', () => {
     expect(resolveAssetFilter('', list)).toEqual({ kind: 'none' })
+    expect(resolveAssetFilter('   ', list)).toEqual({ kind: 'none' })
   })
 
-  it('takes an address verbatim, lowercased', () => {
-    // The unambiguous case, and the one the symbol dropdown cannot express:
-    // three unrelated tokens ship as USD3 and three more as USDP.
+  it('never converts a query into an asset filter', () => {
+    // THE REGRESSION. Typing `svZCHF` used to narrow the listing to
+    // asset = svZCHF, because svZCHF really is an asset — of the two lending
+    // markets that take it as COLLATERAL, both holding no supply and both
+    // rendering $0. The Frankencoin svZCHF vault's asset is ZCHF, so it was
+    // filtered out of a search for its own name, and the table reported
+    // "1 opportunity, $0" about a vault holding 1,731 svZCHF.
+    //
+    // The conversion was invisible: the box still read "svZCHF" while the
+    // listing answered a different question.
+    expect(resolveAssetFilter('svZCHF', list)).toEqual({ kind: 'search', search: 'svZCHF' })
+    expect(resolveAssetFilter('usdc', list)).toEqual({ kind: 'search', search: 'usdc' })
+    expect(resolveAssetFilter('svz', list)).toEqual({ kind: 'search', search: 'svz' })
+  })
+
+  it('searches an address rather than filtering by it', () => {
+    // Same rule, and it matters MORE here: two live contracts are both named
+    // `SavingsVault ZCHF` with ticker `svZCHF`, so an address is the only
+    // query that separates them — and `searchTier` matches both the asset and
+    // the SHARE address, so this finds the vault that IS the token as well as
+    // the markets that take it.
     expect(resolveAssetFilter('0xE5F130253ff137F9917C0107659A4C5262ABf6b0', list)).toEqual({
-      kind: 'address',
-      asset: '0xe5f130253ff137f9917c0107659a4c5262abf6b0',
-    })
-  })
-
-  it('does not mistake a short hex string for an address', () => {
-    // Not 40 hex digits, so it is text — and text is a search, not an address.
-    expect(resolveAssetFilter('0xdead', list)).toEqual({
       kind: 'search',
-      search: '0xdead',
+      search: '0xE5F130253ff137F9917C0107659A4C5262ABf6b0',
     })
   })
 
-  it('resolves a symbol case-insensitively to its canonical facet key', () => {
-    // Sending `usdc` verbatim would match nothing — the server compares
-    // symbols exactly.
-    expect(resolveAssetFilter('usdc', list)).toEqual({ kind: 'symbol', assetSymbol: 'USDC' })
-  })
-
-  it('prefers an EXACT hit over a substring one', () => {
-    // `ZCHF` is a substring of `svZCHF`, so a substring-first rule would
-    // resolve the exact token to the wrong one of the two.
-    expect(resolveAssetFilter('ZCHF', list)).toEqual({ kind: 'symbol', assetSymbol: 'ZCHF' })
-  })
-
-  it('accepts a unique substring', () => {
-    expect(resolveAssetFilter('svz', list)).toEqual({ kind: 'symbol', assetSymbol: 'svZCHF' })
-    expect(resolveAssetFilter('wet', list)).toEqual({ kind: 'symbol', assetSymbol: 'WETH' })
-  })
-
-  it('searches rather than guessing when several assets match', () => {
-    // `usd` hits USDC and USDT. Picking one would filter to an asset the user
-    // did not name; refusing to send anything (the old behaviour) reported
-    // "no match" for a query that matches most of the listing. Searching is
-    // the only reading that is neither wrong nor a dead end.
+  it('passes anything else straight through', () => {
+    // A curator, a protocol or a vault's own name is not in the asset facet
+    // list at all — a box that could only match deposit assets could not
+    // search a listing of vaults by vault name.
+    expect(resolveAssetFilter('Gauntlet', list)).toEqual({ kind: 'search', search: 'Gauntlet' })
     expect(resolveAssetFilter('usd', list)).toEqual({ kind: 'search', search: 'usd' })
-  })
-
-  it('searches when the query names something other than an asset', () => {
-    // The whole point: a curator, a protocol or a vault's own name is not in
-    // the asset facet list, and used to resolve to `unmatched` — so a listing
-    // of vaults could not be searched by vault name at all.
-    expect(resolveAssetFilter('Gauntlet', list)).toEqual({
-      kind: 'search',
-      search: 'Gauntlet',
-    })
     expect(resolveAssetFilter('Savings Module', list)).toEqual({
       kind: 'search',
       search: 'Savings Module',
     })
+  })
+
+  it('trims but does not otherwise rewrite the query', () => {
+    // Case is preserved: the server ranks an exact field hit first and lowers
+    // both sides itself, so mangling the input here would only lose signal.
+    expect(resolveAssetFilter('  svZCHF  ', list)).toEqual({ kind: 'search', search: 'svZCHF' })
   })
 })
 
