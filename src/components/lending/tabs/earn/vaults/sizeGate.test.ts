@@ -69,17 +69,17 @@ describe('passesSizeGate', () => {
   it('keeps a vault the user holds, however small', () => {
     // The svZCHF case. Without this, a deposit removes the row from the
     // catalogue it was made from.
-    expect(
-      passesSizeGate(vault({ totalAssetsUsd: 4.3 }), gate({ isExempt: () => true }))
-    ).toBe(true)
+    expect(passesSizeGate(vault({ totalAssetsUsd: 4.3 }), gate({ isExempt: () => true }))).toBe(
+      true
+    )
   })
 
   it('keeps a vault the user explicitly searched for', () => {
     // Same exemption, different trigger: answering "no results" for a vault
     // that exists and was named is worse than showing a small one.
-    expect(
-      passesSizeGate(vault({ totalAssetsUsd: 4.3 }), gate({ isExempt: () => true }))
-    ).toBe(true)
+    expect(passesSizeGate(vault({ totalAssetsUsd: 4.3 }), gate({ isExempt: () => true }))).toBe(
+      true
+    )
   })
 
   it('keeps an UNPRICED vault rather than reading it as zero', () => {
@@ -113,12 +113,8 @@ describe('passesSizeGate', () => {
   it('treats a zero floor as no floor', () => {
     // `0` must not become a `>= 0` comparison anywhere. It is the same string
     // that, left truthy, built the server-side filter that culled $364M.
-    expect(
-      passesSizeGate(vault({ totalAssetsUsd: 4.3 }), gate({ minTvlUsd: 0 }))
-    ).toBe(true)
-    expect(
-      passesSizeGate(vault({ totalAssetsUsd: 4.3 }), gate({ minTvlUsd: NaN }))
-    ).toBe(true)
+    expect(passesSizeGate(vault({ totalAssetsUsd: 4.3 }), gate({ minTvlUsd: 0 }))).toBe(true)
+    expect(passesSizeGate(vault({ totalAssetsUsd: 4.3 }), gate({ minTvlUsd: NaN }))).toBe(true)
   })
 
   it('admits a vault comfortably over the floor', () => {

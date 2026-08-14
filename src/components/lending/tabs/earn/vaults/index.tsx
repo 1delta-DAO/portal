@@ -5,10 +5,7 @@ import { useTokenBalances } from '../../../../../hooks/lending/useTokenBalances'
 import { useTokenLists } from '../../../../../hooks/useTokenLists'
 import { useIsMobile } from '../../../../../hooks/useIsMobile'
 import { usePersistedFilters } from '../../../../../hooks/usePersistedFilters'
-import {
-  useUserVaults,
-  useVaultsCatalog,
-} from '../../../../../hooks/vaults'
+import { useUserVaults, useVaultsCatalog } from '../../../../../hooks/vaults'
 import {
   VAULT_PROVIDERS,
   type VaultEntry,
@@ -50,11 +47,11 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
     }),
     []
   )
-  const { filters: f, setFilter, resetToDefaults } = usePersistedFilters(
-    'vaults-view',
-    defaults,
-    { chainId }
-  )
+  const {
+    filters: f,
+    setFilter,
+    resetToDefaults,
+  } = usePersistedFilters('vaults-view', defaults, { chainId })
 
   const selectedProviders = useMemo<VaultProvider[]>(
     () =>
@@ -120,7 +117,7 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
   })
 
   const userPosition = useMemo(
-    () => (selected ? userByVault.get(selected.address.toLowerCase()) ?? null : null),
+    () => (selected ? (userByVault.get(selected.address.toLowerCase()) ?? null) : null),
     [selected, userByVault]
   )
 
@@ -130,12 +127,9 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
     () => (selected ? chainTokens[selected.underlying.toLowerCase()] : undefined),
     [selected, chainTokens]
   )
-  const selectedIsWrappedNative = useMemo(
-    () => isWNative(underlyingToken),
-    [underlyingToken]
-  )
+  const selectedIsWrappedNative = useMemo(() => isWNative(underlyingToken), [underlyingToken])
   const nativeToken = useMemo(
-    () => (selectedIsWrappedNative ? chainTokens[zeroAddress] ?? null : null),
+    () => (selectedIsWrappedNative ? (chainTokens[zeroAddress] ?? null) : null),
     [selectedIsWrappedNative, chainTokens]
   )
 
@@ -165,11 +159,11 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
 
   const selectedWalletBal = useMemo(() => {
     const addr = selected?.underlying.toLowerCase()
-    return addr ? walletBalances.get(addr) ?? null : null
+    return addr ? (walletBalances.get(addr) ?? null) : null
   }, [selected, walletBalances])
 
   const nativeBalance = useMemo(
-    () => (selectedIsWrappedNative ? walletBalances.get(zeroAddress) ?? null : null),
+    () => (selectedIsWrappedNative ? (walletBalances.get(zeroAddress) ?? null) : null),
     [selectedIsWrappedNative, walletBalances]
   )
 
@@ -232,8 +226,7 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
         minTvlUsd,
         requiresTvl,
         isExempt: exemptFromSizeFloor,
-        decimalsFor: (e) =>
-          chainTokens[e.underlying.toLowerCase()]?.decimals ?? e.decimals,
+        decimalsFor: (e) => chainTokens[e.underlying.toLowerCase()]?.decimals ?? e.decimals,
       })
     )
 
@@ -244,9 +237,7 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
       // now populate real rates rather than always returning 0. A negative rate
       // IS reported, so it is filtered out by any positive threshold, which is
       // what asking for "at least X%" means.
-      arr = arr.filter(
-        (v) => !isSupplyRateMeaningful(v) || baseApr(v) >= minSupplyRatePct
-      )
+      arr = arr.filter((v) => !isSupplyRateMeaningful(v) || baseApr(v) >= minSupplyRatePct)
     }
 
     if (search.trim()) {
@@ -329,8 +320,7 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
   }
 
   const handleRowClick = (entry: VaultEntry) => {
-    const same =
-      selected && selected.address.toLowerCase() === entry.address.toLowerCase()
+    const same = selected && selected.address.toLowerCase() === entry.address.toLowerCase()
     if (same) {
       setSelected(null)
       setShowMobileAction(false)
@@ -370,11 +360,7 @@ export const VaultsView: React.FC<VaultsViewProps> = ({ chainId, account }) => {
 
       {/* Pending async withdrawals (lst / gmx / lagoon) — request → claim. */}
       {account && (
-        <PendingWithdrawals
-          chainId={chainId}
-          account={account}
-          catalogByVault={catalogByVault}
-        />
+        <PendingWithdrawals chainId={chainId} account={account} catalogByVault={catalogByVault} />
       )}
 
       {/* Catalog header */}

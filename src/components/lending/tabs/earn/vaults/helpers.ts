@@ -28,10 +28,13 @@ export const PROVIDER_LABELS: Record<VaultProvider, string> = {
 export const PROVIDER_LOGOS: Partial<Record<VaultProvider, string>> = {
   // Reuse the lender registry logos that the rest of the app already serves.
   // Empty entries fall back to `Logo`'s initials swatch.
-  fluid: 'https://raw.githubusercontent.com/1delta-DAO/asset-list-config/main/lender-info/fluid/logo.svg',
-  morpho: 'https://raw.githubusercontent.com/1delta-DAO/asset-list-config/main/lender-info/morpho-blue/logo.svg',
+  fluid:
+    'https://raw.githubusercontent.com/1delta-DAO/asset-list-config/main/lender-info/fluid/logo.svg',
+  morpho:
+    'https://raw.githubusercontent.com/1delta-DAO/asset-list-config/main/lender-info/morpho-blue/logo.svg',
   silo: 'https://raw.githubusercontent.com/1delta-DAO/asset-list-config/main/lender-info/silo/logo.svg',
-  gearbox: 'https://raw.githubusercontent.com/1delta-DAO/asset-list-config/main/lender-info/gearbox-v3/logo.svg',
+  gearbox:
+    'https://raw.githubusercontent.com/1delta-DAO/asset-list-config/main/lender-info/gearbox-v3/logo.svg',
 }
 
 /**
@@ -66,7 +69,7 @@ export function isNegativeApr(entry: VaultEntry): boolean {
  * Falls back to the all-in `supplyRate` for providers that don't split it out.
  */
 export function baseApr(entry: VaultEntry): number {
-  return typeof entry.baseRate === 'number' ? entry.baseRate : entry.supplyRate ?? 0
+  return typeof entry.baseRate === 'number' ? entry.baseRate : (entry.supplyRate ?? 0)
 }
 
 /** All-in APR (base lending yield + incentives) — the backend's `totalRate`. */
@@ -168,10 +171,7 @@ export function tvlUsd(entry: VaultEntry, underlyingDecimals: number): number {
  * savings vaults, Hastra PRIME at $364M among them). Filters call this and
  * keep `undefined`; everything else can keep calling `tvlUsd`.
  */
-export function tvlUsdKnown(
-  entry: VaultEntry,
-  underlyingDecimals: number
-): number | undefined {
+export function tvlUsdKnown(entry: VaultEntry, underlyingDecimals: number): number | undefined {
   if (typeof entry.totalAssetsUsd === 'number' && entry.totalAssetsUsd > 0) {
     return entry.totalAssetsUsd
   }

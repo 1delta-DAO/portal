@@ -143,6 +143,7 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
     facets,
     sources,
     excluded,
+    appliedDefaults,
     total,
     pendingChains,
     failedChains,
@@ -159,11 +160,13 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
     venueKind: selection.venueKind,
     assetGroup: selection.assetGroup,
     assetSymbol: selection.assetSymbol,
+    asset: selection.asset,
+    search: selection.search,
     depositableOnly: selection.depositableOnly,
     includePassthrough: selection.includePassthrough,
     includeIlliquid: selection.includeIlliquid,
     // `0` disables the server's floor; undefined keeps the default.
-    minTvlUsd: selection.showLowTvl ? 0 : undefined,
+    minTvlUsd: selection.minTvlUsd,
     maxRiskScore,
     sort: sortKey,
     // The panel renders prose and counterparty terms the digest omits.
@@ -429,6 +432,7 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
                   selection={selection}
                   onChange={onChangeSelection}
                   isFetching={isFetching && !isLoading}
+                  defaultMinTvlUsd={appliedDefaults?.minTvlUsd}
                 />
               </div>
             )}

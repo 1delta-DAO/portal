@@ -95,6 +95,19 @@ export interface UserPositionEntry {
   withdrawable: number | string
   borrowable: number | string
   isAllowed?: boolean
+  /**
+   * LlamaLend only, on the DEBT row: the position's soft-liquidation state and
+   * — the field consumed here — `bandCount`, the `N` the loan was opened at.
+   * `N` is IMMUTABLE for the life of the loan (changing it means closing and
+   * reopening), which is why the band-setter control must render LOCKED at
+   * this value whenever such a position exists, never as an editable default.
+   */
+  llamalendInfo?: {
+    bandCount?: number
+    bands?: [number, number]
+    softLiquidating?: boolean
+    version?: 1 | 2
+  } & Record<string, unknown>
   underlyingInfo?: {
     asset: {
       chainId: string
@@ -189,6 +202,34 @@ export function isAggregatePosition(p: UserPositionEntry): boolean {
 /** True iff this sub-account holds any brokered (fixed-term) loan. */
 export function hasBrokeredLoans(sub: UserSubAccount): boolean {
   return sub.positions.some((p) => typeof p === 'object' && p !== null && isLoanPosition(p))
+}
+
+/**
+ * The band count of an OPEN LlamaLend loan on this position entry, else
+ * undefined.
+ *
+ * Gated on live debt, not on the info block alone: the debt row keeps its
+ * `llamalendInfo` after a full repay (as a lend-side descriptor), and a closed
+ * loan's stale `N` must not lock the setter for the next open — where the
+ * borrower is free to choose again.
+ */
+export function openLoanBandCount(p: UserPositionEntry | null | undefined): number | undefined {
+  if (!p || !(Number(p.debt) > 0)) return undefined
+  const n = p.llamalendInfo?.bandCount
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined
+}
+
+/**
+ * True when this sub-account's "mode" slot carries a POSITION PARAMETER
+ * (LlamaLend's band count) rather than an e-mode category — i.e. any of its
+ * rows is LlamaLend-shaped. Rendering the raw number as "Mode #4" misreads a
+ * band count as a borrow-mode id, and offering a mode SWITCH for it is
+ * meaningless (`N` is fixed at open; changing it is a close + reopen).
+ */
+export function hasParameterizedMode(sub: UserSubAccount | null | undefined): boolean {
+  return !!sub?.positions.some(
+    (p) => typeof p === 'object' && p !== null && p.llamalendInfo != null
+  )
 }
 
 /** The per-loan rows for a given market, in payload order. */

@@ -28,6 +28,7 @@ import { FixedTermDetailsRows } from '../../../shared/FixedTermDetails'
 import { MidnightOrderBook } from '../../../shared/MidnightOrderBook'
 import { TermsSummary, type BandSetterState } from '../../../terms'
 import { BandSetterRow } from '../../../terms/BandSetterRow'
+import { openLoanBandCount } from '../../../../../sdk/lending-helper/userPositionTypes'
 import { isFullSheet } from '../../../terms/types'
 import { useTermSheet } from '../../../../../hooks/lending/useTermSheet'
 import {
@@ -448,6 +449,17 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   // Max amounts
   const debtPos = debtPool ? userPositions.get(debtPool.marketUid) : null
 
+  /**
+   * The band count of an OPEN loan on the selected debt market. Non-null means
+   * `N` is no longer a choice: LlamaLend fixes it at `create_loan` and every
+   * later borrow inherits it, so the setter renders LOCKED at the POSITION's
+   * value — not editable at the market default, which is what let a borrower
+   * at N=4 stare at an editable "10". It also means `bands` must not be sent
+   * with the quote: the API cannot apply it, and a dirty-looking control
+   * implying otherwise is the same lie one layer up.
+   */
+  const lockedBandCount = openLoanBandCount(debtPos)
+
   // Pay wallet balance + overMax.
   //
   // The PRESENCE of a balance entry — not a non-zero one — is what makes the
@@ -504,7 +516,11 @@ export const LoopAction: React.FC<TradingActionProps> = ({
         // Only sent once the user has actually chosen, and only when valid —
         // an out-of-range N is refused by the Controller, so it is better to
         // omit it and take the market default than to send a rejected one.
-        ...(bands?.dirty && bands.valid ? { bands: bands.bands } : {}),
+        // NEVER sent over an open loan: `N` is fixed at open and every later
+        // borrow inherits it, so a value here could only mislead.
+        ...(lockedBandCount == null && bands?.dirty && bands.valid
+          ? { bands: bands.bands }
+          : {}),
         ...(selectedPayCurrency ? { payAsset: selectedPayCurrency.address } : {}),
         ...(selectedPayCurrency && payAmount
           ? { payAmount: parseUnits(payAmount, selectedPayCurrency.decimals).toString() }
@@ -832,8 +848,12 @@ export const LoopAction: React.FC<TradingActionProps> = ({
       {debtTermSheet && isFullSheet(debtTermSheet) && debtTermSheet.borrow?.liquidation ? (
         <BandSetterRow
           liquidation={debtTermSheet.borrow.liquidation}
-          value={bands?.bands}
+          // An OPEN loan pins the control to the position's own `N`, read-only.
+          // Editable-at-the-default over a live position was the bug: a
+          // borrower at N=4 saw an editable "10" that could never apply.
+          value={lockedBandCount ?? bands?.bands}
           onChange={handleBandsChange}
+          mode={lockedBandCount != null ? 'locked' : 'edit'}
           variant="field"
         />
       ) : null}
@@ -978,8 +998,12 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               // drawn against the collateral, and it is fixed at open. The
               // LIVE control is in the form body — this is a read-only mirror,
               // because two inputs bound to one value fight each other and the
-              // quote is sized against whichever wrote last.
-              bandEdit={{ value: bands?.bands, mode: 'mirror' }}
+              // quote is sized against whichever wrote last. Over an open loan
+              // it mirrors the POSITION's `N` and says so (`locked`).
+              bandEdit={{
+                value: lockedBandCount ?? bands?.bands,
+                mode: lockedBandCount != null ? 'locked' : 'mirror',
+              }}
             />
           ) : null}
         </div>

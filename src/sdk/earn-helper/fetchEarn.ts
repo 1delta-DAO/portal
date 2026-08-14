@@ -37,6 +37,24 @@ export interface FetchEarnParams {
   assetGroup?: string
   /** Underlying symbol, e.g. `USDC`. */
   assetSymbol?: string
+  /**
+   * Underlying token ADDRESS — the unambiguous asset filter.
+   *
+   * `assetSymbol` is an exact string match, so it cannot separate two tokens
+   * that share a ticker (three unrelated USD3s, three USDPs), and it cannot be
+   * used at all for a token whose symbol the user does not know. An address
+   * identifies exactly one token on one chain.
+   */
+  asset?: string
+  /**
+   * Free text, matched across a row's name, brand, curator, protocol and asset
+   * symbol and returned ranked exact-first.
+   *
+   * The two filters above both key on the DEPOSIT TOKEN, so neither can find a
+   * row by what it is called — "svZCHF", "Gauntlet", "Savings Module" all
+   * returned an empty table while the rows sat in the listing. Sent as `q`.
+   */
+  search?: string
   /** Hide rows that cannot be entered right now. Opt-in — see below. */
   depositableOnly?: boolean
   /**
@@ -102,6 +120,12 @@ export interface EarnPage {
   facets?: EarnFacets
   sources?: EarnResponse['sources']
   excluded?: EarnResponse['excluded']
+  /**
+   * The filters the server applied WITHOUT being asked. Surfaced so a control
+   * can show the floor actually in force instead of restating it as a local
+   * constant that would drift the moment the server's default moved.
+   */
+  appliedDefaults?: EarnResponse['appliedDefaults']
   /** Rows matching the filters across the WHOLE listing, not just this page. */
   total: number
   /** No further pages — this one came back short. */
@@ -128,6 +152,8 @@ async function fetchEarnPage(
       venue: params.venue?.length ? params.venue.join(',') : undefined,
       assetGroup: params.assetGroup,
       assetSymbol: params.assetSymbol,
+      asset: params.asset,
+      q: params.search,
       terms: params.terms,
       depositable: params.depositableOnly ? 'true' : undefined,
       passthrough: params.includePassthrough ? 'include' : undefined,
@@ -143,6 +169,7 @@ async function fetchEarnPage(
     facets: withEveryDimension(page?.facets),
     sources: page?.sources,
     excluded: page?.excluded,
+    appliedDefaults: page?.appliedDefaults,
     total: page?.total ?? items.length,
     // Two ways to know this was the last page. `total` is the cheap one and
     // saves the empty round trip a listing whose size divides exactly by the

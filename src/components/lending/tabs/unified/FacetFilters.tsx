@@ -1,6 +1,7 @@
 import React from 'react'
-import type { EarnFacets } from '../../../../sdk/earn-helper'
+import type { EarnFacetBucket, EarnFacets } from '../../../../sdk/earn-helper'
 import { MultiSelectDropdown } from './MultiSelectDropdown'
+import { formatUsdShort, parseMinTvl, resolveAssetFilter } from './filterParsing'
 
 export interface FacetSelection {
   /**
@@ -32,15 +33,42 @@ export interface FacetSelection {
   venues: string[]
   venueKind?: string
   assetGroup?: string
-  /** Underlying symbol — the usable asset filter. */
+  /** Underlying symbol — exact match, chosen from the facet list. */
   assetSymbol?: string
+  /**
+   * Underlying token ADDRESS.
+   *
+   * Separate from `assetSymbol` because they answer different questions and
+   * only one of them is unambiguous: three unrelated tokens ship as `USD3`
+   * and three more as `USDP`, so a symbol cannot always name the thing the
+   * user means, and a token whose ticker they do not know cannot be named at
+   * all. Both are sent as-is; the server matches each exactly.
+   */
+  asset?: string
+  /**
+   * Free text, ranked exact-first by the server across a row's name, brand,
+   * curator, protocol and asset symbol.
+   *
+   * The third and loosest of the three "which rows" controls, and the only one
+   * that can find a row by what it is CALLED. `assetSymbol` and `asset` both
+   * filter on the deposit token, so before this existed a listing of vaults
+   * could not be searched by vault name at all.
+   */
+  search?: string
   depositableOnly: boolean
   /** Show rows whose whole yield is the asset's own. Default false. */
   includePassthrough: boolean
   /** Show rows that claim an instant exit but report zero liquidity. */
   includeIlliquid: boolean
-  /** Drop the server's TVL floor. */
-  showLowTvl: boolean
+  /**
+   * TVL floor in USD. `undefined` keeps the server's default, `0` removes the
+   * floor entirely.
+   *
+   * This used to be a boolean "show dust", which could only turn the default
+   * off — there was no way to see the floor in force, and no way to raise it.
+   * A listing spanning $4 to $364M needs a number, not a switch.
+   */
+  minTvlUsd?: number
 }
 
 interface FacetFiltersProps {
@@ -50,6 +78,12 @@ interface FacetFiltersProps {
   selection: FacetSelection
   onChange: (next: FacetSelection) => void
   isFetching?: boolean
+  /**
+   * The TVL floor the server applies when none is sent — read from the
+   * response, never restated here. A local constant would keep rendering
+   * "10,000" for as long as it took anyone to notice the server had moved.
+   */
+  defaultMinTvlUsd?: number
 }
 
 export const EMPTY_SELECTION: FacetSelection = {
@@ -60,7 +94,6 @@ export const EMPTY_SELECTION: FacetSelection = {
   depositableOnly: false,
   includePassthrough: false,
   includeIlliquid: false,
-  showLowTvl: false,
 }
 
 /**
@@ -84,6 +117,7 @@ export const FacetFilters: React.FC<FacetFiltersProps> = ({
   selection,
   onChange,
   isFetching,
+  defaultMinTvlUsd,
 }) => {
   const set = (patch: Partial<FacetSelection>) => onChange({ ...selection, ...patch })
 
@@ -95,10 +129,12 @@ export const FacetFilters: React.FC<FacetFiltersProps> = ({
     !!selection.venueKind ||
     !!selection.assetGroup ||
     !!selection.assetSymbol ||
+    !!selection.asset ||
+    !!selection.search ||
     selection.depositableOnly ||
     selection.includePassthrough ||
     selection.includeIlliquid ||
-    selection.showLowTvl
+    selection.minTvlUsd !== undefined
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -162,7 +198,15 @@ export const FacetFilters: React.FC<FacetFiltersProps> = ({
         placeholder="All assets"
         options={facets.assets}
         selected={selection.assetSymbol ? [selection.assetSymbol] : []}
-        onChange={(next) => set({ assetSymbol: next[next.length - 1] })}
+        onChange={(next) => set({ assetSymbol: next[next.length - 1], asset: undefined })}
+      />
+
+      <AssetInput
+        options={facets.assets}
+        assetSymbol={selection.assetSymbol}
+        asset={selection.asset}
+        search={selection.search}
+        onChange={(next) => set(next)}
       />
 
       <label className="label cursor-pointer gap-2 py-0">
@@ -194,12 +238,11 @@ export const FacetFilters: React.FC<FacetFiltersProps> = ({
         onChange={(v) => set({ includeIlliquid: v })}
         hint="Claims a same-block exit but reports zero liquidity: you can get in, not out. Cooldown vaults are not flagged — being illiquid is their design."
       />
-      <DefaultToggle
-        label="Show dust"
-        count={excluded.lowTvl}
-        checked={selection.showLowTvl}
-        onChange={(v) => set({ showLowTvl: v })}
-        hint="Below the TVL floor. On a near-empty pool the APR is an artefact of rounding, not a rate anyone earns."
+      <MinTvlInput
+        value={selection.minTvlUsd}
+        serverDefault={defaultMinTvlUsd}
+        excludedCount={excluded.lowTvl}
+        onChange={(minTvlUsd) => set({ minTvlUsd })}
       />
       {/* NOT a toggle. Risk tolerance is owned by the selector in the toolbar,
           which every other tab reads too; a second control here meant the two
@@ -257,6 +300,156 @@ function DefaultToggle({
         {label}
         {count > 0 ? ` (${count})` : ''}
       </span>
+    </label>
+  )
+}
+
+/**
+ * The TVL floor, as a number.
+ *
+ * Three states, and they are genuinely different: EMPTY means "whatever the
+ * server does by default" (and the placeholder says what that is), `0` means
+ * "no floor at all", and any other number is an explicit floor. A boolean
+ * could express only the first two, so there was no way to ask for a higher
+ * bar — and no way to see the one in force.
+ *
+ * Committed on blur or Enter rather than per keystroke: every change re-keys
+ * the per-chain queries and refetches the listing, so typing "25000" would
+ * fire five requests, four of them for floors the user never meant.
+ */
+function MinTvlInput({
+  value,
+  serverDefault,
+  excludedCount,
+  onChange,
+}: {
+  value?: number
+  serverDefault?: number
+  excludedCount: number
+  onChange: (next: number | undefined) => void
+}) {
+  const [draft, setDraft] = React.useState<string>(value === undefined ? '' : String(value))
+
+  // Follow the value when it changes from outside (Clear, a deep link) without
+  // fighting the user mid-edit.
+  React.useEffect(() => {
+    setDraft(value === undefined ? '' : String(value))
+  }, [value])
+
+  const commit = () => {
+    const parsed = parseMinTvl(draft)
+    // A non-numeric entry reverts rather than silently filtering by NaN, which
+    // the server would read as an absent parameter and quietly re-apply its
+    // own default under a box that shows something else.
+    if (parsed === null) return setDraft(value === undefined ? '' : String(value))
+    onChange(parsed)
+  }
+
+  const placeholder =
+    serverDefault !== undefined ? `${formatUsdShort(serverDefault)} (default)` : 'default'
+
+  return (
+    <label
+      className="flex items-center gap-1"
+      title="Minimum TVL in USD. Empty uses the server default; 0 removes the floor. Rows we could not price are never dropped by this — unpriced is unknown, not zero."
+    >
+      <span className="text-xs opacity-60">Min TVL $</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        className="input input-bordered input-xs w-24"
+        placeholder={placeholder}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit()
+          if (e.key === 'Escape') setDraft(value === undefined ? '' : String(value))
+        }}
+      />
+      {excludedCount > 0 && (
+        <button
+          type="button"
+          className="text-[10px] text-base-content/50 underline decoration-dotted"
+          title="Show the rows this floor is hiding"
+          onClick={() => onChange(0)}
+        >
+          {excludedCount} hidden
+        </button>
+      )}
+    </label>
+  )
+}
+
+/**
+ * Asset filter that accepts either an ADDRESS or a SYMBOL.
+ *
+ * The dropdown beside it can only offer symbols that are already in view, and
+ * a symbol is not always enough to name a token — three unrelated tokens ship
+ * as `USD3` and three more as `USDP`. An address names exactly one.
+ *
+ * Symbols are RESOLVED against the facet list rather than sent verbatim,
+ * because the server matches symbols exactly: typing `usdc` would otherwise
+ * return an empty table that looks identical to "there are no USDC markets".
+ * An exact case-insensitive hit wins; failing that a unique substring match is
+ * accepted; anything else is reported as no match instead of being sent.
+ */
+function AssetInput({
+  options,
+  assetSymbol,
+  asset,
+  search,
+  onChange,
+}: {
+  options: EarnFacetBucket[]
+  assetSymbol?: string
+  asset?: string
+  search?: string
+  onChange: (next: { assetSymbol?: string; asset?: string; search?: string }) => void
+}) {
+  const current = asset ?? assetSymbol ?? search ?? ''
+  const [draft, setDraft] = React.useState(current)
+
+  React.useEffect(() => {
+    setDraft(current)
+  }, [current])
+
+  // The three are mutually exclusive by construction: each commit sets exactly
+  // one and clears the other two. Sending two would AND them, and a user who
+  // pasted an address did not also mean a symbol.
+  const commit = () => {
+    const r = resolveAssetFilter(draft, options)
+    if (r.kind === 'address')
+      return onChange({ asset: r.asset, assetSymbol: undefined, search: undefined })
+    if (r.kind === 'symbol')
+      return onChange({ assetSymbol: r.assetSymbol, asset: undefined, search: undefined })
+    if (r.kind === 'search')
+      return onChange({ search: r.search, asset: undefined, assetSymbol: undefined })
+    return onChange({ asset: undefined, assetSymbol: undefined, search: undefined })
+  }
+
+  return (
+    <label
+      className="flex items-center gap-1"
+      title="Search the listing — a vault or market name, a curator, a protocol, an asset symbol, or a token address. Exact matches rank first."
+    >
+      <span className="text-xs opacity-60">Search</span>
+      <input
+        type="text"
+        className="input input-bordered input-xs w-40"
+        placeholder="name, curator, symbol…"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit()
+          if (e.key === 'Escape') setDraft(current)
+        }}
+      />
+      {/* The empty state is the TABLE's job now, not this control's. A query
+          that matches nothing is a real answer about the listing, and the row
+          count already says so — an inline "no match" was only ever needed
+          because the old resolver refused to send the query at all. */}
     </label>
   )
 }

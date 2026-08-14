@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import type { UserSubAccount } from '../../../sdk/lending-helper/userPositionTypes'
+import { hasParameterizedMode } from '../../../sdk/lending-helper/userPositionTypes'
 import { usePoolConfigData } from '../../../hooks/lending/usePoolData'
 import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
 import {
@@ -37,6 +38,27 @@ export const EModeBadge: React.FC<EModeBadgeProps> = ({ subAccount, lender, chai
     }
     return modeNum === 0 ? 'Off' : `#${mode}`
   }, [mode, configGroups])
+
+  /**
+   * On a PARAMETERIZED lender (LlamaLend) the mode slot carries the loan's
+   * BAND COUNT, not an e-mode id — "Mode #4" misread a band count as a borrow
+   * mode, and the switch modal behind the click offers an operation that does
+   * not exist there (`N` is fixed at open; changing it is close + reopen). A
+   * plain, non-clickable chip that says what the number actually is.
+   */
+  if (hasParameterizedMode(subAccount)) {
+    const n = Number(mode)
+    if (!(n > 0)) return null
+    return (
+      <span
+        className="badge badge-sm badge-outline gap-1"
+        title="Band count N — chosen at open, fixed for the life of the loan. Fewer bands mean a higher max LTV but a narrower soft-liquidation range."
+      >
+        <span className="text-[10px] font-bold uppercase leading-none">Bands</span>
+        <span className="text-[10px] leading-none font-mono">{n}</span>
+      </span>
+    )
+  }
 
   return (
     <>

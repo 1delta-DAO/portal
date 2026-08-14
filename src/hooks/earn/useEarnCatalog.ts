@@ -5,6 +5,7 @@ import {
   mergeEarnCatalog,
   EMPTY_EXCLUSIONS,
   EMPTY_FACETS,
+  type EarnAppliedDefaults,
   type EarnCatalogChunk,
   type EarnFacets,
   type EarnMarket,
@@ -22,6 +23,11 @@ export interface UseEarnCatalogParams {
   venueKind?: string
   assetGroup?: string
   assetSymbol?: string
+  /** Underlying token address — the unambiguous asset filter. */
+  asset?: string
+  /** Free text over name / brand / curator / protocol / asset, ranked
+   *  exact-first. The two filters above key on the deposit token only. */
+  search?: string
   terms?: 'none' | 'digest' | 'full'
   depositableOnly?: boolean
   includePassthrough?: boolean
@@ -40,6 +46,12 @@ export interface UseEarnCatalogResult {
   sources: EarnSourceStatus[]
   /** Per-default removal counts, so each toggle can show its own number. */
   excluded: { passthrough: number; illiquid: number; lowTvl: number; highRisk: number }
+  /**
+   * The filters the server applied unasked. A control that needs to show the
+   * floor in force reads it here rather than restating it locally — a copied
+   * default drifts silently the moment the server's moves.
+   */
+  appliedDefaults?: EarnAppliedDefaults
   /**
    * Rows the filters match across the chains that have ANSWERED.
    * `total > items.length` means pages are still streaming in.
@@ -101,6 +113,8 @@ export function useEarnCatalog(params: UseEarnCatalogParams): UseEarnCatalogResu
     venueKind,
     assetGroup,
     assetSymbol,
+    asset,
+    search,
     terms,
     depositableOnly,
     includePassthrough,
@@ -137,6 +151,7 @@ export function useEarnCatalog(params: UseEarnCatalogParams): UseEarnCatalogResu
       venueKind ?? '',
       assetGroup ?? '',
       assetSymbol ?? '',
+      asset ?? '',
       terms ?? '',
       depositableOnly ? '1' : '0',
       includePassthrough ? '1' : '0',
@@ -153,6 +168,8 @@ export function useEarnCatalog(params: UseEarnCatalogParams): UseEarnCatalogResu
       venueKind,
       assetGroup,
       assetSymbol,
+      asset,
+      search,
       terms,
       depositableOnly,
       includePassthrough,
@@ -184,6 +201,8 @@ export function useEarnCatalog(params: UseEarnCatalogParams): UseEarnCatalogResu
               venueKind,
               assetGroup,
               assetSymbol,
+              asset,
+              search,
               terms,
               depositableOnly,
               includePassthrough,
@@ -198,6 +217,7 @@ export function useEarnCatalog(params: UseEarnCatalogParams): UseEarnCatalogResu
             acc.facets = page.facets ?? acc.facets
             acc.sources = page.sources ?? acc.sources
             acc.excluded = page.excluded ?? acc.excluded
+            acc.appliedDefaults = page.appliedDefaults ?? acc.appliedDefaults
             acc.total = page.total
 
             // Publish the partial listing NOW. React Query overwrites this with
@@ -258,6 +278,7 @@ export function useEarnCatalog(params: UseEarnCatalogParams): UseEarnCatalogResu
       facets: merged.facets ?? EMPTY_FACETS,
       sources: merged.sources,
       excluded: merged.excluded ?? EMPTY_EXCLUSIONS,
+      appliedDefaults: merged.appliedDefaults,
       total: merged.total,
       pendingChains,
       failedChains,

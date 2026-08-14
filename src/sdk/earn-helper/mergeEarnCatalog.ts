@@ -1,5 +1,6 @@
 import {
   EMPTY_FACETS,
+  type EarnAppliedDefaults,
   type EarnExclusions,
   type EarnFacetBucket,
   type EarnFacets,
@@ -34,6 +35,12 @@ export interface MergedEarnCatalog {
   excluded: EarnExclusions
   /** Rows the FILTERS match across every chain merged — see `items.length`. */
   total: number
+  /**
+   * The server's own defaults, taken from the first chunk that reported them.
+   * Not merged: they are a property of the ENDPOINT, not of a chain, so every
+   * chunk carries the same values and combining them would be meaningless.
+   */
+  appliedDefaults?: EarnAppliedDefaults
 }
 
 export interface EarnCatalogChunk {
@@ -41,6 +48,8 @@ export interface EarnCatalogChunk {
   facets?: EarnFacets
   sources?: EarnSourceStatus[]
   excluded?: EarnExclusions
+  /** Filters the server applied unasked — identical across chunks. */
+  appliedDefaults?: EarnAppliedDefaults
   total?: number
 }
 
@@ -139,12 +148,14 @@ export function mergeEarnCatalog(
   const items: EarnMarket[] = []
   const bySource = new Map<string, EarnSourceStatus>()
   const excluded: EarnExclusions = { ...EMPTY_EXCLUSIONS }
+  let appliedDefaults: EarnAppliedDefaults | undefined
   let total = 0
 
   for (const chunk of chunks) {
     if (!chunk) continue
     if (chunk.items) items.push(...chunk.items)
     total += chunk.total ?? chunk.items?.length ?? 0
+    appliedDefaults ??= chunk.appliedDefaults
 
     if (chunk.excluded) {
       excluded.passthrough += chunk.excluded.passthrough ?? 0
@@ -179,5 +190,6 @@ export function mergeEarnCatalog(
     sources: [...bySource.values()],
     excluded,
     total,
+    appliedDefaults,
   }
 }
