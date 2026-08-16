@@ -39,6 +39,14 @@ interface LenderEntryRaw {
   tvlUsd: number
   /** Lender-wide params (e.g. Morpho/Lista market metadata). Free-form. */
   params?: Record<string, unknown>
+  /**
+   * Canonical fixed-term descriptor. `/lending/latest` serves it per LENDER
+   * KEY (schemas.ts: "Fixed-term descriptor for this lender key"), not on the
+   * market rows — and every fixed-term lender key we serve is one market
+   * (Lista broker, Exactly market, Midnight/Term repo), so it is hoisted onto
+   * each `PoolDataItem` where `fixedTermDetails()` expects to find it.
+   */
+  fixedTerm?: Record<string, unknown> | null
   markets: RawMarket[]
 }
 
@@ -110,7 +118,7 @@ interface RawMarket {
 // Transform
 // ============================================================================
 
-function rawMarketToPoolDataItem(raw: RawMarket): PoolDataItem {
+function rawMarketToPoolDataItem(raw: RawMarket, entry?: LenderEntryRaw): PoolDataItem {
   const info = raw.underlyingInfo
   const asset = info.asset
   return {
@@ -171,7 +179,11 @@ function rawMarketToPoolDataItem(raw: RawMarket): PoolDataItem {
     termSheet: (raw as { termSheet?: AnyTermSheet }).termSheet,
     risk: raw.risk ?? null,
     oracleInfo: raw.oracleInfo ?? null,
-    params: raw.params,
+    params: raw.params ?? entry?.params,
+    // Both live on the lender ENTRY in `/lending/latest`, never on the market
+    // row. Dropping them left `fixedTermDetails(pool)` null for every brokered
+    // market, which silently hid the ↻ Refinance / Roll button on Lista.
+    fixedTerm: (entry?.fixedTerm ?? null) as PoolDataItem['fixedTerm'],
     // Coerce the string-serialized rate card into clean numbers.
     terms: raw.terms
       ? raw.terms.map((t) => ({
@@ -273,7 +285,7 @@ export function useLendingLatest(
         for (const entry of data.items) {
           const key = entry.lenderInfo?.key
           if (!key) continue
-          lenderData[key] = entry.markets.map(rawMarketToPoolDataItem)
+          lenderData[key] = entry.markets.map((m) => rawMarketToPoolDataItem(m, entry))
           lenderInfoMap[key] = entry.lenderInfo
         }
       }

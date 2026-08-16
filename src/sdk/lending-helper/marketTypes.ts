@@ -91,6 +91,14 @@ export interface PoolDataItem {
    * these terms instead of a variable borrow. See BROKERED_MARKETS.md.
    */
   terms?: PoolTerm[] | null
+  /**
+   * Canonical fixed-term descriptor (model / maturity / fees / earlyRepay /
+   * provider). `/lending/latest` serves it per lender KEY, so the transform
+   * hoists it here next to `terms` — this is where `fixedTermDetails()` reads
+   * it, and it is what gates the refinance / roll-over button on brokered
+   * markets. Absent on variable-rate lenders.
+   */
+  fixedTerm?: any
   /** True when variable borrowing isn't offered (brokered markets). */
   variableBorrowDisabled?: boolean
   /**

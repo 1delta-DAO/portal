@@ -250,17 +250,6 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
 
   const onChangeSelection = (next: FacetSelection) => setSelection(next)
 
-  if (error) {
-    return (
-      <div className="space-y-2">
-        <ErrorAlert error={error} title="Could not load earn markets" />
-        <button type="button" className="btn btn-xs" onClick={() => refetch()}>
-          Retry
-        </button>
-      </div>
-    )
-  }
-
   /**
    * The user's position in the selected row, if any.
    *
@@ -278,6 +267,22 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
       (p): p is EarnVaultPosition => isVaultPosition(p) && p.positionUid === selected.earnUid
     )
   }, [selected, positions.items])
+
+  // BELOW every hook, deliberately. `error` flips from null to set at runtime
+  // — every chain's request failing, e.g. the backend going down — and an early
+  // return above a `useMemo` renders fewer hooks than the previous pass, which
+  // React turns into "Rendered fewer hooks than expected" and the whole tab
+  // dies with it. Any early return in this component belongs here or lower.
+  if (error) {
+    return (
+      <div className="space-y-2">
+        <ErrorAlert error={error} title="Could not load earn markets" />
+        <button type="button" className="btn btn-xs" onClick={() => refetch()}>
+          Retry
+        </button>
+      </div>
+    )
+  }
 
   const panelBody = selected ? (
     <DetailPanel
