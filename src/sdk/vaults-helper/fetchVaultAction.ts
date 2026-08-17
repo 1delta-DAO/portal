@@ -1,4 +1,4 @@
-import { apiFetchEnvelope, errorMessage } from '../http'
+import { apiFetchEnvelope, errorMessage, type ApiTransaction, type ApiPermission } from '../http'
 import {
   resolveVaultRoute,
   vaultFamily,
@@ -65,16 +65,10 @@ export interface VaultActionParams {
   ref?: Record<string, string | number | undefined>
 }
 
-export interface VaultTransaction {
-  to: string
-  data: string
-  /** Decimal string of wei. Carries the execution fee for async families (GMX). */
-  value: string
-}
+/** `value` carries the execution fee for async families (GMX). */
+export type VaultTransaction = ApiTransaction
 
-export interface VaultPermission extends VaultTransaction {
-  description?: string
-}
+export type VaultPermission = ApiPermission
 
 export interface VaultActionResponse {
   /** ERC-20 approvals — run FIRST. */

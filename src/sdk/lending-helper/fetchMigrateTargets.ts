@@ -1,9 +1,5 @@
 import { apiFetch, errorMessage } from '../http'
-import {
-  normalisePairRow,
-  type OptimizerAssetRef,
-  type OptimizerPairRow,
-} from '../../hooks/lending/useOptimizerPairs'
+import { normalisePairRow, type OptimizerAssetRef, type OptimizerPairRow } from './optimizerPairs'
 
 /**
  * Which markets can this position migrate to?

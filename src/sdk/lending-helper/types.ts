@@ -1,9 +1,11 @@
+// Straight from the leaf module — the `lib-utils` barrel pulls in
+// wagmi via `publicClient`, which the sdk must not depend on.
 import {
   LendingMode,
   SweepType,
   type MorphoParams,
   TransferToLenderType,
-} from '../../lib/lib-utils'
+} from '../../lib/lib-utils/types'
 
 interface CreateDepositBaseParams {
   receiver?: string

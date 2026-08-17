@@ -1,4 +1,4 @@
-import { apiFetchEnvelope, errorMessage } from '../http'
+import { apiFetchEnvelope, errorMessage, type ApiTransaction, type ApiPermission } from '../http'
 import type { LendingActionSimulation, RateImpactEntry } from './fetchLendingAction'
 
 // ============================================================================
@@ -13,12 +13,7 @@ import type { LendingActionSimulation, RateImpactEntry } from './fetchLendingAct
 // `route` is 'native' | 'composer' | 'sequential' | 'auction'.
 // ============================================================================
 
-export interface CombinedTransaction {
-  to: string
-  data: string
-  value: string
-  description?: string
-}
+export type CombinedTransaction = ApiPermission
 
 export interface TermBidReveal {
   id: string

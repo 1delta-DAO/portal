@@ -1,0 +1,789 @@
+import { apiFetchLoose, apiUrl, type ApiParams } from '../http'
+import { riskBand } from './risk'
+
+/**
+ * Client for the optimizer endpoint:
+ *
+ *   GET /v1/data/lending/pairs/optimize
+ *
+ * Replaces the older `/pairs/by-collateral` and `/pairs/by-debt` endpoints,
+ * which were structurally identical except for which side was required.
+ *
+ * Wire format notes that aren't obvious from the swagger:
+ *
+ *  - Numeric fields can come back either as JSON numbers or as decimal
+ *    strings (the backend uses strings to preserve precision on the SQL
+ *    `numeric` columns). The `num` helper handles both transparently.
+ *  - APR fields (`aprBase`, `aprTotal`, `depositAprLong`, `borrowAprShort`,
+ *    `rewardApr*`) are returned in **percent units** (e.g. `2.19` = 2.19%)
+ *    while `ltv`, `utilizationLong`, `utilizationShort` are already
+ *    fractions. The normaliser divides APRs by 100 so the rest of the UI
+ *    can use a single `fmtPct` formatter.
+ *  - The new envelope is `{ ok, total, count, pairs, ... }`. We tolerate
+ *    the legacy `{ success, data: { items, count } }` shape too so a
+ *    rolling backend deployment doesn't break the UI.
+ */
+
+/**
+ * UI-only direction toggle. The endpoint accepts both sides simultaneously,
+ * so this only controls *which* side gets the optional amount input + which
+ * "max debt" / "min collateral" column is shown in the table.
+ */
+export type OptimizerDirection = 'by-collateral' | 'by-debt'
+
+export type OptimizerSortKey =
+  | 'aprTotal'
+  | 'aprBase'
+  | 'maxLeverage'
+  | 'ltv'
+  | 'depositAprLong'
+  | 'borrowAprShort'
+  | 'totalDepositsUsdLong'
+  | 'totalDepositsUsdShort'
+  | 'totalDebtUsdLong'
+  | 'totalDebtUsdShort'
+  | 'totalLiquidityUsdLong'
+  | 'totalLiquidityUsdShort'
+  | 'utilizationLong'
+  | 'utilizationShort'
+  | 'borrowLiquidityShort'
+  | 'borrowLiquidityUsdShort'
+
+export interface OptimizerAssetRef {
+  chainId: string
+  address: string
+  symbol?: string
+  name?: string
+  decimals?: number
+  logoURI?: string
+  assetGroup?: string
+  priceUsd?: number
+  /** This asset's own token-risk label (low/medium/high/unknown), from the
+   *  pair's per-side `tokenLong`/`tokenShort` risk dimension. */
+  riskLabel?: string
+}
+
+/**
+ * Score → label, matching the backend's own banding (0/absent = unscored).
+ *
+ * Needed because `/pairs/optimize` selects the chain and lender risk *scores*
+ * but not their label columns, so those two dimensions arrive labelled
+ * "unknown" even when they carry a real score — the label is recoverable from
+ * the score, so recover it rather than render an assessment we do have as
+ * missing.
+ */
+export function riskLabelFromScore(score: number | null | undefined): string {
+  // Banded in ONE place — a second copy here is how 4 came to be amber in the
+  // optimizer and red in the terms panel at the same time.
+  return riskBand(score)
+}
+
+/**
+ * Display names for the pair's risk dimensions. The wire categories name the
+ * sides positionally (`tokenLong` / `tokenShort`), which is backend vocabulary —
+ * the UI calls them collateral and debt everywhere else.
+ */
+const RISK_CATEGORY_LABELS: Record<string, string> = {
+  tokenLong: 'collateral token',
+  tokenShort: 'debt token',
+}
+
+// ---------------------------------------------------------------------------
+// Raw API shape
+// ---------------------------------------------------------------------------
+
+interface RawAssetInfo {
+  asset?: {
+    chainId?: string
+    address?: string
+    symbol?: string
+    name?: string
+    decimals?: number
+    logoURI?: string
+    assetGroup?: string
+  }
+  prices?: { priceUsd?: number } | null
+  oraclePrice?: { oraclePriceUsd?: number } | null
+}
+
+/**
+ * `params.market.fixedTerm` as the backend serves it. Only `auction` is read
+ * today; the rest is the cross-protocol descriptor kept for shape fidelity.
+ */
+interface RawFixedTerm {
+  model?: string
+  maturity?: number
+  provider?: { kind?: string; address?: string } | null
+  auction?: {
+    status?: 'upcoming' | 'open' | 'revealing' | 'closed'
+    canBorrow?: boolean
+    canLend?: boolean
+    secondsUntilClose?: number
+    implications?: string[]
+    id?: string
+    startTime?: number
+    revealTime?: number
+    endTime?: number
+    minBorrowAmount?: string
+    minLendAmount?: string
+  } | null
+}
+
+interface RawOptimizerPair {
+  chainId: string
+  lender: string
+  marketLongUid?: string
+  marketShortUid?: string
+  maxLeverage?: string | number
+  eModeConfigId?: string | number
+  eMode?: string | number
+  collateralFactorLong?: string | number
+  borrowCollateralFactorLong?: string | number
+  borrowFactorShort?: string | number
+  ltv?: string | number
+  depositAprLong?: string | number
+  borrowAprShort?: string | number
+  /** One-time origination/mint fee on the debt side, PERCENT (Liquity CDPs).
+   *  Already folded into borrowAprShort/aprTotal by the backend; surfaced for a
+   *  "· fee X%" hint. */
+  originationFeeShort?: string | number | null
+  rewardAprLong?: string | number
+  rewardAprShort?: string | number
+  /** Intrinsic (native/staking) yield of each side's asset, percent units. The
+   *  EFFECTIVE rate is `depositAprLong + intrinsicYieldLong` (collateral) and
+   *  `borrowAprShort + intrinsicYieldShort` (debt) — see the optimizer's
+   *  `minDepositApr` / `maxBorrowRate` filter semantics. */
+  intrinsicYieldLong?: string | number
+  intrinsicYieldShort?: string | number
+  aprBase?: string | number
+  aprTotal?: string | number
+  totalDepositsUsdLong?: string | number
+  totalDebtUsdLong?: string | number
+  totalLiquidityUsdLong?: string | number
+  totalDepositsUsdShort?: string | number
+  totalDebtUsdShort?: string | number
+  totalLiquidityUsdShort?: string | number
+  utilizationLong?: string | number
+  utilizationShort?: string | number
+  /** Fluid smart collateral: the long side is a two-token DEX LP. */
+  isBasketLong?: boolean | null
+  /** This leg's OWN deposit rate, kept so the basket blend stays auditable. */
+  depositRateLongLeg?: string | number | null
+  depositableLong?: string | number | null
+  borrowLiquidityShort?: string | number | null
+  borrowLiquidityUsdShort?: string | number | null
+  underlyingInfoLong?: RawAssetInfo
+  underlyingInfoShort?: RawAssetInfo
+  // New (camelCase) amount-derived fields from /pairs/optimize.
+  maxDebtAmount?: string | number | null
+  maxDebtAmountUsd?: string | number | null
+  minCollateralAmount?: string | number | null
+  minCollateralAmountUsd?: string | number | null
+  // Effective depth-aware APR at the supplied notional (percent units). Each leg
+  // is the headline rate with only its organic (IRM) component re-priced at the
+  // post-action utilization (intrinsic yield + rewards are size-invariant), so
+  // netAprAtAmount is comparable to aprTotal but at the position's actual
+  // size/leverage. Present when an amount is supplied; null/absent for non-curve
+  // lenders. Raw grids (borrowDepthShort/supplyDepthLong) only when depth=true.
+  // Typed here for the contract; not yet consumed by the UI.
+  borrowAprAtAmount?: string | number | null
+  depositAprAtAmount?: string | number | null
+  netAprAtAmount?: string | number | null
+  borrowDepthShort?: unknown
+  supplyDepthLong?: unknown
+  // Legacy snake_case fallbacks (older deployments).
+  max_debt_amount?: string | number | null
+  min_collateral_amount?: string | number | null
+  /** Canonical fixed-term descriptor, joined by lender. Absent on variable markets. */
+  fixedTerm?: RawFixedTerm | null
+  // Fixed-term (Midnight/Lista) rate card on the debt side. One entry per
+  // maturity, `apr` in percent units. Present when the short market is brokered/
+  // order-book (variable borrow rate is 0/meaningless — read the fixed rate here).
+  termsShort?:
+    | {
+        termId?: string | number
+        durationDays?: string | number
+        /** Fixed borrow APR % for this term (0-notional / top-of-book). */
+        apr?: string | number
+        /** Size-weighted (VWAP) borrow APR % at the entered debt amount for
+         *  order-book terms (Midnight): the borrow ladder filled cheapest-first.
+         *  Present only with an amount + a ladder; prefer over `apr` when set. */
+        aprAtAmount?: string | number | null
+        /** Total loan-token depth in this term's book (max borrow at this maturity). */
+        fillable?: string | number | null
+        /** True when the amount exceeds `fillable` (book can't fully fund it). */
+        capped?: boolean
+        /** Raw order-book borrow ladder (only when depth=true). */
+        ladder?: unknown
+      }[]
+    | null
+  // Risk scoring (per-dimension breakdown + max token score).
+  risk?: {
+    maxTokenScore?: number
+    breakdown?: {
+      category: string
+      score: number
+      label: string
+      /** `curation` only: the curators of the pair's two markets (Morpho Blue,
+       *  Euler). Absent on every other dimension. */
+      curatorIds?: string[] | null
+    }[]
+  }
+  [extra: string]: unknown
+}
+
+interface EnvelopeBody {
+  start?: number
+  count?: number
+  total?: number | null
+  hasMore?: boolean | null
+  nextStart?: number | null
+  /** New /pairs/optimize field name. */
+  pairs?: RawOptimizerPair[]
+  /** Legacy key — older deployments returned `items` instead of `pairs`. */
+  items?: RawOptimizerPair[]
+}
+
+// ---------------------------------------------------------------------------
+// Normalised row used by the UI
+// ---------------------------------------------------------------------------
+
+export interface OptimizerPairRow {
+  chainId: string
+  lenderKey: string
+  marketLongUid?: string
+  marketShortUid?: string
+  /**
+   * E-mode / config the LTV + leverage in this row were computed against.
+   * Required for handoffs into Lending/Loop so the receiving panel can
+   * pre-select the same config and the user sees consistent numbers.
+   */
+  eModeConfigId?: string
+  collateral: OptimizerAssetRef
+  debt: OptimizerAssetRef
+  /** APRs as fractions (0.05 = 5%). */
+  depositAprLong: number
+  borrowAprShort: number
+  /** One-time origination/mint fee (fraction, e.g. 0.005 = 0.5%) on the debt
+   *  side (Liquity CDPs). Already reflected in aprTotal / borrowAprEffective;
+   *  surfaced for a "· fee" label. */
+  originationFeeShort?: number
+  rewardAprLong: number
+  rewardAprShort: number
+  /** Intrinsic (native/staking) yield of each side as a fraction. */
+  intrinsicYieldLong: number
+  intrinsicYieldShort: number
+  /** Effective rates = lending rate + intrinsic yield (what the UI should show
+   *  and what the position's net APR should be computed from). */
+  depositAprEffective: number
+  borrowAprEffective: number
+  aprBase: number
+  aprTotal: number
+  /**
+   * The COLLATERAL side is a two-token DEX LP (Fluid T2/T4 smart collateral),
+   * not a single asset.
+   *
+   * It qualifies `depositAprLong` rather than merely decorating the row:
+   * on a basket row that figure is the POSITION's rate, value-weighted across
+   * both legs, and it will not match a per-leg rate quoted anywhere else. The
+   * UI has to say so, because the row still renders under ONE token's name.
+   */
+  autoBalancedLong: boolean
+  /** This leg's own rate as a fraction — what `depositAprLong` was blended FROM. */
+  depositAprLongLeg?: number
+  /** Loan-to-value as a fraction. */
+  ltv: number
+  /** Collateral liquidation threshold as a fraction (drives the health factor). */
+  liquidationThreshold: number
+  maxLeverage: number
+  /** Overall risk score (worst dimension, 0–5+ where higher = riskier). */
+  riskScore: number
+  /** Per-dimension risk breakdown — config, chain, lender, collateral token,
+   *  debt token, plus `curation` on curated lenders (Morpho Blue, Euler) — for
+   *  the risk badge popover. Labels are normalised, so a dimension only reads
+   *  "unknown" when it genuinely carries no score. */
+  riskBreakdown: {
+    category: string
+    score: number
+    label: string
+    curatorIds?: string[] | null
+  }[]
+  /** Utilizations as fractions. */
+  utilizationLong: number
+  utilizationShort: number
+  totalDepositsUsdLong: number
+  totalDebtUsdLong: number
+  totalLiquidityUsdLong: number
+  totalDepositsUsdShort: number
+  totalDebtUsdShort: number
+  totalLiquidityUsdShort: number
+  /** Available borrow liquidity on the debt side, in DEBT-TOKEN units (cap-adjusted).
+   *  NOT dollars — for a non-$1 debt asset (e.g. WBNB) this differs from USD by the
+   *  token price. Use `borrowLiquidityUsdShort` for any $ display or comparison. */
+  borrowLiquidityShort: number
+  /** Available borrow liquidity on the debt side, in USD. This is the correct
+   *  dollar figure to show/compare against USD thresholds. */
+  borrowLiquidityUsdShort: number
+  /** Optional amount-derived columns. */
+  maxDebtAmount?: number
+  maxDebtAmountUsd?: number
+  minCollateralAmount?: number
+  minCollateralAmountUsd?: number
+  /**
+   * Effective depth-aware APR at the entered amount (fractions). Present only
+   * when an amount was supplied and the pair is a curve market. The `*AtAmount`
+   * legs re-price only their organic (IRM) component at the position size;
+   * `netAprAtAmount` is comparable to `aprTotal` but at the entered size/leverage.
+   */
+  depositAprAtAmount?: number
+  borrowAprAtAmount?: number
+  netAprAtAmount?: number
+  /** Reward-free "@ size" net (fraction) — the sustainable rate; rewards are
+   *  transient. Reward contribution at size = netAprAtAmount − netAprAtAmountBase. */
+  netAprAtAmountBase?: number
+  /**
+   * Fixed-term broker rate card on the DEBT side (Lista) — one entry per
+   * maturity. Drives the borrow-term picker in the action panel; passing a
+   * `termId` routes the open through the atomic composer server-side.
+   */
+  termsShort?:
+    | {
+        termId?: string | number
+        durationDays?: string | number
+        /** Fixed borrow APR % for this term (0-notional / top-of-book). */
+        apr?: string | number
+        /** Size-weighted (VWAP) borrow APR % at the entered debt amount for
+         *  order-book terms (Midnight): the borrow ladder filled cheapest-first.
+         *  Present only with an amount + a ladder; prefer over `apr` when set. */
+        aprAtAmount?: string | number | null
+        /** Total loan-token depth in this term's book (max borrow at this maturity). */
+        fillable?: string | number | null
+        /** True when the amount exceeds `fillable` (book can't fully fund it). */
+        capped?: boolean
+        /** Raw order-book borrow ladder (only when depth=true). */
+        ladder?: unknown
+      }[]
+    | null
+  /**
+   * Days to maturity — set ONLY for synthetic fixed-term (Morpho Midnight) rows
+   * that are sourced outside `/pairs/optimize` (see MigrateModal). Drives the
+   * "Fixed · Nd" label; `borrowAprEffective` on these rows is the fixed rate.
+   */
+  maturityDays?: number
+  /**
+   * Origination window for auction-cleared fixed-term markets (Term Finance).
+   *
+   * Present ONLY on those markets — `undefined` means "no window applies", not
+   * "closed". Term borrows are submitted into periodic sealed-bid rounds, so a
+   * row with `status: 'closed'` has a real maturity, a real last-cleared rate
+   * and no way to borrow until the next round opens. Without it a closed repo
+   * is indistinguishable from a live market with no offers, which is what made
+   * the Term rows look broken rather than shut.
+   */
+  auction?: OptimizerAuction
+}
+
+export interface OptimizerAuction {
+  status: 'upcoming' | 'open' | 'revealing' | 'closed'
+  /**
+   * Gate the borrow CTA on this, not on `status`. Re-derived locally from the
+   * timestamps (see `normaliseAuction`) so a cached response can't claim a
+   * window that has since closed.
+   */
+  canBorrow: boolean
+  /**
+   * NOT the inverse of a closed round: lending also works between rounds via
+   * the secondary repo-token book, so a closed market is lend-only rather than
+   * inert and must not be greyed out wholesale.
+   */
+  canLend: boolean
+  /** Submissions open (unix secs). */
+  startTime?: number
+  /** Submissions CLOSE — the deadline to act (unix secs). */
+  revealTime?: number
+  /** Round clears (unix secs). */
+  endTime?: number
+  /** Minimum submission size, debt-token BASE units (raw). */
+  minBorrowAmount?: string
+  minLendAmount?: string
+  /** Ready-to-display consequences from the backend, most important first. */
+  implications?: string[]
+}
+
+const num = (v: unknown): number => {
+  if (v == null) return NaN
+  if (typeof v === 'number') return v
+  const n = Number(v)
+  return Number.isFinite(n) ? n : NaN
+}
+
+const numOr0 = (v: unknown): number => {
+  const n = num(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+const optNum = (v: unknown): number | undefined => {
+  if (v == null) return undefined
+  const n = Number(v)
+  return Number.isFinite(n) ? n : undefined
+}
+
+/** Percent (API) → fraction, preserving `undefined` when the value is absent. */
+const pctToFrac = (v: unknown): number | undefined => {
+  const n = optNum(v)
+  return n == null ? undefined : n / 100
+}
+
+function asAssetRef(info: RawAssetInfo | undefined, fallbackChainId: string): OptimizerAssetRef {
+  const a = info?.asset
+  return {
+    chainId: a?.chainId ?? fallbackChainId,
+    address: (a?.address ?? '').toLowerCase(),
+    symbol: a?.symbol,
+    name: a?.name,
+    decimals: a?.decimals,
+    logoURI: a?.logoURI,
+    assetGroup: a?.assetGroup,
+    priceUsd: info?.prices?.priceUsd ?? info?.oraclePrice?.oraclePriceUsd,
+  }
+}
+
+/**
+ * Re-derive the auction status from the round's timestamps against the CURRENT
+ * clock rather than trusting the served `status`. Optimizer responses are
+ * cached client-side (15s stale, 2min refetch) and server-side on top of that,
+ * so a round that closed in between would otherwise keep rendering as open —
+ * on a window measured in days that is a small error, but it's the one field
+ * whose whole job is to say whether acting is possible right now.
+ */
+function normaliseAuction(ft: RawFixedTerm | null | undefined): OptimizerAuction | undefined {
+  const a = ft?.auction
+  if (!a) return undefined
+  const now = Math.floor(Date.now() / 1000)
+  const { startTime, revealTime, endTime } = a
+  const status: OptimizerAuction['status'] =
+    endTime == null || endTime <= now
+      ? 'closed'
+      : startTime != null && now < startTime
+        ? 'upcoming'
+        : revealTime != null && now >= revealTime
+          ? 'revealing'
+          : 'open'
+  return {
+    status,
+    // Recomputed from the live status, then intersected with the backend's own
+    // flags: the server knows things the timestamps don't (a matured repo is
+    // never borrowable even mid-round), and we know the clock is current.
+    canBorrow: status === 'open' && a.canBorrow !== false,
+    canLend: a.canLend !== false,
+    startTime,
+    revealTime,
+    endTime,
+    minBorrowAmount: a.minBorrowAmount,
+    minLendAmount: a.minLendAmount,
+    implications: a.implications,
+  }
+}
+
+/**
+ * Per-dimension risk, ready for `<RiskBadge>`: side names spelled the way the
+ * UI names them, and labels back-filled from the score for the dimensions the
+ * endpoint scores but doesn't label (chain, lender). Order is preserved — the
+ * backend emits config → chain → lender → collateral → debt.
+ */
+function normaliseRiskBreakdown(
+  raw?: { category: string; score: number; label: string; curatorIds?: string[] | null }[]
+): OptimizerPairRow['riskBreakdown'] {
+  return (raw ?? []).map((b) => ({
+    category: RISK_CATEGORY_LABELS[b.category] ?? b.category,
+    score: numOr0(b.score),
+    label: b.label && b.label !== 'unknown' ? b.label : riskLabelFromScore(numOr0(b.score)),
+    // Only `curation` carries these; the badge lists them under "Curators".
+    ...(b.curatorIds?.length ? { curatorIds: b.curatorIds } : {}),
+  }))
+}
+
+/**
+ * Wire row → UI row. Exported because `/v1/actions/loop/migrate/targets` serves
+ * rows in this exact shape (deliberately, so its consumers reuse this rather
+ * than growing a second normaliser that drifts) — see `fetchMigrateTargets`.
+ */
+export function normalisePairRow(raw: RawOptimizerPair): OptimizerPairRow {
+  return normalisePair(raw)
+}
+
+function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
+  // Fixed-term (order-book) markets — Morpho Midnight — report their rate in
+  // `termsShort` (one entry per maturity) with variable_borrow_rate = 0. Use the
+  // term APR as the borrow rate so the row doesn't show a misleading 0%, and
+  // recompute the leveraged Net APR from it (the backend's aprTotal is derived
+  // off the 0 variable rate for these markets).
+  const fixedTerm = raw.termsShort?.find((t) => t && t.apr != null)
+  // Headline uses the SPOT term rate (top-of-book / flat broker rate), so aprTotal
+  // stays the 0-notional net — consistent with variable markets. The size-weighted
+  // order-book rate feeds `netAprAtAmount` below (drives the "@ size" line).
+  const borrowShortPct = fixedTerm ? numOr0(fixedTerm.apr) : numOr0(raw.borrowAprShort)
+  const maxLev = numOr0(raw.maxLeverage)
+  const depEff = (numOr0(raw.depositAprLong) + numOr0(raw.intrinsicYieldLong)) / 100
+  const borEff = (borrowShortPct + numOr0(raw.intrinsicYieldShort)) / 100
+  const aprTotalFrac =
+    fixedTerm && maxLev > 0 ? maxLev * depEff - (maxLev - 1) * borEff : numOr0(raw.aprTotal) / 100
+  // Reward-free counterpart, and it MUST be derived the same way as aprTotal
+  // above. The backend computes both `aprBase` and `aprTotal` off the variable
+  // borrow rate, which is 0 on a fixed-term market — so pairing our term-derived
+  // `aprTotal` with the backend's `aprBase` compares two different borrow costs.
+  // The difference is then rendered as a "reward", producing a large phantom
+  // NEGATIVE incentive (e.g. base 123.22% vs total 53.25% → "−69.97% rwd", which
+  // is really just the term's borrow leg). Re-derive it here: fixed-term order
+  // books carry no borrow reward, so the only reward in `aprTotal` is the
+  // leveraged deposit reward — same treatment as `netAprAtAmountBaseFrac` below.
+  const aprBaseFrac =
+    fixedTerm && maxLev > 0
+      ? aprTotalFrac - maxLev * (numOr0(raw.rewardAprLong) / 100)
+      : numOr0(raw.aprBase) / 100
+  // "@ size" net APR: variable markets get it from the backend; fixed-term
+  // order-book markets (Midnight) have no IRM grid, so derive it here from the
+  // term's size-weighted VWAP rate (`aprAtAmount`) at the entered amount.
+  const netAprAtAmountFrac =
+    fixedTerm && fixedTerm.aprAtAmount != null && maxLev > 0
+      ? maxLev * depEff -
+        (maxLev - 1) * ((numOr0(fixedTerm.aprAtAmount) + numOr0(raw.intrinsicYieldShort)) / 100)
+      : pctToFrac(raw.netAprAtAmount)
+  // Reward-free ("@ size") net — the sustainable rate (rewards are transient).
+  // Variable / CDP markets get it from the backend; fixed-term (order-book)
+  // markets carry no borrow reward, so strip the collateral reward from the term
+  // net (leveraged deposit reward = maxLev · rewardAprLong).
+  const netAprAtAmountBaseFrac =
+    fixedTerm && fixedTerm.aprAtAmount != null && maxLev > 0
+      ? (netAprAtAmountFrac ?? 0) - maxLev * (numOr0(raw.rewardAprLong) / 100)
+      : pctToFrac(raw.netAprAtAmountBase)
+  return {
+    chainId: raw.chainId,
+    lenderKey: raw.lender,
+    marketLongUid: raw.marketLongUid,
+    marketShortUid: raw.marketShortUid,
+    eModeConfigId: raw.eModeConfigId != null ? String(raw.eModeConfigId) : undefined,
+    collateral: {
+      ...asAssetRef(raw.underlyingInfoLong, raw.chainId),
+      riskLabel: raw.risk?.breakdown?.find((b) => b.category === 'tokenLong')?.label,
+    },
+    debt: {
+      ...asAssetRef(raw.underlyingInfoShort, raw.chainId),
+      riskLabel: raw.risk?.breakdown?.find((b) => b.category === 'tokenShort')?.label,
+    },
+    // APR fields are percent units in the API → convert to fractions.
+    depositAprLong: numOr0(raw.depositAprLong) / 100,
+    borrowAprShort: borrowShortPct / 100,
+    originationFeeShort: pctToFrac(raw.originationFeeShort),
+    rewardAprLong: numOr0(raw.rewardAprLong) / 100,
+    rewardAprShort: numOr0(raw.rewardAprShort) / 100,
+    intrinsicYieldLong: numOr0(raw.intrinsicYieldLong) / 100,
+    intrinsicYieldShort: numOr0(raw.intrinsicYieldShort) / 100,
+    // Effective = lending rate + intrinsic (staking/native) yield. This is the
+    // rate the user actually earns (deposit) / pays (borrow) and what the net
+    // position APR must be derived from.
+    depositAprEffective: depEff,
+    borrowAprEffective: borEff,
+    aprBase: aprBaseFrac,
+    aprTotal: aprTotalFrac,
+    // LTV / utilizations are already fractions.
+    ltv: numOr0(raw.ltv),
+    liquidationThreshold: numOr0(raw.collateralFactorLong),
+    maxLeverage: numOr0(raw.maxLeverage),
+    // Overall risk = the worst (highest) dimension score; fall back to the token score.
+    riskScore: Math.max(
+      0,
+      ...(raw.risk?.breakdown?.map((b) => numOr0(b.score)) ?? []),
+      numOr0(raw.risk?.maxTokenScore)
+    ),
+    riskBreakdown: normaliseRiskBreakdown(raw.risk?.breakdown),
+    utilizationLong: numOr0(raw.utilizationLong),
+    utilizationShort: numOr0(raw.utilizationShort),
+    // Absent on every non-Fluid row and on any deployment older than the
+    // `/pairs/optimize` change that projects it — hence `=== true`, so a
+    // missing field reads as "ordinary market" rather than as truthy.
+    autoBalancedLong: raw.isBasketLong === true,
+    ...(raw.depositRateLongLeg != null
+      ? { depositAprLongLeg: numOr0(raw.depositRateLongLeg) / 100 }
+      : {}),
+    totalDepositsUsdLong: numOr0(raw.totalDepositsUsdLong),
+    totalDebtUsdLong: numOr0(raw.totalDebtUsdLong),
+    totalLiquidityUsdLong: numOr0(raw.totalLiquidityUsdLong),
+    totalDepositsUsdShort: numOr0(raw.totalDepositsUsdShort),
+    totalDebtUsdShort: numOr0(raw.totalDebtUsdShort),
+    totalLiquidityUsdShort: numOr0(raw.totalLiquidityUsdShort),
+    borrowLiquidityShort: numOr0(raw.borrowLiquidityShort),
+    borrowLiquidityUsdShort: numOr0(raw.borrowLiquidityUsdShort),
+    maxDebtAmount: optNum(raw.maxDebtAmount ?? raw.max_debt_amount),
+    maxDebtAmountUsd: optNum(raw.maxDebtAmountUsd),
+    minCollateralAmount: optNum(raw.minCollateralAmount ?? raw.min_collateral_amount),
+    minCollateralAmountUsd: optNum(raw.minCollateralAmountUsd),
+    // Depth-aware APR at the entered amount (percent → fraction). undefined when
+    // absent (no amount / non-curve lender) so the table shows it only then.
+    depositAprAtAmount: pctToFrac(raw.depositAprAtAmount),
+    borrowAprAtAmount: pctToFrac(raw.borrowAprAtAmount),
+    netAprAtAmount: netAprAtAmountFrac,
+    netAprAtAmountBase: netAprAtAmountBaseFrac,
+    // Fixed-term broker rate card (Lista) — drives the borrow-term picker.
+    termsShort: raw.termsShort,
+    // Fixed-term maturity (Midnight): drives the "Fixed · Nd" borrow-rate label.
+    maturityDays: fixedTerm ? optNum(fixedTerm.durationDays) : undefined,
+    // Auction origination window (Term Finance) — drives the borrowable gate.
+    auction: normaliseAuction(raw.fixedTerm),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
+
+export interface OptimizerFilters {
+  /** Long-side filter. Token addresses (single chain) or asset groups (multi/no chain). */
+  collaterals?: string[]
+  /** Short-side filter. Same dual semantics. */
+  debts?: string[]
+  /** Force group semantics regardless of chain mode. */
+  collateralGroups?: string[]
+  debtGroups?: string[]
+
+  /** Property flags the collateral (long) asset must carry, e.g. ['rwa','pendle'].
+   *  AND-narrows on top of any collateral/collateralGroups selection. */
+  collateralTags?: string[]
+  /** Property flags the debt (short) asset must carry. Same semantics. */
+  debtTags?: string[]
+  /** Match mode for `collateralTags`: 'any' (default) or 'all'. */
+  collateralTagsMode?: 'any' | 'all'
+  /** Match mode for `debtTags`: 'any' (default) or 'all'. */
+  debtTagsMode?: 'any' | 'all'
+  /** Include pairs whose collateral or debt is an expired Pendle PT
+   *  (default: excluded). */
+  includeExpired?: boolean
+
+  // At most one of these four. Token-unit forms require exactly one asset
+  // on that side; USD forms work with multi-asset selections.
+  collateralAmount?: number
+  collateralAmountUsd?: number
+  debtAmount?: number
+  debtAmountUsd?: number
+
+  chainId?: string
+  chainIds?: string[]
+
+  lender?: string
+  /** CSV of lender keys (prefix-expanded server-side). */
+  lenders?: string[]
+  excludeLenders?: string[]
+
+  minApr?: number
+  maxApr?: number
+  minLeverage?: number
+  minDepositApr?: number
+  maxBorrowRate?: number
+  minLtv?: number
+  maxUtilizationLong?: number
+  maxUtilizationShort?: number
+  minLiquidityUsdLong?: number
+  minBorrowLiquidityUsd?: number
+  minDepositsUsdLong?: number
+  minDebtUsdShort?: number
+
+  maxRiskScore?: number
+  maxConfigRiskScore?: number
+  maxTokenRiskScore?: number
+  maxChainRiskScore?: number
+  maxLenderRiskScore?: number
+
+  start?: number
+  count?: number
+  sortBy?: OptimizerSortKey
+  sortDir?: 'ASC' | 'DESC'
+}
+
+const OPTIMIZE_PATH = '/v1/data/lending/pairs/optimize'
+
+/** Query params for {@link OPTIMIZE_PATH}. Also feeds the query key, via `apiUrl`. */
+function optimizerParams(filters: OptimizerFilters): ApiParams {
+  const params = new URLSearchParams()
+
+  const csv = (key: string, v: string[] | undefined) => {
+    if (!v?.length) return
+    params.set(key, v.join(','))
+  }
+  csv('collaterals', filters.collaterals)
+  csv('debts', filters.debts)
+  csv('collateralGroups', filters.collateralGroups)
+  csv('debtGroups', filters.debtGroups)
+  csv('collateralTags', filters.collateralTags)
+  csv('debtTags', filters.debtTags)
+  csv('lenders', filters.lenders)
+  csv('excludeLenders', filters.excludeLenders)
+
+  const maybe = <T>(key: string, v: T | undefined) => {
+    if (v === undefined || v === null || v === '' || (typeof v === 'number' && Number.isNaN(v)))
+      return
+    params.set(key, String(v))
+  }
+
+  if (filters.chainIds?.length) {
+    params.set('chainIds', filters.chainIds.join(','))
+  } else {
+    maybe('chainId', filters.chainId)
+  }
+  maybe('lender', filters.lender)
+  maybe('collateralAmount', filters.collateralAmount)
+  maybe('collateralAmountUsd', filters.collateralAmountUsd)
+  maybe('debtAmount', filters.debtAmount)
+  maybe('debtAmountUsd', filters.debtAmountUsd)
+  maybe('minApr', filters.minApr)
+  maybe('maxApr', filters.maxApr)
+  maybe('minLeverage', filters.minLeverage)
+  maybe('minDepositApr', filters.minDepositApr)
+  maybe('maxBorrowRate', filters.maxBorrowRate)
+  maybe('minLtv', filters.minLtv)
+  maybe('maxUtilizationLong', filters.maxUtilizationLong)
+  maybe('maxUtilizationShort', filters.maxUtilizationShort)
+  maybe('minLiquidityUsdLong', filters.minLiquidityUsdLong)
+  maybe('minBorrowLiquidityUsd', filters.minBorrowLiquidityUsd)
+  maybe('minDepositsUsdLong', filters.minDepositsUsdLong)
+  maybe('minDebtUsdShort', filters.minDebtUsdShort)
+  maybe('collateralTagsMode', filters.collateralTagsMode)
+  maybe('debtTagsMode', filters.debtTagsMode)
+  // Default (omitted) excludes expired PTs; only send the opt-in.
+  if (filters.includeExpired) params.set('includeExpired', 'true')
+  maybe('maxRiskScore', filters.maxRiskScore)
+  maybe('maxConfigRiskScore', filters.maxConfigRiskScore)
+  maybe('maxTokenRiskScore', filters.maxTokenRiskScore)
+  maybe('maxChainRiskScore', filters.maxChainRiskScore)
+  maybe('maxLenderRiskScore', filters.maxLenderRiskScore)
+  maybe('start', filters.start)
+  maybe('count', filters.count)
+  maybe('sortBy', filters.sortBy)
+  maybe('sortDir', filters.sortDir)
+
+  return Object.fromEntries(params)
+}
+
+/** Canonical URL for a filter set — doubles as the react-query cache key. */
+export function optimizerPairsUrl(filters: OptimizerFilters): string {
+  return apiUrl(OPTIMIZE_PATH, optimizerParams(filters))
+}
+
+export async function fetchOptimizerPairs(
+  filters: OptimizerFilters
+): Promise<{ total: number; rows: OptimizerPairRow[] }> {
+  // `apiFetchLoose` because this endpoint puts its body at the top level on
+  // some deployments and under `data` on others, and reports status as
+  // `ok` rather than `success`.
+  const body = await apiFetchLoose<EnvelopeBody>(OPTIMIZE_PATH, {
+    params: optimizerParams(filters),
+  })
+  const rawItems = body.pairs ?? body.items ?? []
+  const rows = rawItems
+    .map(normalisePair)
+    .filter((row) => !!row.collateral.address && !!row.debt.address)
+  // `total` is the post-WHERE count from a `COUNT(*) OVER ()` window.
+  // Fall back to the legacy per-page `count` and then to the row length
+  // so pagination still renders something sensible against older backends.
+  const total = body.total ?? body.count ?? rows.length
+  return { total, rows }
+}

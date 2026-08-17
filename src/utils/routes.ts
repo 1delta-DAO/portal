@@ -1,6 +1,8 @@
-import type { SubTab } from '../components/lending/LendingTab'
-
-export type { SubTab }
+/**
+ * The app's tab keys. Defined here — with the slug maps that encode them into
+ * URLs — so `utils` never imports from the component tree.
+ */
+export type SubTab = 'earn' | 'unified' | 'lending' | 'trading' | 'swap' | 'xswap' | 'optimize'
 
 /** URL slug → internal tab key */
 const SLUG_TO_TAB: Record<string, SubTab> = {

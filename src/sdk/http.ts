@@ -108,10 +108,28 @@ export function apiUrl(path: string, params?: ApiParams): string {
 // Requests
 // ---------------------------------------------------------------------------
 
+/**
+ * One call the wallet has to make. The single transaction shape every
+ * `/v1/actions/*` endpoint speaks — the per-domain aliases
+ * (`LendingTransaction`, `VaultTransaction`, `EarnTx`, …) all point here.
+ */
+export interface ApiTransaction {
+  to: string
+  data: string
+  /** Decimal string of wei. */
+  value: string
+}
+
+/** A permission (approval / setup) step — labelled by the backend. */
+export interface ApiPermission extends ApiTransaction {
+  /** Human label the backend attaches to approvals / setup steps. */
+  description?: string
+}
+
 /** The executable payload the `/v1/actions/*` endpoints return. */
 export interface ApiActions {
-  transactions: { to: string; data: string; value: string }[]
-  permissions: { to: string; data: string; value: string; description: string }[]
+  transactions: ApiTransaction[]
+  permissions: ApiPermission[]
 }
 
 /**

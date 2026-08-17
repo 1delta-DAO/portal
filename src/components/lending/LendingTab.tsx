@@ -11,6 +11,7 @@ import type { LenderInfoMap } from '../../sdk/lending-helper/marketTypes'
 import { useLendingBalancesMultiChain } from '../../hooks/lending/useLendingBalances'
 import { useTokenListsMultiChain } from '../../hooks/useTokenLists'
 import { tabFromSlug, slugToLender, buildPath, TAB_CHAIN_MODE } from '../../utils/routes'
+import type { SubTab } from '../../utils/routes'
 import { useChainSelection, usePersistChainSelection } from '../../hooks/useChainSelection'
 import { Badge } from '../common/Badge'
 
@@ -41,7 +42,7 @@ const XChainSwapPanel = lazy(() =>
 
 import { OPTIMIZER_ENABLED, BRIDGE_UI_ENABLED, UNIFIED_EARN_ENABLED } from '../../config/flags'
 
-export type SubTab = 'earn' | 'unified' | 'lending' | 'trading' | 'swap' | 'xswap' | 'optimize'
+export type { SubTab } from '../../utils/routes'
 
 /**
  * Tabs this build has turned off.

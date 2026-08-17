@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { apiFetch } from '../../sdk/http'
+import { apiFetch } from '../sdk/http'
 
 interface ChainData {
   nativeCurrency?: { symbol: string; name: string; decimals: number }

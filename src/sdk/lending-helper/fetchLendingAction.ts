@@ -59,15 +59,9 @@ export interface LendingActionParams {
   simulationBody?: LoopRangeSimulationBody
 }
 
-export interface LendingTransaction {
-  to: string
-  data: string
-  value: string
-}
+export type LendingTransaction = ApiTransaction
 
-export interface LendingPermission extends LendingTransaction {
-  description?: string
-}
+export type LendingPermission = ApiPermission
 
 export interface LendingActionResponse {
   transactions: LendingTransaction[]
@@ -142,7 +136,7 @@ export interface LendingActionResultWithSimulation {
   error?: string
 }
 
-import { apiFetchEnvelope, errorMessage } from '../http'
+import { apiFetchEnvelope, errorMessage, type ApiTransaction, type ApiPermission } from '../http'
 
 const LENDING_ACTIONS_BASE = '/v1/actions/lending'
 

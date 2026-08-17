@@ -1,13 +1,8 @@
-import { apiFetchEnvelope } from '../http'
+import { apiFetchEnvelope, type ApiPermission } from '../http'
 import type { EarnActionKind } from './types'
 
 /** One call the wallet has to make. Matches the worker's `Transaction`. */
-export interface EarnTx {
-  to: string
-  data: string
-  value: string
-  /** Human label the backend attaches to approvals / setup steps. */
-  description?: string
+export interface EarnTx extends ApiPermission {
   /** `erc20-approval`, `credit-delegation`, … where the backend states it. */
   type?: string
   spender?: string

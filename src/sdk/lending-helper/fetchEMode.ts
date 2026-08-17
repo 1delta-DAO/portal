@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchEnvelope, errorMessage } from '../http'
+import { apiFetch, apiFetchEnvelope, errorMessage, type ApiTransaction } from '../http'
 
 // ============================================================================
 // E-Mode List
@@ -105,11 +105,7 @@ export async function fetchEModeAnalysis(params: {
 // E-Mode Switch — build calldata for switching e-mode category
 // ============================================================================
 
-export interface EModeSwitchTx {
-  to: string
-  data: string
-  value: string
-}
+export type EModeSwitchTx = ApiTransaction
 
 export interface EModeSwitchResult {
   success: boolean

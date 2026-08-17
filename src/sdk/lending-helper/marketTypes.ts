@@ -14,8 +14,8 @@
  * The Earn tab browses the first; the position-management tabs use the second.
  */
 
-import type { AnyTermSheet } from '../../components/lending/terms/types'
-import type { RewardEntry } from '../../components/lending/shared/rewards'
+import type { AnyTermSheet } from './termSheets'
+import type { RewardEntry } from './rewards'
 import type { FluidSmartInfo } from './fluidSmart'
 import type {
   LenderInfo,
