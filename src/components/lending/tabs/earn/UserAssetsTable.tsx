@@ -7,8 +7,7 @@ import { ErrorAlert } from '../../../common/ErrorAlert'
 import { Logo } from '../../../common/Logo'
 import { formatUsd } from '../../../../utils/format'
 import { getChainName } from '../../../../lib/lib-utils'
-
-const CHAIN_LOGO_BASE = 'https://raw.githubusercontent.com/1delta-DAO/chains/main'
+import { chainLogoUrl } from '../../../../config/assets'
 
 interface UserAssetsTableProps {
   balances: ChainTokenBalance[]
@@ -144,7 +143,7 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
                       <td>
                         <div className="flex items-center gap-1 min-w-0">
                           <Logo
-                            src={`${CHAIN_LOGO_BASE}/${b.chainId}.webp`}
+                            src={chainLogoUrl(b.chainId)}
                             alt={getChainName(b.chainId)}
                             fallbackText={getChainName(b.chainId)}
                             className="w-3.5 h-3.5 rounded-full shrink-0"

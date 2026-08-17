@@ -1,5 +1,6 @@
 import { formatUnits } from 'viem'
 import type { VaultEntry, VaultProvider } from '../../../../../sdk/vaults-helper'
+import { lenderInfoLogoUrl } from '../../../../../config/assets'
 
 export type VaultSortKey =
   | 'name'
@@ -28,13 +29,10 @@ export const PROVIDER_LABELS: Record<VaultProvider, string> = {
 export const PROVIDER_LOGOS: Partial<Record<VaultProvider, string>> = {
   // Reuse the lender registry logos that the rest of the app already serves.
   // Empty entries fall back to `Logo`'s initials swatch.
-  fluid:
-    'https://raw.githubusercontent.com/1delta-DAO/asset-list-config/main/lender-info/fluid/logo.svg',
-  morpho:
-    'https://raw.githubusercontent.com/1delta-DAO/asset-list-config/main/lender-info/morpho-blue/logo.svg',
-  silo: 'https://raw.githubusercontent.com/1delta-DAO/asset-list-config/main/lender-info/silo/logo.svg',
-  gearbox:
-    'https://raw.githubusercontent.com/1delta-DAO/asset-list-config/main/lender-info/gearbox-v3/logo.svg',
+  fluid: lenderInfoLogoUrl('fluid'),
+  morpho: lenderInfoLogoUrl('morpho-blue'),
+  silo: lenderInfoLogoUrl('silo'),
+  gearbox: lenderInfoLogoUrl('gearbox-v3'),
 }
 
 /**

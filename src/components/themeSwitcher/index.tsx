@@ -34,7 +34,9 @@ const THEMES = [
   'business',
 ] as const
 
-const DEFAULT_THEME = 'forest'
+// Must match the `--default` theme in styles/globals.css, or a first-time
+// visitor gets a different theme than the CSS declares.
+const DEFAULT_THEME = 'bloomberg'
 
 export function ThemeSwitcher() {
   const [theme, setTheme] = useState<string>(DEFAULT_THEME)

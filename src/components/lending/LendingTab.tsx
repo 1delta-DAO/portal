@@ -39,14 +39,7 @@ const XChainSwapPanel = lazy(() =>
   import('../swap/XChainSwapPanel').then((m) => ({ default: m.XChainSwapPanel }))
 )
 
-const OPTIMIZER_ENABLED = import.meta.env.VITE_OPTIMIZER_ENABLED === 'true'
-// Bridge / cross-chain swap UI ships enabled but is still flagged Beta in the
-// tab bar — set VITE_BRIDGE_UI_ENABLED=false in .env to hide the tab again.
-const BRIDGE_UI_ENABLED = import.meta.env.VITE_BRIDGE_UI_ENABLED !== 'false'
-// Unified Earn is OPT-IN — set VITE_UNIFIED_EARN_ENABLED=true in .env to show
-// it. Opt-in rather than opt-out on purpose: a flag you have to remember to
-// turn OFF ships the feature by accident on the first deploy that forgets.
-const UNIFIED_EARN_ENABLED = import.meta.env.VITE_UNIFIED_EARN_ENABLED === 'true'
+import { OPTIMIZER_ENABLED, BRIDGE_UI_ENABLED, UNIFIED_EARN_ENABLED } from '../../config/flags'
 
 export type SubTab = 'earn' | 'unified' | 'lending' | 'trading' | 'swap' | 'xswap' | 'optimize'
 

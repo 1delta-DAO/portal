@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../sdk/http'
 import { getChainName } from '../lib/lib-utils'
+import { chainLogoUrl } from '../config/assets'
 
 export interface ChainMeta {
   chainId: string
@@ -13,12 +14,10 @@ interface ChainsData {
   items: unknown[]
 }
 
-const CHAIN_LOGO_BASE = 'https://raw.githubusercontent.com/1delta-DAO/chains/main'
-
 const enrich = (chainId: string): ChainMeta => ({
   chainId,
   name: getChainName(chainId),
-  logoURI: `${CHAIN_LOGO_BASE}/${chainId}.webp`,
+  logoURI: chainLogoUrl(chainId),
 })
 
 const DEFAULT_CHAINS: ChainMeta[] = [enrich('1')]
@@ -40,7 +39,7 @@ export function useChains(): { chains: ChainMeta[]; isLoading: boolean } {
           return {
             chainId: String(item.chainId),
             name: item.name ?? getChainName(String(item.chainId)),
-            logoURI: item.logoURI ?? `${CHAIN_LOGO_BASE}/${item.chainId}.webp`,
+            logoURI: item.logoURI ?? chainLogoUrl(item.chainId),
           }
         }
         return enrich(String(item))

@@ -1,4 +1,5 @@
 import { RawCurrency } from '../lib-utils'
+import { tokenListUrl } from '../../config/assets'
 
 export type TokenListsRecord = Record<string, Record<string, RawCurrency>>
 export interface DeltaTokenList {
@@ -16,8 +17,7 @@ const chainPromises = new Map<string, Promise<Record<string, RawCurrency> | null
 type ReadyListener = () => void
 const listeners = new Set<ReadyListener>()
 
-const getListUrl = (chainId: string) =>
-  `https://raw.githubusercontent.com/1delta-DAO/token-lists/main/${chainId}.json`
+const getListUrl = tokenListUrl
 
 async function fetchList(chainId: string): Promise<DeltaTokenList | null> {
   try {

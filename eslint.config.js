@@ -19,8 +19,9 @@ import reactHooks from 'eslint-plugin-react-hooks'
  * that is what this closes. Add rules when someone is prepared to fix the
  * backlog they open.
  *
- *   pnpm lint          # errors only, exits non-zero on a violation
- *   pnpm lint:deps     # the same plus the exhaustive-deps warnings
+ *   pnpm lint          # exits non-zero on an ERROR; warnings are advisory
+ *   pnpm lint:strict   # exits non-zero on a warning too — for CI, once the
+ *                      # ~31 existing exhaustive-deps warnings are dealt with
  */
 export default tseslint.config(
   { ignores: ['dist/**', 'node_modules/**', 'coverage/**', '.vite/**', 'public/**'] },

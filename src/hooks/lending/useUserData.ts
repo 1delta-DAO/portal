@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../sdk/http'
 import { fetchUserDataViaRpc } from './fetchUserDataRpc'
+import { USER_POSITIONS_RPC } from '../../config/flags'
 import type {
   RawLenderUserDataEntry,
   LenderUserDataEntry,
@@ -68,11 +69,9 @@ function transformUserDataEntry(raw: RawLenderUserDataEntry): LenderUserDataEntr
 
 const endpointUserData = '/v1/data/lending/user-positions'
 
-// Global override: when true, every chain fetches user positions via the
-// prepare → client eth_call → parse flow instead of letting the API read chain
-// state server-side. Set VITE_USER_POSITIONS_RPC=true to flip it without a
-// code change; the per-chain list below applies either way.
-const USE_RPC_FETCH = import.meta.env.VITE_USER_POSITIONS_RPC === 'true'
+// Global override lives in config/flags.ts (VITE_USER_POSITIONS_RPC); the
+// per-chain lists below apply either way.
+const USE_RPC_FETCH = USER_POSITIONS_RPC
 
 // Per-chain override: these chains always fetch user positions locally via RPC,
 // regardless of USE_RPC_FETCH. Used for chains the API does not (yet) serve well.

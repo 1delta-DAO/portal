@@ -12,6 +12,7 @@ import { buildPath, OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { Logo } from '../../../common/Logo'
 import { getChainName } from '../../../../lib/lib-utils'
+import { chainLogoUrl } from '../../../../config/assets'
 import {
   AutoBalancedBadge,
   autoBalancedExplainer,
@@ -19,8 +20,6 @@ import {
   LpAssetIcons,
   LpPairLabel,
 } from '../../shared/SmartVault'
-
-const CHAIN_LOGO_BASE = 'https://raw.githubusercontent.com/1delta-DAO/chains/main'
 
 /**
  * Where an Earn row hands off to: the Lending tab with THIS market selected and
@@ -177,7 +176,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
             lives in the tooltip and on the asset popover. */}
         <span className="shrink-0 leading-none" title={getChainName(p.chainId)}>
           <Logo
-            src={`${CHAIN_LOGO_BASE}/${p.chainId}.webp`}
+            src={chainLogoUrl(p.chainId)}
             alt={getChainName(p.chainId)}
             fallbackText={getChainName(p.chainId)}
             className="rounded-full w-3 h-3"

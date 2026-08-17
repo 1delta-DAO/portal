@@ -14,6 +14,7 @@ import { AssetPopover } from '../../shared/AssetPopover'
 import { UsdAmount } from '../../../common/UsdAmount'
 import { Logo } from '../../../common/Logo'
 import { getChainName } from '../../../../lib/lib-utils'
+import { chainLogoUrl } from '../../../../config/assets'
 import { RiskBadge } from '../../shared/RiskBadge'
 import { AutoBalancedPill, BasketRateMark } from '../../shared/SmartVault'
 import { riskDotColor } from '../earn/helpers'
@@ -372,8 +373,6 @@ function AuctionTag({ auction }: { auction?: OptimizerAuction }) {
   )
 }
 
-const CHAIN_LOGO_BASE = 'https://raw.githubusercontent.com/1delta-DAO/chains/main'
-
 /**
  * Which chain a pair lives on. Rows can come from any selected chain, and the
  * pair is only actionable on its own — so the chain is part of the row's
@@ -389,7 +388,7 @@ function ChainTag({ chainId, show = true }: { chainId: string; show?: boolean })
       title={getChainName(chainId)}
     >
       <Logo
-        src={`${CHAIN_LOGO_BASE}/${chainId}.webp`}
+        src={chainLogoUrl(chainId)}
         alt={getChainName(chainId)}
         fallbackText={getChainName(chainId)}
         className="w-3 h-3 rounded-full shrink-0"

@@ -3,6 +3,7 @@ import type { LenderData, LenderInfoMap, LenderSummary } from '../../../sdk/lend
 import type { UserDataResult } from '../../../sdk/lending-helper/userPositionTypes'
 import { abbreviateUsd, computeLenderTvl, formatUsd } from '../../../utils/format'
 import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'
+import { lenderIconUrl } from '../../../config/assets'
 
 /* ── Hook: lender dropdown options + balance markers ──
  *
@@ -120,9 +121,7 @@ export function useLenderSelector({
     return {
       value: l,
       label: info?.name ?? l,
-      icon:
-        info?.logoURI ??
-        `https://raw.githubusercontent.com/1delta-DAO/protocol-icons/main/lender/${l.toLowerCase()}.webp`,
+      icon: info?.logoURI ?? lenderIconUrl(l),
       indicator: lenderBalances.has(l) ? '\u25CF ' : undefined,
       trailing: tvl > 0 ? abbreviateUsd(tvl) : undefined,
       trailingTitle: tvl > 0 ? `TVL: $${formatUsd(tvl)}` : undefined,
