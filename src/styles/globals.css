@@ -55,6 +55,8 @@
     aurora,
     cosmos,
     ember,
+    paper,
+    paper-dark,
     light,
     dark --prefersdark,
     forest,
@@ -426,6 +428,109 @@
   --size-field: 0.25rem;
   --border: 1px;
   --depth: 0.5;
+  --noise: 0;
+}
+
+/* ──────────────────────────────────────────
+   PAPER — editorial institutional light theme, ported from the preview
+   site's design system (~/preview/public/assets/site.css). Warm paper
+   page under white cards, deep pine-teal primary carrying cream text,
+   restrained greens, amber for warnings, thin #E3E6EA hairlines, 6px
+   fields / 10px panels, no depth effects.
+
+   The port keeps site.css's contrast discipline: #069F75 is the DISPLAY
+   green (3.37:1 on white — AA for large text only), so it is the accent;
+   anything body-sized reads the darker #05805E via secondary/success.
+   The palette has no blue and no red — info stays in the teal family and
+   error borrows amber's earthy temperature.
+   ────────────────────────────────────────── */
+
+@plugin "daisyui/theme" {
+  name: 'paper';
+  color-scheme: light;
+
+  --color-base-100: #ffffff; /* cards, navbar (site.css --card) */
+  --color-base-200: #faf9f6; /* page background (--paper) */
+  --color-base-300: #e3e6ea; /* hairlines (--line) */
+  --color-base-content: #1c2025; /* --ink */
+
+  --color-primary: #0b3632; /* teal-900 — buttons, wordmark */
+  --color-primary-content: #f4f3ee; /* --off cream, not white */
+
+  --color-secondary: #05805e; /* --green-text: AA at body sizes */
+  --color-secondary-content: #ffffff;
+
+  --color-accent: #069f75; /* --green: display green, large text only */
+  --color-accent-content: #062d22;
+
+  --color-neutral: #1c2025;
+  --color-neutral-content: #f4f3ee;
+
+  --color-info: #12655c; /* teal midpoint — the palette has no blue */
+  --color-info-content: #ffffff;
+  --color-success: #05805e;
+  --color-success-content: #ffffff;
+  --color-warning: #b45309; /* --amber */
+  --color-warning-content: #ffffff;
+  --color-error: #b42318; /* site.css has no red; warm to match amber */
+  --color-error-content: #ffffff;
+
+  --radius-selector: 0.375rem; /* 6px — site .btn */
+  --radius-field: 0.375rem;
+  --radius-box: 0.625rem; /* 10px — site .panel / .pal */
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0; /* the site works in hairlines + faint shadow, not depth */
+  --noise: 0;
+}
+
+/* ──────────────────────────────────────────
+   PAPER DARK — the same design system's dark scheme
+   (site.css `:root[data-theme=dark]`). Deep forest surfaces (#0F1714
+   page, #121C18 cards, #233029 hairlines), sage text, and the teal
+   collapsing into bright green #01C38E — in the source, dark mode remaps
+   --accent and even the primary button to this green because teal-900 is
+   a background colour there, illegible as ink.
+   ────────────────────────────────────────── */
+
+@plugin "daisyui/theme" {
+  name: 'paper-dark';
+  color-scheme: dark;
+
+  --color-base-100: #121c18; /* cards (--card dark) */
+  --color-base-200: #0f1714; /* page background */
+  --color-base-300: #233029; /* hairlines (--line dark) */
+  --color-base-content: #e8eae6; /* --ink dark */
+
+  --color-primary: #01c38e; /* --green-dark, dark's one accent */
+  --color-primary-content: #06251c;
+
+  --color-secondary: #9aa5a0; /* --ink-soft: muted sage */
+  --color-secondary-content: #0f1714;
+
+  --color-accent: #01c38e;
+  --color-accent-content: #06251c;
+
+  --color-neutral: #16211c; /* --gray-50 dark */
+  --color-neutral-content: #e8eae6;
+
+  --color-info: #5cbfb4; /* lightened teal, readable on the forest bg */
+  --color-info-content: #072522;
+  --color-success: #01c38e;
+  --color-success-content: #06251c;
+  --color-warning: #f5a623; /* --amber dark remap */
+  --color-warning-content: #1f1503;
+  --color-error: #f26d5e; /* warmed to sit with the amber */
+  --color-error-content: #250b07;
+
+  --radius-selector: 0.375rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.625rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
   --noise: 0;
 }
 

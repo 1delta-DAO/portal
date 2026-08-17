@@ -13,6 +13,8 @@ const THEMES = [
   'aurora',
   'cosmos',
   'ember',
+  'paper',
+  'paper-dark',
   'light',
   'dark',
   'forest',
