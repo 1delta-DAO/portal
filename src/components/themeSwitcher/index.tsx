@@ -13,8 +13,7 @@ const THEMES = [
   'aurora',
   'cosmos',
   'ember',
-  'paper',
-  'paper-dark',
+  'evergreen',
   'light',
   'dark',
   'forest',
@@ -38,7 +37,7 @@ const THEMES = [
 
 // Must match the `--default` theme in styles/globals.css, or a first-time
 // visitor gets a different theme than the CSS declares.
-const DEFAULT_THEME = 'bloomberg'
+const DEFAULT_THEME = 'evergreen'
 
 export function ThemeSwitcher() {
   const [theme, setTheme] = useState<string>(DEFAULT_THEME)

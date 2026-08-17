@@ -47,7 +47,7 @@
 
 @plugin "daisyui" {
   themes:
-    bloomberg --default,
+    bloomberg,
     graphite,
     terminal,
     nebula,
@@ -55,8 +55,7 @@
     aurora,
     cosmos,
     ember,
-    paper,
-    paper-dark,
+    evergreen --default,
     light,
     dark --prefersdark,
     forest,
@@ -150,7 +149,6 @@
 @plugin "daisyui/theme" {
   name: 'bloomberg';
   color-scheme: dark;
-  default: true;
 
   /* Base surfaces — pure black with two near-black lifts for layering */
   --color-base-100: #000000; /* main background — pure black */
@@ -432,62 +430,9 @@
 }
 
 /* ──────────────────────────────────────────
-   PAPER — editorial institutional light theme, ported from the preview
-   site's design system (~/preview/public/assets/site.css). Warm paper
-   page under white cards, deep pine-teal primary carrying cream text,
-   restrained greens, amber for warnings, thin #E3E6EA hairlines, 6px
-   fields / 10px panels, no depth effects.
-
-   The port keeps site.css's contrast discipline: #069F75 is the DISPLAY
-   green (3.37:1 on white — AA for large text only), so it is the accent;
-   anything body-sized reads the darker #05805E via secondary/success.
-   The palette has no blue and no red — info stays in the teal family and
-   error borrows amber's earthy temperature.
-   ────────────────────────────────────────── */
-
-@plugin "daisyui/theme" {
-  name: 'paper';
-  color-scheme: light;
-
-  --color-base-100: #ffffff; /* cards, navbar (site.css --card) */
-  --color-base-200: #faf9f6; /* page background (--paper) */
-  --color-base-300: #e3e6ea; /* hairlines (--line) */
-  --color-base-content: #1c2025; /* --ink */
-
-  --color-primary: #0b3632; /* teal-900 — buttons, wordmark */
-  --color-primary-content: #f4f3ee; /* --off cream, not white */
-
-  --color-secondary: #05805e; /* --green-text: AA at body sizes */
-  --color-secondary-content: #ffffff;
-
-  --color-accent: #069f75; /* --green: display green, large text only */
-  --color-accent-content: #062d22;
-
-  --color-neutral: #1c2025;
-  --color-neutral-content: #f4f3ee;
-
-  --color-info: #12655c; /* teal midpoint — the palette has no blue */
-  --color-info-content: #ffffff;
-  --color-success: #05805e;
-  --color-success-content: #ffffff;
-  --color-warning: #b45309; /* --amber */
-  --color-warning-content: #ffffff;
-  --color-error: #b42318; /* site.css has no red; warm to match amber */
-  --color-error-content: #ffffff;
-
-  --radius-selector: 0.375rem; /* 6px — site .btn */
-  --radius-field: 0.375rem;
-  --radius-box: 0.625rem; /* 10px — site .panel / .pal */
-  --size-selector: 0.25rem;
-  --size-field: 0.25rem;
-  --border: 1px;
-  --depth: 0; /* the site works in hairlines + faint shadow, not depth */
-  --noise: 0;
-}
-
-/* ──────────────────────────────────────────
-   PAPER DARK — the same design system's dark scheme
-   (site.css `:root[data-theme=dark]`). Deep forest surfaces (#0F1714
+   EVERGREEN — the preview site's design system, dark scheme
+   (~/preview/public/assets/site.css, `:root[data-theme=dark]`).
+   Deep forest surfaces (#0F1714
    page, #121C18 cards, #233029 hairlines), sage text, and the teal
    collapsing into bright green #01C38E — in the source, dark mode remaps
    --accent and even the primary button to this green because teal-900 is
@@ -495,12 +440,20 @@
    ────────────────────────────────────────── */
 
 @plugin "daisyui/theme" {
-  name: 'paper-dark';
+  name: 'evergreen';
   color-scheme: dark;
+  default: true;
 
+  /* The source's dark surface ladder is five steps: page #0F1714 →
+     card #121C18 → lifted strip (--gray-50) #16211C → row hover
+     #1C2A24 → raised chip #26352F. base-200 maps to the LIFTED tone,
+     not the page: inside a card, bg-base-200 strips/zebras must step
+     lighter (as the site's .req/.code strips do), and the app's dark
+     themes all keep the page a step above the card anyway. Hover gets
+     its own override below. */
   --color-base-100: #121c18; /* cards (--card dark) */
-  --color-base-200: #0f1714; /* page background */
-  --color-base-300: #233029; /* hairlines (--line dark) */
+  --color-base-200: #16211c; /* lifted inner surfaces (--gray-50 dark) */
+  --color-base-300: #233029; /* hairlines / raised chips (--line dark) */
   --color-base-content: #e8eae6; /* --ink dark */
 
   --color-primary: #01c38e; /* --green-dark, dark's one accent */
@@ -640,4 +593,81 @@
 [data-theme='bloomberg'] .table-zebra tbody tr:hover {
   --tw-bg-opacity: 1;
   background-color: #1f1500;
+}
+
+/* ──────────────────────────────────────────
+   EVERGREEN theme overrides — the parts of the source design that
+   tokens alone cannot express (site.css does these with rules, not
+   token remaps):
+
+   1. In dark, the source has NO solid green buttons — .btn-primary
+      remaps to a translucent green tint with green text and a green
+      border. Solid #01C38E chips read far louder than the design.
+   2. The wordmark is ink in the source, never the accent colour.
+      Scoping the primary/accent custom properties on the navbar h1
+      re-inks both the letter spans and the logo SVG.
+   3. Row hover: the surface tones sit so close together that a
+      base-200 hover reads as unhovered — the source defines a dedicated
+      --row-hover (#1C2A24) for exactly this reason.
+   ────────────────────────────────────────── */
+
+[data-theme='evergreen'] .btn-primary:not(.btn-disabled):not(:disabled),
+[data-theme='evergreen'] .btn-success:not(.btn-disabled):not(:disabled) {
+  background: rgba(1, 195, 142, 0.14);
+  border: 1px solid rgba(1, 195, 142, 0.4);
+  color: #01c38e;
+  box-shadow: none;
+}
+[data-theme='evergreen'] .btn-primary:not(.btn-disabled):not(:disabled):hover,
+[data-theme='evergreen'] .btn-success:not(.btn-disabled):not(:disabled):hover {
+  background: rgba(1, 195, 142, 0.2);
+  border-color: rgba(1, 195, 142, 0.55);
+}
+
+[data-theme='evergreen'] .navbar h1 {
+  --color-primary: var(--color-base-content);
+  --color-accent: var(--color-base-content);
+}
+
+[data-theme='evergreen'] .table tbody tr:hover,
+[data-theme='evergreen'] .table-zebra tbody tr:hover {
+  --tw-bg-opacity: 1;
+  background-color: #1c2a24; /* site.css --row-hover (dark) */
+}
+
+/* The PAGE keeps the design's signature ground — the deep #0F1714
+   forest, darker than base-200, which now carries the lifted strip
+   tone. App.tsx paints the page as `min-h-screen bg-base-200`; this
+   re-grounds exactly that surface. */
+[data-theme='evergreen'] .min-h-screen.bg-base-200 {
+  background-color: #0f1714; /* site.css html[data-theme=dark] background */
+}
+
+/* Component emphasis — the source design lifts every panel off the page
+   with a hairline border + a soft ambient shadow (site.css --sh-2), not
+   with tone alone. DaisyUI cards are borderless and these themes set
+   --depth: 0, so without this the main card, dropdowns and modals melt
+   into the page ground. Inner tables/action panels already carry
+   `border border-base-300` wrappers, which the base-300 hairline now
+   makes visible; this rule covers the surfaces that have no border of
+   their own. */
+[data-theme='evergreen'] .card,
+[data-theme='evergreen'] .modal-box,
+[data-theme='evergreen'] .dropdown-content {
+  border: 1px solid #233029;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); /* --sh-2 (dark) */
+}
+
+/* Inset panels built as translucent base-200 washes (bg-base-200/40 and
+   friends) barely register at these tight tonal steps — give the common
+   bordered inset recipe a solid lifted ground instead. */
+[data-theme='evergreen'] .border.border-base-300.rounded-lg,
+[data-theme='evergreen'] .border.border-base-300.rounded-box {
+  background-color: #16211c; /* --gray-50 dark: the lifted strip tone */
+  /* A close ambient shadow so tables and action panels lift off the
+     card the way the page-level panels lift off the page. Tighter than
+     the card's --sh-2 — these are one nesting level deeper. */
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 6px 16px rgba(0, 0, 0, 0.25);
 }
