@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import { criticalFindings } from './severity'
 import type { AnyTermSheet, TermSide } from './types'
+import { BRAND } from '../../../config/brand'
 
 /**
  * The **commit**-depth surface — the step the flow was missing entirely.
@@ -25,7 +26,7 @@ import type { AnyTermSheet, TermSide } from './types'
  *    dismiss it by reflex.
  */
 
-const STORAGE_PREFIX = '1delta.terms.ack.'
+const STORAGE_PREFIX = `${BRAND.storagePrefix}terms.ack.`
 
 function ackKey(marketUid: string, side: TermSide, profileId: string): string {
   // profileId in the key is what makes the gate re-arm on a terms change.

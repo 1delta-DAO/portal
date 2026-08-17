@@ -11,6 +11,8 @@ interface TablePaginationProps {
   totalItems: number
   /** Optional noun for the count label, e.g. "pools". */
   itemNoun?: string
+  /** Rendered after the count label — e.g. a "loading more…" spinner. */
+  trailing?: React.ReactNode
   className?: string
 }
 
@@ -26,6 +28,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
   pagination,
   totalItems,
   itemNoun,
+  trailing,
   className = '',
 }) => {
   const { page, totalPages, start, end, hasPrev, hasNext, next, prev } = pagination
@@ -39,6 +42,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
       <span>
         {start}&ndash;{end} of {totalItems}
         {itemNoun ? ` ${itemNoun}` : ''}
+        {trailing}
       </span>
       <div className="flex items-center gap-1">
         <button

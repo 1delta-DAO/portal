@@ -22,7 +22,7 @@ import { WalletConnect } from '../../../../connect'
 import { NativeCurrencySelector } from '../../../actions/NativeCurrencySelector'
 import { SpyModeNotice } from '../../../shared/SpyModeNotice'
 import { TransactionSuccess } from '../../../actions/TransactionSuccess'
-import { formatTokenAmount, formatUsd, parseAmount } from '../../../actions/format'
+import { isOverMax, formatTokenAmount, formatUsd, parseAmount } from '../../../actions/format'
 import type { TokenBalance } from '../../../../../hooks/lending/useTokenBalances'
 import {
   PROVIDER_LABELS,
@@ -217,7 +217,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
   // `max > 0` gate silently skipped. What makes the ceiling KNOWN is the
   // balance/position object existing, not its being positive.
   const maxKnown = tab === 'Deposit' ? !!activeBal : !!userPosition
-  const overMax = !isAll && maxKnown && parseAmount(amount) > parseAmount(maxAmountStr) + 1e-9
+  const overMax = !isAll && maxKnown && isOverMax(amount, maxAmountStr)
 
   // The execute/approval block below hides on over-max. That gate keeps its old
   // reach — only a NON-ZERO ceiling being overspent hides it — so widening the

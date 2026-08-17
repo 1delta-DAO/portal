@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { parseUnits } from 'viem'
 import { AmountInput } from '../../common/AmountInput'
-import { formatTokenAmount, parseAmount } from '../actions/format'
+import { isOverMax, formatTokenAmount, parseAmount } from '../actions/format'
 import { OfferLadder } from './OfferLadder'
 import { MakeOfferPanel, TakeMakeToggle } from './MakeOfferPanel'
 import { useLendingOffers, computeEffectiveBorrow } from '../../../hooks/lending/useLendingOffers'
@@ -59,7 +59,7 @@ export function SellEarlyPanel({
   // Warn whenever the amount exceeds the sellable position — a position of
   // exactly 0 included, which the old `maxAmount > 0` gate skipped. Knowing the
   // ceiling is `maxAmount` being SUPPLIED, not its being positive.
-  const overMax = maxAmount != null && amountNum > parseAmount(maxAmount) + 1e-9
+  const overMax = maxAmount != null && isOverMax(amount, maxAmount)
   // The button gate stays exactly where it was — only a NON-ZERO position that
   // gets overspent blocks the sell. Widening the warning must not widen the
   // block, so a zero position warns loudly and still lets the user try.

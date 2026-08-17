@@ -16,7 +16,7 @@ import { BrokeredAprCell } from '../../shared/BrokeredAprCell'
 import { useTablePagination } from '../../../../hooks/useTablePagination'
 import { AutoBalancedBadge, BasketRateHint } from '../../shared/SmartVault'
 import { positionBorrowRate, positionSupplyRate } from '../../../../sdk/lending-helper/fluidSmart'
-import { SortableHeader } from '../../../common/SortableHeader'
+import { SortableHeader, SortIndicator } from '../../../common/SortableHeader'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { TablePagination } from '../../../common/TablePagination'
 
@@ -362,9 +362,7 @@ const MobilePoolCards: React.FC<{
               onClick={() => onToggleSort(key)}
             >
               {sortLabels[key]}
-              {sortKey === key && (
-                <span className="ml-0.5">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>
-              )}
+              <SortIndicator active={sortKey === key} dir={sortDir} className="ml-0.5" />
             </button>
           ))}
         </div>

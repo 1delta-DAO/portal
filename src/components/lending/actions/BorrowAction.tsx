@@ -4,7 +4,7 @@ import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
 import { ActionExecuteBlock } from './ActionExecuteBlock'
-import { compareAmountStrings, formatTokenAmount, formatUsd, parseAmount } from './format'
+import { isOverMax, formatTokenAmount, formatUsd, parseAmount } from './format'
 import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
@@ -175,7 +175,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   // WithdrawAction does) so the warning waits for the position rather than
   // firing on a not-yet-loaded — or genuinely absent — one. Advisory only: it
   // never disables the action.
-  const overMax = !!userPosition && compareAmountStrings(amount || '0', borrowableStr) > 0
+  const overMax = !!userPosition && isOverMax(amount, borrowableStr)
 
   // Estimated monthly interest: variableBorrowRate is in percent units.
   // Prefer the simulation's projected borrow rate (post-tx) when available —

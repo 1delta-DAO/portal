@@ -15,7 +15,7 @@ import { sortPools, type SortKey, LtvBadge } from '../../dashboard'
 import { RiskBadge } from '../../shared/RiskBadge'
 import { useTableSort } from '../../../../hooks/useTableSort'
 import { useTablePagination } from '../../../../hooks/useTablePagination'
-import { SortableHeader } from '../../../common/SortableHeader'
+import { SortableHeader, SortIndicator } from '../../../common/SortableHeader'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { TablePagination } from '../../../common/TablePagination'
 
@@ -333,9 +333,7 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                   onClick={() => toggleSort(key)}
                 >
                   {labels[key]}
-                  {sortKey === key && (
-                    <span className="ml-0.5">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>
-                  )}
+                  <SortIndicator active={sortKey === key} dir={sortDir} className="ml-0.5" />
                 </button>
               )
             })}

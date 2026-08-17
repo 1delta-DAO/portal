@@ -15,6 +15,7 @@ import {
 import { BrokeredAprCell } from './BrokeredAprCell'
 import { useTablePagination } from '../../../hooks/useTablePagination'
 import { TablePagination } from '../../common/TablePagination'
+import { SortIndicator } from '../../common/SortableHeader'
 import { EmptyState } from '../../common/EmptyState'
 import { nextSort } from '../../../hooks/useTableSort'
 import { DETAIL_PAGE_SIZE, ROLE_RAIL } from './configMarketConstants'
@@ -211,8 +212,9 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
     setSortDir(next.sortDir)
   }
 
-  const sortIndicator = (key: DetailSortKey) =>
-    sortKey === key ? <span className="ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span> : null
+  const sortIndicator = (key: DetailSortKey) => (
+    <SortIndicator active={sortKey === key} dir={sortDir} className="ml-1" />
+  )
 
   return (
     <div className="border-t border-base-300">

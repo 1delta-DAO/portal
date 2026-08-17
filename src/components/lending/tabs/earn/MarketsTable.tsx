@@ -10,6 +10,8 @@ import { RiskBadge } from '../../shared/RiskBadge'
 import { OracleBadge } from '../../shared/OracleBadge'
 import { buildPath, OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
+import { SortIndicator } from '../../../common/SortableHeader'
+import { TablePagination } from '../../../common/TablePagination'
 import { Logo } from '../../../common/Logo'
 import { getChainName } from '../../../../lib/lib-utils'
 import { chainLogoUrl } from '../../../../config/assets'
@@ -193,52 +195,33 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
     selectedEntry.marketUid === entry.marketUid &&
     selectedEntry.chainId === entry.chainId
 
-  const sortIndicator = (key: SortKey) =>
-    sortKey === key ? (
-      <span className="ml-1 text-xs">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>
-    ) : null
+  const sortIndicator = (key: SortKey) => <SortIndicator active={sortKey === key} dir={sortDir} />
 
   const pagination = (
-    <div className="flex flex-col gap-2 items-center justify-between md:flex-row px-4 py-2">
-      <div className="text-xs text-base-content/70">
-        {totalItems === 0 ? (
-          'No results'
-        ) : (
-          <>
-            Showing{' '}
-            <span className="font-semibold">
-              {startIndex + 1}&ndash;{endIndex}
-            </span>{' '}
-            of <span className="font-semibold">{totalItems}</span> pools
-            {isFetchingMore && (
-              <span className="inline-flex items-center gap-1 ml-1">
-                <span className="loading loading-spinner loading-xs" />
-                loading more…
-              </span>
-            )}
-          </>
-        )}
-      </div>
-      <div className="join">
-        <button
-          className="btn btn-xs join-item"
-          disabled={currentPage === 1}
-          onClick={() => onGoToPage(currentPage - 1)}
-        >
-          &laquo; Prev
-        </button>
-        <button className="btn btn-xs join-item" disabled>
-          Page {currentPage} / {totalPages}
-        </button>
-        <button
-          className="btn btn-xs join-item"
-          disabled={currentPage === totalPages}
-          onClick={() => onGoToPage(currentPage + 1)}
-        >
-          Next &raquo;
-        </button>
-      </div>
-    </div>
+    <TablePagination
+      // The parent still owns 1-based page state; adapt it to the shared
+      // 0-based chrome rather than keeping a third pagination bar alive.
+      pagination={{
+        page: currentPage - 1,
+        totalPages,
+        start: totalItems === 0 ? 0 : startIndex + 1,
+        end: endIndex,
+        hasPrev: currentPage > 1,
+        hasNext: currentPage < totalPages,
+        next: () => onGoToPage(currentPage + 1),
+        prev: () => onGoToPage(currentPage - 1),
+      }}
+      totalItems={totalItems}
+      itemNoun="pools"
+      trailing={
+        isFetchingMore ? (
+          <span className="inline-flex items-center gap-1 ml-1">
+            <span className="loading loading-spinner loading-xs" />
+            loading more…
+          </span>
+        ) : null
+      }
+    />
   )
 
   return (
@@ -504,9 +487,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                     onClick={() => onToggleSort(key)}
                   >
                     {labels[key]}
-                    {sortKey === key && (
-                      <span className="ml-0.5">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>
-                    )}
+                    <SortIndicator active={sortKey === key} dir={sortDir} className="ml-0.5" />
                   </button>
                 )
               }

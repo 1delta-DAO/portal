@@ -31,6 +31,20 @@ export function compareAmountStrings(a: string, b: string): number {
 }
 
 /**
+ * True when `amount` exceeds `max`.
+ *
+ * The one over-max check for every action panel. Compares full-precision
+ * decimal STRINGS — 18-decimal amounts overflow a float64, so `Number()`
+ * comparison flags "over max" on values that are exactly equal (and the
+ * epsilon-padded float variants this replaces disagreed with each other on
+ * where "over" starts). An unknown max (`''`/null/undefined) never blocks.
+ */
+export function isOverMax(amount: string, max: string | null | undefined): boolean {
+  if (!max) return false
+  return compareAmountStrings(amount || '0', max) > 0
+}
+
+/**
  * Returns the smaller of two non-negative decimal string amounts,
  * preserving full string precision (no parseFloat).
  */

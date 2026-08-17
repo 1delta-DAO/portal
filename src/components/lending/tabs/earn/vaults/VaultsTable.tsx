@@ -1,6 +1,8 @@
 import React from 'react'
 import { Logo } from '../../../../common/Logo'
 import { TableEmptyRow } from '../../../../common/TableEmptyRow'
+import { SortIndicator } from '../../../../common/SortableHeader'
+import { TablePagination } from '../../../../common/TablePagination'
 import { abbreviateUsd, abbreviateNumber, formatUsd } from '../../../../../utils/format'
 import type { RawCurrency } from '../../../../../types/currency'
 import type { VaultEntry } from '../../../../../sdk/vaults-helper'
@@ -67,44 +69,27 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
   const isSelected = (e: VaultEntry) =>
     selected !== null && selected.address.toLowerCase() === e.address.toLowerCase()
 
-  const sortIndicator = (key: VaultSortKey) =>
-    sortKey === key ? <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span> : null
+  const sortIndicator = (key: VaultSortKey) => (
+    <SortIndicator active={sortKey === key} dir={sortDir} />
+  )
 
   const pagination = (
-    <div className="flex flex-col gap-2 items-center justify-between md:flex-row px-4 py-2">
-      <div className="text-xs text-base-content/70">
-        {totalItems === 0 ? (
-          'No results'
-        ) : (
-          <>
-            Showing{' '}
-            <span className="font-semibold">
-              {startIndex + 1}&ndash;{endIndex}
-            </span>{' '}
-            of <span className="font-semibold">{totalItems}</span> vaults
-          </>
-        )}
-      </div>
-      <div className="join">
-        <button
-          className="btn btn-xs join-item"
-          disabled={currentPage === 1}
-          onClick={() => onGoToPage(currentPage - 1)}
-        >
-          &laquo; Prev
-        </button>
-        <button className="btn btn-xs join-item" disabled>
-          Page {currentPage} / {totalPages}
-        </button>
-        <button
-          className="btn btn-xs join-item"
-          disabled={currentPage === totalPages}
-          onClick={() => onGoToPage(currentPage + 1)}
-        >
-          Next &raquo;
-        </button>
-      </div>
-    </div>
+    <TablePagination
+      // The parent still owns 1-based page state; adapt it to the shared
+      // 0-based chrome rather than keeping a third pagination bar alive.
+      pagination={{
+        page: currentPage - 1,
+        totalPages,
+        start: totalItems === 0 ? 0 : startIndex + 1,
+        end: endIndex,
+        hasPrev: currentPage > 1,
+        hasNext: currentPage < totalPages,
+        next: () => onGoToPage(currentPage + 1),
+        prev: () => onGoToPage(currentPage - 1),
+      }}
+      totalItems={totalItems}
+      itemNoun="vaults"
+    />
   )
 
   return (

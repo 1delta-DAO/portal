@@ -4,6 +4,7 @@ import { ThemeSwitcher } from './components/themeSwitcher'
 import { WalletConnect } from './components/connect'
 import { SettingsMenu } from './components/settingsMenu'
 import { PortalLogo } from './components/PortalLogo'
+import { WORDMARK } from './config/brand'
 import { IrmDockProvider } from './components/lending/shared/IrmDock'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 
@@ -14,9 +15,9 @@ export default function App() {
         <div className="navbar min-h-14 sm:min-h-16 bg-base-100 shadow-lg fixed top-0 left-0 right-0 z-50 px-3 sm:px-6 lg:px-8">
           <div className="flex-1 min-w-0 gap">
             <h1 className="text-xl sm:text-3xl inline-flex items-center gap-0">
-              <span className="text-primary">P</span>
+              <span className="text-primary">{WORDMARK.head}</span>
               <PortalLogo className="w-[1.35em] h-[1.35em]" />
-              <span className="text-primary">RTAL</span>
+              <span className="text-primary">{WORDMARK.tail}</span>
             </h1>
           </div>
           <div className="flex gap-2 items-center">

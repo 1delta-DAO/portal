@@ -4,7 +4,7 @@ import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
 import { useActionExecution } from './useActionExecution'
 import { ActionExecuteBlock } from './ActionExecuteBlock'
-import { formatTokenAmount, formatUsd, parseAmount } from './format'
+import { isOverMax, formatTokenAmount, formatUsd, parseAmount } from './format'
 import { AmountInput } from '../../common/AmountInput'
 import { NativeCurrencySelector } from './NativeCurrencySelector'
 import { SubAccountSelector } from './SubAccountSelector'
@@ -103,8 +103,7 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
   // fully-collateralized case where withdrawable is exactly 0 (deposits back an
   // open borrow). Gate on `userPosition` (not `withdrawable > 0`) so we don't
   // flash the warning before the position loads.
-  const overMax =
-    !isAll && !!userPosition && parseAmount(amount) > parseAmount(withdrawableStr) + 1e-9
+  const overMax = !isAll && !!userPosition && isOverMax(amount, withdrawableStr)
 
   // Estimated earnings forfeited by withdrawing this amount. depositRate is
   // in percent units. Prefer the simulation's projected deposit rate (post-tx)

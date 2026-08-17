@@ -1,4 +1,5 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
+import { BRAND } from './config/brand'
 import { http } from 'wagmi'
 import { defineChain, type Chain } from 'viem'
 import { customChains } from '@1delta/providers'
@@ -176,7 +177,7 @@ export const evmTransportsWagmi = Object.assign(
  *    native balance on mount.
  */
 export const config = getDefaultConfig({
-  appName: 'Portal',
+  appName: BRAND.name,
   projectId: (import.meta.env.VITE_WC_PROJECT_ID as string | undefined) ?? 'id',
   chains: evmChainWagmi,
   transports: evmTransportsWagmi,

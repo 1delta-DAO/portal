@@ -37,9 +37,25 @@ export function SortableHeader<K extends string>({
       title={title}
     >
       {children}
-      {isActive && (
-        <span className="ml-1 text-xs">{activeDir === 'asc' ? '\u2191' : '\u2193'}</span>
-      )}
+      <SortIndicator active={isActive} dir={activeDir} />
     </th>
   )
+}
+
+/**
+ * The one sort-direction arrow. Also used standalone by the mobile sort bars
+ * and the tables whose headers can't use `SortableHeader` directly \u2014 six
+ * hand-rolled copies of this glyph pair once disagreed on encoding.
+ */
+export function SortIndicator({
+  active,
+  dir,
+  className = 'ml-1 text-xs',
+}: {
+  active: boolean
+  dir: SortDirection
+  className?: string
+}) {
+  if (!active) return null
+  return <span className={className}>{dir === 'asc' ? '\u2191' : '\u2193'}</span>
 }

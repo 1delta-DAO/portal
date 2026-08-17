@@ -13,6 +13,7 @@ import { HealthFactorProjection } from '../../actions/HealthFactorProjection'
 import { NativeCurrencySelector } from '../../actions/NativeCurrencySelector'
 import { SubAccountSelector } from '../../actions/SubAccountSelector'
 import { lenderSupportsSubAccounts } from '../../actions/helpers'
+import { isOverMax } from '../../actions/format'
 import { isWNative } from '../../../../lib/lib-utils'
 import type { RawCurrency } from '../../../../types/currency'
 import { useTokenLists } from '../../../../hooks/useTokenLists'
@@ -303,7 +304,9 @@ function SecondaryLeg({
   priceUsd: number
 }) {
   const deliverSymbol = (receiveNative && nativeToken ? nativeToken.symbol : token.symbol) ?? '—'
-  const overMax = gt0(value) && Number(value) > Number(maxAmount) + 1e-9
+  // String comparison, not `Number()` — an 18-decimal amount overflows a
+  // float64, so the numeric compare flagged values that were exactly equal.
+  const overMax = gt0(value) && isOverMax(value, maxAmount)
   return (
     <div className="form-control">
       {canUseNative && nativeToken && (
