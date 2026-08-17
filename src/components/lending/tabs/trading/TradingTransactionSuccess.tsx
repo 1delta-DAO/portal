@@ -5,6 +5,7 @@ const OPERATION_LABELS: Record<TradingOperation, string> = {
   Loop: 'Loop executed',
   ColSwap: 'Collateral swap executed',
   DebtSwap: 'Debt swap executed',
+  Refinance: 'Loan moved to a new term',
   Close: 'Position closed',
 }
 

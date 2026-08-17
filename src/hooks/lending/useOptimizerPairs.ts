@@ -166,6 +166,10 @@ interface RawOptimizerPair {
   totalLiquidityUsdShort?: string | number
   utilizationLong?: string | number
   utilizationShort?: string | number
+  /** Fluid smart collateral: the long side is a two-token DEX LP. */
+  isBasketLong?: boolean | null
+  /** This leg's OWN deposit rate, kept so the basket blend stays auditable. */
+  depositRateLongLeg?: string | number | null
   depositableLong?: string | number | null
   borrowLiquidityShort?: string | number | null
   borrowLiquidityUsdShort?: string | number | null
@@ -276,6 +280,18 @@ export interface OptimizerPairRow {
   borrowAprEffective: number
   aprBase: number
   aprTotal: number
+  /**
+   * The COLLATERAL side is a two-token DEX LP (Fluid T2/T4 smart collateral),
+   * not a single asset.
+   *
+   * It qualifies `depositAprLong` rather than merely decorating the row:
+   * on a basket row that figure is the POSITION's rate, value-weighted across
+   * both legs, and it will not match a per-leg rate quoted anywhere else. The
+   * UI has to say so, because the row still renders under ONE token's name.
+   */
+  autoBalancedLong: boolean
+  /** This leg's own rate as a fraction — what `depositAprLong` was blended FROM. */
+  depositAprLongLeg?: number
   /** Loan-to-value as a fraction. */
   ltv: number
   /** Collateral liquidation threshold as a fraction (drives the health factor). */
@@ -584,6 +600,13 @@ function normalisePair(raw: RawOptimizerPair): OptimizerPairRow {
     riskBreakdown: normaliseRiskBreakdown(raw.risk?.breakdown),
     utilizationLong: numOr0(raw.utilizationLong),
     utilizationShort: numOr0(raw.utilizationShort),
+    // Absent on every non-Fluid row and on any deployment older than the
+    // `/pairs/optimize` change that projects it — hence `=== true`, so a
+    // missing field reads as "ordinary market" rather than as truthy.
+    autoBalancedLong: raw.isBasketLong === true,
+    ...(raw.depositRateLongLeg != null
+      ? { depositAprLongLeg: numOr0(raw.depositRateLongLeg) / 100 }
+      : {}),
     totalDepositsUsdLong: numOr0(raw.totalDepositsUsdLong),
     totalDebtUsdLong: numOr0(raw.totalDebtUsdLong),
     totalLiquidityUsdLong: numOr0(raw.totalLiquidityUsdLong),

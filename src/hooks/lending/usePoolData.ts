@@ -1,7 +1,13 @@
 import { RewardEntry, totalRewardApr } from '../../components/lending/shared/rewards'
 import { useQuery } from '@tanstack/react-query'
-import type { PoolRisk, PoolOracleInfo, LenderInfo } from '../../sdk/lending-helper/poolTypes'
+import type {
+  PoolRisk,
+  PoolOracleInfo,
+  LenderInfo,
+  MarketCapability,
+} from '../../sdk/lending-helper/poolTypes'
 import type { AnyTermSheet } from '../../components/lending/terms/types'
+import type { FluidSmartInfo } from '../../sdk/lending-helper/fluidSmart'
 import type {
   LenderData,
   LenderInfoMap,
@@ -89,6 +95,11 @@ interface RawMarket {
     durationDays: number | string
     apr: number | string
   }> | null
+  /**
+   * Server-declared actions for this row (`MarketCapability[]`). Complete over
+   * the actions the API models, so absent ⇒ not offered. Never re-derive.
+   */
+  capabilities?: MarketCapability[]
   underlyingInfo: {
     asset: {
       chainId: string
@@ -108,6 +119,13 @@ interface RawMarket {
   /** Oracle feed-correctness classification (top-level on /lending/latest markets). */
   oracleInfo?: PoolOracleInfo | null
   params?: any
+  /**
+   * Fluid smart vaults. Both live on the MARKET row, not the lender entry — one
+   * smart vault is one lender key with up to four rows under it (one per LP
+   * leg), and `autoBalanced` is a statement about THIS leg.
+   */
+  autoBalanced?: boolean
+  fluid?: FluidSmartInfo | null
 }
 
 // ============================================================================
@@ -184,6 +202,9 @@ function rawMarketToPoolDataItem(raw: RawMarket, entry?: LenderEntryRaw): PoolDa
     // row. Dropping them left `fixedTermDetails(pool)` null for every brokered
     // market, which silently hid the ↻ Refinance / Roll button on Lista.
     fixedTerm: (entry?.fixedTerm ?? null) as PoolDataItem['fixedTerm'],
+    // Server-declared actions for this row. Passed through verbatim — the
+    // whole point is that the client adds no interpretation of its own.
+    capabilities: Array.isArray(raw.capabilities) ? raw.capabilities : [],
     // Coerce the string-serialized rate card into clean numbers.
     terms: raw.terms
       ? raw.terms.map((t) => ({
@@ -193,6 +214,11 @@ function rawMarketToPoolDataItem(raw: RawMarket, entry?: LenderEntryRaw): PoolDa
         }))
       : null,
     variableBorrowDisabled: raw.flags?.variableBorrowDisabled ?? false,
+    // Passed through verbatim. Absent on every non-smart market, which is what
+    // every `fluidSmart.ts` helper treats as "ordinary single-asset pool" — so
+    // no lender check is needed here or at any call site.
+    autoBalanced: raw.autoBalanced === true,
+    fluid: raw.fluid ?? null,
   }
 }
 

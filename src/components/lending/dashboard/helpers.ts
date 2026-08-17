@@ -1,4 +1,8 @@
 import type { PoolConfig, PoolDataItem } from '../../../sdk/lending-helper/marketTypes'
+import {
+  positionBorrowRate,
+  positionSupplyRate,
+} from '../../../sdk/lending-helper/fluidSmart'
 
 export type SortKey =
   | 'symbol'
@@ -51,13 +55,17 @@ export function sortPools(
         aVal = a.asset.symbol.toLowerCase()
         bVal = b.asset.symbol.toLowerCase()
         break
+      // Rank on the POSITION's rate. On an LP-backed side the row's own
+      // `depositRate` is one leg's — right per dollar, but not what the vault
+      // earns — so sorting on it puts the wrong market at the top. Falls
+      // through to the row's rate on every ordinary market.
       case 'depositApr':
-        aVal = a.depositRate
-        bVal = b.depositRate
+        aVal = positionSupplyRate(a, a.depositRate)
+        bVal = positionSupplyRate(b, b.depositRate)
         break
       case 'borrowApr':
-        aVal = a.variableBorrowRate
-        bVal = b.variableBorrowRate
+        aVal = positionBorrowRate(a, a.variableBorrowRate)
+        bVal = positionBorrowRate(b, b.variableBorrowRate)
         break
       case 'totalDepositsUSD':
         aVal = a.totalDepositsUSD

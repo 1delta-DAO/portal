@@ -33,7 +33,7 @@ export interface QuoteMarketRole {
   borrowRatePct?: number
 }
 
-export type TradingOperation = 'Loop' | 'ColSwap' | 'DebtSwap' | 'Close'
+export type TradingOperation = 'Loop' | 'ColSwap' | 'DebtSwap' | 'Refinance' | 'Close'
 export type PoolRole = 'input' | 'output' | 'pay'
 /** Which view-side of a pool the selection applies to. By-config splits the
  *  same `marketUid` into a Collateral row and a Borrowable row, so the role
@@ -87,6 +87,26 @@ export interface TradingQuote {
   positionDeltas?: QuotePositionDelta[]
   /** Per-quote projected rate impact (this quote's own trade amounts). */
   rateImpact?: RateImpactEntry[]
+  /**
+   * CLOSE only — where the collateral sale actually went.
+   *
+   * A close does NOT hand the whole sale to the debt: it clears the debt and
+   * sweeps the rest back to the wallet, and an `isAll` withdraws slightly more
+   * collateral than it swaps (a 2 bps sizing skim) which also comes back. So
+   * the position legs and the swap legs are different quantities, and reading
+   * either as the other misstates the trade — it showed a −27.5 % "impact" on a
+   * close that was simply returning money.
+   */
+  closeSplit?: {
+    /** Debt actually retired, in USD. */
+    debtRepaidUSD: number
+    /** Loan token returned to the wallet, in USD. */
+    loanReturnedUSD: number
+    /** Collateral returned to the wallet (the `isAll` skim), in USD. */
+    collateralReturnedUSD: number
+    /** Everything the user gets back in the wallet. */
+    returnedTotalUSD: number
+  }
   tx: Tx
 }
 

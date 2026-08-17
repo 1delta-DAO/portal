@@ -14,6 +14,11 @@ import { RiskBadge } from '../../shared/RiskBadge'
 import { OracleBadge } from '../../shared/OracleBadge'
 import { BrokeredAprCell } from '../../shared/BrokeredAprCell'
 import { useTablePagination } from '../../../../hooks/useTablePagination'
+import { AutoBalancedBadge, BasketRateHint } from '../../shared/SmartVault'
+import {
+  positionBorrowRate,
+  positionSupplyRate,
+} from '../../../../sdk/lending-helper/fluidSmart'
 import { SortableHeader } from '../../../common/SortableHeader'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { TablePagination } from '../../../common/TablePagination'
@@ -140,8 +145,13 @@ export const LendingMarketTable: React.FC<Props> = ({
               const hasPosition =
                 userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
               const iy = pool.intrinsicYield ?? 0
-              const depositTotal = pool.depositRate + iy
-              const borrowTotal = pool.variableBorrowRate + iy
+              // The POSITION's rate on an LP-backed side; the row's own
+              // everywhere else. Never render `pool.depositRate` directly on a
+              // market that might be auto-balanced.
+              const depositRate = positionSupplyRate(pool, pool.depositRate)
+              const borrowRate = positionBorrowRate(pool, pool.variableBorrowRate)
+              const depositTotal = depositRate + iy
+              const borrowTotal = borrowRate + iy
               const isBrokered =
                 pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0
 
@@ -180,10 +190,11 @@ export const LendingMarketTable: React.FC<Props> = ({
                           )}
                         </span>
                         <span
-                          className="text-[10px] text-base-content/60 truncate"
+                          className="text-[10px] text-base-content/60 truncate flex items-center gap-1"
                           title={pool.name}
                         >
-                          {pool.name}
+                          <span className="truncate">{pool.name}</span>
+                          <AutoBalancedBadge row={pool} className="shrink-0" />
                         </span>
                       </div>
                     </AssetPopover>
@@ -194,10 +205,15 @@ export const LendingMarketTable: React.FC<Props> = ({
                         <span className="text-sm font-medium text-success">
                           {depositTotal.toFixed(2)}%
                         </span>
+                        <BasketRateHint
+                          row={pool}
+                          side="supply"
+                          legRate={pool.depositRate}
+                        />
                         {iy > 0 && (
                           <span
                             className="badge badge-xs bg-success/15 text-success border-0 cursor-help whitespace-nowrap"
-                            title={`Base rate: ${pool.depositRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}%`}
+                            title={`Base rate: ${depositRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}%`}
                           >
                             +{iy.toFixed(1)}%
                           </span>
@@ -215,10 +231,15 @@ export const LendingMarketTable: React.FC<Props> = ({
                           <span className="text-sm font-medium text-warning">
                             {borrowTotal.toFixed(2)}%
                           </span>
+                          <BasketRateHint
+                            row={pool}
+                            side="borrow"
+                            legRate={pool.variableBorrowRate}
+                          />
                           {iy > 0 && (
                             <span
                               className="badge badge-xs bg-warning/15 text-warning border-0 cursor-help whitespace-nowrap"
-                              title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}% (paid by borrower)`}
+                              title={`Base rate: ${borrowRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}% (paid by borrower)`}
                             >
                               +{iy.toFixed(1)}%
                             </span>
@@ -360,8 +381,10 @@ const MobilePoolCards: React.FC<{
         const userPos = userPositions.get(pool.marketUid)
         const hasPosition = userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
         const mIy = pool.intrinsicYield ?? 0
-        const mDepTotal = pool.depositRate + mIy
-        const mBorTotal = pool.variableBorrowRate + mIy
+        const mDepRate = positionSupplyRate(pool, pool.depositRate)
+        const mBorRate = positionBorrowRate(pool, pool.variableBorrowRate)
+        const mDepTotal = mDepRate + mIy
+        const mBorTotal = mBorRate + mIy
         const mIsBrokered = pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0
         const mBestTermApr = pool.terms?.length ? Math.min(...pool.terms.map((t) => t.apr)) : null
 
@@ -390,8 +413,12 @@ const MobilePoolCards: React.FC<{
                     {pool.asset.symbol}
                     {pool.isFrozen && <span className="ml-1 text-warning text-xs">&#x2744;</span>}
                   </span>
-                  <span className="text-[10px] text-base-content/60 truncate" title={pool.name}>
-                    {pool.name}
+                  <span
+                    className="text-[10px] text-base-content/60 truncate flex items-center gap-1"
+                    title={pool.name}
+                  >
+                    <span className="truncate">{pool.name}</span>
+                    <AutoBalancedBadge row={pool} className="shrink-0" />
                   </span>
                 </div>
               </AssetPopover>
@@ -401,7 +428,7 @@ const MobilePoolCards: React.FC<{
                   {mIy > 0 && (
                     <span
                       className="badge badge-xs bg-success/15 text-success border-0 whitespace-nowrap"
-                      title={`Base rate: ${pool.depositRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
+                      title={`Base rate: ${mDepRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
                     >
                       +{mIy.toFixed(1)}%
                     </span>
@@ -436,7 +463,7 @@ const MobilePoolCards: React.FC<{
                     {mIy > 0 && (
                       <span
                         className="badge badge-xs bg-warning/15 text-warning border-0 whitespace-nowrap"
-                        title={`Base rate: ${pool.variableBorrowRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
+                        title={`Base rate: ${mBorRate.toFixed(2)}% + Intrinsic yield: ${mIy.toFixed(2)}%`}
                       >
                         +{mIy.toFixed(1)}%
                       </span>

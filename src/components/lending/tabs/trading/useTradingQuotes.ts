@@ -38,6 +38,12 @@ const ENDPOINTS: Record<TradingOperation, string> = {
   Loop: '/v1/actions/loop/leverage',
   ColSwap: '/v1/actions/loop/collateral-swap',
   DebtSwap: '/v1/actions/loop/debt-swap',
+  // Present for completeness of the map. The Refinance panel does NOT quote
+  // through this hook — it builds the whole transaction from
+  // `fetchRefinance`, which is what a market row's `capabilities[]` entry
+  // points at, so nothing here should route to a different endpoint than the
+  // one the API declared.
+  Refinance: '/v1/actions/loop/refinance',
   Close: '/v1/actions/loop/close',
 }
 
@@ -58,6 +64,19 @@ interface QuoteDeltas {
   tradeInput: number
   tradeOutput: number
   deltas?: QuoteDeltaItem[]
+}
+
+/**
+ * CLOSE only — the server's split of the collateral sale (`data.quotes[i].close`).
+ *
+ * Raw token units. Present on both the composer and bundler3 routes;
+ * `collateralResidualToWallet` only on an `isAll` composer close, where the swap
+ * is sized 2 bps under the withdraw-all.
+ */
+interface QuoteCloseSplit {
+  debtRepaid: string
+  residualToWallet: string
+  collateralResidualToWallet?: string
 }
 
 /** Convert a raw delta amount string to its native-unit float value. */
@@ -88,7 +107,11 @@ function matchDeltaByAmount(
   return best
 }
 
-function normalizeQuotes(
+/**
+ * Exported for tests: this is the layer that turns the API's position deltas
+ * into what the card shows, and it is where the close-vs-swap conflation lived.
+ */
+export function normalizeQuotes(
   operation: TradingOperation,
   rawQuotes: any[],
   alternatives: Tx[] = [],
@@ -108,6 +131,9 @@ function normalizeQuotes(
     let positionCollateralUSD: number | undefined
     let positionDebtUSD: number | undefined
     let positionDeltas: QuotePositionDelta[] | undefined
+    /** Raw collateral delta — needed to price the `isAll` skim per unit. */
+    let collateralRawAmount: string | number | undefined
+    let closeSplit: TradingQuote['closeSplit']
 
     const deltas = q.deltas as QuoteDeltas | undefined
     if (deltas) {
@@ -117,8 +143,10 @@ function normalizeQuotes(
       const items = deltas.deltas ?? []
 
       for (const d of items) {
-        if (d.position === 'collateral') positionCollateralUSD = d.amountUSD
-        else if (d.position === 'debt') positionDebtUSD = d.amountUSD
+        if (d.position === 'collateral') {
+          positionCollateralUSD = d.amountUSD
+          collateralRawAmount = d.amount
+        } else if (d.position === 'debt') positionDebtUSD = d.amountUSD
       }
 
       // Retain every leg — same-role ops (collateral swap / debt swap) have
@@ -145,6 +173,50 @@ function normalizeQuotes(
         tradeAmountOutUSD = Math.abs(outDelta.amountUSD)
         outSymbol = outDelta.asset?.symbol
         outLogoURI = outDelta.asset?.logoURI
+      }
+    }
+
+    /**
+     * CLOSE: the position legs are NOT the swap legs.
+     *
+     * The server reports the POSITION honestly — collateral removed, debt
+     * retired — and puts what returns to the wallet in `close`. The swap is a
+     * bigger trade than the debt leg on any over-collateralised position, so
+     * pricing the swap off the debt leg (which is what the magnitude match
+     * above does) understates the output by the whole residual and produces a
+     * large fake negative impact.
+     *
+     * Re-derive both swap legs from the position legs plus the residuals, using
+     * the per-unit price the server already resolved. That makes the USD figure
+     * agree with the token amount beside it, and turns the impact back into a
+     * genuine swap impact.
+     */
+    const closeRaw = (q as { close?: QuoteCloseSplit }).close
+    if (
+      operation === 'Close' &&
+      closeRaw &&
+      positionDebtUSD != null &&
+      positionCollateralUSD != null
+    ) {
+      const debtRepaid = Number(closeRaw.debtRepaid)
+      const loanBack = Number(closeRaw.residualToWallet)
+      const collBack = Number(closeRaw.collateralResidualToWallet ?? 0)
+      const collRemoved = Math.abs(Number(collateralRawAmount ?? 0))
+
+      const usdPerLoanUnit = debtRepaid > 0 ? Math.abs(positionDebtUSD) / debtRepaid : 0
+      const usdPerCollUnit = collRemoved > 0 ? Math.abs(positionCollateralUSD) / collRemoved : 0
+
+      // The swap sold everything except what came straight back.
+      if (usdPerCollUnit > 0) tradeAmountInUSD = usdPerCollUnit * (collRemoved - collBack)
+      if (usdPerLoanUnit > 0) tradeAmountOutUSD = usdPerLoanUnit * (debtRepaid + loanBack)
+
+      const loanReturnedUSD = usdPerLoanUnit * loanBack
+      const collateralReturnedUSD = usdPerCollUnit * collBack
+      closeSplit = {
+        debtRepaidUSD: usdPerLoanUnit * debtRepaid,
+        loanReturnedUSD,
+        collateralReturnedUSD,
+        returnedTotalUSD: loanReturnedUSD + collateralReturnedUSD,
       }
     }
 
@@ -188,6 +260,7 @@ function normalizeQuotes(
       positionDebtUSD,
       positionDeltas,
       rateImpact: Array.isArray(q.rateImpact) ? q.rateImpact : undefined,
+      closeSplit,
       tx,
     }
   })

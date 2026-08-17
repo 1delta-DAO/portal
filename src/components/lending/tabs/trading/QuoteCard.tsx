@@ -271,11 +271,27 @@ export const QuoteCard: React.FC<QuoteCardProps> = ({
         if (margin > 0.5) lines.push(`Margin paid in: ${fmtFullUsd(margin)} (netted out)`)
       }
     }
+    // A close pays out. Spelling out where the sale went is the whole point —
+    // without it the collateral simply disappears from the card and the debt
+    // leg looks like it swallowed the difference.
+    if (operation === 'Close' && quote.closeSplit) {
+      const s = quote.closeSplit
+      if (quote.positionCollateralUSD != null)
+        lines.push(`Collateral closed: ${fmtSignedFullUsd(quote.positionCollateralUSD)}`)
+      lines.push(`Debt repaid: ${fmtFullUsd(s.debtRepaidUSD)}`)
+      if (s.loanReturnedUSD > 0)
+        lines.push(`${resolvedOutSymbol || 'Debt asset'} to wallet: ${fmtFullUsd(s.loanReturnedUSD)}`)
+      if (s.collateralReturnedUSD > 0)
+        lines.push(
+          `${resolvedInSymbol || 'Collateral'} to wallet: ${fmtFullUsd(s.collateralReturnedUSD)} (swap-sizing remainder)`
+        )
+    }
     return lines.join('\n')
   })()
 
   const hasFooter =
     impactUsd != null ||
+    (operation === 'Close' && quote.closeSplit != null) ||
     rateEntries.length > 0 ||
     (operation === 'Loop' && (quote.positionCollateralUSD != null || quote.positionDebtUSD != null))
 
@@ -345,6 +361,19 @@ export const QuoteCard: React.FC<QuoteCardProps> = ({
                   {(impactPct * 100).toFixed(2)}%)
                 </span>
               )}
+            </div>
+          )}
+          {operation === 'Close' && quote.closeSplit != null && quote.closeSplit.returnedTotalUSD > 0 && (
+            <div
+              className="flex items-baseline gap-1 cursor-help"
+              title={`Left over once the debt is cleared — paid straight to your wallet, not left in the position.`}
+            >
+              <span className="text-base-content/50 border-b border-dotted border-base-content/30">
+                You receive
+              </span>
+              <span className="font-semibold tabular-nums text-success">
+                {fmtCompactUsd(quote.closeSplit.returnedTotalUSD)}
+              </span>
             </div>
           )}
           {netApr && (

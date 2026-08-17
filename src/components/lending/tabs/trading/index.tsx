@@ -34,6 +34,7 @@ import { LoopAction } from './actions/LoopAction'
 import { ColSwapAction } from './actions/ColSwapAction'
 import { DebtSwapAction } from './actions/DebtSwapAction'
 import { CloseAction } from './actions/CloseAction'
+import { RefinanceAction } from './actions/RefinanceAction'
 import type { TradingOperation, SelectedPool, TableHighlight } from './types'
 import { usePersistedFilters } from '../../../../hooks/usePersistedFilters'
 import { YourPositions, type PositionSummary } from '../../shared/YourPositions'
@@ -61,11 +62,14 @@ interface Props {
   onLenderChange: (lender: string) => void
 }
 
-const OPERATIONS: TradingOperation[] = ['Loop', 'ColSwap', 'DebtSwap', 'Close']
+const OPERATIONS: TradingOperation[] = ['Loop', 'ColSwap', 'DebtSwap', 'Refinance', 'Close']
 const OP_LABELS: Record<TradingOperation, string> = {
   Loop: 'Loop',
   ColSwap: 'Col. Swap',
   DebtSwap: 'Debt Swap',
+  // Named for the parameter it changes, not for either lender's mechanism —
+  // the same panel serves a Lista broker roll and an Exactly DebtManager roll.
+  Refinance: 'Terms',
   Close: 'Close',
 }
 
@@ -650,6 +654,9 @@ export function TradingDashboard({
               {activeOperation === 'DebtSwap' && (
                 <DebtSwapAction key={selectedLender} {...actionProps} />
               )}
+              {activeOperation === 'Refinance' && (
+                <RefinanceAction key={selectedLender} {...actionProps} />
+              )}
               {activeOperation === 'Close' && <CloseAction key={selectedLender} {...actionProps} />}
             </>
           )}
@@ -717,6 +724,7 @@ export function TradingDashboard({
                   {activeOperation === 'Loop' && <LoopAction {...actionProps} />}
                   {activeOperation === 'ColSwap' && <ColSwapAction {...actionProps} />}
                   {activeOperation === 'DebtSwap' && <DebtSwapAction {...actionProps} />}
+                  {activeOperation === 'Refinance' && <RefinanceAction {...actionProps} />}
                   {activeOperation === 'Close' && <CloseAction {...actionProps} />}
                 </>
               )}

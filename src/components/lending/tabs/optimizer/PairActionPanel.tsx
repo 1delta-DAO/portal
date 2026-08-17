@@ -28,6 +28,7 @@ import { OptimizerLoopPanel } from './OptimizerLoopPanel'
 import { DepthChart } from './DepthChart'
 import { ComparableRatesPill } from '../../shared/ComparableRatesPill'
 import { RiskBadge } from '../../shared/RiskBadge'
+import { AutoBalancedNoticeBody } from '../../shared/SmartVault'
 import { useCombinedAction, gt0, asCurrency, type CombinedAction } from './useCombinedAction'
 import { BandSetterRow } from '../../terms/BandSetterRow'
 
@@ -507,6 +508,7 @@ function ExecuteButton({
   blockedReason,
   batchSupported,
   batchNeedsUpgrade,
+  sequential,
   onExecute,
   onExecuteBatch,
 }: {
@@ -524,6 +526,14 @@ function ExecuteButton({
   blockedReason?: string
   batchSupported: boolean
   batchNeedsUpgrade: boolean
+  /**
+   * The server declared these transactions non-atomic (`route: 'sequential'`,
+   * `atomic: false`) — a Fluid T4 close, where the debt must be retired before
+   * the collateral is burned. The batch path is withdrawn, not merely
+   * discouraged: bundling them would override a protocol constraint this layer
+   * cannot see.
+   */
+  sequential?: boolean
   onExecute: () => void
   onExecuteBatch: () => void
 }) {
@@ -531,7 +541,7 @@ function ExecuteButton({
     ? 'Connect wallet'
     : (blockedReason ?? (isOpen ? 'Deposit & Borrow' : 'Withdraw & Repay'))
 
-  if (batchSupported && steps.length > 0) {
+  if (batchSupported && !sequential && steps.length > 0) {
     return (
       <BatchExecuteButton
         steps={stepLabels}
@@ -561,6 +571,11 @@ function ExecuteButton({
         'Connect wallet'
       ) : blockedReason ? (
         blockedReason
+      ) : sequential && step > 0 && step < steps.length ? (
+        // A partially-executed sequential close is the dangerous state: the
+        // debt is gone, the collateral is not. Name the remaining step rather
+        // than resetting to a generic caption that reads as "not started".
+        `Continue — ${stepLabels[step] ?? `step ${step + 1}`}`
       ) : steps.length > 1 ? (
         `Execute (${steps.length} steps)`
       ) : isOpen ? (
@@ -728,6 +743,45 @@ function CombinedForm({
           <span className="loading loading-spinner loading-xs" /> Building…
         </div>
       )}
+      {/* An ordered, non-atomic sequence needs to be VISIBLE before it starts
+          and legible while it runs. On a Fluid T4 close the two transactions
+          are a fixed order the protocol requires — and between them the debt is
+          gone while the collateral is not, which is exactly the moment a user
+          must not think they are finished. */}
+      {a.sequential && a.steps.length > 1 && (
+        <div className="rounded-box border border-warning/30 bg-warning/5 p-2.5 text-xs space-y-1.5">
+          <div className="font-medium text-warning">
+            This closes in {a.steps.length} separate transactions
+          </div>
+          <ol className="space-y-1">
+            {a.stepLabels.map((label, i) => {
+              const state = i < a.step ? 'done' : i === a.step ? 'current' : 'pending'
+              return (
+                <li
+                  key={i}
+                  className={`flex items-center gap-1.5 ${
+                    state === 'done'
+                      ? 'text-success'
+                      : state === 'current'
+                        ? 'text-base-content font-medium'
+                        : 'text-base-content/50'
+                  }`}
+                >
+                  <span className="shrink-0 w-3">
+                    {state === 'done' ? '\u2713' : state === 'current' ? '\u2192' : '\u00b7'}
+                  </span>
+                  <span className="truncate">{label}</span>
+                </li>
+              )
+            })}
+          </ol>
+          <p className="text-[10px] text-base-content/60 leading-snug">
+            They cannot be combined — the protocol rejects the single-call form. Confirm each in
+            order; the position is only fully closed after the last one.
+          </p>
+        </div>
+      )}
+
       {a.buildError && <div className="text-xs text-error break-words">{a.buildError}</div>}
       {a.runError && <div className="text-xs text-error break-words">{a.runError}</div>}
 
@@ -742,6 +796,7 @@ function CombinedForm({
         building={a.building}
         batchSupported={a.batchSupported}
         batchNeedsUpgrade={a.batchNeedsUpgrade}
+        sequential={a.sequential}
         onExecuteBatch={a.executeBatch}
         blockedReason={
           // Origination-only: an auction round gates OPENING a borrow, never
@@ -907,6 +962,15 @@ export function PairActionPanel({ row, account, onClose, lenderName, lenderLogo 
           ✕
         </button>
       </div>
+
+      {/* Auto-balanced collateral, disclosed BEFORE the inputs and before the
+          op tabs — it is a property of the market, not of the operation, and it
+          changes what the user is agreeing to on every one of them.
+
+          A leveraged open is where this matters most: the position is levered,
+          so the pool's rebalancing between the two legs is levered with it, and
+          "I deposited USDC" stops being true from the first block. */}
+      {row.autoBalancedLong && <AutoBalancedNoticeBody />}
 
       {/* Sub-account picker (multi-account lenders: Euler, Fluid, Dolomite, …).
           Drives which position the deposit/borrow extends. The Loop tab embeds

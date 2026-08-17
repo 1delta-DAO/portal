@@ -28,6 +28,31 @@ export interface LendingActionParams {
    * error. Omitted ⇒ the protocol applies the branch average.
    */
   interestRate?: string
+  /**
+   * Fluid smart vaults (T2/T3/T4) — the second leg of a two-token LP side.
+   *
+   * `asset1` NAMES the other leg (matched by address server-side; `amount1`
+   * without it is an error, by design — the order is load-bearing). Absent ⇒
+   * single-sided, which is legal and is the natural default, but pays the
+   * pool's imbalance fee plus price impact.
+   */
+  asset1?: string
+  /** Raw amount of `asset1`. Only meaningful alongside it. */
+  amount1?: string
+  /**
+   * Size the operation in LP SHARES instead of tokens, which routes it to
+   * `operatePerfect`. This is how a full exit is expressed — a token-sized full
+   * exit cannot be, because the pool decides the share delta.
+   */
+  shares?: string
+  /**
+   * The mandatory share bound. **LEAVE THESE UNSET** and let the API quote them
+   * off the DexResolver: the pools are concentrated, so a client-side
+   * constant-product estimate understates price impact exactly where it
+   * matters. They exist for a caller that has its own quote, not for us.
+   */
+  minShares?: string
+  maxShares?: string
   /** When true, the server runs an e2e simulation and returns projected health factor / balances */
   simulate?: boolean
   /** When provided, sent as POST body for simulation (same shape as loop simulation body) */
@@ -142,6 +167,17 @@ export async function fetchLendingAction(
     if (params.loanId != null) qs.set('loanId', params.loanId)
     if (params.interestRate != null)
       qs.set('interestRate', params.interestRate)
+    // Fluid smart legs. `amount1` is sent only WITH `asset1` — the server
+    // rejects the pair the other way round rather than guessing a leg, and
+    // reproducing that guard here keeps the failure in the UI instead of in a
+    // 400.
+    if (params.asset1) {
+      qs.set('asset1', params.asset1)
+      if (params.amount1 != null) qs.set('amount1', params.amount1)
+    }
+    if (params.shares != null) qs.set('shares', params.shares)
+    if (params.minShares != null) qs.set('minShares', params.minShares)
+    if (params.maxShares != null) qs.set('maxShares', params.maxShares)
     if (params.simulate) qs.set('simulate', 'true')
 
     // A `simulationBody` switches the request to POST; without one this is a

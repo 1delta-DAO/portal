@@ -364,17 +364,42 @@ export function useCombinedAction({
 
   const stepLabels = useMemo(() => {
     if (!result) return [] as string[]
+    // A multi-transaction CLOSE is not "Step 1, Step 2" — it is a fixed,
+    // meaningful order the user has to see. On a Fluid T4 the whole smart debt
+    // must be retired before the smart collateral is burned; both share
+    // sentinels in one `operatePerfect` trip a DEX invariant, so the server
+    // returns two transactions with `route: 'sequential'` and `atomic: false`.
+    // Labelling them generically is how a half-finished close looks finished.
+    const sequentialClose =
+      !isOpen && result.transactions.length === 2 && result.route === 'sequential'
     return [
       ...result.permissions.map((p, i) => p.description || `Approval ${i + 1}`),
-      ...result.transactions.map((_t, i) =>
-        result.transactions.length > 1
-          ? `Step ${i + 1}`
-          : isOpen
-            ? 'Open position'
-            : 'Close position'
+      ...result.transactions.map((t, i) =>
+        t.description
+          ? t.description
+          : sequentialClose
+            ? i === 0
+              ? '1. Repay all debt'
+              : '2. Withdraw all collateral'
+            : result.transactions.length > 1
+              ? `Step ${i + 1}`
+              : isOpen
+                ? 'Open position'
+                : 'Close position'
       ),
     ]
   }, [result, isOpen])
+
+  /**
+   * Can these steps go into ONE wallet confirmation?
+   *
+   * `atomic: false` is the server saying the transactions must land
+   * separately — a Fluid T4 close is the live case. Bundling them anyway would
+   * override a protocol constraint we cannot see from here, so the batch path
+   * is withdrawn rather than offered and hoped for. Absent ⇒ atomic, which is
+   * every other route and preserves today's behaviour.
+   */
+  const canBatch = result?.atomic !== false
 
   const execute = async () => {
     if (!steps.length) return
@@ -401,6 +426,9 @@ export function useCombinedAction({
    */
   const executeBatch = async () => {
     if (!steps.length) return
+    // Belt and braces: the button is hidden when the server says non-atomic,
+    // but a stale click must not slip a bundle through either.
+    if (result?.atomic === false) return
     setRunning(true)
     setRunError(null)
     const { ok, error } = await sendBatch(steps)
@@ -476,6 +504,13 @@ export function useCombinedAction({
     runError,
     execute,
     executeBatch,
+    canBatch,
+    /**
+     * True when the action's transactions must be sent one at a time in a fixed
+     * order. Drives the ordered step list — a UI that only sends the first
+     * transaction does half a close.
+     */
+    sequential: result?.route === 'sequential' || result?.atomic === false,
     batchSupported,
     batchNeedsUpgrade,
     startAnother,

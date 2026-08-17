@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
@@ -18,6 +18,9 @@ import { SubAccountSelector } from './SubAccountSelector'
 import { isExactlyMarket, lenderSupportsSubAccounts, lenderSupportsNative } from './helpers'
 import { HealthFactorProjection } from './HealthFactorProjection'
 import { RateImpactIndicator } from './RateImpactIndicator'
+import { useTokenLists } from '../../../hooks/useTokenLists'
+import { resolveSmartLeg } from '../shared/SmartLegInput'
+import { SmartExitPanel, type SmartExitRequest } from '../shared/SmartExitPanel'
 import { TransactionSuccess } from './TransactionSuccess'
 import { loansForMarket } from '../../../sdk/lending-helper/userPositionTypes'
 import {
@@ -83,15 +86,31 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
   const canUseNative =
     !!pool && isWNative(pool.asset) && !!nativeToken && lenderSupportsNative(lenderKey)
 
+  // Fluid smart DEBT (T3/T4): the debt is a two-token LP, so retiring it is a
+  // share burn, not a token payment. Null on every ordinary market.
+  const smartLeg = useMemo(
+    () => (pool ? resolveSmartLeg(pool, pool.underlying, 'debt') : null),
+    [pool]
+  )
+  const [exitRequest, setExitRequest] = useState<SmartExitRequest>({ isAll: true })
+  const smartExit = !!smartLeg
+
   const exec = useActionExecution({
     actionType: 'Repay',
     pool,
     account,
-    amount,
+    amount: smartExit ? '0' : amount,
+    shares: smartExit && !exitRequest.isAll ? exitRequest.shares : undefined,
     // Brokered (Lista) repay is always amount-based (close = debt + penalty,
     // excess refunded) and targets a specific loanId. Exactly repays by
     // maturity (`termId`) and full-closes via isAll (exact on-chain face read).
-    isAll: isBrokered ? (isExactlyLoan ? exactlyFullClose : false) : isAll,
+    isAll: smartExit
+      ? exitRequest.isAll
+      : isBrokered
+        ? isExactlyLoan
+          ? exactlyFullClose
+          : false
+        : isAll,
     payAsset: canUseNative && useNative ? zeroAddress : undefined,
     accountId: hasSubAccounts ? (selectedAccountId ?? undefined) : undefined,
     loanId: isBrokered && !isExactlyLoan ? (selectedLoanId ?? undefined) : undefined,
@@ -106,6 +125,7 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
     setAmount('')
     setIsAll(false)
     setUseNative(false)
+    setExitRequest({ isAll: true })
     resetState()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pool?.marketUid, selectedLoanId])
@@ -121,6 +141,15 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
       : '0'
   const closeNowStr = isBrokered && selectedLoan ? closeNowAmountString(selectedLoan) : debtStr
   const debtTotal = parseAmount(debtStr) // only for display
+
+  // Both legs of the LP debt, in the vault's token0/token1 order.
+  const { data: smartChainTokens } = useTokenLists(smartLeg ? chainId : undefined)
+  const legSymbols: [string, string] = useMemo(() => {
+    if (!smartLeg) return ['', '']
+    const sym = (addr: string) =>
+      smartChainTokens?.[addr.toLowerCase()]?.symbol ?? `${addr.slice(0, 6)}…`
+    return [sym(smartLeg.side.assets[0].underlying), sym(smartLeg.side.assets[1].underlying)]
+  }, [smartLeg, smartChainTokens])
 
   const activeBal = canUseNative && useNative ? nativeBalance : walletBalance
   const activeBalStr = activeBal?.balance ?? '0'
@@ -352,15 +381,28 @@ export const RepayAction: React.FC<ActionPanelProps> = ({
       )}
 
       {/* Amount input with quick buttons */}
-      <AmountInput
-        value={amount}
-        onChange={handleAmountChange}
-        maxAmount={repayMaxStr}
-        decimals={pool?.asset?.decimals}
-        onMaxClick={handleMaxClick}
-        disabled={!pool}
-        error={amountErrorMessage}
-      />
+      {smartLeg && pool ? (
+        <SmartExitPanel
+          row={pool}
+          side={smartLeg.side}
+          legIndex={smartLeg.primaryIndex}
+          legBalance={debtStr}
+          legSymbols={legSymbols}
+          verb="repay"
+          onChange={setExitRequest}
+          disabled={!pool}
+        />
+      ) : (
+        <AmountInput
+          value={amount}
+          onChange={handleAmountChange}
+          maxAmount={repayMaxStr}
+          decimals={pool?.asset?.decimals}
+          onMaxClick={handleMaxClick}
+          disabled={!pool}
+          error={amountErrorMessage}
+        />
+      )}
 
       {/* Estimated monthly interest saved by this repayment. */}
       {monthlySavedUsd > 0 && (

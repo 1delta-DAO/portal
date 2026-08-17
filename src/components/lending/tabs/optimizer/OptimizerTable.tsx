@@ -15,6 +15,7 @@ import { UsdAmount } from '../../../common/UsdAmount'
 import { Logo } from '../../../common/Logo'
 import { getChainName } from '../../../../lib/lib-utils'
 import { RiskBadge } from '../../shared/RiskBadge'
+import { AutoBalancedPill, BasketRateMark } from '../../shared/SmartVault'
 import { riskDotColor } from '../earn/helpers'
 
 /** Small colored dot for an asset's own token risk. Rendered only when the
@@ -156,6 +157,14 @@ function LegRates({ row }: { row: OptimizerPairRow }) {
       >
         {fmtPct(row.depositAprLong)}
       </span>
+      {/* On a smart-collateral pair `depositAprLong` is the POSITION's rate,
+          value-weighted across both legs of the DEX LP — so it will not match
+          the per-leg rate on the market page the user came from. The mark says
+          so and keeps that leg's own rate reachable in the tooltip, which is
+          what makes the headline auditable rather than merely different. */}
+      {row.autoBalancedLong && row.depositAprLongLeg != null && (
+        <BasketRateMark side="supply" legRate={row.depositAprLongLeg * 100} className="ml-1" />
+      )}
       {' / '}
       <span
         className={rebate ? 'text-success' : 'text-error'}
@@ -402,6 +411,7 @@ function AssetCell({
   marketUid,
   depositRate,
   borrowRate,
+  autoBalanced = false,
 }: {
   asset: OptimizerPairRow['collateral']
   marketUid?: string
@@ -409,6 +419,12 @@ function AssetCell({
   depositRate?: number
   /** Borrow rate for this market, in PERCENT (debt side only). */
   borrowRate?: number
+  /**
+   * This side is a two-token DEX LP, not the single asset the cell is named
+   * after. Collateral side only today — Fluid's smart DEBT vaults are the
+   * mirror case and simply do not reach the pair book yet.
+   */
+  autoBalanced?: boolean
 }) {
   return (
     <div className="flex items-center gap-2 min-w-0">
@@ -433,7 +449,14 @@ function AssetCell({
           <span className="truncate">{asset.symbol ?? asset.address.slice(0, 6)}</span>
           <AssetRiskDot label={asset.riskLabel} />
         </div>
-        <div className="text-[10px] text-base-content/50 truncate">{asset.name}</div>
+        {/* The pill replaces the asset's long name rather than joining it: on a
+            basket row the name ("USD Coin") is the least useful thing in the
+            cell, because the position is NOT that asset. */}
+        {autoBalanced ? (
+          <AutoBalancedPill className="mt-0.5" />
+        ) : (
+          <div className="text-[10px] text-base-content/50 truncate">{asset.name}</div>
+        )}
       </div>
     </div>
   )
@@ -471,10 +494,14 @@ function AssetPair({ row }: { row: OptimizerPairRow }) {
     </span>
   )
   return (
-    <div className="flex items-center gap-1.5 min-w-0">
+    <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
       {chip(row.collateral, row.marketLongUid, row.depositAprEffective * 100)}
       <span className="text-base-content/40 shrink-0">→</span>
       {chip(row.debt, row.marketShortUid, undefined, row.borrowAprEffective * 100)}
+      {/* Trails the pair rather than sitting inside the collateral chip: the
+          card has no second line to hang it from, and wrapping it here keeps
+          both symbols on one line at narrow widths. */}
+      {row.autoBalancedLong && <AutoBalancedPill className="shrink-0" />}
     </div>
   )
 }
@@ -719,6 +746,7 @@ export function OptimizerTable({
                       asset={row.collateral}
                       marketUid={row.marketLongUid}
                       depositRate={row.depositAprEffective * 100}
+                      autoBalanced={row.autoBalancedLong}
                     />
                   </td>
                   <td>

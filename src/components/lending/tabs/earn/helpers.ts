@@ -2,6 +2,13 @@ import { riskBand } from '../../../../utils/format'
 import type { PoolEntry } from '../../../../sdk/lending-helper/poolTypes'
 import { totalRewardApr } from '../../shared/rewards'
 import type { PoolDataItem } from '../../../../sdk/lending-helper/marketTypes'
+import {
+  isAutoBalanced,
+  isBasketRate,
+  lenderKeyOf,
+  positionBorrowRate,
+  positionSupplyRate,
+} from '../../../../sdk/lending-helper/fluidSmart'
 
 export type SortKey =
   | 'apr'
@@ -64,12 +71,22 @@ export function riskDotColor(label: string): string {
 /** Derived values from one pool row. See {@link computePoolMetrics}. */
 export interface PoolMetrics {
   utilization: number
+  /**
+   * The POSITION's supply APR. On an auto-balanced (LP-backed) side this is the
+   * basket rate, not this leg's — see {@link computePoolMetrics}.
+   */
   apr: number
   borrowApr: number
   intrinsicYield: number
   price: number
   depositRewardApr: number
   borrowRewardApr: number
+  /** This leg's own rate, kept whenever `apr` is a basket blend. */
+  aprLeg: number
+  borrowAprLeg: number
+  /** True when `apr` / `borrowApr` describe a basket rather than this leg. */
+  isBasketApr: boolean
+  isBasketBorrowApr: boolean
 }
 
 /**
@@ -84,6 +101,70 @@ export interface PoolMetrics {
 export interface PoolWithMetrics {
   pool: PoolEntry
   metrics: PoolMetrics
+  /**
+   * The other legs of the same vault, when this row stands for a whole
+   * auto-balanced position rather than for one market. Set only by
+   * {@link collapseSmartVaults}; absent everywhere else, so a table that
+   * ignores it renders exactly as before.
+   */
+  legs?: PoolWithMetrics[]
+}
+
+/**
+ * Collapse the legs of an auto-balanced vault into ONE row per vault.
+ *
+ * A Fluid T4 emits up to four rows for one vault — one per underlying LP leg,
+ * merged where a token sits on both sides. Rendered flat they are four
+ * independent markets at the same LTV, and a user picking "the wstETH one" has
+ * no way to know it is the same position as "the ETH one". That is the failure
+ * mode AGENTS.md records the earn surface being burned by four times, and it is
+ * also a pagination lie: the footer counts legs and calls them pools.
+ *
+ * The representative leg is the one with the most deposits, not the one that
+ * happened to sort first — the row would otherwise swap identity whenever the
+ * rates crossed, while still describing the same position. Every leg is kept on
+ * `legs` so the detail view can show the split.
+ *
+ * ORDINARY MARKETS PASS THROUGH UNTOUCHED, including two markets that merely
+ * share a lender key: only rows that declare themselves auto-balanced collapse.
+ *
+ * Runs AFTER filtering and sorting and BEFORE pagination, so a filter still
+ * matches on any leg and the page count is in vaults.
+ */
+export function collapseSmartVaults(rows: PoolWithMetrics[]): PoolWithMetrics[] {
+  // Cheap exit for the overwhelmingly common case — no smart vault in the set.
+  if (!rows.some((r) => isAutoBalanced(r.pool))) return rows
+
+  const out: PoolWithMetrics[] = []
+  const groups = new Map<string, { at: number; legs: PoolWithMetrics[] }>()
+
+  for (const row of rows) {
+    if (!isAutoBalanced(row.pool)) {
+      out.push(row)
+      continue
+    }
+    // Legs of one vault can live on different chains only in principle; key on
+    // both so a cross-chain listing never merges two unrelated vaults.
+    const key = `${row.pool.chainId}:${lenderKeyOf(row.pool.marketUid)}`
+    const existing = groups.get(key)
+    if (existing) {
+      existing.legs.push(row)
+      continue
+    }
+    const entry = { at: out.length, legs: [row] }
+    groups.set(key, entry)
+    out.push(row) // placeholder, rewritten below once every leg is known
+  }
+
+  for (const { at, legs } of groups.values()) {
+    const primary = legs.reduce((best, leg) =>
+      (parseFloat(leg.pool.totalDepositsUsd) || 0) > (parseFloat(best.pool.totalDepositsUsd) || 0)
+        ? leg
+        : best
+    )
+    out[at] = { ...primary, legs }
+  }
+  return out
 }
 
 /** Compute derived values from pool data */
@@ -92,10 +173,25 @@ export function computePoolMetrics(pool: PoolEntry): PoolMetrics {
   const totalDebt = parseFloat(pool.totalDebt) || 0
 
   const utilization = totalDeposits > 0 ? totalDebt / totalDeposits : 0
-  const apr = parseFloat(pool.depositRate) || 0
-  const borrowApr = parseFloat(pool.variableBorrowRate) || 0
+  const aprLeg = parseFloat(pool.depositRate) || 0
+  const borrowAprLeg = parseFloat(pool.variableBorrowRate) || 0
   const intrinsicYield = parseFloat(pool.intrinsicYield ?? '') || 0
   const price = pool.underlyingInfo?.prices?.priceUsd ?? 0
+
+  // A leg of an LP-backed side earns the BASKET's rate, not the rate on the row.
+  //
+  // This is the single place the earn surface derives an APR, so it is also the
+  // single place the "Best APR" ranking gets it right or wrong. `depositRate`
+  // on a smart Fluid row is one leg's — correct per DOLLAR, since every dollar
+  // in the LP earns the trading yield whichever token it sits in, but not the
+  // position's. Ranking on the max over legs read 11.81 % where the vault earns
+  // 10.33 %, and three vaults holding $91M between them showed ~0 % because the
+  // leg the row named happened to be the idle one.
+  //
+  // Falls straight through to the leg rate on every non-smart market, which is
+  // every market except Fluid T2/T3/T4.
+  const apr = positionSupplyRate(pool, aprLeg)
+  const borrowApr = positionBorrowRate(pool, borrowAprLeg)
 
   // Incentive rewards — `rewards` is an array of {depositRate, variableBorrowRate,
   // source, …}; sum each side. Deposit rewards boost earn APR; borrow rewards are
@@ -104,7 +200,19 @@ export function computePoolMetrics(pool: PoolEntry): PoolMetrics {
   const depositRewardApr = totalRewardApr(pool.rewards, 'deposit')
   const borrowRewardApr = totalRewardApr(pool.rewards, 'borrow')
 
-  return { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr, borrowRewardApr }
+  return {
+    utilization,
+    apr,
+    borrowApr,
+    intrinsicYield,
+    price,
+    depositRewardApr,
+    borrowRewardApr,
+    aprLeg,
+    borrowAprLeg,
+    isBasketApr: isBasketRate(pool, 'supply'),
+    isBasketBorrowApr: isBasketRate(pool, 'borrow'),
+  }
 }
 
 /** Convert a PoolEntry (from /pools endpoint) into a PoolDataItem for action components */
@@ -166,5 +274,11 @@ export function poolEntryToPoolDataItem(entry: PoolEntry): PoolDataItem {
       : null,
     variableBorrowDisabled:
       entry.variableBorrowDisabled ?? entry.flags?.variableBorrowDisabled ?? false,
+    // The action panel is built from this item, and the deposit form's second
+    // input, the exit's share sizing and the T4 two-step close all read these.
+    // Dropping them here made a smart market act like an ordinary pool at
+    // exactly the point where the difference becomes a transaction.
+    autoBalanced: entry.autoBalanced === true,
+    fluid: entry.fluid ?? null,
   }
 }

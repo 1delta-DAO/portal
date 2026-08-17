@@ -12,6 +12,8 @@
  * strings to avoid float precision loss. Parse at the point of use.
  */
 
+import type { FluidSmartInfo } from './fluidSmart'
+
 export interface PoolExposure {
   debts: string[] | null
   label: string
@@ -128,6 +130,51 @@ export interface PoolTerm {
   apr: number
 }
 
+/**
+ * One action the API declares a market row supports (`MarketCapability`).
+ *
+ * The contract, from the server side: the array is COMPLETE over the actions it
+ * models, so for those actions absent ⇒ not offered, and a client must not
+ * offer them. Actions outside that set are simply not modelled yet.
+ *
+ * Nothing about the mechanism is here on purpose — `refinance` is a flash-loan
+ * composer bundle on a Lista brokered market and the protocol's own DebtManager
+ * on Exactly, and a caller cannot tell which. That is what makes the button
+ * lender-agnostic.
+ */
+export interface MarketCapability {
+  /**
+   * `refinance` — move this market's debt into a different term.
+   * `set-mode`  — switch the ACCOUNT's active risk mode (Aave e-mode).
+   */
+  action: 'refinance' | 'set-mode'
+  /** Which parameter it changes. */
+  parameter: 'term' | 'mode'
+  /**
+   * What the change applies to. `account`-scoped entries are declared on every
+   * row of the lender because they are true of all of them — read one off any
+   * row rather than per market.
+   */
+  scope: 'position' | 'account'
+  /** The endpoint that builds it. */
+  endpoint: string
+  /** Params needed beyond `marketUid` / `operator` / `amount`. */
+  requires?: string[]
+  /**
+   * Which field on the row holds the allowed values — `terms` is the published
+   * rate card, `config` the risk-config map (its KEYS are the mode ids).
+   */
+  domainField?: 'terms' | 'config'
+}
+
+/** Does the API declare this row supports `action`? */
+export function hasCapability(
+  pool: { capabilities?: MarketCapability[] } | null | undefined,
+  action: MarketCapability['action'],
+): boolean {
+  return !!pool?.capabilities?.some((c) => c.action === action)
+}
+
 export interface PoolEntry {
   chainId: string
   marketUid: string
@@ -172,6 +219,22 @@ export interface PoolEntry {
   }> | null
   /** Mirror of `flags.variableBorrowDisabled`, surfaced top-level by `/pools`. */
   variableBorrowDisabled?: boolean
+  /**
+   * THIS ROW'S ASSET IS NOT INDEPENDENTLY HOLDABLE — it is one leg of a
+   * pool-rebalanced basket (a Fluid smart side today; Lista SmartLP and GMX
+   * GM/GLV are the same shape) whose ratio the POOL, not the user, sets.
+   *
+   * A sibling of `fluid` rather than a field inside it, on purpose: branch on
+   * this once instead of learning each protocol. Absent/false ⇒ ordinary
+   * single-asset market. See `fluidSmart.ts`.
+   */
+  autoBalanced?: boolean
+  /**
+   * Fluid smart-vault descriptor (T2/T3/T4 only) — the basket rate, the leg
+   * order, and the share↔token conversion. Null on every other market. Read it
+   * through `fluidSmart.ts`, never by parsing the lender name.
+   */
+  fluid?: FluidSmartInfo | null
 }
 
 export interface PoolOwnerShare {

@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { LendingMode } from '../../../../../lib/lib-utils'
+import { leverageAvailability } from '../../../../../sdk/lending-helper/fluidSmart'
 import { parseUnits } from 'viem'
 import type { PoolDataItem } from '../../../../../sdk/lending-helper/marketTypes'
 import type { TradingActionProps, SelectedPool } from '../types'
@@ -227,6 +228,22 @@ export const CloseAction: React.FC<TradingActionProps> = ({
       activeSubAccount ? buildSimulationBody(activeSubAccount) : undefined
     )
   }
+
+  /**
+   * Why the leveraged close is refused, or null when it is offered.
+   *
+   * Same rule as the open: `/loop/close` answers 400 UNSUPPORTED_LENDER on
+   * every Fluid smart vault. Stating it here saves the user sizing a close they
+   * cannot build — and the position is NOT stuck, the plain Repay and Withdraw
+   * panels close it, which is what the copy says.
+   */
+  const loopBlocked = useMemo(() => {
+    for (const p of [collateralPool, debtPool]) {
+      const availability = leverageAvailability(p)
+      if (!availability.available) return availability.reason
+    }
+    return null
+  }, [collateralPool, debtPool])
 
   const canFetch =
     !!collateralPool && !!debtPool && !!exactAmount && (!isDebtBrokered || selectedLoan != null)
@@ -486,13 +503,26 @@ export const CloseAction: React.FC<TradingActionProps> = ({
 
       <SlippageInput value={slippage} onChange={setSlippage} />
 
+      {loopBlocked && (
+        <div className="rounded-box border border-warning/30 bg-warning/5 p-2.5 text-xs">
+          <div className="font-medium text-warning mb-1">
+            Leveraged close unavailable here
+          </div>
+          <p className="text-base-content/70 leading-snug">{loopBlocked}</p>
+        </div>
+      )}
+
       <button
         type="button"
         className="btn btn-primary btn-sm w-full"
-        disabled={!canFetch || loading}
+        disabled={!canFetch || loading || !!loopBlocked}
         onClick={handleFetchQuotes}
       >
-        {loading ? 'Fetching quotes...' : 'Get Close Quotes'}
+        {loopBlocked
+          ? 'Leveraged close unavailable'
+          : loading
+            ? 'Fetching quotes...'
+            : 'Get Close Quotes'}
       </button>
 
       {error && <ErrorDisplay error={error} />}

@@ -23,9 +23,26 @@ interface EModeBadgeProps {
   lender: string
   chainId: string
   account?: string
+  /**
+   * Does this lender actually have a switchable mode? Read from the API's
+   * per-row `capabilities[]` (`set-mode`, `scope: 'account'`) — pass
+   * `pools.some((p) => hasCapability(p, 'set-mode'))`.
+   *
+   * When false the badge is hidden entirely. It used to render for EVERY
+   * lender: a brokered Lista position showed a clickable "Mode Off" chip whose
+   * modal offered a switch that could only throw `No pool found for lender`,
+   * because Morpho/Lista-shaped markets have no mode at all.
+   */
+  canSwitchMode?: boolean
 }
 
-export const EModeBadge: React.FC<EModeBadgeProps> = ({ subAccount, lender, chainId, account }) => {
+export const EModeBadge: React.FC<EModeBadgeProps> = ({
+  subAccount,
+  lender,
+  chainId,
+  account,
+  canSwitchMode = true,
+}) => {
   const [open, setOpen] = useState(false)
   const mode = subAccount.userConfig.selectedMode
   const { data: configGroups } = usePoolConfigData(chainId, lender)
@@ -59,6 +76,11 @@ export const EModeBadge: React.FC<EModeBadgeProps> = ({ subAccount, lender, chai
       </span>
     )
   }
+
+  // No mode to switch on this lender: show nothing rather than a control that
+  // opens onto an operation the server will refuse. The band-count case above
+  // still renders, because there the number MEANS something to the user.
+  if (!canSwitchMode) return null
 
   return (
     <>

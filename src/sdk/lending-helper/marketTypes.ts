@@ -16,7 +16,15 @@
 
 import type { AnyTermSheet } from '../../components/lending/terms/types'
 import type { RewardEntry } from '../../components/lending/shared/rewards'
-import type { LenderInfo, PoolOracleInfo, PoolRisk, PoolRiskBreakdown, PoolTerm } from './poolTypes'
+import type { FluidSmartInfo } from './fluidSmart'
+import type {
+  LenderInfo,
+  MarketCapability,
+  PoolOracleInfo,
+  PoolRisk,
+  PoolRiskBreakdown,
+  PoolTerm,
+} from './poolTypes'
 
 /** Pools grouped by lender key. One level — no chainId wrapping. */
 export type LenderData = {
@@ -99,6 +107,16 @@ export interface PoolDataItem {
    * markets. Absent on variable-rate lenders.
    */
   fixedTerm?: any
+  /**
+   * Actions this market supports, **declared by the API** (`MarketCapability`
+   * on `/lending/latest` and `/lending/pools`).
+   *
+   * Read this to decide whether to render an action's CTA — never re-derive it
+   * from the lender key, the provider kind or the shape of the row. The array
+   * is complete over the actions the server models, so an absent action means
+   * "not offered here". Same contract as the earn rows' `capabilities[]`.
+   */
+  capabilities?: MarketCapability[]
   /** True when variable borrowing isn't offered (brokered markets). */
   variableBorrowDisabled?: boolean
   /**
@@ -113,6 +131,18 @@ export interface PoolDataItem {
    * through `sideInfo()` / `isFullSheet()`.
    */
   termSheet?: AnyTermSheet
+  /**
+   * THIS ROW'S ASSET IS NOT INDEPENDENTLY HOLDABLE — it is one leg of a
+   * pool-rebalanced basket, and the split drifts with the pool. Lender-agnostic
+   * by design; see {@link PoolEntry.autoBalanced} and `fluidSmart.ts`.
+   */
+  autoBalanced?: boolean
+  /**
+   * Fluid smart-vault descriptor (T2/T3/T4 only). Carries the POSITION's rate —
+   * the row's own `depositRate` is one LEG's, which is right per dollar but is
+   * not the vault's APR. Null everywhere else.
+   */
+  fluid?: FluidSmartInfo | null
 }
 
 export interface PoolAsset {

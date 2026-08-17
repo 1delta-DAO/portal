@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
@@ -18,6 +18,12 @@ import { RateImpactIndicator } from './RateImpactIndicator'
 import { TermsSummary } from '../terms'
 import { useTermsAcknowledgement } from '../terms/TermsDisclosure'
 import { useTermSheet } from '../../../hooks/lending/useTermSheet'
+import { useTokenLists } from '../../../hooks/useTokenLists'
+import {
+  resolveSmartLeg,
+  SmartLegInput,
+  type SmartLegState,
+} from '../shared/SmartLegInput'
 import type { RateSetterState } from '../terms/RateSetterRow'
 import { aprPercentToWad } from '../../../sdk/lending-helper/fetchLiquityRate'
 import { isLiquityFamily, isLlamaLend } from '@1delta/lender-registry'
@@ -123,11 +129,25 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   const canUseNative =
     !!pool && isWNative(pool.asset) && !!nativeToken && lenderSupportsNative(lenderKey)
 
+  // Fluid smart DEBT (T3/T4): a borrow draws a two-token LP, not one token.
+  // Null on every ordinary market.
+  const smartLeg = useMemo(
+    () => (pool ? resolveSmartLeg(pool, pool.underlying, 'debt') : null),
+    [pool]
+  )
+  const [legState, setLegState] = useState<SmartLegState>({})
+  const { data: smartChainTokens } = useTokenLists(smartLeg ? chainId : undefined)
+  const secondaryToken = smartLeg
+    ? smartChainTokens?.[smartLeg.secondary.underlying.toLowerCase()]
+    : undefined
+
   const exec = useActionExecution({
     actionType: 'Borrow',
     pool,
     account,
     amount,
+    asset1: legState.asset1,
+    amount1: legState.amount1,
     isAll: false,
     receiveAsset: canUseNative && useNative ? zeroAddress : undefined,
     accountId: hasSubAccounts ? (selectedAccountId ?? undefined) : undefined,
@@ -144,6 +164,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   useEffect(() => {
     setAmount('')
     setUseNative(false)
+    setLegState({})
     resetState()
   }, [pool?.marketUid])
 
@@ -472,6 +493,20 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
         disabled={!pool || (isBrokered && !selectedTerm)}
         error={overMax ? `Exceeds borrowable amount (${formatTokenAmount(borrowableStr)}).` : null}
       />
+
+      {/* The second leg of an LP debt side. A smart-debt borrow draws BOTH
+          tokens; balanced is the cheaper draw, single-sided pays the pool. */}
+      {smartLeg && pool && (
+        <SmartLegInput
+          row={pool}
+          leg={smartLeg}
+          primaryAmount={amount}
+          primarySymbol={pool.asset.symbol}
+          secondarySymbol={secondaryToken?.symbol}
+          secondaryLogoURI={secondaryToken?.logoURI}
+          onChange={setLegState}
+        />
+      )}
 
       {/* Order-book depth: warn when the borrow is larger than the live book can
           fill on THIS market (a bigger position would need another market's book). */}

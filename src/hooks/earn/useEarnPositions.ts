@@ -176,6 +176,5 @@ export function useEarnPositions(params: UseEarnPositionsParams): UseEarnPositio
           : null,
       refetch: () => results.forEach((r) => r.refetch()),
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [results, chains, requests, queryEnabled])
 }

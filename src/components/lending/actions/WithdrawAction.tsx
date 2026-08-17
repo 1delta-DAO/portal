@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { isWNative } from '../../../lib/lib-utils'
 import { zeroAddress } from 'viem'
 import type { ActionPanelProps } from './types'
@@ -13,6 +13,9 @@ import { SellEarlyPanel } from '../shared/SellEarlyPanel'
 import { HealthFactorProjection } from './HealthFactorProjection'
 import { RateImpactIndicator } from './RateImpactIndicator'
 import { TransactionSuccess } from './TransactionSuccess'
+import { useTokenLists } from '../../../hooks/useTokenLists'
+import { resolveSmartLeg } from '../shared/SmartLegInput'
+import { SmartExitPanel, type SmartExitRequest } from '../shared/SmartExitPanel'
 
 export const WithdrawAction: React.FC<ActionPanelProps> = ({
   pool,
@@ -43,12 +46,25 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
   const canUseNative =
     !!pool && isWNative(pool.asset) && !!nativeToken && lenderSupportsNative(lenderKey)
 
+  // Fluid smart collateral: the exit is share-shaped, not token-shaped.
+  // Null on every ordinary market, and the plain amount form stays.
+  const smartLeg = useMemo(
+    () => (pool ? resolveSmartLeg(pool, pool.underlying, 'collateral') : null),
+    [pool]
+  )
+  const [exitRequest, setExitRequest] = useState<SmartExitRequest>({ isAll: true })
+  const smartExit = !!smartLeg
+
   const exec = useActionExecution({
     actionType: 'Withdraw',
     pool,
     account,
-    amount,
-    isAll,
+    // On a share-sized exit the token amount is not the request — the share
+    // count is — so it goes out as zero rather than as a number the pool would
+    // reinterpret.
+    amount: smartExit ? '0' : amount,
+    isAll: smartExit ? exitRequest.isAll : isAll,
+    shares: smartExit && !exitRequest.isAll ? exitRequest.shares : undefined,
     receiveAsset: canUseNative && useNative ? zeroAddress : undefined,
     accountId: hasSubAccounts ? (selectedAccountId ?? undefined) : undefined,
     chainId,
@@ -61,11 +77,22 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
     setAmount('')
     setIsAll(false)
     setUseNative(false)
+    setExitRequest({ isAll: true })
     resetState()
   }, [pool?.marketUid])
 
   const withdrawableStr = String(userPosition?.withdrawable ?? '0')
   const depositsStr = String(userPosition?.deposits ?? '0')
+
+  // Both legs of the LP, in the vault's token0/token1 order. Falls back to the
+  // raw address so a token the list has not resolved is still identifiable.
+  const { data: smartChainTokens } = useTokenLists(smartLeg ? chainId : undefined)
+  const legSymbols: [string, string] = useMemo(() => {
+    if (!smartLeg) return ['', '']
+    const sym = (addr: string) =>
+      smartChainTokens?.[addr.toLowerCase()]?.symbol ?? `${addr.slice(0, 6)}…`
+    return [sym(smartLeg.side.assets[0].underlying), sym(smartLeg.side.assets[1].underlying)]
+  }, [smartLeg, smartChainTokens])
 
   // Midnight loan-token (order-book) lender position — offer an early-exit SELL
   // (into the book) alongside the plain Redeem (settled units at maturity).
@@ -176,18 +203,33 @@ export const WithdrawAction: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      {/* Amount input with quick buttons */}
-      <AmountInput
-        value={amount}
-        onChange={handleAmountChange}
-        maxAmount={withdrawableStr}
-        decimals={pool?.asset?.decimals}
-        onMaxClick={handleMaxClick}
-        disabled={!pool}
-        error={
-          overMax ? `Exceeds withdrawable balance (${formatTokenAmount(withdrawableStr)}).` : null
-        }
-      />
+      {/* Amount input with quick buttons — or, on an LP side, the share-shaped
+          exit, because "withdraw 100 USDC" is a question only the pool can
+          answer and it answers it differently every block. */}
+      {smartLeg && pool ? (
+        <SmartExitPanel
+          row={pool}
+          side={smartLeg.side}
+          legIndex={smartLeg.primaryIndex}
+          legBalance={withdrawableStr}
+          legSymbols={legSymbols}
+          verb="withdraw"
+          onChange={setExitRequest}
+          disabled={!pool}
+        />
+      ) : (
+        <AmountInput
+          value={amount}
+          onChange={handleAmountChange}
+          maxAmount={withdrawableStr}
+          decimals={pool?.asset?.decimals}
+          onMaxClick={handleMaxClick}
+          disabled={!pool}
+          error={
+            overMax ? `Exceeds withdrawable balance (${formatTokenAmount(withdrawableStr)}).` : null
+          }
+        />
+      )}
 
       {/* Estimated earnings forfeited by this withdrawal. */}
       {monthlyForfeitedUsd > 0 && (

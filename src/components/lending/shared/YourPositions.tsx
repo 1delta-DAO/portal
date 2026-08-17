@@ -16,7 +16,14 @@ import {
   loanImpliedRateToMaturityPct,
 } from './brokeredLoans'
 import { listaEarlyRepay, earlyRepayLabel } from './fixedTerm'
-import { isMidnightMarket, isExactlyMarket, fixedTermDetails } from '../actions/helpers'
+import { isMidnightMarket, fixedTermDetails } from '../actions/helpers'
+import { hasCapability } from '../../../sdk/lending-helper/poolTypes'
+import {
+  isAutoBalanced,
+  positionBorrowRate,
+  positionSupplyRate,
+} from '../../../sdk/lending-helper/fluidSmart'
+import { AutoBalancedBadge, autoBalancedExplainer } from './SmartVault'
 import { RefinanceModal } from './RefinanceModal'
 import { MigrateModal, type MigrateSource } from './MigrateModal'
 
@@ -80,6 +87,11 @@ export function YourPositions({
   // Migrate moves ONE collateral + ONE debt leg to another lender/market. Offer
   // it only for the simple single-collateral / single-debt shape (the route's
   // scope) and only when the viewer is the owner (needs to sign).
+  // Does this lender have a switchable risk mode? Declared per row by the API
+  // (`set-mode`, `scope: 'account'`), so it is true of the lender rather than
+  // of one market — read it off any row we hold.
+  const canSwitchMode = activePositions.some(({ pool }) => hasCapability(pool, 'set-mode'))
+
   const collateralLegs = activePositions.filter(({ position }) => Number(position.deposits) > 0)
   const debtLegs = activePositions.filter(({ position }) => debtNative(position) > 0)
   // Brokered (Lista) source: the migrate's single repay targets ONE loan by its
@@ -166,6 +178,7 @@ export function YourPositions({
                   lender={selectedLender}
                   chainId={chainId}
                   account={account}
+                  canSwitchMode={canSwitchMode}
                 />
               )}
             </button>
@@ -406,10 +419,15 @@ function PositionSection({
                   ? Math.min(...pool.terms.map((t) => t.apr))
                   : null
 
+            // The POSITION's rate: on an LP-backed side the row's own rate is
+            // one leg's, and the position earns neither leg's rate but the
+            // value-weighted basket. Falls through unchanged everywhere else.
             const positionApr =
               (brokeredBorrowApr ??
                 midnightApr ??
-                (isDeposits ? pool.depositRate : pool.variableBorrowRate)) +
+                (isDeposits
+                  ? positionSupplyRate(pool, pool.depositRate)
+                  : positionBorrowRate(pool, pool.variableBorrowRate))) +
               (pool.intrinsicYield ?? 0)
             const sharePct = totalUsd > 0 ? (usd / totalUsd) * 100 : 0
             const barPct = maxUsd > 0 ? Math.max(2, (usd / maxUsd) * 100) : 0
@@ -441,7 +459,10 @@ function PositionSection({
                       chainId={pool.asset.chainId}
                     >
                       <div className="flex flex-col min-w-0 leading-tight">
-                        <span className="text-sm font-medium truncate">{pool.asset.symbol}</span>
+                        <span className="text-sm font-medium truncate flex items-center gap-1">
+                          <span className="truncate">{pool.asset.symbol}</span>
+                          <AutoBalancedBadge row={pool} className="shrink-0" />
+                        </span>
                         <span className="text-[10px] font-mono tabular-nums flex items-center gap-1.5 min-w-0">
                           {/* APR shown inline only on mobile — desktop has a dedicated column */}
                           <span
@@ -510,8 +531,17 @@ function PositionSection({
                   {/* Native amount */}
                   <span
                     className="hidden sm:inline text-right text-xs font-mono tabular-nums text-base-content/60 truncate"
-                    title={`${native.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${pool.asset.symbol}`}
+                    title={
+                      isAutoBalanced(pool)
+                        ? `${native.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${pool.asset.symbol} — this is the pool's CURRENT split of your LP position, not what you deposited, and it keeps moving. ${autoBalancedExplainer(pool)}`
+                        : `${native.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${pool.asset.symbol}`
+                    }
                   >
+                    {isAutoBalanced(pool) && (
+                      <span className="text-base-content/40 mr-0.5" title="current pool split">
+                        ≈
+                      </span>
+                    )}
                     {formatTokenAmount(native)}
                     <span className="text-base-content/40 ml-1">{pool.asset.symbol}</span>
                   </span>
@@ -629,17 +659,18 @@ function LoanBreakdown({
   // The loan currently open in the refinance / roll-over modal, if any.
   const [refinancing, setRefinancing] = useState<UserPositionEntry | null>(null)
 
-  // Refinance moves debt into a *fixed* term, so it needs the market's rate
-  // card and a connected wallet. Hidden otherwise (e.g. spy mode without an
-  // address, or a market that exposes no terms).
+  // The SERVER decides whether this market can be refinanced and says so on the
+  // row (`capabilities[]`, complete over the actions it models). We only need a
+  // connected wallet to act.
   //
-  // `/v1/actions/loop/refinance` serves TWO lenders and rejects the rest:
-  // Lista brokered markets (a flash-loan composer bundle) and Exactly (its own
-  // DebtManager/DebtRoller `roll*` — one direct tx). Gating on those two keeps
-  // the button off markets where it would always error.
-  const isRollable =
-    isExactlyMarket(pool.marketUid) || fixedTermDetails(pool)?.provider?.kind === 'broker'
-  const canRefinance = !!account && isRollable && (pool.terms?.length ?? 0) > 0
+  // This used to be inferred here — `isExactlyMarket(marketUid) ||
+  // fixedTermDetails(pool)?.provider?.kind === 'broker'` — which meant the
+  // frontend carried its own copy of a per-lender routing matrix AND depended
+  // on a field (`fixedTerm`) that `/lending/latest` serves on the lender item
+  // rather than the market row. The button existed, worked, and rendered for
+  // nobody. Never re-derive a capability the API publishes: a new fixed-term
+  // lender now lights up with no release here.
+  const canRefinance = !!account && hasCapability(pool, 'refinance')
 
   return (
     <div className="bg-base-200/40 px-3 py-1.5 pl-6 space-y-1">

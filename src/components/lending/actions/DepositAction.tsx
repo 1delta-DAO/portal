@@ -21,6 +21,13 @@ import { TransactionSuccess } from './TransactionSuccess'
 import { TermsSummary } from '../terms'
 import { useTermsAcknowledgement } from '../terms/TermsDisclosure'
 import { useTermSheet } from '../../../hooks/lending/useTermSheet'
+import { useTokenLists } from '../../../hooks/useTokenLists'
+import { useTokenBalances } from '../../../hooks/lending/useTokenBalances'
+import {
+  resolveSmartLeg,
+  SmartLegInput,
+  type SmartLegState,
+} from '../shared/SmartLegInput'
 
 export const DepositAction: React.FC<ActionPanelProps> = ({
   pool,
@@ -235,6 +242,29 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   const canUseNative =
     !!pool && isWNative(pool.asset) && !!nativeToken && lenderSupportsNative(lenderKey)
 
+  // ── Fluid smart collateral: the deposit takes TWO amounts ────────────────
+  //
+  // A deposit acts on the COLLATERAL side, so this resolves against that side
+  // regardless of which leg the selected row happens to name. Null on every
+  // ordinary market, and every branch below then behaves exactly as before.
+  const smartLeg = useMemo(
+    () => (pool ? resolveSmartLeg(pool, pool.underlying, 'collateral') : null),
+    [pool]
+  )
+  const [legState, setLegState] = useState<SmartLegState>({})
+  const { data: chainTokens } = useTokenLists(smartLeg ? chainId : undefined)
+  const secondaryToken = smartLeg
+    ? chainTokens?.[smartLeg.secondary.underlying.toLowerCase()]
+    : undefined
+  const { balances: secondaryBalances } = useTokenBalances({
+    chainId,
+    account,
+    assets: smartLeg ? [smartLeg.secondary.underlying] : [],
+  })
+  const secondaryBalance = smartLeg
+    ? secondaryBalances.get(smartLeg.secondary.underlying.toLowerCase())?.balance
+    : undefined
+
   const exec = useActionExecution({
     actionType: 'Deposit',
     pool,
@@ -246,6 +276,8 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
     accountId: hasSubAccounts ? (selectedAccountId ?? undefined) : undefined,
     chainId,
     subAccount,
+    asset1: legState.asset1,
+    amount1: legState.amount1,
   })
   const { simulation, rateImpact, loading, error, txSuccess, resetState, dismissSuccess } = exec
 
@@ -259,6 +291,10 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
   useEffect(() => {
     setAmount('')
     setUseNative(false)
+    // The second leg belongs to the market that was selected, not to the one
+    // now selected — carrying it across would build a request naming a token
+    // that is not in the new vault.
+    setLegState({})
     nativeDefaultSettledRef.current = false
     resetState()
   }, [pool?.marketUid])
@@ -701,6 +737,21 @@ export const DepositAction: React.FC<ActionPanelProps> = ({
         disabled={!pool}
         error={overMax ? `Exceeds wallet balance (${formatTokenAmount(walletAmountStr)}).` : null}
       />
+
+      {/* The second leg of an LP collateral side, plus the balanced /
+          single-sided choice. Renders nothing on an ordinary market. */}
+      {smartLeg && pool && (
+        <SmartLegInput
+          row={pool}
+          leg={smartLeg}
+          primaryAmount={amount}
+          primarySymbol={pool.asset.symbol}
+          secondarySymbol={secondaryToken?.symbol}
+          secondaryLogoURI={secondaryToken?.logoURI}
+          secondaryBalance={secondaryBalance}
+          onChange={setLegState}
+        />
+      )}
 
       {/* Estimated monthly earnings — surfaces what the user will earn on this
           deposit based on the market's current deposit APR. */}

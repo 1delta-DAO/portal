@@ -12,6 +12,13 @@ import { buildPath, OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { Logo } from '../../../common/Logo'
 import { getChainName } from '../../../../lib/lib-utils'
+import {
+  AutoBalancedBadge,
+  autoBalancedExplainer,
+  BasketRateHint,
+  LpAssetIcons,
+  LpPairLabel,
+} from '../../shared/SmartVault'
 
 const CHAIN_LOGO_BASE = 'https://raw.githubusercontent.com/1delta-DAO/chains/main'
 
@@ -32,10 +39,48 @@ const CHAIN_LOGO_BASE = 'https://raw.githubusercontent.com/1delta-DAO/chains/mai
 function lendingPathForPool(p: PoolEntry): string {
   return buildPath('lending', p.chainId, p.lenderKey, {
     [OPTIMIZER_DEEPLINK_KEYS.colMarket]: p.marketUid,
-    [OPTIMIZER_DEEPLINK_KEYS.collateral]:
-      p.underlyingAddress || p.underlyingInfo?.asset?.address,
+    [OPTIMIZER_DEEPLINK_KEYS.collateral]: p.underlyingAddress || p.underlyingInfo?.asset?.address,
     [OPTIMIZER_DEEPLINK_KEYS.action]: 'deposit',
   })
+}
+
+/**
+ * The legs to draw for a collapsed vault row, in the vault's own token0/token1
+ * order — which is the order the deposit builder's `amount` / `amount1` pair
+ * maps onto, so it is the order the user should learn the pair in.
+ *
+ * Symbols and logos come from the sibling LEG ROWS rather than from a token
+ * list: each leg is a market row that already carries its own resolved asset,
+ * so this cannot go stale against the list. A leg the API did not emit is
+ * dropped rather than rendered as a blank icon.
+ *
+ * Returns a single-element array on an ordinary market, and the caller renders
+ * exactly as before.
+ */
+interface LegIcon {
+  address: string
+  symbol?: string
+  logoURI?: string
+}
+
+function lpSideLegs(p: PoolEntry, legs: PoolWithMetrics[] | undefined): LegIcon[] {
+  const pair = p.fluid?.collateralPair ?? p.fluid?.debtPair
+  if (!pair || pair.length < 2 || !legs?.length) {
+    const a = p.underlyingInfo?.asset
+    return a ? [{ address: a.address, symbol: a.symbol, logoURI: a.logoURI }] : []
+  }
+  const byAddress = new Map(
+    legs.map((l) => [
+      (l.pool.underlyingAddress || l.pool.underlyingInfo?.asset?.address || '').toLowerCase(),
+      l.pool.underlyingInfo?.asset,
+    ])
+  )
+  const out: LegIcon[] = []
+  for (const addr of pair) {
+    const asset = byAddress.get(addr.toLowerCase())
+    if (asset) out.push({ address: asset.address, symbol: asset.symbol, logoURI: asset.logoURI })
+  }
+  return out
 }
 
 /** Compact radial utilization indicator */
@@ -236,10 +281,21 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ pool: p, metrics }) => {
-              const { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr } =
-                metrics
+            {rows.map(({ pool: p, metrics, legs }) => {
+              const {
+                utilization,
+                apr,
+                borrowApr,
+                intrinsicYield,
+                price,
+                depositRewardApr,
+                aprLeg,
+              } = metrics
               const utilPct = utilization * 100
+              // One vault, N legs: the row stands for the POSITION, so it is
+              // identified by the whole pair rather than by the leg that
+              // represents it. `legs` is set only by `collapseSmartVaults`.
+              const lpLegs = lpSideLegs(p, legs)
               const totalDepositsUSD = parseFloat(p.totalDepositsUsd) || 0
               const totalDebtUSD = parseFloat(p.totalDebtUsd) || 0
               const totalLiquidityUSD = parseFloat(p.totalLiquidityUsd) || 0
@@ -270,10 +326,21 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                       >
                         <div className="flex flex-col min-w-0">
                           <span
-                            className="font-medium truncate"
-                            title={getAsset(p)?.name ?? p.name}
+                            className="font-medium truncate flex items-center gap-1.5"
+                            title={
+                              lpLegs.length > 1
+                                ? autoBalancedExplainer(p)
+                                : (getAsset(p)?.name ?? p.name)
+                            }
                           >
-                            {getAsset(p)?.symbol ?? p.name}
+                            {lpLegs.length > 1 ? (
+                              <>
+                                <LpAssetIcons legs={lpLegs} size={16} />
+                                <LpPairLabel symbols={lpLegs.map((l) => l.symbol ?? '?')} />
+                              </>
+                            ) : (
+                              (getAsset(p)?.symbol ?? p.name)
+                            )}
                           </span>
                           <span
                             className="text-[10px] text-base-content/60 flex items-center gap-1 min-w-0"
@@ -287,11 +354,17 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                             />
                             {chainMarker(p)}
                             <span className="truncate">{p.lenderInfo?.name ?? p.lenderKey}</span>
+                            <AutoBalancedBadge row={p} className="shrink-0" />
                           </span>
                         </div>
                       </AssetPopover>
+                      {/* `ml-auto` parks the arrow at the COLUMN edge instead of
+                          hugging whatever the meta line happens to end with. It
+                          used to sit flush against the "Auto-balanced LP" pill,
+                          which made the pill read as the link — two affordances
+                          fused into one. */}
                       <a
-                        className="shrink-0 text-base-content/30 hover:text-primary transition-colors"
+                        className="shrink-0 ml-auto pl-1 text-base-content/30 hover:text-primary transition-colors"
                         title={`Open ${p.underlyingInfo?.asset?.symbol ?? 'this market'} on ${
                           p.lenderInfo?.name ?? p.lenderKey
                         } in the Lending tab`}
@@ -322,6 +395,9 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                         <span className="font-semibold text-success">
                           {(apr + intrinsicYield).toFixed(2)}%
                         </span>
+                        {/* `apr` is already the basket figure — this only says
+                            so, and keeps the leg rate reachable for auditing. */}
+                        <BasketRateHint row={p} side="supply" legRate={aprLeg} />
                         {intrinsicYield > 0 && (
                           <span
                             className="badge badge-xs bg-success/15 text-success border-0 cursor-help whitespace-nowrap"
@@ -498,8 +574,8 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                     type="button"
                     className="btn btn-ghost btn-xs btn-circle opacity-40 hover:opacity-100"
                     title={`Open ${p.underlyingInfo?.asset?.symbol ?? 'this market'} on ${
-                          p.lenderInfo?.name ?? p.lenderKey
-                        } in the Lending tab`}
+                      p.lenderInfo?.name ?? p.lenderKey
+                    } in the Lending tab`}
                     onClick={(e) => {
                       e.stopPropagation()
                       navigate(lendingPathForPool(p))

@@ -46,6 +46,19 @@ export function useActionExecution(params: {
   chainId?: string
   /** Active sub-account — when provided, enables simulation via `simulate` param */
   subAccount?: UserSubAccount
+  /**
+   * Fluid smart vaults: the second leg of a two-token LP side, already in RAW
+   * units (the panel owns the decimals of a token that is NOT `pool.asset`).
+   * Both or neither — `amount1` alone is a server-side error.
+   */
+  asset1?: string
+  amount1?: string
+  /**
+   * Size the operation in LP shares rather than tokens (`operatePerfect`).
+   * When set it REPLACES the token amount as the sizing input, so the amount
+   * field becomes a display of the estimated split rather than the request.
+   */
+  shares?: string
 }) {
   const {
     actionType,
@@ -62,6 +75,9 @@ export function useActionExecution(params: {
     loanId,
     chainId,
     subAccount,
+    asset1,
+    amount1,
+    shares,
   } = params
   const effectiveReceiver = receiver && receiver.length > 0 ? receiver : account
   const { send } = useSendLendingTransaction({ chainId: chainId ?? '', account })
@@ -146,7 +162,10 @@ export function useActionExecution(params: {
     }
 
     const parsedAmt = parseFloat(debouncedAmount || '0')
-    if (parsedAmt <= 0 && !isAll) {
+    // A share-sized request is a real request with a zero token amount — the
+    // pool decides the split — so it must not be filtered out as "no input".
+    const sharesSized = !!shares && shares !== '0'
+    if (parsedAmt <= 0 && !isAll && !sharesSized) {
       setResult(null)
       setError(null)
       setLoading(false)
@@ -176,6 +195,14 @@ export function useActionExecution(params: {
         termId,
         loanId,
         interestRate,
+        // Already raw: the second leg is a DIFFERENT token from `pool.asset`,
+        // so its decimals are the panel's to know, not this hook's.
+        asset1,
+        amount1,
+        shares,
+        // `minShares`/`maxShares` are deliberately never sent — the API quotes
+        // the bound off the DexResolver, and a client-side estimate over a
+        // concentrated pool understates impact exactly where it matters.
         simulate: shouldSimulate,
         simulationBody,
       })
@@ -205,6 +232,9 @@ export function useActionExecution(params: {
     loanId,
     actionType,
     shouldSimulate,
+    asset1,
+    amount1,
+    shares,
   ])
 
   /** Execute the next pending permission transaction */

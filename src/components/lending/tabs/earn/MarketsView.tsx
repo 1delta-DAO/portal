@@ -7,6 +7,7 @@ import type { UserDataResult } from '../../../../sdk/lending-helper/userPosition
 import { useTokenBalances } from '../../../../hooks/lending/useTokenBalances'
 import { useTokenListsMultiChain } from '../../../../hooks/useTokenLists'
 import {
+  collapseSmartVaults,
   computePoolMetrics,
   poolEntryToPoolDataItem,
   type PoolWithMetrics,
@@ -453,13 +454,24 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     return () => document.removeEventListener('mousedown', handler)
   }, [showExtendedFilters])
 
+  // One row per POSITION, not per leg.
+  //
+  // Between sorting and pagination on purpose: a filter still matches on any
+  // leg (a user searching "ETH" finds a wstETH+ETH vault), the sort still ranks
+  // on the leg that best satisfies it, and the page count is finally in vaults
+  // rather than in legs of vaults. See {@link collapseSmartVaults}.
+  const displayRows = useMemo(
+    () => collapseSmartVaults(filteredAndSortedPools),
+    [filteredAndSortedPools]
+  )
+
   // Pagination
-  const totalItems = filteredAndSortedPools.length
+  const totalItems = displayRows.length
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
   const currentPage = Math.min(page, totalPages)
   const startIndex = (currentPage - 1) * pageSize
   const endIndex = Math.min(startIndex + pageSize, totalItems)
-  const paginatedPools = filteredAndSortedPools.slice(startIndex, endIndex)
+  const paginatedPools = displayRows.slice(startIndex, endIndex)
 
   // Reset minDepositsUsd to a selection-appropriate default when the chain set
   // changes (unless the user overrode it).
