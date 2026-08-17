@@ -1,8 +1,8 @@
-# Dashboard/
+# dashboard/
 
 Small shared utilities for pool tables and dashboards. Despite the
 name, this is **not** the lending dashboard view (that's
-[../LendingDashboard/](../LendingDashboard/)) — it's a helper module
+[../tabs/lending/](../tabs/lending/)) — it's a helper module
 reused by the various market/position views.
 
 ## Files

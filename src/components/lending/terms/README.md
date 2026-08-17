@@ -3,9 +3,9 @@
 Renders the API's `termSheet` — one structured description of every market's
 lend and borrow offer, for every lender, in one shape.
 
-Design doc: [`TERM_SHEET_UI_PLAN.md`](../../../../TERM_SHEET_UI_PLAN.md).
-API side: `~/lending-sdks/TERM_SHEET_PLAN.md` and
-`packages/margin-fetcher/src/terms/`.
+The wire model lives in the sdk ([`termSheets.ts`](../../../sdk/lending-helper/termSheets.ts));
+[`types.ts`](types.ts) re-exports it for this tree. API side:
+`packages/margin-fetcher/src/terms/` in the lending-sdks repo.
 
 ## The one rule
 

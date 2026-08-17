@@ -94,8 +94,7 @@ src/
 │   │                            #   marketTypes.ts      /lending/latest (PoolDataItem)
 │   │                            #   userPositionTypes.ts /lending/user-positions
 │   ├── earn-helper/             # Earn listing + positions
-│   ├── vaults-helper/           # Vault catalog, actions, withdrawals
-│   └── hooks/                   # Chain registry
+│   └── vaults-helper/           # Vault catalog, actions, withdrawals
 │
 ├── components/lending/
 │   ├── LendingTab.tsx           # Tab bar + router; tab panels are lazy-loaded
@@ -120,7 +119,9 @@ src/
 │   └── use*.ts                  # Chains, token lists, debounce, table sort/pagination
 │
 ├── contexts/                    # Spy mode (view-as-address), risk mode, batch mode
-├── config/backend.ts            # Base URL + the header hook for a fork's auth
+├── config/                      # backend.ts (base URL + a fork's auth header hook),
+│                                # flags.ts, assets.ts (logo/token-list URL bases),
+│                                # brand.ts (name, wordmark, storage prefix)
 ├── utils/                       # format, routes, explorer, price, validation
 └── types/ lib/ styles/
 ```

@@ -30,8 +30,7 @@ src/
 │   │                        #   marketTypes.ts       /lending/latest → PoolDataItem
 │   │                        #   userPositionTypes.ts /lending/user-positions
 │   ├── earn-helper/         # Earn listing, positions, merge logic
-│   ├── vaults-helper/       # Vault catalog, actions, withdrawals, validators
-│   └── hooks/               # useChainsRegistry
+│   └── vaults-helper/       # Vault catalog, actions, withdrawals, validators
 │
 ├── components/
 │   ├── lending/
@@ -55,7 +54,9 @@ src/
 │   └── useChains.ts / useTokenLists.ts / useSyncChain.ts / useSendLendingTransaction.ts
 │
 ├── contexts/                # SpyMode (view-as-address), RiskMode, BatchMode
-├── config/backend.ts        # Base URL + apiHeaders() — a fork's auth hook
+├── config/                  # backend.ts (base URL + apiHeaders() — a fork's auth
+│                            # hook), flags.ts (feature flags), assets.ts (logo /
+│                            # token-list URL bases), brand.ts (name, wordmark)
 ├── lib/                     # lib-utils, token list cache, trade helpers
 ├── utils/                   # format, routes, explorer, price, validation
 ├── types/ styles/
@@ -81,20 +82,24 @@ All primary features live under `src/components/lending/`:
 
 ### Earn Tab (`tabs/earn/`)
 
-- `MarketsView.tsx` - Browse all lending pools across lenders
+- `index.tsx` - Tab container: assets/positions sub-tabs, vaults handoff
+- `MarketsView.tsx` - Browse all lending pools across lenders (filters, sort, pagination)
 - `MarketsTable.tsx` - Searchable, sortable pool table
+- `UserPositionsTable.tsx` / `UserAssetsTable.tsx` - The user's positions / wallet assets
+- `poolFilters.ts` - Facet filter model (+ tests)
 - `DepositPanel.tsx` - Side panel for one-click deposits
 - `ExposureCell.tsx` - Market exposure indicator
+- `vaults/` - Vault catalog + positions (see the Vaults section below)
 
 ### Lending Tab (`tabs/lending/`)
 
-- `LendingDashboard.tsx` - Main view: lender selector, positions, market table, action panel
+- `index.tsx` - Main view: lender selector, positions, market table, action panel
 - `LendingMarketTable.tsx` - Desktop table + mobile cards, paginated (25/page)
 - `ActionPanel.tsx` - Shared action form wrapper (desktop sidebar + mobile modal)
 
 ### Looping/Trading Tab (`tabs/trading/`)
 
-- `TradingDashboard.tsx` - Main view: lender selector, pool selection, operation forms
+- `index.tsx` - Main view: lender selector, pool selection, operation forms
 - `TradingMarketTable.tsx` - Market table with role highlights (input/output/pay), paginated
 - `PoolSelectorDropdown.tsx` - Multi-pool picker for trade operations
 - `useTradingQuotes.ts` - Quote fetching hook
@@ -102,11 +107,14 @@ All primary features live under `src/components/lending/`:
 - `actions/ColSwapAction.tsx` - Collateral swap
 - `actions/DebtSwapAction.tsx` - Debt swap
 - `actions/CloseAction.tsx` - Position close
+- `actions/RefinanceAction.tsx` - Cross-lender refinance
 
 ### Shared Lending Actions (`actions/`)
 
 - `DepositAction.tsx`, `WithdrawAction.tsx`, `BorrowAction.tsx`, `RepayAction.tsx`
-- `useActionExecution.ts` - Hook: simulate + execute lending transactions
+- `useActionExecution.ts` - Hook: simulate + execute lending transactions (wraps
+  `hooks/usePermissionLadder`, the one approvals+execute state machine)
+- `ExecutionLadder.tsx` - The one approvals + execute UI block
 - `HealthFactorProjection.tsx` - Health factor preview before tx
 - `SubAccountSelector.tsx` - Sub-account picker (for AAVE-style protocols)
 - `NativeCurrencySelector.tsx` - Toggle native vs wrapped token
@@ -115,17 +123,19 @@ All primary features live under `src/components/lending/`:
 
 ### Shared Components (`shared/`)
 
-- `dashboard/` - `sortPools()` helper, `LtvBadge` component, `SortKey` type
 - `YourPositions.tsx` - Position summary: deposits, debt, NAV, health, APR
 - `ConfigMarketView.tsx` - E-Mode category view
 - `EModeAnalysisModal.tsx` - E-Mode switching impact analysis
-- `IrmChart.tsx` - Interest rate model curve (Recharts)
+- `IrmChart.tsx` - Interest rate model curve (hand-rolled SVG, no chart lib)
 - `IrmDock.tsx` - Draggable dock for multiple IRM chart panels
 - `AssetPopover.tsx` - Asset detail popover (oracle price, utilization, rates)
 - `SearchableSelect.tsx` - Reusable searchable dropdown
 - `ChainFilter.tsx` - Chain selector dropdown
-- `UserTable.tsx` - User's lending positions table with collateral toggles
-- `UserAssetsTable.tsx` - User's wallet assets
+- `MigrateModal.tsx` / `RefinanceModal.tsx` - Cross-lender migrate / fixed-term refinance
+- `SmartVault.tsx` / `SmartLegInput.tsx` / `SmartExitPanel.tsx` - Fluid smart-vault UI
+
+(`dashboard/` — `sortPools()`, `LtvBadge`, `SortKey` — is a sibling of `shared/`,
+not inside it.)
 
 ### Vaults (`tabs/earn/vaults/`)
 
@@ -175,7 +185,9 @@ against, so dropping them makes the claim a silent no-op).
 
 2. **URL-driven state** - Tab, chain, lender selection via `useParams()` / `useNavigate()`
 
-3. **React Context** - `IrmDockContext` (chart panels), `ToastContext` (notifications)
+3. **React Context** - `src/contexts/`: `SpyMode` (view-as-address), `RiskMode`, `BatchMode`.
+   The IRM dock provider lives in `components/lending/shared/IrmDock.tsx` and the toast
+   context in `components/common/ToastHost.tsx`.
 
 4. **Local state** - Component-level `useState` for forms, filters, selections
 

@@ -1,26 +1,27 @@
-# TradingDashboard/
+# tabs/trading/
 
-Advanced position trading: looping, collateral swap, debt swap and
-position close. These actions combine borrow/repay/deposit/withdraw
-with a DEX swap into a single transaction, so they need quote
-aggregation, simulation and multi-pool selection — distinct from the
-plain actions in [../DashboardActions/](../DashboardActions/).
+Advanced position trading: looping, collateral swap, debt swap,
+refinance and position close. These actions combine
+borrow/repay/deposit/withdraw with a DEX swap into a single
+transaction, so they need quote aggregation, simulation and
+multi-pool selection — distinct from the plain forms in
+[../../actions/](../../actions/).
 
-Mounted from [../LendingTab.tsx](../LendingTab.tsx) as the "Trading"
-tab.
+Mounted from [../../LendingTab.tsx](../../LendingTab.tsx) as the
+"Trading" tab.
 
 ## Entry point
 
-[TradingDashboard.tsx](TradingDashboard.tsx) selects the operation
-type (`Loop` / `ColSwap` / `DebtSwap` / `Close`), manages the
-multi-role pool selection (input/output/pay), highlights the
-relevant rows in the markets table and routes to the matching action
-form in [actions/](actions/).
+[index.tsx](index.tsx) exports the `TradingDashboard` container. It
+selects the operation type (`Loop` / `ColSwap` / `DebtSwap` /
+`Refinance` / `Close`), manages the multi-role pool selection
+(input/output/pay), highlights the relevant rows in the markets table
+and routes to the matching action form in [actions/](actions/).
 
 ## Files
 
-- [TradingDashboard.tsx](TradingDashboard.tsx) — Top-level container;
-  operation switching, pool selection state, action routing.
+- [index.tsx](index.tsx) — `TradingDashboard` container; operation
+  switching, pool selection state, action routing.
 - [TradingMarketTable.tsx](TradingMarketTable.tsx) — Markets table
   with role-based row highlighting (input / output / pay).
 - [PoolSelectorDropdown.tsx](PoolSelectorDropdown.tsx) — Searchable
@@ -31,6 +32,9 @@ form in [actions/](actions/).
   with preset buttons.
 - [ErrorDisplay.tsx](ErrorDisplay.tsx) — Error banner with
   copy-to-clipboard for debugging.
+- [TradingExecuteBlock.tsx](TradingExecuteBlock.tsx) — Approvals +
+  execute stack for a fetched quote bundle; one atomic EIP-5792 batch
+  where the wallet supports it.
 - [TradingTransactionSuccess.tsx](TradingTransactionSuccess.tsx) —
   Success banner with operation label and tx hash.
 - [useTradingQuotes.ts](useTradingQuotes.ts) — Hook fetching
@@ -39,6 +43,5 @@ form in [actions/](actions/).
 - [types.ts](types.ts) — `TradingOperation`, `PoolRole`,
   `SelectedPool`, `TableHighlight`, `Tx`, `TradingQuote` and DEX
   routing types.
-- [actions/](actions/) — Per-operation action forms (Loop, ColSwap,
-  DebtSwap, Close).
-- [index.ts](index.ts) — Barrel export.
+- [actions/](actions/) — Per-operation action forms; see
+  [actions/README.md](actions/README.md).
