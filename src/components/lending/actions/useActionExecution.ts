@@ -9,9 +9,8 @@ import {
   type RateImpactEntry,
 } from '../../../sdk/lending-helper/fetchLendingAction'
 import type { LoopRangeSimulationBody } from '../../../sdk/lending-helper/fetchLoopRange'
-import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
-import { useAtomicBatch } from '../../../hooks/useAtomicBatch'
 import { useDebounce } from '../../../hooks/useDebounce'
+import { usePermissionLadder } from '../../../hooks/usePermissionLadder'
 import type { ActionType } from './types'
 
 export function useActionExecution(params: {
@@ -80,26 +79,30 @@ export function useActionExecution(params: {
     shares,
   } = params
   const effectiveReceiver = receiver && receiver.length > 0 ? receiver : account
-  const { send } = useSendLendingTransaction({ chainId: chainId ?? '', account })
-  const {
-    supported: batchSupported,
-    needsUpgrade: batchNeedsUpgrade,
-    sendBatch,
-  } = useAtomicBatch({ chainId: chainId ?? '', account })
 
   const [result, setResult] = useState<LendingActionResponseWithSimulation | null>(null)
   const [loading, setLoading] = useState(false)
-  const [executingPermission, setExecutingPermission] = useState(false)
-  const [executingMain, setExecutingMain] = useState(false)
-  /** Number of permissions that have been successfully executed */
-  const [permissionsCompleted, setPermissionsCompleted] = useState(0)
-  const [error, setError] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [txSuccess, setTxSuccess] = useState<{
     actionType: ActionType
     amount: string
     symbol: string
     hash?: string
   } | null>(null)
+
+  const ladder = usePermissionLadder({
+    chainId: chainId ?? '',
+    account,
+    permissions: result?.permissions ?? [],
+    transactions: result?.transactions ?? [],
+    onDone: (hash) =>
+      setTxSuccess({
+        actionType,
+        amount,
+        symbol: pool?.asset.symbol ?? '',
+        hash,
+      }),
+  })
 
   const debouncedAmount = useDebounce(amount, 500)
   const fetchIdRef = useRef(0)
@@ -132,32 +135,28 @@ export function useActionExecution(params: {
       }
     : undefined
 
-  const permissions = result?.permissions ?? []
-  const hasPermissions = permissions.length > 0
-  const allPermissionsDone = hasPermissions && permissionsCompleted >= permissions.length
-  const executing = executingPermission || executingMain
   const simulation: LendingActionSimulation | undefined = result?.simulation
   const rateImpact: RateImpactEntry[] | undefined = result?.rateImpact
 
   const resetState = () => {
     setResult(null)
-    setError(null)
-    setPermissionsCompleted(0)
+    setFetchError(null)
     setTxSuccess(null)
+    ladder.resetLadder()
     fetchIdRef.current++
   }
 
   const dismissSuccess = () => {
     setTxSuccess(null)
     setResult(null)
-    setPermissionsCompleted(0)
+    ladder.resetLadder()
   }
 
   // Auto-fetch when debounced inputs change
   useEffect(() => {
     if (!account || !pool) {
       setResult(null)
-      setError(null)
+      setFetchError(null)
       return
     }
 
@@ -167,7 +166,7 @@ export function useActionExecution(params: {
     const sharesSized = !!shares && shares !== '0'
     if (parsedAmt <= 0 && !isAll && !sharesSized) {
       setResult(null)
-      setError(null)
+      setFetchError(null)
       setLoading(false)
       return
     }
@@ -177,8 +176,10 @@ export function useActionExecution(params: {
 
     const doFetch = async () => {
       setLoading(true)
-      setError(null)
-      setPermissionsCompleted(0)
+      setFetchError(null)
+      // A new bundle invalidates the approval progress: the amount an approval
+      // was granted for is no longer the amount being sent.
+      ladder.resetLadder()
 
       const parsedAmount = parseUnits(debouncedAmount || '0', decimals)
 
@@ -211,13 +212,16 @@ export function useActionExecution(params: {
 
       setLoading(false)
       if (!response.success) {
-        setError(response.error ?? 'Failed to fetch transaction data')
+        setFetchError(response.error ?? 'Failed to fetch transaction data')
         return
       }
       setResult(response.data ?? null)
     }
 
     doFetch()
+    // `ladder`/`simulationBody` are rebuilt per render; the fields below are
+    // their stable identities. `ladder.resetLadder` only touches stable setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     debouncedAmount,
     pool?.marketUid,
@@ -237,71 +241,16 @@ export function useActionExecution(params: {
     shares,
   ])
 
-  /** Execute the next pending permission transaction */
-  const executeNextPermission = async () => {
-    if (!hasPermissions || permissionsCompleted >= permissions.length) return
-    setExecutingPermission(true)
-    setError(null)
-
-    const perm = permissions[permissionsCompleted]
-    const { ok, error: txError } = await send(perm)
-    if (ok) {
-      setPermissionsCompleted((prev) => prev + 1)
-    } else {
-      setError(txError ?? 'Permission transaction failed')
-    }
-    setExecutingPermission(false)
-  }
-
+  // The ladder owns the execution sequence; these wrappers only add the
+  // "nothing to execute yet" guard.
   const executeMain = async () => {
     if (!result || !pool) return
-    setExecutingMain(true)
-    setError(null)
-
-    let lastHash: string | undefined
-    for (const tx of result.transactions) {
-      const { ok, error: txError, hash } = await send(tx)
-      if (!ok) {
-        setError(txError ?? 'Transaction failed')
-        setExecutingMain(false)
-        return
-      }
-      lastHash = hash
-    }
-
-    setExecutingMain(false)
-    setTxSuccess({
-      actionType,
-      amount,
-      symbol: pool.asset.symbol ?? '',
-      hash: lastHash,
-    })
+    await ladder.executeMain()
   }
 
-  /**
-   * Atomic path: permissions + the action's transactions in ONE confirmation.
-   * Ordering is preserved inside the bundle, so approvals land before the call
-   * that spends them, and an atomic revert leaves no dangling allowance.
-   */
   const executeAll = async () => {
     if (!result || !pool) return
-    setExecutingMain(true)
-    setError(null)
-
-    const { ok, error: txError, hash } = await sendBatch([...permissions, ...result.transactions])
-    setExecutingMain(false)
-    if (!ok) {
-      setError(txError ?? 'Transaction failed')
-      return
-    }
-
-    setPermissionsCompleted(permissions.length)
-    setTxSuccess({
-      actionType,
-      amount,
-      symbol: pool.asset.symbol ?? '',
-      hash,
-    })
+    await ladder.executeAll()
   }
 
   return {
@@ -309,18 +258,18 @@ export function useActionExecution(params: {
     simulation,
     rateImpact,
     loading,
-    executing,
-    executingPermission,
-    executingMain,
-    permissions,
-    hasPermissions,
-    permissionsCompleted,
-    allPermissionsDone,
-    batchSupported,
-    batchNeedsUpgrade,
-    error,
+    executing: ladder.executing,
+    executingPermission: ladder.executingPermission,
+    executingMain: ladder.executingMain,
+    permissions: ladder.permissions,
+    hasPermissions: ladder.hasPermissions,
+    permissionsCompleted: ladder.permissionsCompleted,
+    allPermissionsDone: ladder.allPermissionsDone,
+    batchSupported: ladder.batchSupported,
+    batchNeedsUpgrade: ladder.batchNeedsUpgrade,
+    error: fetchError ?? ladder.error,
     txSuccess,
-    executeNextPermission,
+    executeNextPermission: ladder.executeNextPermission,
     executeMain,
     executeAll,
     resetState,

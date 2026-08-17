@@ -9,9 +9,8 @@ import {
   type VaultFamily,
   type VaultProvider,
 } from '../../sdk/vaults-helper'
-import { useSendLendingTransaction } from '../useSendLendingTransaction'
-import { useAtomicBatch } from '../useAtomicBatch'
 import { useDebounce } from '../useDebounce'
+import { usePermissionLadder } from '../usePermissionLadder'
 
 export interface UseVaultActionExecutionParams {
   actionType: VaultActionType
@@ -133,53 +132,54 @@ export function useVaultActionExecution(
   const extraParamsKey = JSON.stringify(extraParams ?? {})
   const effectiveReceiver = receiver && receiver.length > 0 ? receiver : account
 
-  const { send } = useSendLendingTransaction({ chainId, account })
-  const {
-    supported: batchSupported,
-    needsUpgrade: batchNeedsUpgrade,
-    sendBatch,
-  } = useAtomicBatch({ chainId, account })
-
   const [result, setResult] = useState<VaultActionResponse | null>(null)
   const [loading, setLoading] = useState(false)
-  const [executingPermission, setExecutingPermission] = useState(false)
-  const [executingMain, setExecutingMain] = useState(false)
-  const [permissionsCompleted, setPermissionsCompleted] = useState(0)
-  const [error, setError] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [txSuccess, setTxSuccess] = useState<UseVaultActionExecutionResult['txSuccess']>(null)
 
   const debouncedAmount = useDebounce(amount, 500)
   const fetchIdRef = useRef(0)
 
-  const permissions = result?.permissions ?? []
-  const hasPermissions = permissions.length > 0
-  const allPermissionsDone = hasPermissions && permissionsCompleted >= permissions.length
+  const ladder = usePermissionLadder({
+    chainId,
+    account,
+    permissions: result?.permissions ?? [],
+    // Strict order: transactions → postTransactions (permissions already ran).
+    transactions: result ? [...result.transactions, ...result.postTransactions] : [],
+    onDone: (hash) =>
+      setTxSuccess({
+        actionType,
+        amount,
+        symbol: underlyingSymbol,
+        hash,
+      }),
+  })
 
   const resetState = () => {
     setResult(null)
-    setError(null)
-    setPermissionsCompleted(0)
+    setFetchError(null)
     setTxSuccess(null)
+    ladder.resetLadder()
     fetchIdRef.current++
   }
 
   const dismissSuccess = () => {
     setTxSuccess(null)
     setResult(null)
-    setPermissionsCompleted(0)
+    ladder.resetLadder()
   }
 
   useEffect(() => {
     if (!account || !vault || !underlying) {
       setResult(null)
-      setError(null)
+      setFetchError(null)
       return
     }
 
     const parsed = parseFloat(debouncedAmount || '0')
     if (parsed <= 0 && !isAll) {
       setResult(null)
-      setError(null)
+      setFetchError(null)
       setLoading(false)
       return
     }
@@ -189,8 +189,10 @@ export function useVaultActionExecution(
 
     const doFetch = async () => {
       setLoading(true)
-      setError(null)
-      setPermissionsCompleted(0)
+      setFetchError(null)
+      // A new bundle invalidates the approval progress: the amount an approval
+      // was granted for is no longer the amount being sent.
+      ladder.resetLadder()
 
       const parsedAmount = isAll ? '0' : parseUnits(debouncedAmount || '0', dec).toString()
 
@@ -217,13 +219,15 @@ export function useVaultActionExecution(
 
       setLoading(false)
       if (!response.success) {
-        setError(response.error ?? 'Failed to build vault transaction')
+        setFetchError(response.error ?? 'Failed to build vault transaction')
         return
       }
       setResult(response.data ?? null)
     }
 
     doFetch()
+    // `ladder` is rebuilt per render; `ladder.resetLadder` only touches stable setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     debouncedAmount,
     vault,
@@ -245,87 +249,32 @@ export function useVaultActionExecution(
     chainId,
   ])
 
-  const executeNextPermission = async () => {
-    if (!hasPermissions || permissionsCompleted >= permissions.length) return
-    setExecutingPermission(true)
-    setError(null)
-
-    const perm = permissions[permissionsCompleted]
-    const { ok, error: txError } = await send(perm)
-    if (ok) {
-      setPermissionsCompleted((prev) => prev + 1)
-    } else {
-      setError(txError ?? 'Permission transaction failed')
-    }
-    setExecutingPermission(false)
-  }
-
+  // The ladder owns the execution sequence; these wrappers only add the
+  // "nothing to execute yet" guard.
   const executeMain = async () => {
     if (!result) return
-    setExecutingMain(true)
-    setError(null)
-
-    // Strict order: transactions → postTransactions (permissions already ran).
-    let lastHash: string | undefined
-    for (const tx of [...result.transactions, ...result.postTransactions]) {
-      const { ok, error: txError, hash } = await send(tx)
-      if (!ok) {
-        setError(txError ?? 'Transaction failed')
-        setExecutingMain(false)
-        return
-      }
-      lastHash = hash
-    }
-
-    setExecutingMain(false)
-    setTxSuccess({
-      actionType,
-      amount,
-      symbol: underlyingSymbol,
-      hash: lastHash,
-    })
+    await ladder.executeMain()
   }
 
-  /** Atomic path: permissions → transactions → postTransactions, one bundle. */
   const executeAll = async () => {
     if (!result) return
-    setExecutingMain(true)
-    setError(null)
-
-    const {
-      ok,
-      error: txError,
-      hash,
-    } = await sendBatch([...permissions, ...result.transactions, ...result.postTransactions])
-    setExecutingMain(false)
-    if (!ok) {
-      setError(txError ?? 'Transaction failed')
-      return
-    }
-
-    setPermissionsCompleted(permissions.length)
-    setTxSuccess({
-      actionType,
-      amount,
-      symbol: underlyingSymbol,
-      hash,
-    })
+    await ladder.executeAll()
   }
 
   return {
     result,
     loading,
-    executingPermission,
-    executingMain,
-    permissions,
-    hasPermissions,
-    permissionsCompleted,
-    allPermissionsDone,
-    batchSupported,
-    batchNeedsUpgrade,
-    error,
+    executingPermission: ladder.executingPermission,
+    executingMain: ladder.executingMain,
+    permissions: result?.permissions ?? [],
+    hasPermissions: ladder.hasPermissions,
+    permissionsCompleted: ladder.permissionsCompleted,
+    allPermissionsDone: ladder.allPermissionsDone,
+    batchSupported: ladder.batchSupported,
+    batchNeedsUpgrade: ladder.batchNeedsUpgrade,
+    error: fetchError ?? ladder.error,
     txSuccess,
-    executeNextPermission,
+    executeNextPermission: ladder.executeNextPermission,
     executeMain,
     executeAll,
     resetState,

@@ -1,5 +1,5 @@
 import type { ActionExecution } from './useActionExecution'
-import { BatchExecuteButton } from '../../common/BatchExecuteButton'
+import { ExecutionLadder } from './ExecutionLadder'
 import { TermsDisclosure } from '../terms'
 import type { TermsAcknowledgement } from '../terms/TermsDisclosure'
 import type { TermSide } from '../terms/types'
@@ -35,22 +35,7 @@ export function ActionExecuteBlock({
   termsSide = 'supply',
   termsActionLabel,
 }: ActionExecuteBlockProps) {
-  const {
-    result,
-    permissions,
-    hasPermissions,
-    permissionsCompleted,
-    allPermissionsDone,
-    executingPermission,
-    executingMain,
-    batchSupported,
-    batchNeedsUpgrade,
-    executeNextPermission,
-    executeMain,
-    executeAll,
-  } = exec
-
-  if (!result) return null
+  if (!exec.result) return null
 
   // Disclose BEFORE anything reaches the wallet — including approvals, since a
   // grant is itself part of what the user is agreeing to.
@@ -58,66 +43,5 @@ export function ActionExecuteBlock({
     return <TermsDisclosure ack={terms} side={termsSide} actionLabel={termsActionLabel} />
   }
 
-  const permLabel = (i: number) => permissions[i].description || `Approval ${i + 1}`
-
-  // Once an approval has been confirmed on its own, stay sequential: re-bundling
-  // would ask the wallet to repeat a grant that already landed.
-  if (batchSupported && permissionsCompleted === 0) {
-    return (
-      <BatchExecuteButton
-        steps={[...permissions.map((_p, i) => permLabel(i)), label]}
-        label={label}
-        executing={executingMain}
-        needsUpgrade={batchNeedsUpgrade}
-        onExecute={executeAll}
-      />
-    )
-  }
-
-  return (
-    <>
-      {hasPermissions && !allPermissionsDone && (
-        <div className="space-y-1">
-          <span className="text-xs text-base-content/60">
-            Approvals ({permissionsCompleted}/{permissions.length})
-          </span>
-          {permissions.map((_perm, i) => {
-            const done = i < permissionsCompleted
-            const isCurrent = i === permissionsCompleted
-            return (
-              <button
-                key={i}
-                type="button"
-                className={`btn btn-sm w-full ${done ? 'btn-disabled btn-outline btn-success' : isCurrent ? 'btn-warning' : 'btn-outline btn-ghost'}`}
-                disabled={!isCurrent || executingPermission}
-                onClick={isCurrent ? executeNextPermission : undefined}
-                title={permLabel(i)}
-              >
-                <span className="truncate max-w-full">
-                  {done ? (
-                    `✓ ${permLabel(i)}`
-                  ) : isCurrent && executingPermission ? (
-                    <span className="loading loading-spinner loading-xs" />
-                  ) : (
-                    permLabel(i)
-                  )}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      {(!hasPermissions || allPermissionsDone) && (
-        <button
-          type="button"
-          className="btn btn-success btn-sm w-full"
-          disabled={executingMain}
-          onClick={executeMain}
-        >
-          {executingMain ? <span className="loading loading-spinner loading-xs" /> : label}
-        </button>
-      )}
-    </>
-  )
+  return <ExecutionLadder ladder={exec} label={label} />
 }

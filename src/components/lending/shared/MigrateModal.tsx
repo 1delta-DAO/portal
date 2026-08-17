@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { parseUnits } from 'viem'
-import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
-import { useAtomicBatch } from '../../../hooks/useAtomicBatch'
-import { BatchExecuteButton } from '../../common/BatchExecuteButton'
+import { usePermissionLadder } from '../../../hooks/usePermissionLadder'
+import { ExecutionLadder } from '../actions/ExecutionLadder'
 import type { OptimizerAssetRef } from '../../../hooks/lending/useOptimizerPairs'
 import { useLenders } from '../../../hooks/lending/usePoolData'
 import {
@@ -309,31 +308,27 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
   const [result, setResult] = useState<MigrateResult['data'] | null>(null)
   const [position, setPosition] = useState<MigratePositionResult | null>(null)
   const [building, setBuilding] = useState(false)
-  const [buildError, setBuildError] = useState<string | null>(null)
-  const [permissionsCompleted, setPermissionsCompleted] = useState(0)
-  const [executingPermission, setExecutingPermission] = useState(false)
-  const [executingMain, setExecutingMain] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [done, setDone] = useState<{ hash?: string } | null>(null)
 
-  const { send } = useSendLendingTransaction({ chainId, account })
-  const {
-    supported: batchSupported,
-    needsUpgrade: batchNeedsUpgrade,
-    sendBatch,
-  } = useAtomicBatch({ chainId, account })
-
-  const permissions = result?.permissions ?? []
-  const hasPermissions = permissions.length > 0
-  const allPermissionsDone = !hasPermissions || permissionsCompleted >= permissions.length
+  const ladder = usePermissionLadder({
+    chainId,
+    account,
+    permissions: result?.permissions ?? [],
+    transactions: result?.transactions ?? [],
+    onDone: (hash) => setDone({ hash }),
+  })
+  const buildError = fetchError ?? ladder.error
 
   const pickTarget = async (row: MigrateTargetRow) => {
     setSelected(row)
     setResult(null)
     setPosition(null)
-    setBuildError(null)
-    setPermissionsCompleted(0)
+    setFetchError(null)
+    // A new bundle invalidates the approval progress.
+    ladder.resetLadder()
     if (!debtAmountWei) {
-      setBuildError('Could not determine the debt amount to migrate')
+      setFetchError('Could not determine the debt amount to migrate')
       return
     }
     setBuilding(true)
@@ -366,58 +361,11 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
     })
     setBuilding(false)
     if (!res.success) {
-      setBuildError(res.error ?? 'Failed to build migrate transaction')
+      setFetchError(res.error ?? 'Failed to build migrate transaction')
       return
     }
     setResult(res.data ?? null)
     setPosition(res.result ?? null)
-  }
-
-  const executeNextPermission = async () => {
-    if (allPermissionsDone) return
-    setExecutingPermission(true)
-    setBuildError(null)
-    const { ok, error: txError } = await send(permissions[permissionsCompleted])
-    if (ok) setPermissionsCompleted((p) => p + 1)
-    else setBuildError(txError ?? 'Permission transaction failed')
-    setExecutingPermission(false)
-  }
-
-  const executeMain = async () => {
-    if (!result) return
-    setExecutingMain(true)
-    setBuildError(null)
-    let lastHash: string | undefined
-    for (const tx of result.transactions) {
-      const { ok, error: txError, hash } = await send(tx)
-      if (!ok) {
-        setBuildError(txError ?? 'Transaction failed')
-        setExecutingMain(false)
-        return
-      }
-      lastHash = hash
-    }
-    setExecutingMain(false)
-    setDone({ hash: lastHash })
-  }
-
-  // Only offer the bundle while nothing has been confirmed on its own —
-  // re-bundling would ask the wallet to repeat a grant that already landed.
-  const useAtomicPath = batchSupported && permissionsCompleted === 0
-
-  /** Atomic path: approvals + the migration itself in one confirmation. */
-  const executeAll = async () => {
-    if (!result) return
-    setExecutingMain(true)
-    setBuildError(null)
-    const { ok, error: txError, hash } = await sendBatch([...permissions, ...result.transactions])
-    setExecutingMain(false)
-    if (!ok) {
-      setBuildError(txError ?? 'Transaction failed')
-      return
-    }
-    setPermissionsCompleted(permissions.length)
-    setDone({ hash })
   }
 
   const executeLabel = `Migrate to ${lenderName(selected?.lenderKey) || 'target'}`
@@ -664,7 +612,7 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
                       key={rowKey(row)}
                       type="button"
                       onClick={() => pickTarget(row)}
-                      disabled={building || executingPermission || executingMain}
+                      disabled={building || ladder.executing}
                       className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border text-left transition-colors cursor-pointer ${
                         active
                           ? 'border-primary bg-primary/10 ring-1 ring-primary'
@@ -947,73 +895,7 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
               </div>
             )}
 
-            {/* Atomic path — approvals + migration in one confirmation. */}
-            {result && useAtomicPath && (
-              <BatchExecuteButton
-                steps={[
-                  ...permissions.map((p, i) => p.description || `Approval ${i + 1}`),
-                  executeLabel,
-                ]}
-                label={executeLabel}
-                executing={executingMain}
-                needsUpgrade={batchNeedsUpgrade}
-                onExecute={executeAll}
-              />
-            )}
-
-            {/* Permissions */}
-            {result && !useAtomicPath && hasPermissions && !allPermissionsDone && (
-              <div className="space-y-1">
-                <span className="text-xs text-base-content/60">
-                  Approvals ({permissionsCompleted}/{permissions.length})
-                </span>
-                {permissions.map((perm, i) => {
-                  const isDonePerm = i < permissionsCompleted
-                  const isCurrent = i === permissionsCompleted
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      className={`btn btn-sm w-full ${
-                        isDonePerm
-                          ? 'btn-disabled btn-outline btn-success'
-                          : isCurrent
-                            ? 'btn-warning'
-                            : 'btn-outline btn-ghost'
-                      }`}
-                      disabled={!isCurrent || executingPermission}
-                      onClick={isCurrent ? executeNextPermission : undefined}
-                      title={perm.description || `Approval ${i + 1}`}
-                    >
-                      <span className="truncate max-w-full">
-                        {isDonePerm ? (
-                          `✓ ${perm.description || `Approval ${i + 1}`}`
-                        ) : isCurrent && executingPermission ? (
-                          <span className="loading loading-spinner loading-xs" />
-                        ) : (
-                          perm.description || `Approval ${i + 1}`
-                        )}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-
-            {result && !useAtomicPath && allPermissionsDone && (
-              <button
-                type="button"
-                className="btn btn-success btn-sm w-full"
-                disabled={executingMain}
-                onClick={executeMain}
-              >
-                {executingMain ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  executeLabel
-                )}
-              </button>
-            )}
+            {result && <ExecutionLadder ladder={ladder} label={executeLabel} />}
           </div>
         )}
       </div>

@@ -16,7 +16,7 @@ import { useSyncChain } from '../../../../../hooks/useSyncChain'
 import { useSpyMode } from '../../../../../contexts/SpyMode'
 import { useUserVaults, useVaultActionExecution } from '../../../../../hooks/vaults'
 import { AmountInput } from '../../../../common/AmountInput'
-import { BatchExecuteButton } from '../../../../common/BatchExecuteButton'
+import { ExecutionLadder } from '../../../actions/ExecutionLadder'
 import { Logo } from '../../../../common/Logo'
 import { WalletConnect } from '../../../../connect'
 import { NativeCurrencySelector } from '../../../actions/NativeCurrencySelector'
@@ -176,10 +176,6 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
     },
     underlyingToken?.symbol ?? selected?.symbol ?? ''
   )
-
-  // Only offer the bundle while nothing has been confirmed on its own —
-  // re-bundling would ask the wallet to repeat a grant that already landed.
-  const useAtomicPath = exec.batchSupported && exec.permissionsCompleted === 0
 
   // Fetch the receiver's existing position on the *selected* vault so the
   // integrator can see how much that address already holds. Only fires when
@@ -706,84 +702,9 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
             </div>
           )}
 
-          {/* Atomic path — approvals + the action itself in one confirmation. */}
-          {exec.result && !overMaxBlocksExecute && delegationReady && useAtomicPath && (
-            <BatchExecuteButton
-              steps={[
-                ...exec.permissions.map((p, i) => p.description || `Approval ${i + 1}`),
-                executeLabel,
-              ]}
-              label={executeLabel}
-              executing={exec.executingMain}
-              needsUpgrade={exec.batchNeedsUpgrade}
-              onExecute={exec.executeAll}
-            />
+          {exec.result && !overMaxBlocksExecute && delegationReady && (
+            <ExecutionLadder ladder={exec} label={executeLabel} />
           )}
-
-          {/* Permissions */}
-          {exec.result &&
-            !overMaxBlocksExecute &&
-            delegationReady &&
-            !useAtomicPath &&
-            exec.hasPermissions &&
-            !exec.allPermissionsDone && (
-              <div className="space-y-1">
-                <span className="text-xs text-base-content/60">
-                  Approvals ({exec.permissionsCompleted}/{exec.permissions.length})
-                </span>
-                {exec.permissions.map((perm, i) => {
-                  const done = i < exec.permissionsCompleted
-                  const isCurrent = i === exec.permissionsCompleted
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      className={`btn btn-sm w-full ${
-                        done
-                          ? 'btn-disabled btn-outline btn-success'
-                          : isCurrent
-                            ? 'btn-warning'
-                            : 'btn-outline btn-ghost'
-                      }`}
-                      disabled={!isCurrent || exec.executingPermission}
-                      onClick={isCurrent ? exec.executeNextPermission : undefined}
-                      title={perm.description || `Approval ${i + 1}`}
-                    >
-                      <span className="truncate max-w-full">
-                        {done
-                          ? `✓ ${perm.description || `Approval ${i + 1}`}`
-                          : isCurrent && exec.executingPermission
-                            ? null
-                            : perm.description || `Approval ${i + 1}`}
-                        {isCurrent && exec.executingPermission && (
-                          <span className="loading loading-spinner loading-xs" />
-                        )}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-
-          {/* Execute */}
-          {exec.result &&
-            !overMaxBlocksExecute &&
-            delegationReady &&
-            !useAtomicPath &&
-            (!exec.hasPermissions || exec.allPermissionsDone) && (
-              <button
-                type="button"
-                className="btn btn-success btn-sm w-full"
-                disabled={exec.executingMain}
-                onClick={exec.executeMain}
-              >
-                {exec.executingMain ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  executeLabel
-                )}
-              </button>
-            )}
         </>
       )}
     </div>
