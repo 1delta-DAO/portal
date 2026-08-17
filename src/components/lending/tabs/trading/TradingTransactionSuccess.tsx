@@ -39,11 +39,7 @@ export const TradingTransactionSuccess: React.FC<{
         </p>
       )}
 
-      <button
-        type="button"
-        className="btn btn-sm btn-ghost w-full mt-1"
-        onClick={onDismiss}
-      >
+      <button type="button" className="btn btn-sm btn-ghost w-full mt-1" onClick={onDismiss}>
         Done
       </button>
     </div>

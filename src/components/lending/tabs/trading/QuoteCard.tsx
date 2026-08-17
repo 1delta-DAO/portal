@@ -280,7 +280,9 @@ export const QuoteCard: React.FC<QuoteCardProps> = ({
         lines.push(`Collateral closed: ${fmtSignedFullUsd(quote.positionCollateralUSD)}`)
       lines.push(`Debt repaid: ${fmtFullUsd(s.debtRepaidUSD)}`)
       if (s.loanReturnedUSD > 0)
-        lines.push(`${resolvedOutSymbol || 'Debt asset'} to wallet: ${fmtFullUsd(s.loanReturnedUSD)}`)
+        lines.push(
+          `${resolvedOutSymbol || 'Debt asset'} to wallet: ${fmtFullUsd(s.loanReturnedUSD)}`
+        )
       if (s.collateralReturnedUSD > 0)
         lines.push(
           `${resolvedInSymbol || 'Collateral'} to wallet: ${fmtFullUsd(s.collateralReturnedUSD)} (swap-sizing remainder)`
@@ -363,19 +365,21 @@ export const QuoteCard: React.FC<QuoteCardProps> = ({
               )}
             </div>
           )}
-          {operation === 'Close' && quote.closeSplit != null && quote.closeSplit.returnedTotalUSD > 0 && (
-            <div
-              className="flex items-baseline gap-1 cursor-help"
-              title={`Left over once the debt is cleared — paid straight to your wallet, not left in the position.`}
-            >
-              <span className="text-base-content/50 border-b border-dotted border-base-content/30">
-                You receive
-              </span>
-              <span className="font-semibold tabular-nums text-success">
-                {fmtCompactUsd(quote.closeSplit.returnedTotalUSD)}
-              </span>
-            </div>
-          )}
+          {operation === 'Close' &&
+            quote.closeSplit != null &&
+            quote.closeSplit.returnedTotalUSD > 0 && (
+              <div
+                className="flex items-baseline gap-1 cursor-help"
+                title={`Left over once the debt is cleared — paid straight to your wallet, not left in the position.`}
+              >
+                <span className="text-base-content/50 border-b border-dotted border-base-content/30">
+                  You receive
+                </span>
+                <span className="font-semibold tabular-nums text-success">
+                  {fmtCompactUsd(quote.closeSplit.returnedTotalUSD)}
+                </span>
+              </div>
+            )}
           {netApr && (
             <div className="flex items-baseline gap-1 cursor-help" title={netAprTitle}>
               <span className="text-base-content/50 border-b border-dotted border-base-content/30">

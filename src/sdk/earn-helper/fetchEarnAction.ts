@@ -86,10 +86,8 @@ export interface FetchEarnActionParams {
  * routing matrix straight back into the browser.
  */
 export async function fetchEarnAction(
-  params: FetchEarnActionParams,
-): Promise<
-  { success: true; result: EarnActionResult } | { success: false; error: string }
-> {
+  params: FetchEarnActionParams
+): Promise<{ success: true; result: EarnActionResult } | { success: false; error: string }> {
   try {
     const { actions } = await apiFetchEnvelope<unknown, EarnActionEnvelope>(
       `/v1/actions/earn/${params.action}`,
@@ -106,7 +104,7 @@ export async function fetchEarnAction(
           slippage: params.slippage,
           ...(params.extra ?? {}),
         },
-      },
+      }
     )
 
     const transactions = actions?.transactions ?? []

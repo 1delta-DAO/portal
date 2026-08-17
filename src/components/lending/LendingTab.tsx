@@ -349,71 +349,73 @@ export function LenderTab() {
       </div>
 
       <Suspense fallback={<TabFallback />}>
-      {activeTab === 'earn' && (
-        <EarnTab
-          account={account}
-          chainIds={chainIds}
-          tokensByChain={tokensByChain}
-          userData={userData}
-          lenderInfoMap={fullLenderInfoMap}
-          lendingBalances={lendingBalances}
-          isLendingBalancesLoading={isLendingBalancesLoading}
-          lendingBalancesError={lendingBalancesError}
-          balanceFailedChains={balanceFailedChains}
-          isLoading={isLoading}
-          userDataError={error}
-          refetchUserData={refetch}
-        />
-      )}
+        {activeTab === 'earn' && (
+          <EarnTab
+            account={account}
+            chainIds={chainIds}
+            tokensByChain={tokensByChain}
+            userData={userData}
+            lenderInfoMap={fullLenderInfoMap}
+            lendingBalances={lendingBalances}
+            isLendingBalancesLoading={isLendingBalancesLoading}
+            lendingBalancesError={lendingBalancesError}
+            balanceFailedChains={balanceFailedChains}
+            isLoading={isLoading}
+            userDataError={error}
+            refetchUserData={refetch}
+          />
+        )}
 
-      {UNIFIED_EARN_ENABLED && activeTab === 'unified' && (
-        <UnifiedEarnTab chainIds={chainIds} enabled={chainsReady} />
-      )}
+        {UNIFIED_EARN_ENABLED && activeTab === 'unified' && (
+          <UnifiedEarnTab chainIds={chainIds} enabled={chainsReady} />
+        )}
 
-      {activeTab === 'lending' && (
-        <LendingDashboard
-          lenderSummaries={lenderSummaries}
-          lenderData={lenderData}
-          lenderInfoMap={fullLenderInfoMap}
-          userData={userData}
-          chainId={effectiveChainId}
-          account={account}
-          isPublicDataLoading={isPublicDataLoading}
-          isUserDataLoading={isUserDataLoading}
-          selectedLender={activeLender}
-          onLenderChange={setSelectedLender}
-        />
-      )}
+        {activeTab === 'lending' && (
+          <LendingDashboard
+            lenderSummaries={lenderSummaries}
+            lenderData={lenderData}
+            lenderInfoMap={fullLenderInfoMap}
+            userData={userData}
+            chainId={effectiveChainId}
+            account={account}
+            isPublicDataLoading={isPublicDataLoading}
+            isUserDataLoading={isUserDataLoading}
+            selectedLender={activeLender}
+            onLenderChange={setSelectedLender}
+          />
+        )}
 
-      {activeTab === 'trading' && (
-        <TradingDashboard
-          lenderSummaries={lenderSummaries}
-          lenderData={lenderData}
-          lenderInfoMap={fullLenderInfoMap}
-          userData={userData}
-          chainId={effectiveChainId}
-          account={account}
-          isPublicDataLoading={isPublicDataLoading}
-          isUserDataLoading={isUserDataLoading}
-          selectedLender={activeLender}
-          onLenderChange={setSelectedLender}
-        />
-      )}
+        {activeTab === 'trading' && (
+          <TradingDashboard
+            lenderSummaries={lenderSummaries}
+            lenderData={lenderData}
+            lenderInfoMap={fullLenderInfoMap}
+            userData={userData}
+            chainId={effectiveChainId}
+            account={account}
+            isPublicDataLoading={isPublicDataLoading}
+            isUserDataLoading={isUserDataLoading}
+            selectedLender={activeLender}
+            onLenderChange={setSelectedLender}
+          />
+        )}
 
-      {OPTIMIZER_ENABLED && activeTab === 'optimize' && (
-        <OptimizerTab
-          chainIds={chainIds}
-          account={account}
-          userData={userData}
-          isUserDataLoading={isUserDataLoading}
-          userDataError={error}
-          refetchUserData={refetch}
-        />
-      )}
+        {OPTIMIZER_ENABLED && activeTab === 'optimize' && (
+          <OptimizerTab
+            chainIds={chainIds}
+            account={account}
+            userData={userData}
+            isUserDataLoading={isUserDataLoading}
+            userDataError={error}
+            refetchUserData={refetch}
+          />
+        )}
 
-      {activeTab === 'swap' && <SpotSwapPanel chainId={effectiveChainId} />}
+        {activeTab === 'swap' && <SpotSwapPanel chainId={effectiveChainId} />}
 
-      {BRIDGE_UI_ENABLED && activeTab === 'xswap' && <XChainSwapPanel chainId={effectiveChainId} />}
+        {BRIDGE_UI_ENABLED && activeTab === 'xswap' && (
+          <XChainSwapPanel chainId={effectiveChainId} />
+        )}
       </Suspense>
     </div>
   )

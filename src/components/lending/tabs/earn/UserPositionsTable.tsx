@@ -92,7 +92,8 @@ function getActiveLenders(raw: LenderUserDataEntry[] | undefined): LenderUserDat
   return raw
     .filter(
       (entry) =>
-        entry.balanceData.nav !== 0 || entry.data.some((sub) => extractPositions(sub.positions).length > 0)
+        entry.balanceData.nav !== 0 ||
+        entry.data.some((sub) => extractPositions(sub.positions).length > 0)
     )
     .sort((a, b) => b.balanceData.nav - a.balanceData.nav)
 }
@@ -255,30 +256,32 @@ const PositionsList: React.FC<{
             <span className="shrink-0 font-mono tabular-nums text-base-content/50">
               ${abbreviateUsd(usd)}
             </span>
-            {fixed && fixed.length > 0 && (() => {
-              const single = fixed.length === 1 ? fixed[0] : null
-              const rate = single ? loanRatePct(single) : null
-              const label = single
-                ? `Fixed${rate != null ? ` ${rate.toFixed(2)}%` : ''}`
-                : `Fixed ×${fixed.length}`
-              const tip = fixed
-                .map((l) => {
-                  const r = loanRatePct(l)
-                  const m = maturityDisplay(l)
-                  return `${termLabel(l)}${r != null ? ` @ ${r.toFixed(2)}%` : ''}${
-                    m.isFlex ? '' : m.isPast ? ' · matured' : ` · ${m.label} left`
-                  }`
-                })
-                .join('\n')
-              return (
-                <span
-                  className="shrink-0 px-1 py-0.5 rounded text-[9px] font-semibold bg-warning/15 text-warning cursor-help whitespace-nowrap"
-                  title={`Fixed-term loan${fixed.length > 1 ? 's' : ''}:\n${tip}`}
-                >
-                  {label}
-                </span>
-              )
-            })()}
+            {fixed &&
+              fixed.length > 0 &&
+              (() => {
+                const single = fixed.length === 1 ? fixed[0] : null
+                const rate = single ? loanRatePct(single) : null
+                const label = single
+                  ? `Fixed${rate != null ? ` ${rate.toFixed(2)}%` : ''}`
+                  : `Fixed ×${fixed.length}`
+                const tip = fixed
+                  .map((l) => {
+                    const r = loanRatePct(l)
+                    const m = maturityDisplay(l)
+                    return `${termLabel(l)}${r != null ? ` @ ${r.toFixed(2)}%` : ''}${
+                      m.isFlex ? '' : m.isPast ? ' · matured' : ` · ${m.label} left`
+                    }`
+                  })
+                  .join('\n')
+                return (
+                  <span
+                    className="shrink-0 px-1 py-0.5 rounded text-[9px] font-semibold bg-warning/15 text-warning cursor-help whitespace-nowrap"
+                    title={`Fixed-term loan${fixed.length > 1 ? 's' : ''}:\n${tip}`}
+                  >
+                    {label}
+                  </span>
+                )
+              })()}
             {!isDebt && account && (
               <CollateralToggle
                 marketUid={pos.marketUid}
@@ -310,11 +313,7 @@ const MobileSummaryCard: React.FC<{ summary: any }> = ({ summary }) => {
         <div className="text-xs text-base-content/60">Net Worth</div>
         <div className="text-lg font-bold">{abbreviateUsd(bd?.nav ?? 0)}</div>
         {bd?.nav24h != null && bd.nav24h !== 0 && (
-          <div
-            className={`text-xs ${
-              bd.nav - bd.nav24h >= 0 ? 'text-success' : 'text-error'
-            }`}
-          >
+          <div className={`text-xs ${bd.nav - bd.nav24h >= 0 ? 'text-success' : 'text-error'}`}>
             {(((bd.nav - bd.nav24h) / bd.nav24h) * 100).toFixed(2)}% 24h
           </div>
         )}
@@ -435,7 +434,9 @@ const MobileLenderCard: React.FC<{
             <Logo
               src={entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI}
               alt={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
-              fallbackText={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
+              fallbackText={
+                entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender
+              }
               className="w-5 h-5 rounded-full object-contain"
             />
             <h3 className="font-semibold text-base">
@@ -637,17 +638,9 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
             <div className="stat-value text-lg">${formatUsd(sbd?.nav ?? 0)}</div>
             {sbd?.nav24h != null && sbd.nav24h !== 0 && (
               <div
-                className={`stat-desc ${
-                  sbd.nav - sbd.nav24h >= 0
-                    ? 'text-success'
-                    : 'text-error'
-                }`}
+                className={`stat-desc ${sbd.nav - sbd.nav24h >= 0 ? 'text-success' : 'text-error'}`}
               >
-                {(
-                  ((sbd.nav - sbd.nav24h) / sbd.nav24h) *
-                  100
-                ).toFixed(2)}
-                % 24h
+                {(((sbd.nav - sbd.nav24h) / sbd.nav24h) * 100).toFixed(2)}% 24h
               </div>
             )}
           </div>
@@ -711,18 +704,41 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                       <td colSpan={hasSingleSub ? 1 : 7}>
                         <div className="flex items-center gap-2 min-w-0">
                           <Logo
-                            src={entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI}
-                            alt={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
-                            fallbackText={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
+                            src={
+                              entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI
+                            }
+                            alt={
+                              entry.lenderInfo?.name ??
+                              lenderInfoMap?.[entry.lender]?.name ??
+                              entry.lender
+                            }
+                            fallbackText={
+                              entry.lenderInfo?.name ??
+                              lenderInfoMap?.[entry.lender]?.name ??
+                              entry.lender
+                            }
                             className="w-4 h-4 rounded-full object-contain shrink-0"
                           />
-                          <span className="font-semibold text-sm truncate min-w-0" title={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}>
-                            {entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
+                          <span
+                            className="font-semibold text-sm truncate min-w-0"
+                            title={
+                              entry.lenderInfo?.name ??
+                              lenderInfoMap?.[entry.lender]?.name ??
+                              entry.lender
+                            }
+                          >
+                            {entry.lenderInfo?.name ??
+                              lenderInfoMap?.[entry.lender]?.name ??
+                              entry.lender}
                           </span>
                           <OpenLenderLink
                             chainId={entry.chainId}
                             lender={entry.lender}
-                            name={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
+                            name={
+                              entry.lenderInfo?.name ??
+                              lenderInfoMap?.[entry.lender]?.name ??
+                              entry.lender
+                            }
                           />
                           {!hasSingleSub && (
                             <span className="text-xs text-base-content/50 shrink-0">
@@ -733,9 +749,15 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                       </td>
                       {hasSingleSub && (
                         <>
-                          <td className="text-xs font-semibold text-right">{abbreviateUsd(entry.balanceData.nav)}</td>
-                          <td className="text-xs text-right">{abbreviateUsd(entry.balanceData.deposits)}</td>
-                          <td className="text-xs text-right">{abbreviateUsd(entry.balanceData.debt)}</td>
+                          <td className="text-xs font-semibold text-right">
+                            {abbreviateUsd(entry.balanceData.nav)}
+                          </td>
+                          <td className="text-xs text-right">
+                            {abbreviateUsd(entry.balanceData.deposits)}
+                          </td>
+                          <td className="text-xs text-right">
+                            {abbreviateUsd(entry.balanceData.debt)}
+                          </td>
                           <td>
                             <div className="flex flex-wrap items-center justify-end gap-1">
                               <span className="text-xs font-semibold">
@@ -785,7 +807,9 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                                 {sub.accountId.slice(0, 8)}...
                               </span>
                             </td>
-                            <td className="text-xs font-semibold text-right">{abbreviateUsd(bal.nav)}</td>
+                            <td className="text-xs font-semibold text-right">
+                              {abbreviateUsd(bal.nav)}
+                            </td>
                             <td className="text-xs text-right">{abbreviateUsd(bal.deposits)}</td>
                             <td className="text-xs text-right">{abbreviateUsd(bal.debt)}</td>
                             <td>

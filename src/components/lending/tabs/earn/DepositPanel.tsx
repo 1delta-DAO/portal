@@ -2,7 +2,10 @@ import React, { useState } from 'react'
 import type { RawCurrency } from '../../../../types/currency'
 import type { PoolEntry } from '../../../../sdk/lending-helper/poolTypes'
 import type { PoolDataItem } from '../../../../sdk/lending-helper/marketTypes'
-import type { UserPositionEntry, UserSubAccount } from '../../../../sdk/lending-helper/userPositionTypes'
+import type {
+  UserPositionEntry,
+  UserSubAccount,
+} from '../../../../sdk/lending-helper/userPositionTypes'
 import type { TokenBalance } from '../../../../hooks/lending/useTokenBalances'
 import { useSyncChain } from '../../../../hooks/useSyncChain'
 import { useSpyMode } from '../../../../contexts/SpyMode'
@@ -55,8 +58,7 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
   const [actionTab, setActionTab] = useState<EarnAction>('Deposit')
   const { syncChain, currentChainId } = useSyncChain()
   const { isSpyMode } = useSpyMode()
-  const isWrongChain =
-    !isSpyMode && !!account && !!chainId && currentChainId !== Number(chainId)
+  const isWrongChain = !isSpyMode && !!account && !!chainId && currentChainId !== Number(chainId)
 
   return (
     <div className="w-72 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
@@ -108,7 +110,10 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
             <span className="font-medium text-sm truncate" title={selectedEntry!.name}>
               {selectedEntry!.name}
             </span>
-            <span className="text-xs text-base-content/60 truncate" title={resolvedPool.asset.symbol}>
+            <span
+              className="text-xs text-base-content/60 truncate"
+              title={resolvedPool.asset.symbol}
+            >
               {resolvedPool.asset.symbol}
             </span>
           </div>
@@ -119,7 +124,10 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
             <span className="font-medium text-sm truncate" title={selectedEntry.name}>
               {selectedEntry.name}
             </span>
-            <span className="text-xs text-base-content/60 truncate" title={selectedEntry.underlyingInfo?.asset?.symbol}>
+            <span
+              className="text-xs text-base-content/60 truncate"
+              title={selectedEntry.underlyingInfo?.asset?.symbol}
+            >
               {selectedEntry.underlyingInfo?.asset?.symbol ?? selectedEntry.name}
             </span>
           </div>
@@ -149,7 +157,8 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
             <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
           </svg>
           <span>
-            You have an open borrow on this lender. Use the <strong>Lending</strong> tab to see health-factor impact.
+            You have an open borrow on this lender. Use the <strong>Lending</strong> tab to see
+            health-factor impact.
           </span>
         </div>
       )}

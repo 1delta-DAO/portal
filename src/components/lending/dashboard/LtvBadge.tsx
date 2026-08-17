@@ -12,9 +12,7 @@ export const LtvBadge: React.FC<Props> = ({ config, variant }) => {
   const ltv = getMaxLtv(config)
 
   if (!ltv) {
-    return variant === 'cell' ? (
-      <span className="text-xs text-base-content/40">&mdash;</span>
-    ) : null
+    return variant === 'cell' ? <span className="text-xs text-base-content/40">&mdash;</span> : null
   }
 
   const pct = `${(ltv.max * 100).toFixed(0)}%`

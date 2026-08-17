@@ -107,7 +107,11 @@ export function TokenSelectorModal({
             />
             {showChainSelector && (
               <div className="shrink-0 basis-28 sm:basis-40 min-w-0">
-                <ChainFilterSelect chains={chains} value={chainId ?? ''} onChange={handleChainChange} />
+                <ChainFilterSelect
+                  chains={chains}
+                  value={chainId ?? ''}
+                  onChange={handleChainChange}
+                />
               </div>
             )}
           </div>

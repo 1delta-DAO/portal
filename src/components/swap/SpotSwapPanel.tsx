@@ -116,11 +116,19 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
   const tokenInCurrencies = useMemo(() => (tokenIn ? [tokenIn] : []), [tokenIn])
   const tokenOutCurrencies = useMemo(() => (tokenOut ? [tokenOut] : []), [tokenOut])
 
-  const { data: tokenInBalances, isFetching: tokenInFetching, refetch: refetchTokenIn } = useBalanceQuery({
+  const {
+    data: tokenInBalances,
+    isFetching: tokenInFetching,
+    refetch: refetchTokenIn,
+  } = useBalanceQuery({
     currencies: tokenInCurrencies,
     enabled: !!tokenIn && !!account,
   })
-  const { data: tokenOutBalances, isFetching: tokenOutFetching, refetch: refetchTokenOut } = useBalanceQuery({
+  const {
+    data: tokenOutBalances,
+    isFetching: tokenOutFetching,
+    refetch: refetchTokenOut,
+  } = useBalanceQuery({
     currencies: tokenOutCurrencies,
     enabled: !!tokenOut && !!account,
   })
@@ -132,12 +140,12 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
   const isBalancesFetching = tokenInFetching || tokenOutFetching
 
   const tokenInBalance: BalanceEntry | undefined = useMemo(
-    () => tokenIn ? tokenInBalances?.[chainId]?.[tokenIn.address.toLowerCase()] : undefined,
+    () => (tokenIn ? tokenInBalances?.[chainId]?.[tokenIn.address.toLowerCase()] : undefined),
     [tokenInBalances, chainId, tokenIn]
   )
 
   const tokenOutBalance: BalanceEntry | undefined = useMemo(
-    () => tokenOut ? tokenOutBalances?.[chainId]?.[tokenOut.address.toLowerCase()] : undefined,
+    () => (tokenOut ? tokenOutBalances?.[chainId]?.[tokenOut.address.toLowerCase()] : undefined),
     [tokenOutBalances, chainId, tokenOut]
   )
 
@@ -155,11 +163,11 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
   })
 
   const tokenInPrice = useMemo(
-    () => (tokenIn ? priceData?.[chainId]?.[tokenIn.address.toLowerCase()]?.usd ?? 0 : 0),
+    () => (tokenIn ? (priceData?.[chainId]?.[tokenIn.address.toLowerCase()]?.usd ?? 0) : 0),
     [priceData, chainId, tokenIn]
   )
   const tokenOutPrice = useMemo(
-    () => (tokenOut ? priceData?.[chainId]?.[tokenOut.address.toLowerCase()]?.usd ?? 0 : 0),
+    () => (tokenOut ? (priceData?.[chainId]?.[tokenOut.address.toLowerCase()]?.usd ?? 0) : 0),
     [priceData, chainId, tokenOut]
   )
 
@@ -346,7 +354,8 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
   const handleFetchQuoteRef = useRef(handleFetchQuote)
   handleFetchQuoteRef.current = handleFetchQuote
 
-  const debouncedActiveAmount = activeField === 'input' ? debouncedInputAmount : debouncedOutputAmount
+  const debouncedActiveAmount =
+    activeField === 'input' ? debouncedInputAmount : debouncedOutputAmount
 
   useEffect(() => {
     if (!canFetchQuote) return
@@ -355,14 +364,8 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
   }, [debouncedActiveAmount, canFetchQuote, resolvedTokenInAddress, resolvedTokenOutAddress])
 
   // Excluded addresses for each modal
-  const excludeIn = useMemo(
-    () => (tokenOut ? [tokenOut.address as Address] : []),
-    [tokenOut]
-  )
-  const excludeOut = useMemo(
-    () => (tokenIn ? [tokenIn.address as Address] : []),
-    [tokenIn]
-  )
+  const excludeIn = useMemo(() => (tokenOut ? [tokenOut.address as Address] : []), [tokenOut])
+  const excludeOut = useMemo(() => (tokenIn ? [tokenIn.address as Address] : []), [tokenIn])
 
   return (
     <div className="max-w-md mx-auto">
@@ -372,7 +375,13 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
         {txSuccess ? (
           <div className="flex flex-col items-center gap-3 py-4 animate-in fade-in">
             <div className="w-14 h-14 rounded-full bg-success/15 flex items-center justify-center">
-              <svg className="w-8 h-8 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <svg
+                className="w-8 h-8 text-success"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
@@ -400,357 +409,422 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
             </button>
           </div>
         ) : (
-        <>
-        {/* Input token panel (exact input / tradeType=0) */}
-        <div className="rounded-lg bg-base-200/60 p-3">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-base-content/50">You pay</span>
-              {tokenIn && tokenInBalance && tokenInBalance.value > 0 && (
-                <div className="flex items-center gap-0.5">
-                  {[
-                    { label: '25%', fraction: 0.25 },
-                    { label: '50%', fraction: 0.5 },
-                    { label: '75%', fraction: 0.75 },
-                    { label: '100%', fraction: 1 },
-                  ].map((e) => (
-                    <button
-                      key={e.label}
-                      type="button"
-                      className="btn btn-ghost btn-xs px-1.5 py-0 h-5 min-h-0 text-[10px]"
-                      onClick={() => handleInputChange(e.fraction === 1 ? tokenInBalance.balance : multiplyAmountString(tokenInBalance.balance, e.fraction))}
-                    >
-                      {e.label}
-                    </button>
-                  ))}
+          <>
+            {/* Input token panel (exact input / tradeType=0) */}
+            <div className="rounded-lg bg-base-200/60 p-3">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-base-content/50">You pay</span>
+                  {tokenIn && tokenInBalance && tokenInBalance.value > 0 && (
+                    <div className="flex items-center gap-0.5">
+                      {[
+                        { label: '25%', fraction: 0.25 },
+                        { label: '50%', fraction: 0.5 },
+                        { label: '75%', fraction: 0.75 },
+                        { label: '100%', fraction: 1 },
+                      ].map((e) => (
+                        <button
+                          key={e.label}
+                          type="button"
+                          className="btn btn-ghost btn-xs px-1.5 py-0 h-5 min-h-0 text-[10px]"
+                          onClick={() =>
+                            handleInputChange(
+                              e.fraction === 1
+                                ? tokenInBalance.balance
+                                : multiplyAmountString(tokenInBalance.balance, e.fraction)
+                            )
+                          }
+                        >
+                          {e.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            {tokenIn && account && (
-              <span className="text-xs text-base-content/50 flex items-center gap-1">
-                {tokenInBalance && tokenInBalance.value > 0 && (
-                  <>
-                    {fmtBalance(tokenInBalance.value)}
-                    {tokenInBalance.balanceUSD > 0 && (
-                      <span>{fmtUsd(tokenInBalance.balanceUSD)}</span>
+                {tokenIn && account && (
+                  <span className="text-xs text-base-content/50 flex items-center gap-1">
+                    {tokenInBalance && tokenInBalance.value > 0 && (
+                      <>
+                        {fmtBalance(tokenInBalance.value)}
+                        {tokenInBalance.balanceUSD > 0 && (
+                          <span>{fmtUsd(tokenInBalance.balanceUSD)}</span>
+                        )}
+                      </>
                     )}
-                  </>
-                )}
-                <button type="button" className="text-base-content/30 hover:text-base-content/60 transition-colors" onClick={() => refetchBalances()} title="Refresh balances">
-                  {isBalancesFetching ? <span className="loading loading-spinner w-2.5 h-2.5" /> : (
-                    <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>
-                  )}
-                </button>
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              inputMode="decimal"
-              className="input input-ghost text-2xl font-medium flex-1 p-0 h-auto focus:outline-none bg-transparent"
-              placeholder="0"
-              value={inputAmount}
-              onChange={(e) => { const v = sanitizeAmountInput(e.target.value); if (v !== null) handleInputChange(v) }}
-            />
-            <button
-              type="button"
-              className="btn btn-sm gap-1.5 shrink-0"
-              onClick={() => {
-                setTokenQuery('')
-                setTokenInModalOpen(true)
-              }}
-            >
-              {tokenIn ? (
-                <>
-                  <Logo
-                    src={tokenIn.logoURI}
-                    alt={tokenIn.symbol}
-                    fallbackText={tokenIn.symbol}
-                    className="w-5 h-5 rounded-full object-contain token-logo"
-                  />
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium text-sm">{tokenIn.symbol}</span>
-                  </div>
-                </>
-              ) : (
-                <span className="text-base-content/50">Select</span>
-              )}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className="w-4 h-4"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
-          </div>
-          <div className="flex items-center justify-between mt-1">
-            {(() => {
-              const amt = parseFloat(inputAmount)
-              const usd = amt > 0 && tokenInPrice > 0 ? amt * tokenInPrice : 0
-              return usd > 0 ? (
-                <div className="text-xs text-base-content/50">{fmtUsd(usd)}</div>
-              ) : null
-            })()}
-            {tokenIn && (
-              <div className="text-xs text-base-content/40">{tokenIn.name}</div>
-            )}
-          </div>
-        </div>
-
-        {/* Swap direction button */}
-        <div className="flex justify-center -my-2 relative z-10">
-          <button
-            type="button"
-            className="btn btn-circle btn-sm bg-base-100 border-base-300 shadow-sm hover:bg-base-200"
-            onClick={handleSwapDirection}
-            title="Switch tokens"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              className="w-4 h-4"
-            >
-              <path
-                fillRule="evenodd"
-                d="M2.24 6.8a.75.75 0 0 0 1.06-.04l1.95-2.1v8.59a.75.75 0 0 0 1.5 0V4.66l1.95 2.1a.75.75 0 1 0 1.1-1.02l-3.25-3.5a.75.75 0 0 0-1.1 0L2.2 5.74a.75.75 0 0 0 .04 1.06Zm8 6.4a.75.75 0 0 0-.04 1.06l3.25 3.5a.75.75 0 0 0 1.1 0l3.25-3.5a.75.75 0 1 0-1.1-1.02l-1.95 2.1V6.75a.75.75 0 0 0-1.5 0v8.59l-1.95-2.1a.75.75 0 0 0-1.06-.04Z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
-        </div>
-
-        {/* Output token panel (exact output / tradeType=1) */}
-        <div className="rounded-lg bg-base-200/60 p-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-base-content/50">You receive</span>
-            {tokenOut && account && (
-              <span className="text-xs text-base-content/50 flex items-center gap-1">
-                {tokenOutBalance && tokenOutBalance.value > 0 && (
-                  <>
-                    {fmtBalance(tokenOutBalance.value)}
-                    {tokenOutBalance.balanceUSD > 0 && (
-                      <span>{fmtUsd(tokenOutBalance.balanceUSD)}</span>
-                    )}
-                  </>
-                )}
-                <button type="button" className="text-base-content/30 hover:text-base-content/60 transition-colors" onClick={() => refetchBalances()} title="Refresh balances">
-                  {isBalancesFetching ? <span className="loading loading-spinner w-2.5 h-2.5" /> : (
-                    <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>
-                  )}
-                </button>
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              inputMode="decimal"
-              className="input input-ghost text-2xl font-medium flex-1 p-0 h-auto focus:outline-none bg-transparent"
-              placeholder="0"
-              value={outputAmount}
-              onChange={(e) => { const v = sanitizeAmountInput(e.target.value); if (v !== null) handleOutputChange(v) }}
-            />
-            <button
-              type="button"
-              className="btn btn-sm gap-1.5 shrink-0"
-              onClick={() => {
-                setTokenQuery('')
-                setTokenOutModalOpen(true)
-              }}
-            >
-              {tokenOut ? (
-                <>
-                  <Logo
-                    src={tokenOut.logoURI}
-                    alt={tokenOut.symbol}
-                    fallbackText={tokenOut.symbol}
-                    className="w-5 h-5 rounded-full object-contain token-logo"
-                  />
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium text-sm">{tokenOut.symbol}</span>
-                  </div>
-                </>
-              ) : (
-                <span className="text-base-content/50">Select</span>
-              )}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className="w-4 h-4"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
-          </div>
-          <div className="flex items-center justify-between mt-1">
-            {(() => {
-              const amt = parseFloat(outputAmount)
-              const usd = amt > 0 && tokenOutPrice > 0 ? amt * tokenOutPrice : 0
-              return usd > 0 ? (
-                <div className="text-xs text-base-content/50">{fmtUsd(usd)}</div>
-              ) : null
-            })()}
-            {tokenOut && (
-              <div className="text-xs text-base-content/40">{tokenOut.name}</div>
-            )}
-          </div>
-        </div>
-
-        {/* Insufficient balance warning */}
-        {tokenIn && inputAmount && parseFloat(inputAmount) > 0 && account && (
-          tokenInBalance ? compareAmountStrings(inputAmount, tokenInBalance.balance) > 0 : false
-        ) && (
-          <div className="text-xs text-warning flex items-center gap-1.5 px-1">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 shrink-0">
-              <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 6a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 6Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
-            </svg>
-            Insufficient {tokenIn.symbol} balance
-          </div>
-        )}
-
-        {/* Slippage */}
-        <div className="pt-1">
-          <SlippageInput
-            value={slippage}
-            onChange={(v) => {
-              setSlippage(v)
-              reset()
-            }}
-          />
-        </div>
-
-        {/* Loading indicator */}
-        {loading && (
-          <div className="flex items-center justify-center gap-2 py-1 text-xs text-base-content/50">
-            <span className="loading loading-spinner loading-xs" />
-            Fetching quotes...
-          </div>
-        )}
-
-        {/* Error */}
-        {error && <ErrorDisplay error={error} />}
-
-        {/* Quotes list */}
-        {quotes.length > 0 && (
-          <div className="space-y-1.5">
-            <span className="text-xs font-medium">Quotes</span>
-            {quotes.map((q, i) => (
-              <SwapQuoteCard
-                key={i}
-                quote={q}
-                index={i}
-                isSelected={selectedIndex === i}
-                onClick={() => selectQuote(i)}
-                inSymbol={tokenIn?.symbol}
-                outSymbol={tokenOut?.symbol}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* USD value impact */}
-        {swapUsdImpact && (
-          <div className="rounded-lg border border-base-300 bg-base-200/40 px-2.5 py-2 text-xs space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-base-content/60">You pay</span>
-              <span className="font-medium">{fmtUsd(swapUsdImpact.inputUsd)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-base-content/60">You receive</span>
-              <span className="font-medium">{fmtUsd(swapUsdImpact.outputUsd)}</span>
-            </div>
-            <div className="flex items-center justify-between border-t border-base-300 pt-1">
-              <span className="text-base-content/60">Price impact</span>
-              <span className={`font-semibold ${swapUsdImpact.pct >= -0.1 ? 'text-success' : swapUsdImpact.pct >= -1 ? 'text-warning' : 'text-error'}`}>
-                {swapUsdImpact.diff >= 0 ? '+' : ''}{fmtUsd(swapUsdImpact.diff)} ({swapUsdImpact.pct >= 0 ? '+' : ''}{swapUsdImpact.pct.toFixed(2)}%)
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Permissions, and execute */}
-        {selectedIndex !== null && (
-          <div className="space-y-1.5">
-            {!account ? (
-              <div className="w-full flex justify-center">
-                <WalletConnect />
-              </div>
-            ) : isWrongChain ? (
-              <button
-                type="button"
-                className="btn btn-warning btn-sm w-full"
-                onClick={() => syncChain(Number(chainId))}
-              >
-                Switch Wallet Chain
-              </button>
-            ) : (
-              <>
-                {batchSupported ? (
-                  <BatchExecuteButton
-                    steps={[
-                      ...permissions.map((tx, i) => tx.description || `Approve ${i + 1}`),
-                      'Execute Swap',
-                    ]}
-                    label="Execute Swap"
-                    executing={executing}
-                    needsUpgrade={batchNeedsUpgrade}
-                    onExecute={executeAll}
-                  />
-                ) : (
-                  <>
-                    {permissions.map((tx, i) => (
-                      <button
-                        key={`perm-${i}`}
-                        type="button"
-                        className="btn btn-outline btn-sm w-full"
-                        onClick={() => executePermission(tx)}
-                      >
-                        {tx.description || 'Approve'}
-                      </button>
-                    ))}
                     <button
                       type="button"
-                      className="btn btn-success btn-sm w-full"
-                      disabled={executing}
-                      onClick={executeSwap}
+                      className="text-base-content/30 hover:text-base-content/60 transition-colors"
+                      onClick={() => refetchBalances()}
+                      title="Refresh balances"
                     >
-                      {executing ? (
-                        <>
-                          <span className="loading loading-spinner loading-xs" />
-                          Executing swap...
-                        </>
+                      {isBalancesFetching ? (
+                        <span className="loading loading-spinner w-2.5 h-2.5" />
                       ) : (
-                        'Execute Swap'
+                        <svg
+                          className="w-2.5 h-2.5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M21 2v6h-6" />
+                          <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                          <path d="M3 22v-6h6" />
+                          <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                        </svg>
                       )}
                     </button>
-                  </>
+                  </span>
                 )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="input input-ghost text-2xl font-medium flex-1 p-0 h-auto focus:outline-none bg-transparent"
+                  placeholder="0"
+                  value={inputAmount}
+                  onChange={(e) => {
+                    const v = sanitizeAmountInput(e.target.value)
+                    if (v !== null) handleInputChange(v)
+                  }}
+                />
                 <button
                   type="button"
-                  className="btn btn-ghost btn-xs w-full"
-                  disabled={loading}
-                  onClick={handleFetchQuote}
+                  className="btn btn-sm gap-1.5 shrink-0"
+                  onClick={() => {
+                    setTokenQuery('')
+                    setTokenInModalOpen(true)
+                  }}
                 >
-                  Refresh Quotes
+                  {tokenIn ? (
+                    <>
+                      <Logo
+                        src={tokenIn.logoURI}
+                        alt={tokenIn.symbol}
+                        fallbackText={tokenIn.symbol}
+                        className="w-5 h-5 rounded-full object-contain token-logo"
+                      />
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium text-sm">{tokenIn.symbol}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-base-content/50">Select</span>
+                  )}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="w-4 h-4"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
                 </button>
-              </>
+              </div>
+              <div className="flex items-center justify-between mt-1">
+                {(() => {
+                  const amt = parseFloat(inputAmount)
+                  const usd = amt > 0 && tokenInPrice > 0 ? amt * tokenInPrice : 0
+                  return usd > 0 ? (
+                    <div className="text-xs text-base-content/50">{fmtUsd(usd)}</div>
+                  ) : null
+                })()}
+                {tokenIn && <div className="text-xs text-base-content/40">{tokenIn.name}</div>}
+              </div>
+            </div>
+
+            {/* Swap direction button */}
+            <div className="flex justify-center -my-2 relative z-10">
+              <button
+                type="button"
+                className="btn btn-circle btn-sm bg-base-100 border-base-300 shadow-sm hover:bg-base-200"
+                onClick={handleSwapDirection}
+                title="Switch tokens"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="w-4 h-4"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M2.24 6.8a.75.75 0 0 0 1.06-.04l1.95-2.1v8.59a.75.75 0 0 0 1.5 0V4.66l1.95 2.1a.75.75 0 1 0 1.1-1.02l-3.25-3.5a.75.75 0 0 0-1.1 0L2.2 5.74a.75.75 0 0 0 .04 1.06Zm8 6.4a.75.75 0 0 0-.04 1.06l3.25 3.5a.75.75 0 0 0 1.1 0l3.25-3.5a.75.75 0 1 0-1.1-1.02l-1.95 2.1V6.75a.75.75 0 0 0-1.5 0v8.59l-1.95-2.1a.75.75 0 0 0-1.06-.04Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Output token panel (exact output / tradeType=1) */}
+            <div className="rounded-lg bg-base-200/60 p-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-base-content/50">You receive</span>
+                {tokenOut && account && (
+                  <span className="text-xs text-base-content/50 flex items-center gap-1">
+                    {tokenOutBalance && tokenOutBalance.value > 0 && (
+                      <>
+                        {fmtBalance(tokenOutBalance.value)}
+                        {tokenOutBalance.balanceUSD > 0 && (
+                          <span>{fmtUsd(tokenOutBalance.balanceUSD)}</span>
+                        )}
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      className="text-base-content/30 hover:text-base-content/60 transition-colors"
+                      onClick={() => refetchBalances()}
+                      title="Refresh balances"
+                    >
+                      {isBalancesFetching ? (
+                        <span className="loading loading-spinner w-2.5 h-2.5" />
+                      ) : (
+                        <svg
+                          className="w-2.5 h-2.5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M21 2v6h-6" />
+                          <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                          <path d="M3 22v-6h6" />
+                          <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                        </svg>
+                      )}
+                    </button>
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="input input-ghost text-2xl font-medium flex-1 p-0 h-auto focus:outline-none bg-transparent"
+                  placeholder="0"
+                  value={outputAmount}
+                  onChange={(e) => {
+                    const v = sanitizeAmountInput(e.target.value)
+                    if (v !== null) handleOutputChange(v)
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm gap-1.5 shrink-0"
+                  onClick={() => {
+                    setTokenQuery('')
+                    setTokenOutModalOpen(true)
+                  }}
+                >
+                  {tokenOut ? (
+                    <>
+                      <Logo
+                        src={tokenOut.logoURI}
+                        alt={tokenOut.symbol}
+                        fallbackText={tokenOut.symbol}
+                        className="w-5 h-5 rounded-full object-contain token-logo"
+                      />
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium text-sm">{tokenOut.symbol}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-base-content/50">Select</span>
+                  )}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="w-4 h-4"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex items-center justify-between mt-1">
+                {(() => {
+                  const amt = parseFloat(outputAmount)
+                  const usd = amt > 0 && tokenOutPrice > 0 ? amt * tokenOutPrice : 0
+                  return usd > 0 ? (
+                    <div className="text-xs text-base-content/50">{fmtUsd(usd)}</div>
+                  ) : null
+                })()}
+                {tokenOut && <div className="text-xs text-base-content/40">{tokenOut.name}</div>}
+              </div>
+            </div>
+
+            {/* Insufficient balance warning */}
+            {tokenIn &&
+              inputAmount &&
+              parseFloat(inputAmount) > 0 &&
+              account &&
+              (tokenInBalance
+                ? compareAmountStrings(inputAmount, tokenInBalance.balance) > 0
+                : false) && (
+                <div className="text-xs text-warning flex items-center gap-1.5 px-1">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="w-4 h-4 shrink-0"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 6a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 6Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Insufficient {tokenIn.symbol} balance
+                </div>
+              )}
+
+            {/* Slippage */}
+            <div className="pt-1">
+              <SlippageInput
+                value={slippage}
+                onChange={(v) => {
+                  setSlippage(v)
+                  reset()
+                }}
+              />
+            </div>
+
+            {/* Loading indicator */}
+            {loading && (
+              <div className="flex items-center justify-center gap-2 py-1 text-xs text-base-content/50">
+                <span className="loading loading-spinner loading-xs" />
+                Fetching quotes...
+              </div>
             )}
-          </div>
-        )}
-        </>
+
+            {/* Error */}
+            {error && <ErrorDisplay error={error} />}
+
+            {/* Quotes list */}
+            {quotes.length > 0 && (
+              <div className="space-y-1.5">
+                <span className="text-xs font-medium">Quotes</span>
+                {quotes.map((q, i) => (
+                  <SwapQuoteCard
+                    key={i}
+                    quote={q}
+                    index={i}
+                    isSelected={selectedIndex === i}
+                    onClick={() => selectQuote(i)}
+                    inSymbol={tokenIn?.symbol}
+                    outSymbol={tokenOut?.symbol}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* USD value impact */}
+            {swapUsdImpact && (
+              <div className="rounded-lg border border-base-300 bg-base-200/40 px-2.5 py-2 text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-base-content/60">You pay</span>
+                  <span className="font-medium">{fmtUsd(swapUsdImpact.inputUsd)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-base-content/60">You receive</span>
+                  <span className="font-medium">{fmtUsd(swapUsdImpact.outputUsd)}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-base-300 pt-1">
+                  <span className="text-base-content/60">Price impact</span>
+                  <span
+                    className={`font-semibold ${swapUsdImpact.pct >= -0.1 ? 'text-success' : swapUsdImpact.pct >= -1 ? 'text-warning' : 'text-error'}`}
+                  >
+                    {swapUsdImpact.diff >= 0 ? '+' : ''}
+                    {fmtUsd(swapUsdImpact.diff)} ({swapUsdImpact.pct >= 0 ? '+' : ''}
+                    {swapUsdImpact.pct.toFixed(2)}%)
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Permissions, and execute */}
+            {selectedIndex !== null && (
+              <div className="space-y-1.5">
+                {!account ? (
+                  <div className="w-full flex justify-center">
+                    <WalletConnect />
+                  </div>
+                ) : isWrongChain ? (
+                  <button
+                    type="button"
+                    className="btn btn-warning btn-sm w-full"
+                    onClick={() => syncChain(Number(chainId))}
+                  >
+                    Switch Wallet Chain
+                  </button>
+                ) : (
+                  <>
+                    {batchSupported ? (
+                      <BatchExecuteButton
+                        steps={[
+                          ...permissions.map((tx, i) => tx.description || `Approve ${i + 1}`),
+                          'Execute Swap',
+                        ]}
+                        label="Execute Swap"
+                        executing={executing}
+                        needsUpgrade={batchNeedsUpgrade}
+                        onExecute={executeAll}
+                      />
+                    ) : (
+                      <>
+                        {permissions.map((tx, i) => (
+                          <button
+                            key={`perm-${i}`}
+                            type="button"
+                            className="btn btn-outline btn-sm w-full"
+                            onClick={() => executePermission(tx)}
+                          >
+                            {tx.description || 'Approve'}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          className="btn btn-success btn-sm w-full"
+                          disabled={executing}
+                          onClick={executeSwap}
+                        >
+                          {executing ? (
+                            <>
+                              <span className="loading loading-spinner loading-xs" />
+                              Executing swap...
+                            </>
+                          ) : (
+                            'Execute Swap'
+                          )}
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs w-full"
+                      disabled={loading}
+                      onClick={handleFetchQuote}
+                    >
+                      Refresh Quotes
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 

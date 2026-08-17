@@ -97,7 +97,7 @@ function resolveLoopRangeEntry(raw: any): LoopRangeEntry {
   const targetRange = parseModeRange(ma.targetModeRange)
   const userRange = parseModeRange(ma.userModeRange)
 
-  const effective = canSwitch && targetRange ? targetRange : userRange ?? ZERO_RANGE
+  const effective = canSwitch && targetRange ? targetRange : (userRange ?? ZERO_RANGE)
 
   // Preserve raw strings from the API for input fields
   const rawEffective = canSwitch && ma.targetModeRange ? ma.targetModeRange : ma.userModeRange
@@ -171,10 +171,10 @@ export interface LoopRangeSimulationBody {
 export type RangeOperation = 'leverage' | 'collateral-swap' | 'debt-swap' | 'close'
 
 const RANGE_ENDPOINTS: Record<RangeOperation, string> = {
-  'leverage': '/v1/data/loop/range/leverage',
+  leverage: '/v1/data/loop/range/leverage',
   'collateral-swap': '/v1/data/loop/range/collateral-swap',
   'debt-swap': '/v1/data/loop/range/debt-swap',
-  'close': '/v1/data/loop/range/close',
+  close: '/v1/data/loop/range/close',
 }
 
 // ============================================================================

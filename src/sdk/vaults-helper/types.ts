@@ -54,13 +54,7 @@ export const VAULT_PROVIDERS: VaultProvider[] = [
  * - `lagoon`    — ERC-7540 async withdrawals, routed through `/lst?kind=lagoon`.
  * - `hypercore` — HyperLiquid multi-leg, via `/deposit|withdraw?interface=hypercore`.
  */
-export type VaultFamily =
-  | 'erc4626'
-  | 'savings'
-  | 'lst'
-  | 'gmx'
-  | 'lagoon'
-  | 'hypercore'
+export type VaultFamily = 'erc4626' | 'savings' | 'lst' | 'gmx' | 'lagoon' | 'hypercore'
 
 export function vaultFamily(provider: VaultProvider): VaultFamily {
   switch (provider) {
@@ -89,9 +83,7 @@ export function vaultFamily(provider: VaultProvider): VaultFamily {
  *   (lst, gmx, lagoon).
  */
 export function withdrawalStyle(family: VaultFamily): 'direct' | 'async' {
-  return family === 'lst' || family === 'gmx' || family === 'lagoon'
-    ? 'async'
-    : 'direct'
+  return family === 'lst' || family === 'gmx' || family === 'lagoon' ? 'async' : 'direct'
 }
 
 /**
@@ -108,12 +100,7 @@ export function withdrawalStyle(family: VaultFamily): 'direct' | 'async' {
  *
  * `instant` and `instant-capped` (Spark, 3Jane USD3) stay direct.
  */
-const ASYNC_SAVINGS_MODES = new Set([
-  'fixed-cooldown',
-  'request-based',
-  'queued',
-  'fee-or-queued',
-])
+const ASYNC_SAVINGS_MODES = new Set(['fixed-cooldown', 'request-based', 'queued', 'fee-or-queued'])
 
 /**
  * Per-vault withdrawal asyncness. The family-level `withdrawalStyle` is right
@@ -125,9 +112,7 @@ const ASYNC_SAVINGS_MODES = new Set([
  * The mode lives in the row's `providerMeta`, NOT at its root — verified
  * against the live catalog, where every savings row carries it.
  */
-export function isAsyncVaultWithdraw(
-  entry: Pick<VaultEntry, 'provider' | 'extras'>
-): boolean {
+export function isAsyncVaultWithdraw(entry: Pick<VaultEntry, 'provider' | 'extras'>): boolean {
   const family = vaultFamily(entry.provider)
   if (withdrawalStyle(family) === 'async') return true
   if (family !== 'savings') return false
@@ -135,12 +120,8 @@ export function isAsyncVaultWithdraw(
 }
 
 /** The savings row's `withdrawalMode`, or undefined for other providers. */
-export function savingsWithdrawalMode(
-  entry: Pick<VaultEntry, 'extras'>
-): string | undefined {
-  const meta = entry.extras?.providerMeta as
-    | { withdrawalMode?: unknown }
-    | undefined
+export function savingsWithdrawalMode(entry: Pick<VaultEntry, 'extras'>): string | undefined {
+  const meta = entry.extras?.providerMeta as { withdrawalMode?: unknown } | undefined
   const mode = meta?.withdrawalMode ?? entry.extras?.withdrawalMode
   return typeof mode === 'string' ? mode : undefined
 }
@@ -160,9 +141,7 @@ export function savingsWithdrawalMode(
  *   sDAI, stUSD, …) — it only lists the non-instant ones plus a few pinned
  *   for address resolution.
  */
-export function withdrawFamily(
-  entry: Pick<VaultEntry, 'provider' | 'extras'>
-): VaultFamily {
+export function withdrawFamily(entry: Pick<VaultEntry, 'provider' | 'extras'>): VaultFamily {
   const family = vaultFamily(entry.provider)
   if (family !== 'savings') return family
   return isAsyncVaultWithdraw(entry) ? 'savings' : 'erc4626'
@@ -172,21 +151,14 @@ export function withdrawFamily(
 export function savingsWithdrawalCooldownSeconds(
   entry: Pick<VaultEntry, 'extras'>
 ): number | undefined {
-  const meta = entry.extras?.providerMeta as
-    | { withdrawalCooldownSeconds?: unknown }
-    | undefined
+  const meta = entry.extras?.providerMeta as { withdrawalCooldownSeconds?: unknown } | undefined
   const raw = meta?.withdrawalCooldownSeconds
   const n = typeof raw === 'string' ? Number(raw) : raw
   return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined
 }
 
 /** The verbs the action endpoints accept. */
-export type VaultActionVerb =
-  | 'deposit'
-  | 'withdraw'
-  | 'request-withdraw'
-  | 'claim'
-  | 'cancel'
+export type VaultActionVerb = 'deposit' | 'withdraw' | 'request-withdraw' | 'claim' | 'cancel'
 
 /**
  * Resolved worker route for a (family, verb) pair.
@@ -208,10 +180,7 @@ export interface VaultRoute {
   actionInQuery: boolean
 }
 
-export function resolveVaultRoute(
-  family: VaultFamily,
-  verb: VaultActionVerb
-): VaultRoute {
+export function resolveVaultRoute(family: VaultFamily, verb: VaultActionVerb): VaultRoute {
   const isDeposit = verb === 'deposit'
 
   // GMX is USD-denominated / multi-leg, not an `asset()`-based share token, so

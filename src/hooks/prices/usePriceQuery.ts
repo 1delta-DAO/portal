@@ -55,7 +55,11 @@ export function usePriceQuery({ currencies, enabled = true }: UsePriceQueryParam
           const chainPrices: Record<string, PriceEntry> = {}
           if (items && typeof items === 'object') {
             if (Array.isArray(items)) {
-              for (const item of items as { address: string; priceUSD?: number; price?: number }[]) {
+              for (const item of items as {
+                address: string
+                priceUSD?: number
+                price?: number
+              }[]) {
                 chainPrices[item.address.toLowerCase()] = { usd: item.priceUSD ?? item.price ?? 0 }
               }
             } else {

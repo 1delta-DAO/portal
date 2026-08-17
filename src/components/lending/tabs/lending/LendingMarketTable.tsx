@@ -15,10 +15,7 @@ import { OracleBadge } from '../../shared/OracleBadge'
 import { BrokeredAprCell } from '../../shared/BrokeredAprCell'
 import { useTablePagination } from '../../../../hooks/useTablePagination'
 import { AutoBalancedBadge, BasketRateHint } from '../../shared/SmartVault'
-import {
-  positionBorrowRate,
-  positionSupplyRate,
-} from '../../../../sdk/lending-helper/fluidSmart'
+import { positionBorrowRate, positionSupplyRate } from '../../../../sdk/lending-helper/fluidSmart'
 import { SortableHeader } from '../../../common/SortableHeader'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { TablePagination } from '../../../common/TablePagination'
@@ -205,11 +202,7 @@ export const LendingMarketTable: React.FC<Props> = ({
                         <span className="text-sm font-medium text-success">
                           {depositTotal.toFixed(2)}%
                         </span>
-                        <BasketRateHint
-                          row={pool}
-                          side="supply"
-                          legRate={pool.depositRate}
-                        />
+                        <BasketRateHint row={pool} side="supply" legRate={pool.depositRate} />
                         {iy > 0 && (
                           <span
                             className="badge badge-xs bg-success/15 text-success border-0 cursor-help whitespace-nowrap"

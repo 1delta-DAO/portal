@@ -21,7 +21,10 @@ import type {
   UserPositionEntry,
   UserSubAccount,
 } from '../../../../sdk/lending-helper/userPositionTypes'
-import { isAggregatePosition, isLoanPosition } from '../../../../sdk/lending-helper/userPositionTypes'
+import {
+  isAggregatePosition,
+  isLoanPosition,
+} from '../../../../sdk/lending-helper/userPositionTypes'
 import { useTokenBalances } from '../../../../hooks/lending/useTokenBalances'
 import { useLenderAccounts } from '../../../../hooks/lending/useLenderAccounts'
 import { useSyncChain } from '../../../../hooks/useSyncChain'
@@ -510,9 +513,7 @@ export function TradingDashboard({
           // routing effect. Same plumbing as by-config row clicks: deposits
           // section fires with side='collateral', debt section with
           // side='borrowable'.
-          onPoolSelect={(pool, side) =>
-            setPendingMarketClick({ pool, side, nonce: Date.now() })
-          }
+          onPoolSelect={(pool, side) => setPendingMarketClick({ pool, side, nonce: Date.now() })}
         />
       )}
 
@@ -601,9 +602,7 @@ export function TradingDashboard({
                   <span className="text-xs font-medium truncate" title={labelText}>
                     {labelText}
                     {isUserMode && (
-                      <span className="ml-1.5 text-[10px] font-medium text-success/80">
-                        active
-                      </span>
+                      <span className="ml-1.5 text-[10px] font-medium text-success/80">active</span>
                     )}
                   </span>
                 </div>

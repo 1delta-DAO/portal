@@ -1,6 +1,10 @@
 import React, { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { OracleBand, PoolOracleInfo, PoolOracleFeed } from '../../../sdk/lending-helper/poolTypes'
+import type {
+  OracleBand,
+  PoolOracleInfo,
+  PoolOracleFeed,
+} from '../../../sdk/lending-helper/poolTypes'
 import { useIsMobile } from '../../../hooks/useIsMobile'
 import { ModalHeader } from '../../common/ModalHeader'
 
@@ -46,7 +50,12 @@ const CopyAddressButton: React.FC<{ address: string }> = ({ address }) => {
   const [copied, setCopied] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  React.useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+  React.useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    []
+  )
 
   const copy = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -65,15 +74,29 @@ const CopyAddressButton: React.FC<{ address: string }> = ({ address }) => {
       aria-label={`Copy ${address}`}
     >
       {copied ? (
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-success"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-          strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-3 h-3 text-success"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <polyline points="20 6 9 17 4 12" />
         </svg>
       ) : (
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-          strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-3 h-3"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
           <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
         </svg>
@@ -85,8 +108,7 @@ const CopyAddressButton: React.FC<{ address: string }> = ({ address }) => {
 /** A yes / no / unknown indicator for a boolean-or-null feed property. */
 const CheckFlag: React.FC<{ value: boolean | null; label: string }> = ({ value, label }) => {
   const text = value === null ? 'unknown' : value ? 'yes' : 'no'
-  const color =
-    value === null ? 'text-base-content/40' : value ? 'text-success' : 'text-error'
+  const color = value === null ? 'text-base-content/40' : value ? 'text-success' : 'text-error'
   return (
     <div className="flex items-center justify-between gap-4">
       <span className="text-[11px] text-base-content/70">{label}</span>
@@ -116,9 +138,7 @@ const FeedBlock: React.FC<{ feed: PoolOracleFeed }> = ({ feed }) => {
         </span>
         <span className="inline-flex items-center gap-1.5 shrink-0">
           <span className={`w-1.5 h-1.5 rounded-full ${bandDotColor(feed.band)}`} />
-          <span className={`text-[11px] font-medium ${bandTextColor(feed.band)}`}>
-            {feed.band}
-          </span>
+          <span className={`text-[11px] font-medium ${bandTextColor(feed.band)}`}>{feed.band}</span>
         </span>
       </div>
 
@@ -128,7 +148,9 @@ const FeedBlock: React.FC<{ feed: PoolOracleFeed }> = ({ feed }) => {
           {feed.priceDescription && (
             <div className="flex items-center justify-between gap-4">
               <span className="text-base-content/50">reports</span>
-              <span className="font-mono text-base-content/80 truncate">{feed.priceDescription}</span>
+              <span className="font-mono text-base-content/80 truncate">
+                {feed.priceDescription}
+              </span>
             </div>
           )}
           {feed.intendedPair && (
@@ -153,10 +175,7 @@ const FeedBlock: React.FC<{ feed: PoolOracleFeed }> = ({ feed }) => {
       {feed.flags.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-0.5">
           {feed.flags.map((f) => (
-            <span
-              key={f}
-              className="badge badge-xs bg-error/10 text-error border-0 font-mono"
-            >
+            <span key={f} className="badge badge-xs bg-error/10 text-error border-0 font-mono">
               {f}
             </span>
           ))}
@@ -275,8 +294,12 @@ export const OracleBadge: React.FC<OracleBadgeProps> = ({ oracleInfo, size = 'md
         <svg
           xmlns="http://www.w3.org/2000/svg"
           className={`shrink-0 ${bandTextColor(oracleInfo.worstBand)} ${isMd ? 'w-3.5 h-3.5' : 'w-3 h-3'}`}
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-          strokeLinecap="round" strokeLinejoin="round"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
           <path d="M4.93 19.07a10 10 0 010-14.14" />
           <path d="M7.76 16.24a6 6 0 010-8.49" />
@@ -287,7 +310,8 @@ export const OracleBadge: React.FC<OracleBadgeProps> = ({ oracleInfo, size = 'md
         Oracle
       </span>
 
-      {open && isMobile &&
+      {open &&
+        isMobile &&
         createPortal(
           <div
             className="fixed inset-0 z-9999 flex items-center justify-center p-4"
@@ -314,7 +338,9 @@ export const OracleBadge: React.FC<OracleBadgeProps> = ({ oracleInfo, size = 'md
           document.body
         )}
 
-      {open && pos && !isMobile &&
+      {open &&
+        pos &&
+        !isMobile &&
         createPortal(
           <div
             ref={popoverRef}

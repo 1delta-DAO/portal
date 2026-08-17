@@ -1,6 +1,9 @@
 import React from 'react'
 import type { PoolDataItem } from '../../../../sdk/lending-helper/marketTypes'
-import type { UserPositionEntry, UserSubAccount } from '../../../../sdk/lending-helper/userPositionTypes'
+import type {
+  UserPositionEntry,
+  UserSubAccount,
+} from '../../../../sdk/lending-helper/userPositionTypes'
 import {
   DepositAction,
   WithdrawAction,
@@ -116,7 +119,12 @@ const SelectedAssetBadge: React.FC<{
         </span>
         {lenderInfo ? (
           <span className="text-xs text-base-content/60 truncate flex items-center gap-1">
-            <Logo src={lenderInfo.logoURI} alt={lenderInfo.name} fallbackText={lenderInfo.name} className="rounded-full object-contain w-3.5 h-3.5" />
+            <Logo
+              src={lenderInfo.logoURI}
+              alt={lenderInfo.name}
+              fallbackText={lenderInfo.name}
+              className="rounded-full object-contain w-3.5 h-3.5"
+            />
             {lenderInfo.name}
           </span>
         ) : (
@@ -218,9 +226,14 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
 
 /* ── Mobile action modal ── */
 
-export const MobileActionModal: React.FC<
-  ActionPanelProps & { onClose: () => void }
-> = ({ onClose, actionTab, onTabChange, selectedPool, lenderInfo, ...rest }) => {
+export const MobileActionModal: React.FC<ActionPanelProps & { onClose: () => void }> = ({
+  onClose,
+  actionTab,
+  onTabChange,
+  selectedPool,
+  lenderInfo,
+  ...rest
+}) => {
   if (!selectedPool) return null
 
   return (

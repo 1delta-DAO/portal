@@ -7,7 +7,8 @@
     scroll-behavior: smooth;
   }
 
-  body, #root {
+  body,
+  #root {
     min-height: 100%;
   }
 
@@ -432,8 +433,9 @@
    font-stack is preserved (the plugin strips it to generic `monospace`, which triggers
    browsers' 13px monospace default and shrinks every rem-based dimension). */
 [data-theme='terminal'] {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-    'Courier New', monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
   font-size: 16px; /* pin root font-size so 1rem stays 16px */
 }
 
@@ -474,7 +476,6 @@
   }
 }
 
-
 /* Table rows: ensure hover is always distinct from zebra stripes */
 [data-theme='terminal'] .table tbody tr:hover,
 [data-theme='terminal'] .table-zebra tbody tr:hover {
@@ -490,8 +491,9 @@
    ────────────────────────────────────────── */
 
 [data-theme='bloomberg'] {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-    'Courier New', monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
   font-size: 16px; /* pin root font-size so 1rem stays 16px */
 }
 

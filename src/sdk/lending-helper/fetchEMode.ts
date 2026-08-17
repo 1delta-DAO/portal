@@ -80,10 +80,9 @@ export async function fetchEModeAnalysis(params: {
     qs.set('simulate', 'true')
     if (params.accountId) qs.set('accountId', params.accountId)
 
-    const payload = await apiFetch<{ data?: any[] } | any[]>(
-      '/v1/data/lending/e-mode/analysis',
-      { params: Object.fromEntries(qs) }
-    )
+    const payload = await apiFetch<{ data?: any[] } | any[]>('/v1/data/lending/e-mode/analysis', {
+      params: Object.fromEntries(qs),
+    })
 
     const rawAnalysis: any[] = Array.isArray(payload) ? payload : (payload?.data ?? [])
 

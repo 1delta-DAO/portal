@@ -66,7 +66,8 @@ export function flattenLenderDataWithUser(
     const lenderUserData: LenderUserDataEntry | undefined = userDataForChain.get(lender)
 
     // Build a lookup: marketUid -> { [subAccountId]: UserPositionEntry }
-    const positionsByPool: { [marketUid: string]: { [subAccountId: string]: UserPositionEntry } } = {}
+    const positionsByPool: { [marketUid: string]: { [subAccountId: string]: UserPositionEntry } } =
+      {}
 
     if (lenderUserData) {
       for (const sub of lenderUserData.data) {

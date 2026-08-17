@@ -16,11 +16,6 @@ export const HealthBadge: React.FC<HealthBadgeProps> = ({ health, size = 'sm' })
   if (health == null) {
     return <span className="text-xs text-base-content/50">n/a</span>
   }
-  const tone =
-    health < 1.1 ? 'badge-error' : health < 1.3 ? 'badge-warning' : 'badge-success'
-  return (
-    <span className={`badge badge-${size} ${tone} tabular-nums`}>
-      {health.toFixed(2)}
-    </span>
-  )
+  const tone = health < 1.1 ? 'badge-error' : health < 1.3 ? 'badge-warning' : 'badge-success'
+  return <span className={`badge badge-${size} ${tone} tabular-nums`}>{health.toFixed(2)}</span>
 }

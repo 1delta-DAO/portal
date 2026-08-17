@@ -30,7 +30,12 @@ const CopyOwnerButton: React.FC<{ owner: string }> = ({ owner }) => {
   const [copied, setCopied] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  React.useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+  React.useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    []
+  )
 
   const copy = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -49,15 +54,29 @@ const CopyOwnerButton: React.FC<{ owner: string }> = ({ owner }) => {
       aria-label={`Copy ${owner}`}
     >
       {copied ? (
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-success"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-          strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-3 h-3 text-success"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <polyline points="20 6 9 17 4 12" />
         </svg>
       ) : (
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-          strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-3 h-3"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
           <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
         </svg>
@@ -71,7 +90,7 @@ function sliceArcPath(
   cy: number,
   r: number,
   startAngle: number,
-  endAngle: number,
+  endAngle: number
 ): string {
   const x1 = cx + r * Math.cos(startAngle)
   const y1 = cy + r * Math.sin(startAngle)
@@ -116,9 +135,8 @@ const OwnerDistributionChart: React.FC<{ distribution: PoolOwnerShare[] }> = ({ 
       })
 
   const canCollapse = colored.length > OWNER_LEGEND_COLLAPSED_LIMIT
-  const visible = canCollapse && !expanded
-    ? colored.slice(0, OWNER_LEGEND_COLLAPSED_LIMIT)
-    : colored
+  const visible =
+    canCollapse && !expanded ? colored.slice(0, OWNER_LEGEND_COLLAPSED_LIMIT) : colored
   const hiddenCount = colored.length - visible.length
 
   return (
@@ -145,10 +163,7 @@ const OwnerDistributionChart: React.FC<{ distribution: PoolOwnerShare[] }> = ({ 
                   className="w-2 h-2 rounded-sm shrink-0"
                   style={{ backgroundColor: row.color }}
                 />
-                <span
-                  className="font-mono text-base-content/70 truncate"
-                  title={row.owner}
-                >
+                <span className="font-mono text-base-content/70 truncate" title={row.owner}>
                   {shortOwner(row.owner)}
                 </span>
                 {row.owner !== 'others' && <CopyOwnerButton owner={row.owner} />}
@@ -203,7 +218,7 @@ function riskTextColor(label: string): string {
 function governanceOwnerLabel(
   ownerKind: string,
   signerThreshold?: number | null,
-  signerCount?: number | null,
+  signerCount?: number | null
 ): string | null {
   switch (ownerKind.toUpperCase()) {
     case 'EOA':
@@ -250,14 +265,18 @@ const RiskBreakdownContent: React.FC<{ breakdown: PoolRiskBreakdown[] }> = ({ br
               {b.baseAsset && <span> (base: {b.baseAsset})</span>}
             </div>
           )}
-          {b.category === 'concentration' && b.ownerDistribution && b.ownerDistribution.length > 0 && (
-            <OwnerDistributionChart distribution={b.ownerDistribution} />
-          )}
-          {b.category === 'governance' && b.ownerKind && governanceOwnerLabel(b.ownerKind, b.signerThreshold, b.signerCount) && (
-            <div className="text-[10px] text-base-content/50 mt-0.5 ml-0.5">
-              Controlled by {governanceOwnerLabel(b.ownerKind, b.signerThreshold, b.signerCount)}
-            </div>
-          )}
+          {b.category === 'concentration' &&
+            b.ownerDistribution &&
+            b.ownerDistribution.length > 0 && (
+              <OwnerDistributionChart distribution={b.ownerDistribution} />
+            )}
+          {b.category === 'governance' &&
+            b.ownerKind &&
+            governanceOwnerLabel(b.ownerKind, b.signerThreshold, b.signerCount) && (
+              <div className="text-[10px] text-base-content/50 mt-0.5 ml-0.5">
+                Controlled by {governanceOwnerLabel(b.ownerKind, b.signerThreshold, b.signerCount)}
+              </div>
+            )}
         </div>
       ))}
       {curators.length > 0 && (
@@ -355,7 +374,9 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ label, breakdown, size = '
         {label}
       </span>
 
-      {open && hasBreakdown && isMobile &&
+      {open &&
+        hasBreakdown &&
+        isMobile &&
         createPortal(
           // React events bubble through the React tree, not the DOM tree —
           // so without stopPropagation here, taps on the backdrop (and any
@@ -387,7 +408,10 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ label, breakdown, size = '
           document.body
         )}
 
-      {open && pos && hasBreakdown && !isMobile &&
+      {open &&
+        pos &&
+        hasBreakdown &&
+        !isMobile &&
         createPortal(
           <div
             ref={popoverRef}

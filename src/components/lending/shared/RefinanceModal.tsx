@@ -6,10 +6,7 @@ import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransact
 import { useAtomicBatch } from '../../../hooks/useAtomicBatch'
 import { BatchExecuteButton } from '../../common/BatchExecuteButton'
 import { useDebounce } from '../../../hooks/useDebounce'
-import {
-  fetchRefinance,
-  type RefinanceResult,
-} from '../../../sdk/lending-helper/fetchRefinance'
+import { fetchRefinance, type RefinanceResult } from '../../../sdk/lending-helper/fetchRefinance'
 import { AmountInput } from '../../common/AmountInput'
 import { formatTokenAmount } from '../../../utils/format'
 import {
@@ -271,9 +268,7 @@ export const RefinanceModal: React.FC<RefinanceModalProps> = ({
           <div className="space-y-3">
             {/* Source loan summary */}
             <div className="rounded-lg border border-base-300 bg-base-200/50 px-2.5 py-1.5 space-y-1">
-              <div className="text-[10px] uppercase tracking-wide text-base-content/50">
-                From
-              </div>
+              <div className="text-[10px] uppercase tracking-wide text-base-content/50">From</div>
               <div className="flex items-center justify-between gap-2 text-xs">
                 <span className="flex items-center gap-1.5 min-w-0">
                   <span className="font-semibold">{termLabel(loan)}</span>

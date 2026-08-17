@@ -64,9 +64,7 @@ function readStoredMaxRisk(): number {
 /** Initial value: URL `?riskTolerance=` wins, then localStorage, then default. */
 function readInitialMaxRisk(): number {
   try {
-    const fromUrl = parseRiskTolerance(
-      new URLSearchParams(window.location.search).get(URL_PARAM),
-    )
+    const fromUrl = parseRiskTolerance(new URLSearchParams(window.location.search).get(URL_PARAM))
     if (fromUrl != null) return fromUrl
   } catch {
     /* no window (SSR) — fall through */
@@ -113,7 +111,7 @@ export function RiskModeProvider({ children }: { children: ReactNode }) {
       setMaxRiskScoreState(value)
       persist(value)
     },
-    [persist],
+    [persist]
   )
 
   // Keep state and the `riskTolerance` URL param in sync, both directions:
@@ -167,7 +165,7 @@ export function RiskModeProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<RiskModeState>(
     () => ({ maxRiskScore, setMaxRiskScore }),
-    [maxRiskScore, setMaxRiskScore],
+    [maxRiskScore, setMaxRiskScore]
   )
 
   return <RiskModeContext.Provider value={value}>{children}</RiskModeContext.Provider>

@@ -47,7 +47,10 @@ export function Logo({ src, alt = '', size, fallbackText, className = '', width,
 
   if (!src || error) {
     const initials =
-      seed.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || '?'
+      seed
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .slice(0, 2)
+        .toUpperCase() || '?'
     const fallbackStyle: CSSProperties = {
       ...dimension,
       backgroundColor: colors.bg,

@@ -149,13 +149,13 @@ unavailability banner, and **every `critical` finding**. Criticals are what
 would trade a real safety property for tidiness.
 
 **Expanded only:** `warn` / `info` findings, the description, and the detail
-rows. Governance boilerplate — *"Parameters can be changed with no notice
-period"* — is true of most markets we serve; leaving it in the summary made it
+rows. Governance boilerplate — _"Parameters can be changed with no notice
+period"_ — is true of most markets we serve; leaving it in the summary made it
 compete with the headline while saying little.
 
 **The toggle is conditional.** `hasExpandableDetail()` decides whether the
 header is a button at all. A digest-only row whose findings are all critical has
-nothing behind the chevron but *"Full terms are not loaded for this market"* — a
+nothing behind the chevron but _"Full terms are not loaded for this market"_ — a
 dead end — so it renders as static content with no affordance.
 
 Both rules live in `severity.ts` (`splitFindings`, `hasExpandableDetail`) rather

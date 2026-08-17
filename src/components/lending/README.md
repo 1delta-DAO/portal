@@ -39,6 +39,7 @@ These are reusable widgets and view fragments shared by the
 sub-dashboards above.
 
 ### Orchestration / view fragments
+
 - [LendingTab.tsx](LendingTab.tsx) — Main router; tab navigation and
   global chain/lender filtering.
 - [LendingActionTab.tsx](LendingActionTab.tsx) — Unified action panel
@@ -55,6 +56,7 @@ sub-dashboards above.
   balance changes preview (assets received / paid).
 
 ### Selectors and filters
+
 - [LenderSelector.tsx](LenderSelector.tsx) — Lender dropdown with TVL
   display.
 - [ChainFilter.tsx](ChainFilter.tsx) — Chain selector built on
@@ -68,6 +70,7 @@ sub-dashboards above.
   (address, chain, copy-to-clipboard).
 
 ### IRM / e-mode
+
 - [IrmChart.tsx](IrmChart.tsx) — SVG IRM (interest rate model) curve.
 - [IrmDock.tsx](IrmDock.tsx) — Context provider and dock UI for the
   IRM analytics modal.
@@ -75,6 +78,7 @@ sub-dashboards above.
   inspecting and switching e-mode categories.
 
 ### Small display primitives
+
 - [Pill.tsx](Pill.tsx) — Generic value pill with tone styling.
 - [RiskBadge.tsx](RiskBadge.tsx) — Risk score badge with breakdown
   popover.

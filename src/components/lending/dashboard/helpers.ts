@@ -1,8 +1,5 @@
 import type { PoolConfig, PoolDataItem } from '../../../sdk/lending-helper/marketTypes'
-import {
-  positionBorrowRate,
-  positionSupplyRate,
-} from '../../../sdk/lending-helper/fluidSmart'
+import { positionBorrowRate, positionSupplyRate } from '../../../sdk/lending-helper/fluidSmart'
 
 export type SortKey =
   | 'symbol'

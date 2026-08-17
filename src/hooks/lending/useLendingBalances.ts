@@ -16,7 +16,10 @@ export interface ChainTokenBalance extends TokenBalance {
   chainId: string
 }
 
-async function fetchLendingBalances(chainId: string, account: string): Promise<ChainTokenBalance[]> {
+async function fetchLendingBalances(
+  chainId: string,
+  account: string
+): Promise<ChainTokenBalance[]> {
   const data = await apiFetch<LendingBalancesData>('/v1/data/token/balances/lending', {
     params: { chainId, account },
   })

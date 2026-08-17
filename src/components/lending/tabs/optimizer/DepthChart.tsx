@@ -1,5 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
-import { useMarketDepth, type DepthGrid, type DepthGridPoint } from '../../../../hooks/lending/useMarketDepth'
+import {
+  useMarketDepth,
+  type DepthGrid,
+  type DepthGridPoint,
+} from '../../../../hooks/lending/useMarketDepth'
 import { formatUsd } from '../../../../utils/format'
 
 interface Props {
@@ -27,7 +31,11 @@ const fmtTok = (v: number): string =>
   v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(1)}K` : v.toFixed(2)
 
 /** Linear-interpolate the rate at an arbitrary size from the sampled grid. */
-function rateAtSize(points: DepthGridPoint[], side: 'borrow' | 'supply', size: number): number | null {
+function rateAtSize(
+  points: DepthGridPoint[],
+  side: 'borrow' | 'supply',
+  size: number
+): number | null {
   if (points.length === 0) return null
   if (size <= points[0].size) return rateOf(points[0], side)
   const last = points[points.length - 1]
@@ -90,7 +98,11 @@ export function DepthChart({
     maxY = maxY + padY
     const sx = (v: number) => PAD_L + (v / maxX) * PLOT_W
     const sy = (r: number) => PAD_T + PLOT_H - ((r - minY) / (maxY - minY)) * PLOT_H
-    const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${sx(p.size).toFixed(1)},${sy(rateOf(p, side)).toFixed(1)}`).join(' ')
+    const line = pts
+      .map(
+        (p, i) => `${i === 0 ? 'M' : 'L'}${sx(p.size).toFixed(1)},${sy(rateOf(p, side)).toFixed(1)}`
+      )
+      .join(' ')
     const area = `${line} L${sx(maxX).toFixed(1)},${(PAD_T + PLOT_H).toFixed(1)} L${sx(0).toFixed(1)},${(PAD_T + PLOT_H).toFixed(1)} Z`
     const curRate = rateOf(pts[0], side)
     const clampMarker = Math.min(Math.max(markerAmount, 0), maxX)
@@ -183,10 +195,28 @@ export function DepthChart({
                 strokeWidth={1}
               />
               {/* area + line */}
-              <path d={geom.area} className={accent} fill="currentColor" fillOpacity={0.12} stroke="none" />
-              <path d={geom.line} className={accent} fill="none" stroke="currentColor" strokeWidth={1.8} />
+              <path
+                d={geom.area}
+                className={accent}
+                fill="currentColor"
+                fillOpacity={0.12}
+                stroke="none"
+              />
+              <path
+                d={geom.line}
+                className={accent}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+              />
               {/* "you are here" at size 0 */}
-              <circle cx={geom.sx(0)} cy={geom.sy(geom.curRate)} r={3} className="text-base-content/70" fill="currentColor" />
+              <circle
+                cx={geom.sx(0)}
+                cy={geom.sy(geom.curRate)}
+                r={3}
+                className="text-base-content/70"
+                fill="currentColor"
+              />
               {/* live marker at the entered amount */}
               {geom.markerRate != null && (
                 <g>
@@ -221,7 +251,13 @@ export function DepthChart({
                     strokeWidth={1}
                     strokeDasharray="2 2"
                   />
-                  <circle cx={hover.vbX} cy={geom.sy(hover.rate)} r={3} className={accent} fill="currentColor" />
+                  <circle
+                    cx={hover.vbX}
+                    cy={geom.sy(hover.rate)}
+                    r={3}
+                    className={accent}
+                    fill="currentColor"
+                  />
                 </g>
               )}
             </svg>
@@ -238,7 +274,9 @@ export function DepthChart({
                   {fmtTok(hover.size)}
                   {symbol ? ` ${symbol}` : ''}
                 </span>
-                {price ? <span className="text-base-content/40"> (${formatUsd(hover.size * price)})</span> : null}
+                {price ? (
+                  <span className="text-base-content/40"> (${formatUsd(hover.size * price)})</span>
+                ) : null}
               </div>
             )}
           </div>

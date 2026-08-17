@@ -285,7 +285,8 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
           <div className="text-xs text-base-content/60">
             Current mode:{' '}
             <span className="font-semibold text-base-content">
-              {categories.find((c) => c.id === Number(currentMode))?.label ?? (Number(currentMode) === 0 ? 'Default' : `Mode #${currentMode}`)}
+              {categories.find((c) => c.id === Number(currentMode))?.label ??
+                (Number(currentMode) === 0 ? 'Default' : `Mode #${currentMode}`)}
             </span>
           </div>
 
@@ -315,10 +316,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
           <ErrorAlert error={error} />
 
           {!loading && !error && categories.length <= 1 && (
-            <EmptyState
-              size="sm"
-              title="No additional borrow modes available for this lender."
-            />
+            <EmptyState size="sm" title="No additional borrow modes available for this lender." />
           )}
 
           {!loading && !error && categories.length > 1 && (

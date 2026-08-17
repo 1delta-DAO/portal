@@ -7,8 +7,7 @@ import {
 import { useSendLendingTransaction } from '../useSendLendingTransaction'
 import { useDebounce } from '../useDebounce'
 
-interface UseEarnActionParams
-  extends Omit<FetchEarnActionParams, 'operator' | 'amount'> {
+interface UseEarnActionParams extends Omit<FetchEarnActionParams, 'operator' | 'amount'> {
   chainId: string
   operator?: string
   /** Base units, as a decimal string. Empty / zero means "do not build yet". */
@@ -48,15 +47,7 @@ export interface EarnActionExecution {
  * aggregator call.
  */
 export function useEarnAction(params: UseEarnActionParams): EarnActionExecution {
-  const {
-    chainId,
-    operator,
-    amount,
-    enabled = true,
-    earnUid,
-    action,
-    ...rest
-  } = params
+  const { chainId, operator, amount, enabled = true, earnUid, action, ...rest } = params
 
   const { send } = useSendLendingTransaction({ chainId, account: operator })
 

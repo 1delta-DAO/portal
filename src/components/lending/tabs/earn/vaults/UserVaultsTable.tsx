@@ -161,7 +161,10 @@ export const UserVaultsTable: React.FC<UserVaultsTableProps> = ({
                       {formatTokenAmount(it.shares)}
                     </td>
                     <td className="text-right">
-                      <span className="text-sm font-semibold" title={`$${formatUsd(it.balanceUSD)}`}>
+                      <span
+                        className="text-sm font-semibold"
+                        title={`$${formatUsd(it.balanceUSD)}`}
+                      >
                         {abbreviateUsd(it.balanceUSD)}
                       </span>
                     </td>

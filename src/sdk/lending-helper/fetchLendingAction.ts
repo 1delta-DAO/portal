@@ -165,8 +165,7 @@ export async function fetchLendingAction(
     if (params.accountId) qs.set('accountId', params.accountId)
     if (params.termId != null) qs.set('termId', String(params.termId))
     if (params.loanId != null) qs.set('loanId', params.loanId)
-    if (params.interestRate != null)
-      qs.set('interestRate', params.interestRate)
+    if (params.interestRate != null) qs.set('interestRate', params.interestRate)
     // Fluid smart legs. `amount1` is sent only WITH `asset1` — the server
     // rejects the pair the other way round rather than guessing a leg, and
     // reproducing that guard here keeps the failure in the UI instead of in a

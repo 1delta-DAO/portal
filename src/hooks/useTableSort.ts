@@ -47,7 +47,7 @@ export function nextSort<K extends string>(
 export function useTableSort<K extends string>(
   initialKey: K,
   initialDir: SortDirection = 'desc',
-  defaultDir: SortDirection = 'desc',
+  defaultDir: SortDirection = 'desc'
 ): TableSort<K> {
   const [sortKey, setSortKey] = useState<K>(initialKey)
   const [sortDir, setSortDir] = useState<SortDirection>(initialDir)
@@ -58,7 +58,7 @@ export function useTableSort<K extends string>(
       setSortKey(next.sortKey)
       setSortDir(next.sortDir)
     },
-    [sortKey, sortDir, defaultDir],
+    [sortKey, sortDir, defaultDir]
   )
 
   return { sortKey, sortDir, toggleSort, setSortKey, setSortDir }

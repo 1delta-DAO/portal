@@ -202,7 +202,7 @@ export function severityBadgeClass(s: Severity): string {
  */
 export function splitFindings(
   sheet: AnyTermSheet | undefined,
-  side: TermSide,
+  side: TermSide
 ): { criticals: TermFinding[]; secondary: TermFinding[] } {
   const ranked = sheet ? findings(sheet, side) : []
   return {
@@ -219,10 +219,7 @@ export function splitFindings(
  * digest-only row with no secondary findings and no description that is all
  * there is.
  */
-export function hasExpandableDetail(
-  sheet: AnyTermSheet | undefined,
-  side: TermSide,
-): boolean {
+export function hasExpandableDetail(sheet: AnyTermSheet | undefined, side: TermSide): boolean {
   if (!sheet) return false
   if (splitFindings(sheet, side).secondary.length > 0) return true
   if (sideInfo(sheet, side)?.description) return true

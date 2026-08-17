@@ -409,7 +409,7 @@ describe('summary collapse — what survives it, and when to offer a toggle', ()
     // expanding.
     const { criticals, secondary } = splitFindings(
       digest(['time-liquidation', 'no-timelock']),
-      'borrow',
+      'borrow'
     )
     expect(criticals.map((f) => f.id)).toContain('borrow-time-liquidation')
     expect(secondary.map((f) => f.id)).not.toContain('borrow-time-liquidation')
@@ -454,7 +454,9 @@ describe('native capability — allow by default, deny only where impossible', (
 
   it('denies Curvance, including its per-market keys', () => {
     expect(lenderSupportsNative('CURVANCE')).toBe(false)
-    expect(lenderSupportsNative('CURVANCE_143_E1C24B2E93230FBE33D32BA38ECA3218284143E2')).toBe(false)
+    expect(lenderSupportsNative('CURVANCE_143_E1C24B2E93230FBE33D32BA38ECA3218284143E2')).toBe(
+      false
+    )
     // A marketUid, which is what some call sites hold.
     expect(lenderSupportsNative('CURVANCE_143_ABC:143:0xdead')).toBe(false)
   })

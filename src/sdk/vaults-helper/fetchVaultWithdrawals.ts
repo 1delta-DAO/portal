@@ -1,8 +1,5 @@
 import { apiFetchLoose, errorMessage } from '../http'
-import type {
-  VaultWithdrawalRequest,
-  VaultWithdrawalsResponse,
-} from './types'
+import type { VaultWithdrawalRequest, VaultWithdrawalsResponse } from './types'
 
 export interface FetchVaultWithdrawalsParams {
   chainId: string

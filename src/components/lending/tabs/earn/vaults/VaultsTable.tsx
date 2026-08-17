@@ -68,9 +68,7 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
     selected !== null && selected.address.toLowerCase() === e.address.toLowerCase()
 
   const sortIndicator = (key: VaultSortKey) =>
-    sortKey === key ? (
-      <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
-    ) : null
+    sortKey === key ? <span className="ml-1 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span> : null
 
   const pagination = (
     <div className="flex flex-col gap-2 items-center justify-between md:flex-row px-4 py-2">
@@ -133,7 +131,10 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
               <th className="w-[12%] text-right" title="Price per share">
                 Share price
               </th>
-              <th className="w-[12%] cursor-pointer text-right" onClick={() => onToggleSort('totalAssetsUsd')}>
+              <th
+                className="w-[12%] cursor-pointer text-right"
+                onClick={() => onToggleSort('totalAssetsUsd')}
+              >
                 TVL{sortIndicator('totalAssetsUsd')}
               </th>
               <th
@@ -172,9 +173,14 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                     >
                       <div className="flex flex-col min-w-0">
                         <span className="font-medium truncate" title={v.name}>
-                          {v.name || v.symbol || `${v.address.slice(0, 6)}...${v.address.slice(-4)}`}
+                          {v.name ||
+                            v.symbol ||
+                            `${v.address.slice(0, 6)}...${v.address.slice(-4)}`}
                         </span>
-                        <span className="text-[10px] text-base-content/60 truncate" title={v.symbol}>
+                        <span
+                          className="text-[10px] text-base-content/60 truncate"
+                          title={v.symbol}
+                        >
                           {v.symbol}
                         </span>
                       </div>
@@ -263,7 +269,10 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                   </td>
                   <td className="text-right">
                     <div className="flex flex-col items-end text-xs">
-                      <span className="font-semibold" title={usd ? `$${formatUsd(usd)}` : undefined}>
+                      <span
+                        className="font-semibold"
+                        title={usd ? `$${formatUsd(usd)}` : undefined}
+                      >
                         {usd
                           ? abbreviateUsd(usd)
                           : `${abbreviateNumber(tvlNativeVal)} ${underlyingToken?.symbol ?? ''}`}

@@ -134,9 +134,7 @@ export function formatPrice(v: number): string {
  * Lives here, in the dependency-free formatter module, so a HOOK can band a
  * score without importing a component-tree helper.
  */
-export function riskBand(
-  score: number | null | undefined,
-): 'low' | 'medium' | 'high' | 'unknown' {
+export function riskBand(score: number | null | undefined): 'low' | 'medium' | 'high' | 'unknown' {
   if (score == null || score === 0) return 'unknown'
   if (score <= 2) return 'low'
   if (score === 3) return 'medium'

@@ -292,11 +292,11 @@ export function useVaultActionExecution(
     setExecutingMain(true)
     setError(null)
 
-    const { ok, error: txError, hash } = await sendBatch([
-      ...permissions,
-      ...result.transactions,
-      ...result.postTransactions,
-    ])
+    const {
+      ok,
+      error: txError,
+      hash,
+    } = await sendBatch([...permissions, ...result.transactions, ...result.postTransactions])
     setExecutingMain(false)
     if (!ok) {
       setError(txError ?? 'Transaction failed')

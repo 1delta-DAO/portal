@@ -93,9 +93,7 @@ export interface VaultActionResult {
 
 const VAULT_ACTIONS_BASE = '/v1/actions/vaults'
 
-export async function fetchVaultAction(
-  params: VaultActionParams
-): Promise<VaultActionResult> {
+export async function fetchVaultAction(params: VaultActionParams): Promise<VaultActionResult> {
   try {
     const family = params.family ?? vaultFamily(params.provider)
     const route = resolveVaultRoute(family, params.verb)
@@ -122,9 +120,7 @@ export async function fetchVaultAction(
 
     // Amount only matters for deposit / withdraw / request-withdraw.
     const verbUsesAmount =
-      params.verb === 'deposit' ||
-      params.verb === 'withdraw' ||
-      params.verb === 'request-withdraw'
+      params.verb === 'deposit' || params.verb === 'withdraw' || params.verb === 'request-withdraw'
     if (verbUsesAmount && params.amount != null) qs.set('amount', params.amount)
 
     if (params.receiver) qs.set('receiver', params.receiver)

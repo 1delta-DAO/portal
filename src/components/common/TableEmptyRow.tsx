@@ -20,10 +20,7 @@ export const TableEmptyRow: React.FC<TableEmptyRowProps> = ({
   className = '',
 }) => (
   <tr>
-    <td
-      colSpan={colSpan}
-      className={`text-center py-6 text-sm text-base-content/60 ${className}`}
-    >
+    <td colSpan={colSpan} className={`text-center py-6 text-sm text-base-content/60 ${className}`}>
       {children}
     </td>
   </tr>

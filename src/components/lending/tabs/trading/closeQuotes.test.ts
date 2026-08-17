@@ -91,13 +91,10 @@ describe('Close quote normalization', () => {
     expect(q.closeSplit).toBeDefined()
     expect(q.closeSplit!.debtRepaidUSD).toBeCloseTo(loanUnit * DEBT, 8)
     expect(q.closeSplit!.loanReturnedUSD).toBeCloseTo(loanUnit * LOAN_BACK, 8)
-    expect(q.closeSplit!.collateralReturnedUSD).toBeCloseTo(
-      collUnit * COLL_BACK,
-      8,
-    )
+    expect(q.closeSplit!.collateralReturnedUSD).toBeCloseTo(collUnit * COLL_BACK, 8)
     expect(q.closeSplit!.returnedTotalUSD).toBeCloseTo(
       q.closeSplit!.loanReturnedUSD + q.closeSplit!.collateralReturnedUSD,
-      8,
+      8
     )
     expect(q.closeSplit!.returnedTotalUSD).toBeGreaterThan(0)
   })

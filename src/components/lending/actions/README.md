@@ -7,6 +7,7 @@ projection, rate impact, sub-account selection, simulation hook,
 success banner).
 
 These are consumed by:
+
 - [../LendingDashboard/ActionPanel.tsx](../LendingDashboard/ActionPanel.tsx)
   in the standard lending dashboard, and
 - [../MarketsView/DepositPanel.tsx](../MarketsView/DepositPanel.tsx)

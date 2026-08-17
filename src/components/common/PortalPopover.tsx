@@ -29,7 +29,12 @@ export function CopyRow({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout>>(null)
 
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    []
+  )
 
   const short = `${value.slice(0, 6)}…${value.slice(-4)}`
 

@@ -23,7 +23,10 @@ import type {
   UserPositionEntry,
   UserSubAccount,
 } from '../../../../sdk/lending-helper/userPositionTypes'
-import { isAggregatePosition, isLoanPosition } from '../../../../sdk/lending-helper/userPositionTypes'
+import {
+  isAggregatePosition,
+  isLoanPosition,
+} from '../../../../sdk/lending-helper/userPositionTypes'
 import { useTokenBalances } from '../../../../hooks/lending/useTokenBalances'
 import { useLenderAccounts } from '../../../../hooks/lending/useLenderAccounts'
 import { useTokenLists } from '../../../../hooks/useTokenLists'

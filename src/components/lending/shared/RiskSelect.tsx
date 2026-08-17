@@ -37,8 +37,7 @@ export const RiskSelect: React.FC<RiskSelectProps> = ({ value, onChange }) => {
   // admits. A stored or URL-supplied 4 is not an option value, and falling
   // back to a fixed entry (this used to be OPTIONS[1]) displayed "Up to
   // medium" while high-risk rows were being served.
-  const current =
-    OPTIONS.find((o) => o.value >= value) ?? OPTIONS[OPTIONS.length - 1]
+  const current = OPTIONS.find((o) => o.value >= value) ?? OPTIONS[OPTIONS.length - 1]
 
   return (
     <div className="relative" ref={ref}>

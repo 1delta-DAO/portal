@@ -1,5 +1,9 @@
 import React, { useMemo } from 'react'
-import type { LenderData, LenderInfoMap, LenderSummary } from '../../../sdk/lending-helper/marketTypes'
+import type {
+  LenderData,
+  LenderInfoMap,
+  LenderSummary,
+} from '../../../sdk/lending-helper/marketTypes'
 import type { UserDataResult } from '../../../sdk/lending-helper/userPositionTypes'
 import { abbreviateUsd, computeLenderTvl, formatUsd } from '../../../utils/format'
 import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'

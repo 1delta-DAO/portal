@@ -58,9 +58,7 @@ export const TokenRow: React.FC<TokenRowProps> = ({
     <div className="flex flex-col items-start min-w-0 flex-1">
       <div className="flex items-center gap-1.5 min-w-0 max-w-full">
         <span className="font-medium text-sm truncate">{token.symbol}</span>
-        {price > 0 && (
-          <span className="text-[10px] text-base-content/40">{fmtPrice(price)}</span>
-        )}
+        {price > 0 && <span className="text-[10px] text-base-content/40">{fmtPrice(price)}</span>}
       </div>
       <span className="text-xs text-base-content/50 truncate">{token.name}</span>
       <span
@@ -72,8 +70,17 @@ export const TokenRow: React.FC<TokenRowProps> = ({
         title="Copy address"
       >
         {token.address.slice(0, 6)}...{token.address.slice(-4)}
-        <svg className="w-2.5 h-2.5 inline-block shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        <svg
+          className="w-2.5 h-2.5 inline-block shrink-0"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
       </span>
     </div>
@@ -81,9 +88,7 @@ export const TokenRow: React.FC<TokenRowProps> = ({
       {balanceAmount > 0 && (
         <span className="text-sm font-medium">{fmtBalance(balanceAmount)}</span>
       )}
-      {usdValue > 0 && (
-        <span className="text-xs text-base-content/50">{fmtUsd(usdValue)}</span>
-      )}
+      {usdValue > 0 && <span className="text-xs text-base-content/50">{fmtUsd(usdValue)}</span>}
     </div>
   </button>
 )

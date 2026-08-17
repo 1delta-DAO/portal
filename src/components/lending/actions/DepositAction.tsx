@@ -23,11 +23,7 @@ import { useTermsAcknowledgement } from '../terms/TermsDisclosure'
 import { useTermSheet } from '../../../hooks/lending/useTermSheet'
 import { useTokenLists } from '../../../hooks/useTokenLists'
 import { useTokenBalances } from '../../../hooks/lending/useTokenBalances'
-import {
-  resolveSmartLeg,
-  SmartLegInput,
-  type SmartLegState,
-} from '../shared/SmartLegInput'
+import { resolveSmartLeg, SmartLegInput, type SmartLegState } from '../shared/SmartLegInput'
 
 export const DepositAction: React.FC<ActionPanelProps> = ({
   pool,

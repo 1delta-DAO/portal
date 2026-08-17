@@ -29,7 +29,9 @@ export const BrokeredAprCell: React.FC<{ terms?: PoolTerm[] | null }> = ({ terms
       className="inline-flex flex-col items-start gap-0.5 cursor-help"
       onMouseEnter={show}
       onMouseLeave={hide}
-      title={list.length === 0 ? 'Fixed-term borrowing only — variable borrow unavailable' : undefined}
+      title={
+        list.length === 0 ? 'Fixed-term borrowing only — variable borrow unavailable' : undefined
+      }
     >
       <span className="badge badge-xs bg-warning/15 text-warning border-0 font-medium">Fixed</span>
       {bestApr != null && (

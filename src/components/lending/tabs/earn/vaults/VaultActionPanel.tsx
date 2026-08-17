@@ -22,11 +22,7 @@ import { WalletConnect } from '../../../../connect'
 import { NativeCurrencySelector } from '../../../actions/NativeCurrencySelector'
 import { SpyModeNotice } from '../../../shared/SpyModeNotice'
 import { TransactionSuccess } from '../../../actions/TransactionSuccess'
-import {
-  formatTokenAmount,
-  formatUsd,
-  parseAmount,
-} from '../../../actions/format'
+import { formatTokenAmount, formatUsd, parseAmount } from '../../../actions/format'
 import type { TokenBalance } from '../../../../../hooks/lending/useTokenBalances'
 import {
   PROVIDER_LABELS,
@@ -101,8 +97,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
   const isWrappedNative = !!selected && isWNative(underlyingToken)
   const canUseNative = isWrappedNative && !!nativeToken
   // Provider-native depositNative is only supported by Fluid's fWETH today.
-  const supportsProviderNativeDeposit =
-    canUseNative && selected?.provider === 'fluid'
+  const supportsProviderNativeDeposit = canUseNative && selected?.provider === 'fluid'
 
   // Reset state when the selected vault changes
   useEffect(() => {
@@ -122,17 +117,15 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
   }, [canUseNative, useNative, walletBalance, nativeBalance, tab])
 
   const payAsset = canUseNative && useNative && tab === 'Deposit' ? zeroAddress : undefined
-  const nativeProvider = supportsProviderNativeDeposit && useNative && tab === 'Deposit'
-    ? selected?.provider
-    : undefined
+  const nativeProvider =
+    supportsProviderNativeDeposit && useNative && tab === 'Deposit' ? selected?.provider : undefined
 
   // Async exits submit a request now and are claimed later from the Pending
   // Withdrawals list. That's every lst/gmx/lagoon vault plus the savings
   // vaults whose `withdrawalMode` is cooldown/request-based/queued (sUSDe,
   // sNUSD, sUSD3, the Strata tranches, apyUSD, Native wNLP, …) — instant
   // savings vaults (sUSDS, sDAI) settle in the same transaction.
-  const isAsyncWithdraw =
-    tab === 'Withdraw' && !!selected && isAsyncVaultWithdraw(selected)
+  const isAsyncWithdraw = tab === 'Withdraw' && !!selected && isAsyncVaultWithdraw(selected)
   const executeLabel = isAsyncWithdraw ? 'Request Withdrawal' : `Execute ${tab}`
   // Withdrawals route per *vault*, not per provider: an instant savings vault
   // (sUSDS, sDAI) exits through the generic `/withdraw`, while a
@@ -146,9 +139,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
   // `request-withdraw` takes SHARE units on every route that accepts it, so
   // async exits max out on the share balance; instant ones stay in underlying
   // units (and keep the withdraw-all path).
-  const withdrawVerb: VaultActionVerb | undefined = isAsyncWithdraw
-    ? 'request-withdraw'
-    : undefined
+  const withdrawVerb: VaultActionVerb | undefined = isAsyncWithdraw ? 'request-withdraw' : undefined
   const isAllDirect = tab === 'Withdraw' && !isAsyncWithdraw && isAll
 
   // LST delegation (validator / group / pool selection) — deposit-only. When a
@@ -158,9 +149,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
   const delegationReady = !delegation || !delegation.required || !!delegationChoice
   const extraParams = useMemo(
     () =>
-      delegation && delegationChoice
-        ? { [delegation.optionKey]: delegationChoice }
-        : undefined,
+      delegation && delegationChoice ? { [delegation.optionKey]: delegationChoice } : undefined,
     [delegation, delegationChoice]
   )
 
@@ -197,10 +186,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
   // the override is a valid address and a vault is selected — otherwise the
   // hook's enabled gate keeps it idle. `includeZero` is on so freshly-empty
   // receivers still get a "0" line instead of a missing row.
-  const receiverVaults = useMemo(
-    () => (selected ? [selected.address] : []),
-    [selected]
-  )
+  const receiverVaults = useMemo(() => (selected ? [selected.address] : []), [selected])
   const {
     byVault: receiverByVault,
     isLoading: receiverLoading,
@@ -214,7 +200,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
     enabled: !!receiverOverride && !!selected,
   })
   const receiverPosition = useMemo(
-    () => (selected ? receiverByVault.get(selected.address.toLowerCase()) ?? null : null),
+    () => (selected ? (receiverByVault.get(selected.address.toLowerCase()) ?? null) : null),
     [selected, receiverByVault]
   )
 
@@ -225,10 +211,10 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
   // balance.
   const maxAmountStr =
     tab === 'Deposit'
-      ? activeBal?.balance ?? '0'
+      ? (activeBal?.balance ?? '0')
       : isAsyncWithdraw
-        ? userPosition?.shares ?? '0'
-        : userPosition?.assets ?? '0'
+        ? (userPosition?.shares ?? '0')
+        : (userPosition?.assets ?? '0')
 
   // Warn whenever the amount exceeds the ceiling — a ceiling of exactly ZERO
   // included (empty wallet on Deposit, no position on Withdraw), which the old
@@ -473,10 +459,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
                     </span>
                   ) : receiverError ? (
                     <span className="flex items-center gap-1">
-                      <span
-                        className="text-error/80"
-                        title={receiverError.message}
-                      >
+                      <span className="text-error/80" title={receiverError.message}>
                         unavailable
                       </span>
                       <button
@@ -666,24 +649,29 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
           )}
 
           {/* APR-derived monthly earnings estimate (Deposit only) */}
-          {tab === 'Deposit' && selected && isSupplyRateMeaningful(selected) && (() => {
-            const amt = parseAmount(amount)
-            const px = selected.underlyingPriceUsd ?? userPosition?.priceUSD ?? 0
-            // Project off the real (base) yield — incentive-inflated totals
-            // would wildly overstate expected earnings.
-            const apr = baseApr(selected)
-            const monthly = amt > 0 && px > 0 && apr > 0 ? (amt * px * (apr / 100)) / 12 : 0
-            if (monthly <= 0) return null
-            return (
-              <div className="text-xs flex items-center justify-between gap-2 px-1">
-                <span className="text-base-content/60 whitespace-nowrap">Earnings / month</span>
-                <span className="text-success font-medium whitespace-nowrap">
-                  ~${formatUsd(monthly)}
-                  <span className="text-base-content/40 font-normal ml-1">({apr.toFixed(2)}%)</span>
-                </span>
-              </div>
-            )
-          })()}
+          {tab === 'Deposit' &&
+            selected &&
+            isSupplyRateMeaningful(selected) &&
+            (() => {
+              const amt = parseAmount(amount)
+              const px = selected.underlyingPriceUsd ?? userPosition?.priceUSD ?? 0
+              // Project off the real (base) yield — incentive-inflated totals
+              // would wildly overstate expected earnings.
+              const apr = baseApr(selected)
+              const monthly = amt > 0 && px > 0 && apr > 0 ? (amt * px * (apr / 100)) / 12 : 0
+              if (monthly <= 0) return null
+              return (
+                <div className="text-xs flex items-center justify-between gap-2 px-1">
+                  <span className="text-base-content/60 whitespace-nowrap">Earnings / month</span>
+                  <span className="text-success font-medium whitespace-nowrap">
+                    ~${formatUsd(monthly)}
+                    <span className="text-base-content/40 font-normal ml-1">
+                      ({apr.toFixed(2)}%)
+                    </span>
+                  </span>
+                </div>
+              )
+            })()}
 
           {/* Async exit explainer — the request matures off-chain, then is
               claimed from the Pending Withdrawals list below the table. For
@@ -692,11 +680,8 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
           {isAsyncWithdraw && selected && (
             <div className="text-[11px] text-base-content/60 wrap-break-word px-1">
               {(() => {
-                const wait = formatCooldown(
-                  savingsWithdrawalCooldownSeconds(selected)
-                )
-                const label =
-                  selected.curator ?? PROVIDER_LABELS[selected.provider]
+                const wait = formatCooldown(savingsWithdrawalCooldownSeconds(selected))
+                const label = selected.curator ?? PROVIDER_LABELS[selected.provider]
                 return wait
                   ? `${label} withdrawals have a ${wait} cooldown: this submits a redeem request. Claim it from “Pending withdrawals” once it matures.`
                   : `${label} withdrawals are asynchronous: this submits a redeem request. Once it matures, claim it from “Pending withdrawals”.`
@@ -736,44 +721,49 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
           )}
 
           {/* Permissions */}
-          {exec.result && !overMaxBlocksExecute && delegationReady && !useAtomicPath && exec.hasPermissions && !exec.allPermissionsDone && (
-            <div className="space-y-1">
-              <span className="text-xs text-base-content/60">
-                Approvals ({exec.permissionsCompleted}/{exec.permissions.length})
-              </span>
-              {exec.permissions.map((perm, i) => {
-                const done = i < exec.permissionsCompleted
-                const isCurrent = i === exec.permissionsCompleted
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    className={`btn btn-sm w-full ${
-                      done
-                        ? 'btn-disabled btn-outline btn-success'
-                        : isCurrent
-                          ? 'btn-warning'
-                          : 'btn-outline btn-ghost'
-                    }`}
-                    disabled={!isCurrent || exec.executingPermission}
-                    onClick={isCurrent ? exec.executeNextPermission : undefined}
-                    title={perm.description || `Approval ${i + 1}`}
-                  >
-                    <span className="truncate max-w-full">
-                      {done
-                        ? `✓ ${perm.description || `Approval ${i + 1}`}`
-                        : isCurrent && exec.executingPermission
-                          ? null
-                          : perm.description || `Approval ${i + 1}`}
-                      {isCurrent && exec.executingPermission && (
-                        <span className="loading loading-spinner loading-xs" />
-                      )}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          )}
+          {exec.result &&
+            !overMaxBlocksExecute &&
+            delegationReady &&
+            !useAtomicPath &&
+            exec.hasPermissions &&
+            !exec.allPermissionsDone && (
+              <div className="space-y-1">
+                <span className="text-xs text-base-content/60">
+                  Approvals ({exec.permissionsCompleted}/{exec.permissions.length})
+                </span>
+                {exec.permissions.map((perm, i) => {
+                  const done = i < exec.permissionsCompleted
+                  const isCurrent = i === exec.permissionsCompleted
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`btn btn-sm w-full ${
+                        done
+                          ? 'btn-disabled btn-outline btn-success'
+                          : isCurrent
+                            ? 'btn-warning'
+                            : 'btn-outline btn-ghost'
+                      }`}
+                      disabled={!isCurrent || exec.executingPermission}
+                      onClick={isCurrent ? exec.executeNextPermission : undefined}
+                      title={perm.description || `Approval ${i + 1}`}
+                    >
+                      <span className="truncate max-w-full">
+                        {done
+                          ? `✓ ${perm.description || `Approval ${i + 1}`}`
+                          : isCurrent && exec.executingPermission
+                            ? null
+                            : perm.description || `Approval ${i + 1}`}
+                        {isCurrent && exec.executingPermission && (
+                          <span className="loading loading-spinner loading-xs" />
+                        )}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
 
           {/* Execute */}
           {exec.result &&

@@ -33,7 +33,7 @@ export function useTablePagination<T>(
    * Extra dependencies that should reset the current page back to 0 when
    * they change (e.g. search query, sort key, sort direction).
    */
-  resetDeps: ReadonlyArray<unknown> = [],
+  resetDeps: ReadonlyArray<unknown> = []
 ): TablePagination<T> {
   const [page, setPage] = useState(0)
 
@@ -53,7 +53,7 @@ export function useTablePagination<T>(
 
   const pagedItems = useMemo(
     () => items.slice(safePage * pageSize, (safePage + 1) * pageSize),
-    [items, safePage, pageSize],
+    [items, safePage, pageSize]
   )
 
   const start = itemCount === 0 ? 0 : safePage * pageSize + 1

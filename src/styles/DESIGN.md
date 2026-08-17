@@ -3,7 +3,7 @@
 The canonical visual conventions for the Portal frontend. This is a **financial
 terminal**: data-dense, professional, restrained. The default theme is
 `bloomberg` (pure-black, amber). New UI should match what's documented here, not
-re-invent it. Most rules below are the *de-facto* practice already in the
+re-invent it. Most rules below are the _de-facto_ practice already in the
 codebase, promoted to canon and backed by the research notes at the bottom.
 
 > Philosophy: **density is value ÷ (time × space)**, not raw element count.
@@ -13,13 +13,13 @@ codebase, promoted to canon and backed by the research notes at the bottom.
 
 ## 1. Typography scale
 
-| Token            | Use                                                        |
-| ---------------- | ---------------------------------------------------------- |
-| `text-[10px]`    | Dense labels: column headers, badges, chips, micro-labels  |
-| `text-xs` (12px) | **Default body / secondary text**, table cells             |
-| `text-sm` (14px) | Section titles, modal titles, headers                      |
-| `text-lg` (18px) | Headline values only (net worth, summary totals)           |
-| `text-xl`/`3xl`  | App title (navbar) only                                    |
+| Token            | Use                                                       |
+| ---------------- | --------------------------------------------------------- |
+| `text-[10px]`    | Dense labels: column headers, badges, chips, micro-labels |
+| `text-xs` (12px) | **Default body / secondary text**, table cells            |
+| `text-sm` (14px) | Section titles, modal titles, headers                     |
+| `text-lg` (18px) | Headline values only (net worth, summary totals)          |
+| `text-xl`/`3xl`  | App title (navbar) only                                   |
 
 - **Avoid one-off sizes** (`text-[9px]`, `text-[11px]`, `text-base`). Snap to the scale.
 - Weights: `font-medium` = muted/secondary, `font-semibold` = values & labels,
@@ -63,7 +63,7 @@ Use **theme tokens only** — no hardcoded hex/hsl in components (theme CSS exce
 - Flex gaps: `gap-2` default, `gap-1` compact, `gap-3` spacious.
 - Vertical stacks: `space-y-3`, sections `space-y-3 sm:space-y-4`.
 
-## 4. Tables  ← the core of the product
+## 4. Tables ← the core of the product
 
 - Class baseline: `table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden`.
 - **Numeric columns are right-aligned** (`text-right`) — APR, USD, %, leverage,
@@ -79,20 +79,20 @@ Use **theme tokens only** — no hardcoded hex/hsl in components (theme CSS exce
 - **Zebra striping is allowed** (it aids long/static tables); just keep the
   hover state visually distinct from the stripe (handled per-theme in globals.css).
 
-## 5. Numbers & currency  (`src/utils/format.ts`)
+## 5. Numbers & currency (`src/utils/format.ts`)
 
 Route **all** number rendering through the shared utils — don't `toFixed` inline.
 
-| Need                  | Util                                  |
-| --------------------- | ------------------------------------- |
-| USD, full             | `formatUsd`                           |
-| USD, abbreviated      | `abbreviateUsd`                       |
-| Token amount          | `formatTokenAmount`                   |
-| Number, abbreviated   | `abbreviateNumber`                    |
-| Percent / APR         | `formatPercent` (2dp default)         |
-| Leverage / multiplier | `formatLeverage` (`2.50×`)            |
-| Price (magnitude-aware)| `formatPrice`                        |
-| Missing value         | `formatEmptyValue` / `EMPTY_VALUE` (`—`) |
+| Need                    | Util                                     |
+| ----------------------- | ---------------------------------------- |
+| USD, full               | `formatUsd`                              |
+| USD, abbreviated        | `abbreviateUsd`                          |
+| Token amount            | `formatTokenAmount`                      |
+| Number, abbreviated     | `abbreviateNumber`                       |
+| Percent / APR           | `formatPercent` (2dp default)            |
+| Leverage / multiplier   | `formatLeverage` (`2.50×`)               |
+| Price (magnitude-aware) | `formatPrice`                            |
+| Missing value           | `formatEmptyValue` / `EMPTY_VALUE` (`—`) |
 
 Empty / null / non-finite → always `—` (`EMPTY_VALUE`). Never `-`, `–`, `N/A`, `0`.
 
@@ -112,7 +112,7 @@ Empty / null / non-finite → always `—` (`EMPTY_VALUE`). Never `-`, `–`, `N
       clips it, and the drag chains to the page instead of scrolling.
     - **Background lock:** iOS ignores `overflow: hidden` on `<html>`/`<body>`,
       so pin `<body>` to `position: fixed` at `top: -scrollY` while open and
-      restore scroll on close. This is safe *because* the inner list is its own
+      restore scroll on close. This is safe _because_ the inner list is its own
       scroll container (above) — the two MUST be paired. Without the pin,
       dismissing the keyboard leaves the page scrollable behind the modal.
 - Floating popovers: `bg-base-200 border border-base-300 rounded-box shadow-xl`.
@@ -122,20 +122,20 @@ Empty / null / non-finite → always `—` (`EMPTY_VALUE`). Never `-`, `–`, `N
 
 ### z-index ladder (use these, nothing in between)
 
-| Layer                          | z      |
-| ------------------------------ | ------ |
-| Table sticky headers           | `z-20` |
-| Dropdowns / select menus       | `z-50` |
-| Navbar                         | `z-50` |
-| Modal backdrop / content       | `z-40` / `z-50` |
-| IRM dock                       | `z-[9990]` |
-| Portal popovers (asset/vault)  | `z-[9999]` |
+| Layer                         | z               |
+| ----------------------------- | --------------- |
+| Table sticky headers          | `z-20`          |
+| Dropdowns / select menus      | `z-50`          |
+| Navbar                        | `z-50`          |
+| Modal backdrop / content      | `z-40` / `z-50` |
+| IRM dock                      | `z-[9990]`      |
+| Portal popovers (asset/vault) | `z-[9999]`      |
 
 Anything `fixed`/portaled that floats over modals must be `z-50`+; popovers `z-[9999]`.
 
 ## 7. Motion
 
-Restraint and speed. Gate every animation behind "*should this animate at all?*"
+Restraint and speed. Gate every animation behind "_should this animate at all?_"
 
 - Durations **< 300ms** (≈150–200ms feels most responsive). The existing
   `animate-in fade-in zoom-in-95 duration-100` on popovers is the reference.

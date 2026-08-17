@@ -156,10 +156,9 @@ export async function fetchMigrate(params: MigrateParams): Promise<MigrateResult
       qs.set('sourceDebtDecimals', String(params.sourceDebtDecimals))
     if (params.slippage != null) qs.set('slippage', String(params.slippage))
 
-    const { data, actions } = await apiFetchEnvelope<{ result?: any }>(
-      '/v1/actions/loop/migrate',
-      { params: Object.fromEntries(qs) }
-    )
+    const { data, actions } = await apiFetchEnvelope<{ result?: any }>('/v1/actions/loop/migrate', {
+      params: Object.fromEntries(qs),
+    })
 
     return {
       success: true,

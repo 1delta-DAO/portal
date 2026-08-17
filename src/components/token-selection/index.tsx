@@ -15,12 +15,7 @@ import { useSpyAccount } from '../../contexts/SpyMode'
 import { getMainTokensCache, isMainToken } from '../../lib/assetLists'
 import { getUserTokensForChain, addUserToken, isUserToken } from '../../lib/userTokens'
 import { useDebounce } from '../../hooks/useDebounce'
-import {
-  NO_MATCH,
-  compareTokenMatches,
-  normalizeTokenQuery,
-  scoreTokenMatch,
-} from './tokenSearch'
+import { NO_MATCH, compareTokenMatches, normalizeTokenQuery, scoreTokenMatch } from './tokenSearch'
 
 const MAX_SEARCH_RESULTS = 100
 /**

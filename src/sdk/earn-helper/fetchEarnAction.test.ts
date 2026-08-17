@@ -18,9 +18,7 @@ const ENVELOPE = {
   data: { lender: 'AAVE_V3', estimatedShares: '999' },
   actions: {
     transactions: [{ to: '0xpool', data: '0xdeposit', value: '0' }],
-    permissions: [
-      { to: '0xusdc', data: '0xapprove', value: '0', description: 'Approve USDC' },
-    ],
+    permissions: [{ to: '0xusdc', data: '0xapprove', value: '0', description: 'Approve USDC' }],
     postTransactions: [{ to: '0xweth', data: '0xunwrap', value: '0' }],
     signatures: [],
   },
@@ -70,10 +68,7 @@ describe('fetchEarnAction', () => {
   it('surfaces the server error rather than swallowing it', async () => {
     vi.stubGlobal(
       'fetch',
-      mockFetch(
-        { success: false, error: { code: 'INVALID_PARAM', message: 'Bad uid' } },
-        false,
-      ),
+      mockFetch({ success: false, error: { code: 'INVALID_PARAM', message: 'Bad uid' } }, false)
     )
     const res = await fetchEarnAction(params)
     expect(res.success).toBe(false)

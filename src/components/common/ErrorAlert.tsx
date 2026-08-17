@@ -71,9 +71,7 @@ export const ErrorAlert: React.FC<ErrorAlertProps> = ({
           )}
         </button>
       </div>
-      <div className="text-error text-xs break-words max-h-24 overflow-y-auto">
-        {message}
-      </div>
+      <div className="text-error text-xs break-words max-h-24 overflow-y-auto">{message}</div>
     </div>
   )
 }

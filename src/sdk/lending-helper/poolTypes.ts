@@ -170,7 +170,7 @@ export interface MarketCapability {
 /** Does the API declare this row supports `action`? */
 export function hasCapability(
   pool: { capabilities?: MarketCapability[] } | null | undefined,
-  action: MarketCapability['action'],
+  action: MarketCapability['action']
 ): boolean {
   return !!pool?.capabilities?.some((c) => c.action === action)
 }

@@ -141,12 +141,12 @@ Fetches every pool for each selected chain, paging until the server runs short
 refetches only that chain and one chain failing degrades to a partial result
 rather than blanking the table.
 
-|              |                                                                                                       |
-| ------------ | ----------------------------------------------------------------------------------------------------- |
-| **Endpoint** | `GET /v1/data/lending/pools?chainId=&lender=&start=&count=&includeExposures=true`                     |
-| **Params**   | `chainIds`, `lender?`, `maxRiskScore?`, `pageSize?`, `filters?`, `enabled?`                           |
+|              |                                                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------------------ |
+| **Endpoint** | `GET /v1/data/lending/pools?chainId=&lender=&start=&count=&includeExposures=true`                      |
+| **Params**   | `chainIds`, `lender?`, `maxRiskScore?`, `pageSize?`, `filters?`, `enabled?`                            |
 | **Returns**  | `{ pools: PoolEntry[], count, isPoolsLoading, isPoolsFetching, failedChains, truncatedChains, error }` |
-| **Caching**  | `staleTime: 30s`, `refetchInterval: 8 min`                                                            |
+| **Caching**  | `staleTime: 30s`, `refetchInterval: 8 min`                                                             |
 
 Merging happens in `useQueries({ combine })`, not a `useMemo` over the results
 array — `useQueries` returns a new array identity every render, so a memo keyed
@@ -282,11 +282,11 @@ This approach offloads RPC load to the client while keeping parsing server-side.
 
 Cross-chain swap quotes for the Cross-Chain tab (`XChainSwapPanel`).
 
-| Item        | Value                                                                    |
-| ----------- | ------------------------------------------------------------------------ |
-| **Endpoint**| `GET /v1/actions/swap/x-chain`                                           |
-| **Params**  | `fromChainId, toChainId, tokenIn, tokenOut, amount, slippage, account?, receiver?, order?` |
-| **Returns** | Bridge quotes (`bridge`, `tradeOutput`, `estimatedDuration`, `approvalTarget`) index-matched to `actions.alternatives` |
+| Item         | Value                                                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| **Endpoint** | `GET /v1/actions/swap/x-chain`                                                                                         |
+| **Params**   | `fromChainId, toChainId, tokenIn, tokenOut, amount, slippage, account?, receiver?, order?`                             |
+| **Returns**  | Bridge quotes (`bridge`, `tradeOutput`, `estimatedDuration`, `approvalTarget`) index-matched to `actions.alternatives` |
 
 Same-chain pairs fall back server-side to the spot meta-aggregator (`data.fallback === 'spot'`,
 rows carry `aggregator`). Approvals are **per bridge** — `permissionsForQuote(quote)` filters

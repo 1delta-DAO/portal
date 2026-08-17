@@ -1,9 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import type { RawCurrency } from '../types/currency'
-import {
-  loadTokenListForChain,
-  getChainTokensCache,
-} from '../lib/data/tokenListsCache'
+import { loadTokenListForChain, getChainTokensCache } from '../lib/data/tokenListsCache'
 
 /**
  * Fetches the token list for a single chain on demand.

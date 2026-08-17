@@ -35,11 +35,7 @@ export const TokenSelectorListMode: React.FC<TokenSelectorListModeProps> = ({
   }
 
   if (rows.length === 0) {
-    return (
-      <div className="text-center py-6 text-base-content/50 text-sm">
-        No tokens found
-      </div>
-    )
+    return <div className="text-center py-6 text-base-content/50 text-sm">No tokens found</div>
   }
 
   return (

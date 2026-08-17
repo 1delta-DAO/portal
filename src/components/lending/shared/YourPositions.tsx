@@ -1,6 +1,9 @@
 import React, { useState } from 'react'
 import type { PoolDataItem } from '../../../sdk/lending-helper/marketTypes'
-import type { UserPositionEntry, UserSubAccount } from '../../../sdk/lending-helper/userPositionTypes'
+import type {
+  UserPositionEntry,
+  UserSubAccount,
+} from '../../../sdk/lending-helper/userPositionTypes'
 import type { PoolSide } from '../tabs/trading/types'
 import { formatUsd, abbreviateUsd, formatTokenAmount } from '../../../utils/format'
 import { AssetPopover } from './AssetPopover'
@@ -427,8 +430,7 @@ function PositionSection({
                 midnightApr ??
                 (isDeposits
                   ? positionSupplyRate(pool, pool.depositRate)
-                  : positionBorrowRate(pool, pool.variableBorrowRate))) +
-              (pool.intrinsicYield ?? 0)
+                  : positionBorrowRate(pool, pool.variableBorrowRate))) + (pool.intrinsicYield ?? 0)
             const sharePct = totalUsd > 0 ? (usd / totalUsd) * 100 : 0
             const barPct = maxUsd > 0 ? Math.max(2, (usd / maxUsd) * 100) : 0
 

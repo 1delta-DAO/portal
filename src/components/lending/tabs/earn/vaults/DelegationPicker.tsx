@@ -2,10 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { formatUnits } from 'viem'
 import { abbreviateNumber } from '../../../../../utils/format'
 import { useVaultValidators } from '../../../../../hooks/vaults'
-import type {
-  VaultDelegation,
-  VaultValidatorItem,
-} from '../../../../../sdk/vaults-helper'
+import type { VaultDelegation, VaultValidatorItem } from '../../../../../sdk/vaults-helper'
 
 interface DelegationPickerProps {
   chainId: string
@@ -29,9 +26,7 @@ const KIND_LABELS: Record<VaultDelegation['kind'], string> = {
 }
 
 function shortId(id: string): string {
-  return id.startsWith('0x') && id.length > 12
-    ? `${id.slice(0, 6)}…${id.slice(-4)}`
-    : id
+  return id.startsWith('0x') && id.length > 12 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id
 }
 
 function room(req: string | undefined, decimals: number): string | null {
@@ -74,8 +69,7 @@ export const DelegationPicker: React.FC<DelegationPickerProps> = ({
   useEffect(() => {
     if (isOffchain || !delegation.required || value || validators.length === 0) return
     const pick =
-      validators.find((v) => v.recommended && v.selectable) ??
-      validators.find((v) => v.selectable)
+      validators.find((v) => v.recommended && v.selectable) ?? validators.find((v) => v.selectable)
     if (pick) onChange(pick.id)
   }, [isOffchain, delegation.required, value, validators, onChange])
 

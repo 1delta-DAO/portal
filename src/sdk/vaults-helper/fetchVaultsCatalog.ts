@@ -31,9 +31,8 @@ export async function fetchVaultsCatalog(
   params: FetchVaultsCatalogParams
 ): Promise<FetchVaultsCatalogResult> {
   try {
-    const providers = params.providers && params.providers.length > 0
-      ? params.providers
-      : VAULT_PROVIDERS
+    const providers =
+      params.providers && params.providers.length > 0 ? params.providers : VAULT_PROVIDERS
 
     const items: RawVault[] = []
     let start = 0
@@ -118,8 +117,7 @@ function normalizeVault(v: RawVault): VaultEntry | null {
     fee: toNumber(rates.fee),
     curator: deriveCurator(provider, v),
     // Resolved icon — vaultInfo first, then the underlying asset's logo.
-    logoURI:
-      info.logoURI ?? v.underlyingInfo?.asset?.logoURI ?? undefined,
+    logoURI: info.logoURI ?? v.underlyingInfo?.asset?.logoURI ?? undefined,
     assetGroup: info.assetGroup ?? undefined,
     yieldProfile: info.yieldProfile ?? undefined,
     denomination: info.denomination ?? undefined,

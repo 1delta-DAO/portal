@@ -244,10 +244,7 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
               // Show separator between preferred and non-preferred groups
               const prevPool = idx > 0 ? visible[idx - 1] : null
               const showSeparator =
-                hasPreferred &&
-                !isPreferred &&
-                prevPool &&
-                preferredUids!.has(prevPool.marketUid)
+                hasPreferred && !isPreferred && prevPool && preferredUids!.has(prevPool.marketUid)
 
               return (
                 <React.Fragment key={pool.marketUid}>

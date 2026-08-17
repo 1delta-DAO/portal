@@ -44,7 +44,7 @@ export interface MarketDepthItem {
 
 async function fetchMarketDepth(
   marketUids: string[],
-  side: 'borrow' | 'supply' | 'both',
+  side: 'borrow' | 'supply' | 'both'
 ): Promise<MarketDepthItem[]> {
   if (marketUids.length === 0) return []
   const data = await apiFetch<{ items?: MarketDepthItem[] }>('/v1/data/lending/irm/depth', {
@@ -60,7 +60,7 @@ async function fetchMarketDepth(
  */
 export function useMarketDepth(
   marketUids: Array<string | undefined | null>,
-  side: 'borrow' | 'supply' | 'both' = 'borrow',
+  side: 'borrow' | 'supply' | 'both' = 'borrow'
 ) {
   const uids = marketUids.filter((u): u is string => !!u)
   const key = [...uids].sort().join(',')

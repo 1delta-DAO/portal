@@ -1,10 +1,4 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  type ReactNode,
-} from 'react'
+import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useIrmData } from '../../../hooks/lending/useIrmData'
 import { IrmCurveChart } from './IrmChart'
@@ -13,7 +7,7 @@ import { EmptyState } from '../../common/EmptyState'
 // Resolved at render time from the active DaisyUI theme so legend swatches
 // and stat numbers re-color on theme switch instead of staying neon.
 const DEPOSIT_COLOR = 'var(--color-success)'
-const BORROW_COLOR  = 'var(--color-warning)'
+const BORROW_COLOR = 'var(--color-warning)'
 
 // ---------------------------------------------------------------------------
 // Context
@@ -53,8 +47,12 @@ interface IrmDockedPanelProps extends IrmPanelEntry {
 }
 
 function IrmDockedPanel({
-  marketUid, marketName,
-  currentDepositRate, currentBorrowRate, onClose, fullWidth,
+  marketUid,
+  marketName,
+  currentDepositRate,
+  currentBorrowRate,
+  onClose,
+  fullWidth,
 }: IrmDockedPanelProps) {
   const { data, isLoading, error } = useIrmData(marketUid)
   const lenderKey = data?.lenderKey ?? marketUid.split(':')[0] ?? marketUid
@@ -84,8 +82,16 @@ function IrmDockedPanel({
             onClick={onClose}
             aria-label="Close"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-3.5 h-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -100,13 +106,19 @@ function IrmDockedPanel({
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl bg-base-200 px-3 py-2">
             <p className="text-[10px] text-base-content/50 mb-1 leading-none">Deposit APR</p>
-            <p className="text-lg font-bold leading-none tabular-nums" style={{ color: DEPOSIT_COLOR }}>
+            <p
+              className="text-lg font-bold leading-none tabular-nums"
+              style={{ color: DEPOSIT_COLOR }}
+            >
               {currentDepositRate !== undefined ? `${currentDepositRate.toFixed(2)}%` : '—'}
             </p>
           </div>
           <div className="rounded-xl bg-base-200 px-3 py-2">
             <p className="text-[10px] text-base-content/50 mb-1 leading-none">Borrow APR</p>
-            <p className="text-lg font-bold leading-none tabular-nums" style={{ color: BORROW_COLOR }}>
+            <p
+              className="text-lg font-bold leading-none tabular-nums"
+              style={{ color: BORROW_COLOR }}
+            >
               {currentBorrowRate !== undefined ? `${currentBorrowRate.toFixed(2)}%` : '—'}
             </p>
           </div>
@@ -133,8 +145,16 @@ function IrmDockedPanel({
             title="IRM data unavailable"
             description="No curve data returned for this market"
             icon={
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-full h-full"
-                fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                className="w-full h-full"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="12" cy="12" r="10" />
                 <line x1="12" y1="8" x2="12" y2="12" />
                 <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -148,8 +168,16 @@ function IrmDockedPanel({
             title="No data available"
             description="This market has no IRM curve"
             icon={
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-full h-full"
-                fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                className="w-full h-full"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M3 3l18 18M10.5 10.677A2 2 0 0113.5 12.5" />
                 <path d="M17 17H3V7a4 4 0 011.173-2.826M7 7h10v6" />
               </svg>
@@ -162,17 +190,31 @@ function IrmDockedPanel({
             {/* Legend */}
             <div className="flex items-center gap-4 mb-2 text-xs">
               <span className="flex items-center gap-1.5">
-                <span className="w-4 h-0.5 rounded inline-block" style={{ background: DEPOSIT_COLOR }} />
+                <span
+                  className="w-4 h-0.5 rounded inline-block"
+                  style={{ background: DEPOSIT_COLOR }}
+                />
                 <span className="text-base-content/50">Deposit APR</span>
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-4 h-0.5 rounded inline-block" style={{ background: BORROW_COLOR }} />
+                <span
+                  className="w-4 h-0.5 rounded inline-block"
+                  style={{ background: BORROW_COLOR }}
+                />
                 <span className="text-base-content/50">Borrow APR</span>
               </span>
               {currentUtilization !== undefined && (
                 <span className="flex items-center gap-1.5 ml-auto text-[10px] text-base-content/40">
                   <svg width="12" height="8" viewBox="0 0 12 8">
-                    <line x1="0" y1="4" x2="12" y2="4" stroke="currentColor" strokeDasharray="3 2" strokeWidth="1.5" />
+                    <line
+                      x1="0"
+                      y1="4"
+                      x2="12"
+                      y2="4"
+                      stroke="currentColor"
+                      strokeDasharray="3 2"
+                      strokeWidth="1.5"
+                    />
                   </svg>
                   current
                 </span>
@@ -191,13 +233,20 @@ function IrmDockedPanel({
 // Dock container
 // ---------------------------------------------------------------------------
 
-function IrmDockContainer({ panels, close }: { panels: IrmPanelEntry[]; close: (uid: string) => void }) {
+function IrmDockContainer({
+  panels,
+  close,
+}: {
+  panels: IrmPanelEntry[]
+  close: (uid: string) => void
+}) {
   if (panels.length === 0) return null
 
   return createPortal(
     <>
       {/* Desktop: horizontal row anchored bottom-left */}
-      <div className="hidden sm:flex fixed bottom-4 left-4 z-9990 flex-row items-end gap-3"
+      <div
+        className="hidden sm:flex fixed bottom-4 left-4 z-9990 flex-row items-end gap-3"
         style={{ maxWidth: 'calc(100vw - 2rem)' }}
       >
         {panels.map((p) => (
@@ -206,7 +255,8 @@ function IrmDockContainer({ panels, close }: { panels: IrmPanelEntry[]; close: (
       </div>
 
       {/* Mobile: vertical stack anchored bottom, full width */}
-      <div className="flex sm:hidden fixed bottom-0 left-0 right-0 z-9990 flex-col gap-2 p-3 pb-safe"
+      <div
+        className="flex sm:hidden fixed bottom-0 left-0 right-0 z-9990 flex-col gap-2 p-3 pb-safe"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         {panels.map((p) => (
@@ -214,7 +264,7 @@ function IrmDockContainer({ panels, close }: { panels: IrmPanelEntry[]; close: (
         ))}
       </div>
     </>,
-    document.body,
+    document.body
   )
 }
 
@@ -259,7 +309,10 @@ interface IrmDetailsButtonProps {
 }
 
 export function IrmDetailsButton({
-  marketUid, marketName, currentDepositRate, currentBorrowRate,
+  marketUid,
+  marketName,
+  currentDepositRate,
+  currentBorrowRate,
 }: IrmDetailsButtonProps) {
   const { open, close, panels } = useIrmDock()
   const isOpen = panels.some((p) => p.marketUid === marketUid)
@@ -273,7 +326,7 @@ export function IrmDetailsButton({
         open({ marketUid, marketName, currentDepositRate, currentBorrowRate })
       }
     },
-    [isOpen, open, close, marketUid, marketName, currentDepositRate, currentBorrowRate],
+    [isOpen, open, close, marketUid, marketName, currentDepositRate, currentBorrowRate]
   )
 
   return (
@@ -286,9 +339,16 @@ export function IrmDetailsButton({
     >
       {isOpen ? 'Close IRM' : 'IRM'}
       {!isOpen && (
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-2.5 h-2.5 opacity-60"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-          strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-2.5 h-2.5 opacity-60"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
           <polyline points="17 6 23 6 23 12" />
         </svg>

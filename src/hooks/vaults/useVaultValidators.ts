@@ -1,8 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import {
-  fetchVaultValidators,
-  type VaultValidatorItem,
-} from '../../sdk/vaults-helper'
+import { fetchVaultValidators, type VaultValidatorItem } from '../../sdk/vaults-helper'
 
 export interface UseVaultValidatorsParams {
   chainId?: string
@@ -23,9 +20,7 @@ export interface UseVaultValidatorsResult {
  * default — the caller enables it only for endpoint-sourced delegations (and,
  * for optional pickers, only once the user opens the advanced selector).
  */
-export function useVaultValidators(
-  params: UseVaultValidatorsParams
-): UseVaultValidatorsResult {
+export function useVaultValidators(params: UseVaultValidatorsParams): UseVaultValidatorsResult {
   const { chainId, shareToken, enabled = true } = params
   const queryEnabled = enabled && !!chainId && !!shareToken
 

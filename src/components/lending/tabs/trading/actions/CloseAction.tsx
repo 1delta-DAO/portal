@@ -505,9 +505,7 @@ export const CloseAction: React.FC<TradingActionProps> = ({
 
       {loopBlocked && (
         <div className="rounded-box border border-warning/30 bg-warning/5 p-2.5 text-xs">
-          <div className="font-medium text-warning mb-1">
-            Leveraged close unavailable here
-          </div>
+          <div className="font-medium text-warning mb-1">Leveraged close unavailable here</div>
           <p className="text-base-content/70 leading-snug">{loopBlocked}</p>
         </div>
       )}

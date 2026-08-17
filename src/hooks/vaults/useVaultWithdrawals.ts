@@ -30,15 +30,11 @@ export interface UseVaultWithdrawalsResult {
  * lagoon). Polls on the same cadence as positions so a request flips to
  * "claimable" without a manual refresh.
  */
-export function useVaultWithdrawals(
-  params: UseVaultWithdrawalsParams
-): UseVaultWithdrawalsResult {
+export function useVaultWithdrawals(params: UseVaultWithdrawalsParams): UseVaultWithdrawalsResult {
   const { chainId, account, enabled = true } = params
   const queryEnabled = enabled && !!chainId && !!account
 
-  const { data, isLoading, isFetching, error, refetch } = useQuery<
-    VaultWithdrawalRequest[]
-  >({
+  const { data, isLoading, isFetching, error, refetch } = useQuery<VaultWithdrawalRequest[]>({
     queryKey: ['vaultWithdrawals', chainId ?? '', account ?? ''],
     enabled: queryEnabled,
     queryFn: async () => {
@@ -67,9 +63,7 @@ export function useVaultWithdrawals(
  * verbatim into the claim/cancel builder. Kept loose because each protocol uses
  * a different subset.
  */
-function refFromRequest(
-  req: VaultWithdrawalRequest
-): Record<string, string | number | undefined> {
+function refFromRequest(req: VaultWithdrawalRequest): Record<string, string | number | undefined> {
   return {
     requestId: req.requestId,
     requestIds: req.requestIds,
@@ -146,12 +140,7 @@ export function useVaultRequestAction(
       // endpoint only ever lists vaults with an actual open request, so an
       // instant savings vault can't reach this path.
       const family = vaultFamily(provider)
-      if (
-        family !== 'lst' &&
-        family !== 'gmx' &&
-        family !== 'lagoon' &&
-        family !== 'savings'
-      ) {
+      if (family !== 'lst' && family !== 'gmx' && family !== 'lagoon' && family !== 'savings') {
         setError(`${provider} has no claimable withdrawals`)
         return false
       }

@@ -33,12 +33,12 @@ across the lending UI.
   flex-column-with-svg empty states.
 - [ErrorAlert.tsx](ErrorAlert.tsx) — Red-bordered card with the error
   message and a copy-to-clipboard button. Accepts `string | Error |
-  null` and renders nothing when the error is falsy, so callers can
+null` and renders nothing when the error is falsy, so callers can
   drop it in unconditionally. Generalizes the older
   `TradingDashboard/ErrorDisplay` (which is now a thin alias).
 - [ToastHost.tsx](ToastHost.tsx) — Toast context + provider. Exposes
   `useToast()` with `show / showError / showSuccess / showInfo /
-  showWarning`. Mount the host once near the app root.
+showWarning`. Mount the host once near the app root.
 
 ## Badges & buttons
 

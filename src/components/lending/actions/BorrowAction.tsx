@@ -19,11 +19,7 @@ import { TermsSummary } from '../terms'
 import { useTermsAcknowledgement } from '../terms/TermsDisclosure'
 import { useTermSheet } from '../../../hooks/lending/useTermSheet'
 import { useTokenLists } from '../../../hooks/useTokenLists'
-import {
-  resolveSmartLeg,
-  SmartLegInput,
-  type SmartLegState,
-} from '../shared/SmartLegInput'
+import { resolveSmartLeg, SmartLegInput, type SmartLegState } from '../shared/SmartLegInput'
 import type { RateSetterState } from '../terms/RateSetterRow'
 import { aprPercentToWad } from '../../../sdk/lending-helper/fetchLiquityRate'
 import { isLiquityFamily, isLlamaLend } from '@1delta/lender-registry'

@@ -15,11 +15,7 @@ export const SlippageInput: React.FC<SlippageInputProps> = ({ value, onChange })
       <span className="label-text text-xs">Slippage %</span>
       <div className="flex gap-1">
         {presets.map((p) => (
-          <PresetButton
-            key={p}
-            active={value === String(p)}
-            onClick={() => onChange(String(p))}
-          >
+          <PresetButton key={p} active={value === String(p)} onClick={() => onChange(String(p))}>
             {p}%
           </PresetButton>
         ))}
@@ -30,7 +26,10 @@ export const SlippageInput: React.FC<SlippageInputProps> = ({ value, onChange })
       inputMode="decimal"
       className="input input-bordered input-xs w-full"
       value={value}
-      onChange={(e) => { const v = sanitizeAmountInput(e.target.value); if (v !== null) onChange(v) }}
+      onChange={(e) => {
+        const v = sanitizeAmountInput(e.target.value)
+        if (v !== null) onChange(v)
+      }}
     />
   </div>
 )

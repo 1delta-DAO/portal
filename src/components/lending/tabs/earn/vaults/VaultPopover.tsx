@@ -47,8 +47,14 @@ export const VaultPopover: React.FC<VaultPopoverProps> = ({
       triggerTitle="Click for vault details"
       trigger={children}
     >
-      {vault.name && vault.name !== sym && <PopoverField label="Name" value={vault.name} capitalize />}
-      <PopoverField label="Provider" value={PROVIDER_LABELS[vault.provider] ?? vault.provider} capitalize />
+      {vault.name && vault.name !== sym && (
+        <PopoverField label="Name" value={vault.name} capitalize />
+      )}
+      <PopoverField
+        label="Provider"
+        value={PROVIDER_LABELS[vault.provider] ?? vault.provider}
+        capitalize
+      />
       {vault.curator && <PopoverField label="Curator" value={vault.curator} capitalize />}
       {vault.assetGroup && <PopoverField label="Class" value={vault.assetGroup} capitalize />}
       {vault.yieldProfile && <PopoverField label="Profile" value={vault.yieldProfile} capitalize />}
@@ -88,7 +94,9 @@ export const VaultPopover: React.FC<VaultPopoverProps> = ({
           value={<span className="tabular-nums">{abbreviateUsd(vault.totalAssetsUsd)}</span>}
         />
       )}
-      {vault.fee != null && vault.fee > 0 && <PopoverField label="Fee" value={`${vault.fee.toFixed(2)}%`} />}
+      {vault.fee != null && vault.fee > 0 && (
+        <PopoverField label="Fee" value={`${vault.fee.toFixed(2)}%`} />
+      )}
       {underlyingSymbol && <PopoverField label="Underlying" value={underlyingSymbol} />}
       <CopyRow label="Asset" value={vault.underlying} />
       <CopyRow label="Vault" value={vault.address} />

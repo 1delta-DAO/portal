@@ -29,9 +29,7 @@ describe('resolveDeepLinkPool', () => {
   ]
 
   it('picks the market named by the UID, not the first one sharing the underlying', () => {
-    expect(resolveDeepLinkPool(pools, 'EULER_V2:1:0xccc', USDC)?.marketUid).toBe(
-      'EULER_V2:1:0xccc'
-    )
+    expect(resolveDeepLinkPool(pools, 'EULER_V2:1:0xccc', USDC)?.marketUid).toBe('EULER_V2:1:0xccc')
   })
 
   it('falls back to the address when no UID is supplied (pre-UID links)', () => {

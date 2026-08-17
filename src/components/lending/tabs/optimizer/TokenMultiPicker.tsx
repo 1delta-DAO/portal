@@ -7,7 +7,19 @@ import { Logo } from '../../../common/Logo'
 
 type Preset = 'all' | 'stables' | 'majors'
 
-const STABLE_GROUPS = new Set(['USDC', 'USDT', 'DAI', 'FRAX', 'LUSD', 'USDE', 'USDS', 'GHO', 'CRVUSD', 'PYUSD', 'TUSD'])
+const STABLE_GROUPS = new Set([
+  'USDC',
+  'USDT',
+  'DAI',
+  'FRAX',
+  'LUSD',
+  'USDE',
+  'USDS',
+  'GHO',
+  'CRVUSD',
+  'PYUSD',
+  'TUSD',
+])
 const MAJOR_GROUPS = new Set(['ETH', 'BTC', 'WBTC', 'WETH', 'SOL'])
 
 interface Props {
@@ -44,7 +56,13 @@ interface PickerToken {
  *    something on one chain and `/pairs/optimize` matches on groups once
  *    `chainIds` holds more than one entry.
  */
-export function TokenMultiPicker({ chainIds, selected, onChange, label, placeholder = 'Add token...' }: Props) {
+export function TokenMultiPicker({
+  chainIds,
+  selected,
+  onChange,
+  label,
+  placeholder = 'Add token...',
+}: Props) {
   const isGroupMode = chainIds.length > 1
   const primaryChainId = chainIds[0]
   const { assets, isLoading: assetsLoading } = useAvailableLendingAssets(
@@ -148,7 +166,12 @@ export function TokenMultiPicker({ chainIds, selected, onChange, label, placehol
     const next = new Set(selected)
     for (const t of assetMap.values()) {
       const group = (t.assetGroup ?? '').toUpperCase()
-      const matchPreset = p === 'stables' ? STABLE_GROUPS.has(group) : p === 'majors' ? MAJOR_GROUPS.has(group) : false
+      const matchPreset =
+        p === 'stables'
+          ? STABLE_GROUPS.has(group)
+          : p === 'majors'
+            ? MAJOR_GROUPS.has(group)
+            : false
       if (matchPreset) next.add(t.address)
     }
     onChange([...next])
@@ -191,7 +214,11 @@ export function TokenMultiPicker({ chainIds, selected, onChange, label, placehol
             + Majors
           </button>
           {selected.length > 0 && (
-            <button type="button" className="btn btn-ghost btn-xs text-error" onClick={() => onChange([])}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs text-error"
+              onClick={() => onChange([])}
+            >
               Clear
             </button>
           )}
@@ -211,7 +238,12 @@ export function TokenMultiPicker({ chainIds, selected, onChange, label, placehol
                 className="badge badge-neutral gap-1 cursor-default"
                 onClick={(e) => e.stopPropagation()}
               >
-                <Logo src={t?.logoURI} alt={t?.symbol ?? addr} fallbackText={t?.symbol ?? addr} className="w-3 h-3 rounded-full" />
+                <Logo
+                  src={t?.logoURI}
+                  alt={t?.symbol ?? addr}
+                  fallbackText={t?.symbol ?? addr}
+                  className="w-3 h-3 rounded-full"
+                />
                 {t?.symbol ?? `${addr.slice(0, 6)}…`}
                 <button
                   type="button"
@@ -266,7 +298,9 @@ export function TokenMultiPicker({ chainIds, selected, onChange, label, placehol
               </span>
             </div>
             <div className="max-h-72 overflow-y-auto">
-              {assetsLoading && <div className="p-3 text-sm text-base-content/60">Loading lendable assets…</div>}
+              {assetsLoading && (
+                <div className="p-3 text-sm text-base-content/60">Loading lendable assets…</div>
+              )}
               {!assetsLoading && rows.length === 0 && (
                 <div className="p-3 text-sm text-base-content/60">No tokens match</div>
               )}
@@ -281,11 +315,18 @@ export function TokenMultiPicker({ chainIds, selected, onChange, label, placehol
                     }`}
                     onClick={() => toggle(t.address)}
                   >
-                    <Logo src={t.logoURI} alt={t.symbol ?? t.address} fallbackText={t.symbol ?? t.address} className="w-5 h-5 rounded-full" />
+                    <Logo
+                      src={t.logoURI}
+                      alt={t.symbol ?? t.address}
+                      fallbackText={t.symbol ?? t.address}
+                      className="w-5 h-5 rounded-full"
+                    />
                     <span className="font-medium">{t.symbol ?? t.address.slice(0, 6)}</span>
                     <span className="text-base-content/60 text-xs truncate">{t.name}</span>
                     {t.assetGroup && (
-                      <span className="ml-auto text-[10px] uppercase text-base-content/40">{t.assetGroup}</span>
+                      <span className="ml-auto text-[10px] uppercase text-base-content/40">
+                        {t.assetGroup}
+                      </span>
                     )}
                     {isSel && <span className="ml-2 text-primary text-xs">✓</span>}
                   </button>

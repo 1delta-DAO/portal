@@ -1,9 +1,6 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  fetchNextAccount,
-  type NextAccountData,
-} from '../../sdk/lending-helper/fetchNextAccount'
+import { fetchNextAccount, type NextAccountData } from '../../sdk/lending-helper/fetchNextAccount'
 import { lenderSupportsSubAccounts } from '../../components/lending/actions/helpers'
 import type {
   UserSubAccount,

@@ -38,7 +38,7 @@ two functions:
 ```ts
 // Unwraps the `{ success, data }` envelope, throws ApiError on failure.
 const data = await apiFetch<PoolsData>('/v1/data/lending/pools', {
-  params: { chainId, count: 500 },   // undefined values are dropped
+  params: { chainId, count: 500 }, // undefined values are dropped
 })
 
 // Keeps the whole envelope, for /v1/actions/* endpoints whose payload
@@ -139,23 +139,23 @@ src/
 
 Single dynamic route: `/:tab?/:chainId?/:lender?`
 
-| URL | Tab | View |
-|-----|-----|------|
-| `/earn` | Earn | Browse pools, deposit |
-| `/lending/1/aave-v3` | Lending | Manage AAVE V3 positions on Ethereum |
+| URL                       | Tab     | View                                   |
+| ------------------------- | ------- | -------------------------------------- |
+| `/earn`                   | Earn    | Browse pools, deposit                  |
+| `/lending/1/aave-v3`      | Lending | Manage AAVE V3 positions on Ethereum   |
 | `/loop/42161/morpho-blue` | Looping | Leverage ops on Morpho Blue (Arbitrum) |
-| `/swap` | Swap | Spot token swaps |
+| `/swap`                   | Swap    | Spot token swaps                       |
 
 URL helpers in `src/utils/routes.ts`.
 
 ### State Management
 
-| Layer | Tool | Examples |
-|-------|------|---------|
-| Server state | React Query | Pool data, user positions, balances, IRM curves |
-| URL state | react-router | Tab, chain, lender selection |
-| Global UI | React Context | IRM dock panels, toast notifications, spy mode |
-| Local state | useState | Form inputs, filters, selections, pagination |
+| Layer        | Tool          | Examples                                        |
+| ------------ | ------------- | ----------------------------------------------- |
+| Server state | React Query   | Pool data, user positions, balances, IRM curves |
+| URL state    | react-router  | Tab, chain, lender selection                    |
+| Global UI    | React Context | IRM dock panels, toast notifications, spy mode  |
+| Local state  | useState      | Form inputs, filters, selections, pagination    |
 
 ### Code splitting
 
@@ -175,13 +175,13 @@ adding both a `lazy()` element and its flag test.
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm start` | Start Vite dev server |
-| `pnpm build` | Production build |
-| `pnpm preview` | Preview production build |
-| `pnpm format` | Format code with Prettier |
-| `pnpm test` | Run the unit tests (vitest) |
+| Command        | Description                 |
+| -------------- | --------------------------- |
+| `pnpm start`   | Start Vite dev server       |
+| `pnpm build`   | Production build            |
+| `pnpm preview` | Preview production build    |
+| `pnpm format`  | Format code with Prettier   |
+| `pnpm test`    | Run the unit tests (vitest) |
 
 ## Supported Protocols
 

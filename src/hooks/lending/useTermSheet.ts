@@ -52,8 +52,7 @@ export function useTermSheet(params: {
     // the row — so both sides also land in the same render rather than
     // popping in one after the other.
     queryKey: ['termSheets', String(chainId ?? ''), lender ?? ''],
-    select: (rows: Map<string, TermSheet>) =>
-      marketUid ? rows.get(marketUid) : undefined,
+    select: (rows: Map<string, TermSheet>) => (marketUid ? rows.get(marketUid) : undefined),
     enabled: enabled && !!marketUid && !!chainId && !!lender,
     // Governance and oracle move far slower than rates, and the whole sheet is
     // a snapshot — a long stale window is correct here, not a shortcut.

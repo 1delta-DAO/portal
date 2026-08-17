@@ -48,7 +48,11 @@ export const PendingWithdrawals: React.FC<PendingWithdrawalsProps> = ({
     chainId,
     account,
   })
-  const { run, busyKey, error: actionError } = useVaultRequestAction({
+  const {
+    run,
+    busyKey,
+    error: actionError,
+  } = useVaultRequestAction({
     chainId,
     account,
   })
@@ -59,10 +63,7 @@ export const PendingWithdrawals: React.FC<PendingWithdrawalsProps> = ({
   const providerFor = (req: VaultWithdrawalRequest) =>
     catalogByVault.get(req.lst.toLowerCase())?.provider
 
-  const act = async (
-    verb: 'claim' | 'cancel',
-    req: VaultWithdrawalRequest
-  ) => {
+  const act = async (verb: 'claim' | 'cancel', req: VaultWithdrawalRequest) => {
     const provider = providerFor(req)
     if (!provider) return
     const ok = await run(verb, provider, req)
@@ -106,9 +107,7 @@ export const PendingWithdrawals: React.FC<PendingWithdrawalsProps> = ({
                   <tr key={key}>
                     <td>
                       <div className="flex flex-col">
-                        <span className="font-medium">
-                          {req.symbol ?? req.brand ?? 'Vault'}
-                        </span>
+                        <span className="font-medium">{req.symbol ?? req.brand ?? 'Vault'}</span>
                         {provider && (
                           <span className="text-[10px] text-base-content/50">
                             {PROVIDER_LABELS[provider]}
@@ -117,15 +116,11 @@ export const PendingWithdrawals: React.FC<PendingWithdrawalsProps> = ({
                       </div>
                     </td>
                     <td className="tabular-nums">
-                      {req.amountUnderlying
-                        ? formatTokenAmount(req.amountUnderlying)
-                        : '—'}
+                      {req.amountUnderlying ? formatTokenAmount(req.amountUnderlying) : '—'}
                     </td>
                     <td>
                       <span
-                        className={`badge badge-sm ${
-                          claimable ? 'badge-success' : 'badge-ghost'
-                        }`}
+                        className={`badge badge-sm ${claimable ? 'badge-success' : 'badge-ghost'}`}
                       >
                         {claimable ? 'Claimable' : 'Pending'}
                       </span>

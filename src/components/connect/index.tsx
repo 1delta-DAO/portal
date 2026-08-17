@@ -39,7 +39,19 @@ export function WalletConnect() {
           onClick={disableSpy}
           title="Exit Spy Mode"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="size-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
       </div>
     )
@@ -58,7 +70,19 @@ export function WalletConnect() {
             onClick={() => setShowSpyInput((v) => !v)}
             title="Spy Mode"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="size-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
           </button>
           {showSpyInput && (
             <div className="absolute right-0 top-full mt-1 z-50 bg-base-200 rounded-box shadow-lg p-2 w-72">
@@ -69,7 +93,10 @@ export function WalletConnect() {
                   className={`input input-xs input-bordered flex-1 font-mono text-[11px] ${spyError ? 'input-error' : ''}`}
                   placeholder="0x..."
                   value={spyInput}
-                  onChange={(e) => { setSpyInput(e.target.value); setSpyError(false) }}
+                  onChange={(e) => {
+                    setSpyInput(e.target.value)
+                    setSpyError(false)
+                  }}
                   onKeyDown={(e) => e.key === 'Enter' && handleSpySubmit()}
                   autoFocus
                 />
@@ -118,16 +145,42 @@ export function WalletConnect() {
         <ul className="menu menu-sm bg-base-200 rounded-box shadow-lg absolute right-0 top-full mt-1 z-50 w-52 p-1">
           <li>
             <button onClick={handleCopy} className="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2-2v1"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="size-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2-2v1" />
+              </svg>
               Copy Address
             </button>
           </li>
           <li>
             <button
-              onClick={() => { setShowSpyInput((v) => !v); }}
+              onClick={() => {
+                setShowSpyInput((v) => !v)
+              }}
               className="flex items-center gap-2"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="size-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
               Spy Mode
             </button>
           </li>
@@ -139,7 +192,10 @@ export function WalletConnect() {
                   className={`input input-xs input-bordered flex-1 font-mono text-[11px] ${spyError ? 'input-error' : ''}`}
                   placeholder="0x..."
                   value={spyInput}
-                  onChange={(e) => { setSpyInput(e.target.value); setSpyError(false) }}
+                  onChange={(e) => {
+                    setSpyInput(e.target.value)
+                    setSpyError(false)
+                  }}
                   onKeyDown={(e) => e.key === 'Enter' && handleSpySubmit()}
                   autoFocus
                 />
@@ -151,7 +207,20 @@ export function WalletConnect() {
           )}
           <li>
             <button onClick={handleDisconnect} className="text-error flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="size-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
               Disconnect
             </button>
           </li>

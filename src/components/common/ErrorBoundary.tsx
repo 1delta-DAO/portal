@@ -5,10 +5,7 @@ interface State {
   errorInfo: React.ErrorInfo | null
 }
 
-export class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  State
-> {
+export class ErrorBoundary extends React.Component<{ children: React.ReactNode }, State> {
   state: State = { error: null, errorInfo: null }
 
   static getDerivedStateFromError(error: Error) {

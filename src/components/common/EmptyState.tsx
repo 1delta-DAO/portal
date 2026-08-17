@@ -33,21 +33,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         isSm ? 'gap-1 py-4' : 'gap-2 py-8'
       } ${className}`}
     >
-      {icon && (
-        <div className={`text-base-content/20 ${isSm ? 'w-6 h-6' : 'w-8 h-8'}`}>
-          {icon}
-        </div>
-      )}
-      <p
-        className={`text-base-content/50 ${
-          isSm ? 'text-xs' : 'text-sm font-medium'
-        }`}
-      >
-        {title}
-      </p>
-      {description && (
-        <p className="text-[10px] text-base-content/40 max-w-xs">{description}</p>
-      )}
+      {icon && <div className={`text-base-content/20 ${isSm ? 'w-6 h-6' : 'w-8 h-8'}`}>{icon}</div>}
+      <p className={`text-base-content/50 ${isSm ? 'text-xs' : 'text-sm font-medium'}`}>{title}</p>
+      {description && <p className="text-[10px] text-base-content/40 max-w-xs">{description}</p>}
       {action && <div className="mt-1">{action}</div>}
     </div>
   )

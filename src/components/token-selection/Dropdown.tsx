@@ -94,9 +94,7 @@ export const TokenSelectorDropdownMode: React.FC<TokenSelectorDropdownModeProps>
                 <span className="loading loading-spinner loading-sm" />
               </div>
             ) : rows.length === 0 ? (
-              <div className="text-center py-4 text-base-content/50 text-sm">
-                No tokens found
-              </div>
+              <div className="text-center py-4 text-base-content/50 text-sm">No tokens found</div>
             ) : (
               <div className="space-y-0.5">
                 {rows.map((row) => (

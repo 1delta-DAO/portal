@@ -58,14 +58,14 @@
 /* Wallet-option buttons (icon grid on mobile) – keep them tappable
    by restoring pointer-events and adding touch-action so mobile
    browsers don't swallow the tap as a scroll gesture. */
-[data-rk] [data-testid^="wallet-option-"] {
+[data-rk] [data-testid^='wallet-option-'] {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 
 /* Ensure RainbowKit dialog portal sits above every app layer (navbar z-50,
    IRM dock z-9990, popovers z-9999) on all mobile browsers. */
-[data-rk] [role="dialog"] {
+[data-rk] [role='dialog'] {
   z-index: 2147483646 !important;
   touch-action: manipulation;
 }

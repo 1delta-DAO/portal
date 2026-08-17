@@ -19,10 +19,7 @@ interface SendResult {
   hash?: string
 }
 
-export function useSendLendingTransaction(params: {
-  chainId: string
-  account?: string
-}) {
+export function useSendLendingTransaction(params: { chainId: string; account?: string }) {
   const { chainId, account } = params
   const { data: walletClient } = useWalletClient()
   const { syncChain } = useSyncChain()
@@ -61,7 +58,11 @@ export function useSendLendingTransaction(params: {
         try {
           const publicClient = getIndependentPublicClient(chainId)
           if (publicClient) {
-            await publicClient.waitForTransactionReceipt({ hash, confirmations: 2, pollingInterval: 4_000 })
+            await publicClient.waitForTransactionReceipt({
+              hash,
+              confirmations: 2,
+              pollingInterval: 4_000,
+            })
           }
         } catch (receiptErr) {
           // Receipt polling can fail on some RPCs; continue to invalidate anyway

@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  NO_MATCH,
-  compareTokenMatches,
-  normalizeTokenQuery,
-  scoreTokenMatch,
-} from './tokenSearch'
+import { NO_MATCH, compareTokenMatches, normalizeTokenQuery, scoreTokenMatch } from './tokenSearch'
 
 /**
  * The token search ranking.
@@ -105,7 +100,11 @@ describe('token search ranking', () => {
     expect(ranked).toEqual(['USDC', 'USDC'])
     const q = normalizeTokenQuery('usdc')
     const scored = [fake, USDC]
-      .map((t) => ({ ...t, score: scoreTokenMatch(q, t, t.address), isMainOrUser: !!t.isMainOrUser }))
+      .map((t) => ({
+        ...t,
+        score: scoreTokenMatch(q, t, t.address),
+        isMainOrUser: !!t.isMainOrUser,
+      }))
       .sort(compareTokenMatches)
     expect(scored[0].address).toBe(USDC.address)
   })

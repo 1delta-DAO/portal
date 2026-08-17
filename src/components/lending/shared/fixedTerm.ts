@@ -61,10 +61,7 @@ export function providerLabel(p?: FixedTermProvider): string | null {
 }
 
 /** Early-repay policy for a concrete Lista brokered loan (per-loan penalty). */
-export function listaEarlyRepay(
-  loan: UserPositionEntry,
-  symbol?: string,
-): EarlyRepay {
+export function listaEarlyRepay(loan: UserPositionEntry, symbol?: string): EarlyRepay {
   if (!hasEarlyRepayPenalty(loan)) return { hasPenalty: false }
   return {
     hasPenalty: true,
