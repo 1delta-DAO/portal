@@ -10,7 +10,7 @@ pnpm i && pnpm start
 
 Copy `.env.example` to `.env` and fill it in. `VITE_BACKEND_BASE_URL` overrides the default API endpoint; a `VITE_WC_PROJECT_ID` (WalletConnect/Reown) is required for mobile wallet connections.
 
-Feature flags (all defined in `src/config/flags.ts`): `VITE_OPTIMIZER_ENABLED=true` shows the Optimize tab (default OFF); `VITE_BRIDGE_UI_ENABLED=false` hides the Cross-Chain (bridge) tab, which is shown by default with a "Beta" pill; `VITE_USER_POSITIONS_RPC=true` reads user positions through the client-side RPC flow rather than the API (default OFF).
+Feature flags (all defined in `src/config/flags.ts`): `VITE_OPTIMIZER_ENABLED=true` shows the Optimize tab (default OFF); `VITE_BRIDGE_UI_ENABLED=false` hides the Cross-Chain (bridge) tab, which is shown by default with a "Beta" pill; `VITE_UNIFIED_EARN_ENABLED=true` shows the Unified Earn tab redesign (default OFF); `VITE_USER_POSITIONS_RPC=true` reads user positions through the client-side RPC flow rather than the API (default OFF).
 
 ### Chain selection
 

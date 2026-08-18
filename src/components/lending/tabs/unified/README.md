@@ -2,7 +2,8 @@
 
 One tab over `GET /v1/data/earn`: lending markets and vaults in a single
 listing, the account's whole supply-side portfolio, and the actions for both.
-Rendered by [../../LendingTab.tsx](../../LendingTab.tsx).
+Opt-in behind `VITE_UNIFIED_EARN_ENABLED=true` (see
+[../../LendingTab.tsx](../../LendingTab.tsx)).
 
 ## Layout
 

@@ -232,6 +232,7 @@ pnpm format     # Prettier
 | `VITE_WC_PROJECT_ID`        | —                          | WalletConnect/Reown project id (mobile wallets)                                                                                                                                  |
 | `VITE_OPTIMIZER_ENABLED`    | off                        | `true` shows the Optimize tab                                                                                                                                                    |
 | `VITE_BRIDGE_UI_ENABLED`    | on                         | Cross-Chain (bridge) tab, shown by default with a "Beta" pill — set `false` to hide it                                                                                           |
+| `VITE_UNIFIED_EARN_ENABLED` | off                        | `true` shows the Unified Earn tab redesign (`tabs/unified/`)                                                                                                                     |
 | `VITE_USER_POSITIONS_RPC`   | off                        | `true` fetches user positions for every chain via the client-side prepare → `eth_call` → parse flow instead of the API. Per-chain overrides in `useUserData.ts` apply either way |
 
 ## Chain Selection

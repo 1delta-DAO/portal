@@ -35,8 +35,8 @@ One directory per sub-tab; the container is always `index.tsx`.
 - [tabs/optimizer/](tabs/optimizer/) — Flag-gated
   (`OPTIMIZER_ENABLED`) rate optimizer: token baskets, pair rate
   comparison with depth charts, combined loop/pair actions.
-- [tabs/unified/](tabs/unified/) — Unified Earn tab over
-  `GET /v1/data/earn`.
+- [tabs/unified/](tabs/unified/) — Flag-gated
+  (`UNIFIED_EARN_ENABLED`) Unified Earn tab over `GET /v1/data/earn`.
   See [tabs/unified/README.md](tabs/unified/README.md).
 
 ### Shared modules

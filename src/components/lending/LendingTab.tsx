@@ -40,7 +40,7 @@ const XChainSwapPanel = lazy(() =>
   import('../swap/XChainSwapPanel').then((m) => ({ default: m.XChainSwapPanel }))
 )
 
-import { OPTIMIZER_ENABLED, BRIDGE_UI_ENABLED } from '../../config/flags'
+import { OPTIMIZER_ENABLED, BRIDGE_UI_ENABLED, UNIFIED_EARN_ENABLED } from '../../config/flags'
 
 export type { SubTab } from '../../utils/routes'
 
@@ -55,6 +55,7 @@ export type { SubTab } from '../../utils/routes'
  */
 const DISABLED_TABS: ReadonlySet<SubTab> = new Set<SubTab>([
   ...(BRIDGE_UI_ENABLED ? [] : (['xswap'] as SubTab[])),
+  ...(UNIFIED_EARN_ENABLED ? [] : (['unified'] as SubTab[])),
   ...(OPTIMIZER_ENABLED ? [] : (['optimize'] as SubTab[])),
 ])
 
@@ -264,14 +265,16 @@ export function LenderTab() {
             Earn
           </button>
 
-          <button
-            type="button"
-            role="tab"
-            className={`tab tab-sm ${activeTab === 'unified' ? 'tab-active' : ''}`}
-            onClick={() => setActiveTab('unified')}
-          >
-            Unified
-          </button>
+          {UNIFIED_EARN_ENABLED && (
+            <button
+              type="button"
+              role="tab"
+              className={`tab tab-sm ${activeTab === 'unified' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('unified')}
+            >
+              Unified
+            </button>
+          )}
 
           <button
             type="button"
@@ -364,7 +367,7 @@ export function LenderTab() {
           />
         )}
 
-        {activeTab === 'unified' && (
+        {UNIFIED_EARN_ENABLED && activeTab === 'unified' && (
           <UnifiedEarnTab chainIds={chainIds} enabled={chainsReady} />
         )}
 
