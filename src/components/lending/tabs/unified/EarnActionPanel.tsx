@@ -10,6 +10,7 @@ import { parseUnits } from 'viem'
 import { formatTokenAmount } from '../../../../utils/format'
 import { useEarnAction } from '../../../../hooks/earn/useEarnAction'
 import { getCurrency } from '../../../../lib/trade-helpers/utils'
+import { isWNative } from '../../../../lib/lib-utils'
 import { UsdAmount } from '../../../common/UsdAmount'
 import { ErrorAlert } from '../../../common/ErrorAlert'
 import {
@@ -226,7 +227,41 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab, position }) => {
   // `slippage` is the generic marker; `min*` keys are the same requirement
   // stated as a concrete option name. Both are satisfied by one tolerance.
   const boundNeeds = requires.filter((r) => r === 'slippage' || isBoundNeed(r))
-  const needsSlippage = boundNeeds.length > 0
+
+  /**
+   * Does the chosen pay asset route through a third-party AGGREGATOR?
+   *
+   * Any row advertising `acceptsPayAsset` — lending markets, and (phase 3)
+   * plain-4626 vault rows — serves the conversion on two different paths,
+   * mirroring the worker's dispatch:
+   *
+   *  - **direct** — no aggregator. The pay asset matches the market's asset,
+   *    or it is native paid into a wrapped-native market (a deterministic
+   *    wrap — no price exists to bound).
+   *  - **swap** — anything else is quoted through an aggregator, and that
+   *    route REQUIRES `slippage` (it 400s "Missing 'slippage'" without it).
+   *
+   * The capability cannot state this per pay asset — it depends on what the
+   * user picks — so the split is derived here. Over-detecting is safe (a
+   * direct builder ignores an unneeded bound); under-detecting is the 400.
+   */
+  const isAggregatorSwap =
+    !!capability?.acceptsPayAsset &&
+    !isExit &&
+    isCustomSpend &&
+    !(
+      payAsset === NATIVE_ADDRESS &&
+      isWNative(
+        getCurrency(row.chainId, row.asset.address) ?? {
+          chainId: row.chainId,
+          address: row.asset.address,
+          decimals: row.asset.decimals,
+          symbol: row.asset.symbol,
+        }
+      )
+    )
+
+  const needsSlippage = boundNeeds.length > 0 || isAggregatorSwap
   const unsupported = requires.filter((r) => r !== 'slippage' && !isBoundNeed(r))
 
   /**
@@ -257,9 +292,10 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab, position }) => {
     payAsset: isExit ? undefined : isCustomSpend ? payAsset : undefined,
     receiveAsset: isExit && isCustomSpend ? payAsset : undefined,
     isShares: isExit && !!row.shareToken,
-    // Sent ONLY where the server said a bound is required. Sending it
-    // unasked would look harmless but sets a limit on venues that price
-    // deterministically, where any bound is noise the builder must interpret.
+    // Sent where the server said a bound is required, OR where the chosen
+    // pay asset routes through an aggregator (the swap branch 400s without
+    // it). Still withheld everywhere else: an unasked bound on a venue that
+    // prices deterministically is noise the builder must interpret.
     slippage: needsSlippage ? Number(slippage) : undefined,
     // Blocked while a required param exists that this UI cannot collect —
     // building anyway produces a call that reverts or fills at any price.
@@ -303,7 +339,15 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab, position }) => {
             type="button"
             role="tab"
             className={`tab ${action === c.action ? 'tab-active' : ''}`}
-            onClick={() => setAction(c.action)}
+            onClick={() => {
+              setAction(c.action)
+              // The pay asset and amount belong to the verb they were entered
+              // for. Carrying a deposit's pay asset into a withdraw silently
+              // turned it into `receiveAsset` and re-denominated the amount
+              // field in a token the exit never touches.
+              setPayAsset(undefined)
+              setAmount('')
+            }}
             title={c.async ? 'Settles asynchronously' : undefined}
           >
             {vocabLabel(vocab, 'action', c.action)}
@@ -357,9 +401,14 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab, position }) => {
             value={spendToken}
             onChange={(a) => setPayAsset(a)}
           />
-          {payAsset && payAsset.toLowerCase() !== row.asset.address.toLowerCase() && (
+          {isCustomSpend && (
             <div className="mt-1 text-[10px] text-base-content/50">
-              Swapped to {row.asset.symbol} on deposit.
+              {isAggregatorSwap
+                ? // The amount entered is the PAY asset spent (the swap is
+                  // exact-in) — say so, or the field reads as "how much
+                  // ${row.asset.symbol} arrives".
+                  `You spend ${spendSymbol}; it is swapped to ${row.asset.symbol} via an aggregator on deposit.`
+                : `Wrapped to ${row.asset.symbol} on deposit.`}
             </div>
           )}
         </div>
@@ -425,9 +474,13 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab, position }) => {
         error={amountExceedsBalance ? `Exceeds your ${spendSymbol} balance` : null}
         label={
           <span className="text-xs text-base-content/50">
+            {/* Denominated in what the user SPENDS. For a pay-asset zap the
+                swap is exact-in, so the amount is the pay asset — labelling
+                it with the market's symbol paired this field's number with a
+                different token's name. */}
             {isExit && row.shareToken
               ? `${row.shareToken.symbol} to redeem`
-              : `${row.asset.symbol} amount`}
+              : `${spendSymbol} amount`}
           </span>
         }
       />
@@ -442,9 +495,11 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab, position }) => {
               Max slippage
               {capability?.via === 'swap'
                 ? ' · traded on a market'
-                : boundNeeds.some(isBoundNeed)
-                  ? ` · sets ${boundNeeds.filter(isBoundNeed).join(', ')}`
-                  : ''}
+                : isAggregatorSwap
+                  ? ' · swapped via an aggregator'
+                  : boundNeeds.some(isBoundNeed)
+                    ? ` · sets ${boundNeeds.filter(isBoundNeed).join(', ')}`
+                    : ''}
             </span>
             <div className="join">
               {['0.1', '0.5', '1'].map((p) => (

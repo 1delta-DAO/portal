@@ -8,7 +8,12 @@ export function lenderSupportsSubAccounts(lender?: string): boolean {
   return (
     MULTI_ACCOUNT_LENDERS.has(lender) ||
     lender.startsWith('FLUID_') ||
-    lender.startsWith('GEARBOX_')
+    lender.startsWith('GEARBOX_') ||
+    // TermMax positions are GT NFTs — one sub-account per GT, `accountId` =
+    // the decimal gtId. The server's borrow/repay/withdraw builders REQUIRE it
+    // as `posId` (a user can hold many GTs per market), so without the
+    // selector every one of those ops 400s.
+    lender.startsWith('TERMMAX_')
   )
 }
 

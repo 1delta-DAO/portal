@@ -91,6 +91,43 @@ export const AutoBalancedPill: React.FC<{
   </Badge>
 )
 
+/**
+ * Explainer for a UNIFIED EARN row's `basket`, built from the descriptor.
+ *
+ * The earn surface needs its own wording because the lending one is written
+ * from the collateral side ("Collateral here is…"), which is simply false on a
+ * vault row — there is no borrower and no collateral, just a deposit.
+ *
+ * Names the legs when the descriptor carries them, because "USDe + USDT" is
+ * the concrete form of the warning and a generic sentence is easy to skim past.
+ */
+export function basketExplainer(
+  basket: {
+    legs?: { symbol?: string }[]
+    autoBalanced?: boolean
+    rowAsset?: 'leg' | 'positionUnit'
+  },
+  assetSymbol?: string
+): string {
+  const named = (basket.legs ?? []).map((l) => l.symbol).filter(Boolean) as string[]
+  const pair = named.length > 1 ? named.join(' + ') : undefined
+  const what = pair ? `a ${pair} liquidity position` : 'a multi-token liquidity position'
+  const notThis = assetSymbol ? `, not ${assetSymbol} alone` : ', not a single asset'
+  const drift = basket.autoBalanced
+    ? ' The pool keeps rebalancing the split between them and you cannot hold one leg on its own.'
+    : ''
+  // The per-leg-row case is the one that misleads a TOTAL, not just a label.
+  const perLeg =
+    basket.rowAsset === 'leg'
+      ? ' This venue lists one row per leg, so the same position appears more than once.'
+      : ''
+  return (
+    `This position is ${what}${notThis}.` +
+    ` Depositing one token gives you a claim on all of them.${drift}` +
+    ` The APR shown is the whole position’s, not this token’s.${perLeg}`
+  )
+}
+
 /** Collateral-side wording for callers that have a flag and nothing else. */
 export const AUTO_BALANCED_COLLATERAL_EXPLAINER =
   'Collateral here is a two-token liquidity position, not a single asset. ' +

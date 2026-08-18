@@ -19,6 +19,7 @@ import {
   type EarnVocabulary,
 } from '../../../../sdk/earn-helper'
 import { buildPath, OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'
+import { AutoBalancedPill, basketExplainer } from '../../shared/SmartVault'
 
 export type EarnSortKey = 'rate' | 'marketRate' | 'tvl' | 'liquidity'
 
@@ -218,6 +219,15 @@ export const EarnMarketsTable: React.FC<Props> = ({
                 </div>
               </td>
               <td className="truncate text-xs">
+                {/* A basket row's asset symbol is a half-truth: it is what you
+                    hand over, not what you end up holding. The pill is the only
+                    thing on the row that says so. */}
+                {row.basket && (
+                  <AutoBalancedPill
+                    className="mb-0.5"
+                    title={basketExplainer(row.basket, row.asset.symbol)}
+                  />
+                )}
                 {row.asset.symbol ? (
                   row.asset.symbol
                 ) : row.asset.address ? (

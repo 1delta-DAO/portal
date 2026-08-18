@@ -269,6 +269,41 @@ export interface EarnCurator {
   entity?: string
 }
 
+/**
+ * A position whose unit is a POOL POSITION over several tokens.
+ *
+ * Mirrors `@1delta/margin-fetcher`'s `EarnBasket` verbatim — see
+ * EARN_ENDPOINT_PLAN.md §4.2b. Two fields carry the whole meaning:
+ *
+ *  - `autoBalanced` — the composition is POOL-controlled and drifts, and the
+ *    holder cannot take one leg out on its own. This is what a drift warning
+ *    fires on; it is NOT implied by `legs.length > 1`.
+ *  - `rowAsset` — whether this row is one LEG of the pool (Fluid emits one row
+ *    per leg, so a T4 emits up to four rows for ONE vault and a naive sum
+ *    counts it four times) or the position itself (Lista SmartLP, GMX GM).
+ */
+export interface EarnBasket {
+  rowAsset: 'leg' | 'positionUnit'
+  /** POOL INDEX ORDER — load-bearing; a two-input deposit form maps positionally. */
+  legs: EarnBasketLeg[]
+  autoBalanced: boolean
+  positionUnit?: { kind: 'shares' | 'lpToken'; address?: string; decimals: number }
+  /** Current split BY VALUE — a snapshot of a moving number. Never cache it. */
+  weights?: number[]
+  /** `fluid-dex` | `lista-smartlp` | `gmx-gm` | `curve` | `uniswap-v2` | … */
+  pool?: string
+  feeBps?: number
+}
+
+export interface EarnBasketLeg {
+  address: string
+  symbol?: string
+  decimals?: number
+  assetGroup?: string
+  /** This leg's OWN rate, PERCENT — what the row's `rate.total` was blended from. */
+  rate?: number
+}
+
 export interface EarnMarket {
   /** Opaque primary key. Pass back verbatim; never split it. */
   earnUid: string
@@ -300,6 +335,15 @@ export interface EarnMarket {
   logoURI?: string
   asset: EarnAsset
   shareToken?: EarnShareToken
+  /**
+   * Present when the row's POSITION is a multi-token pool position rather than
+   * a balance of `asset` — Fluid smart collateral, Lista SmartLP, GMX GM/GLV,
+   * and any Curve/Uniswap LP that follows.
+   *
+   * `asset` stays what the user hands over. What it stops being is what they
+   * end up HOLDING, and nothing else on the row says so.
+   */
+  basket?: EarnBasket
   rate: EarnRate
   tvl: EarnAmount
   liquidity?: EarnAmount

@@ -25,6 +25,8 @@ import { aprPercentToWad } from '../../../sdk/lending-helper/fetchLiquityRate'
 import { isLiquityFamily, isLlamaLend } from '@1delta/lender-registry'
 import { LiquityOpenPanel } from './LiquityOpenPanel'
 import { LlamaLendOpenNotice } from './LlamaLendOpenNotice'
+import { TermMaxOpenNotice } from './TermMaxOpenNotice'
+import { DepositBorrowOpenPanel, openPanelCollaterals } from './DepositBorrowOpenPanel'
 import { isFullSheet } from '../terms/types'
 import { ComparableRatesPill } from '../shared/ComparableRatesPill'
 import { TransactionSuccess } from './TransactionSuccess'
@@ -93,6 +95,14 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
    * this point a loan always exists, so the parameter really is immutable.
    */
   const llamaLendNeedsOpen = isLlamaLend(lenderOfPool) && !hasTrove
+
+  /**
+   * TermMax is the same shape a third time: the standalone borrow raises debt
+   * on an EXISTING GT and the server requires its gtId (`posId`) — with no
+   * position the endpoint 400s ("use deposit-and-borrow"). Opening takes
+   * collateral + borrow in one router transaction, from the Optimizer.
+   */
+  const termMaxNeedsOpen = lenderOfPool.startsWith('TERMMAX_') && !hasTrove
   const [useNative, setUseNative] = useState(false)
 
   const hasSubAccounts = lenderSupportsSubAccounts(lenderKey)
@@ -256,10 +266,36 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
     )
   }
 
-  // No trove yet on a Liquity-family branch: the borrow form has nothing to
-  // increase, so open one instead.
-  if (llamaLendNeedsOpen && pool) {
-    return <LlamaLendOpenNotice symbol={pool.asset.symbol} />
+  // No position yet on a lender whose standalone borrow needs one (LlamaLend
+  // `borrow_more`, TermMax `issueFtByExistedGt`): embed the deposit-and-borrow
+  // open right here — collateral + borrow in one transaction, the same build
+  // the Optimizer uses — instead of dead-ending into a notice. The notice
+  // stays as the fallback for when the term sheet cannot name a collateral to
+  // address the request with (still loading, or a digest-only sheet).
+  if ((llamaLendNeedsOpen || termMaxNeedsOpen) && pool) {
+    if (termsLoading) {
+      return (
+        <div className="flex items-center justify-center gap-2 py-3 text-xs text-base-content/60">
+          <span className="loading loading-spinner loading-xs" />
+          <span>Loading market terms…</span>
+        </div>
+      )
+    }
+    if (openPanelCollaterals(termSheet).length > 0) {
+      return (
+        <DepositBorrowOpenPanel
+          pool={pool}
+          termSheet={termSheet}
+          account={account}
+          chainId={chainId}
+        />
+      )
+    }
+    return llamaLendNeedsOpen ? (
+      <LlamaLendOpenNotice symbol={pool.asset.symbol} />
+    ) : (
+      <TermMaxOpenNotice symbol={pool.asset.symbol} />
+    )
   }
 
   if (needsOpen && pool) {

@@ -39,6 +39,13 @@ export interface EarnActionResult {
  */
 interface EarnActionEnvelope {
   transactions?: EarnTx[]
+  /**
+   * Aggregator-quoted builds (a pay-asset conversion), best output first.
+   * The worker's `successAction` puts quote-list results HERE and leaves
+   * `transactions` empty — reading only `transactions` reports "the server
+   * returned no transaction" for every zap that actually succeeded.
+   */
+  alternatives?: EarnTx[]
   permissions?: EarnTx[] | null
   postTransactions?: EarnTx[]
   signatures?: unknown[]
@@ -58,7 +65,14 @@ export interface FetchEarnActionParams {
   isAll?: boolean
   /** Withdrawals denominated in SHARES rather than the underlying. */
   isShares?: boolean
-  /** Percent, not bps. Only sent where the capability asks for a bound. */
+  /**
+   * Percent (`0.5` = 0.5 %). Converted to BASIS POINTS on the wire — the
+   * worker's earn translator forwards `slippage` verbatim to routes that all
+   * read it as bps (`/v1/actions/vaults/*` validates `[0, 10000]` bps;
+   * `/v1/actions/lending/deposit`'s swap branch runs it through
+   * `slippageBpsToPercent`). Sending percent unconverted quoted Pendle legs at
+   * a 0.5 bps tolerance — 100× tighter than the user chose.
+   */
   slippage?: number
   /**
    * Anything a specific venue needs that this app does not model — Yield
@@ -96,13 +110,25 @@ export async function fetchEarnAction(
           receiveAsset: params.receiveAsset,
           isAll: params.isAll ? 'true' : undefined,
           isShares: params.isShares ? 'true' : undefined,
-          slippage: params.slippage,
+          slippage:
+            params.slippage != null && Number.isFinite(params.slippage)
+              ? Math.round(params.slippage * 100)
+              : undefined,
           ...(params.extra ?? {}),
         },
       }
     )
 
-    const transactions = actions?.transactions ?? []
+    // A conversion (pay-asset zap) comes back as `alternatives` — one built
+    // transaction per aggregator, sorted best-output-first by the server.
+    // Take the winner as THE transaction; the rest are the same action at a
+    // worse price, not steps to execute.
+    const transactions =
+      actions?.transactions?.length
+        ? actions.transactions
+        : actions?.alternatives?.length
+          ? [actions.alternatives[0]]
+          : []
 
     if (transactions.length === 0) {
       // A 200 with nothing to send is not success — it is a builder that
