@@ -14,6 +14,7 @@ import {
   type SortKey,
 } from './helpers'
 import { filterAndSortPools } from './poolFilters'
+import type { VaultLeg } from '../../shared/VaultLegBreakdown'
 import { MarketsTable } from './MarketsTable'
 import { DepositPanel } from './DepositPanel'
 import { useIsMobile } from '../../../../hooks/useIsMobile'
@@ -54,6 +55,12 @@ interface LendingPoolsTableProps {
   chainIds: string[]
   account?: string
   externalAssetFilter?: string
+  /**
+   * Why `externalAssetFilter` is set. `'owned'` (the wallet-assets toggle)
+   * keeps the numeric filters below active; `'explicit'` (a row click on one
+   * asset) suspends them. See `PoolFilterCriteria` for the reasoning.
+   */
+  externalAssetFilterSource?: 'explicit' | 'owned'
   userData?: UserDataResult
 }
 
@@ -61,6 +68,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   chainIds,
   account,
   externalAssetFilter,
+  externalAssetFilterSource,
   userData,
 }) => {
   const isMobile = useIsMobile()
@@ -204,9 +212,9 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   //     the other would hide fully-utilized markets with large deposits.
   //   - The util / APR floors here exempt deposit-only pools (`isFloorExempt`),
   //     which a server-side floor cannot express.
-  //   - Every numeric filter is skipped when the user has narrowed via an
-  //     external asset filter (row click / "owned only"), so that every market
-  //     for those assets stays visible. A server-side filter would still apply.
+  //   - Every numeric filter is skipped when the user picks a single asset by
+  //     row click, so that every market for it stays visible. A server-side
+  //     filter would still apply.
   //
   // The backend's own `minTvlUsd` default (100k on Ethereum, 25k elsewhere)
   // already prunes the long tail per request, and the per-chain page budget in
@@ -394,6 +402,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
         search: debouncedSearch,
         assetFilter,
         externalAssetFilter,
+        externalAssetFilterSource,
         effectiveMaxRisk,
         minUtilPct,
         maxUtilPct,
@@ -439,6 +448,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       effectiveMaxRisk,
       assetFilter,
       externalAssetFilter,
+      externalAssetFilterSource,
     ]
   )
 
@@ -464,6 +474,35 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     () => collapseSmartVaults(filteredAndSortedPools),
     [filteredAndSortedPools]
   )
+
+  /**
+   * The legs of the selected vault, when the selected row stands for a whole
+   * auto-balanced position rather than for one market.
+   *
+   * Read off `displayRows` rather than re-derived: `collapseSmartVaults` has
+   * already grouped them, and re-grouping here would be a second definition of
+   * "same vault" that could drift from the one the table renders.
+   */
+  const selectedVaultLegs = useMemo<VaultLeg[]>(() => {
+    if (!selectedEntry) return []
+    const group = displayRows.find(
+      (r) =>
+        r.pool.marketUid === selectedEntry.marketUid && r.pool.chainId === selectedEntry.chainId
+    )
+    if (!group?.legs || group.legs.length < 2) return []
+    return group.legs.map(({ pool, metrics }) => {
+      const asset = pool.underlyingInfo?.asset
+      return {
+        key: pool.marketUid,
+        symbol: asset?.symbol ?? pool.name,
+        logoURI: asset?.logoURI,
+        // The LEG's own rate — the headline above it is the weighted blend.
+        legRate: metrics.aprLeg,
+        depositsUsd: parseFloat(pool.totalDepositsUsd) || 0,
+        amount: parseFloat(pool.totalDeposits) || undefined,
+      }
+    })
+  }, [selectedEntry, displayRows])
 
   // Pagination
   const totalItems = displayRows.length
@@ -511,6 +550,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     effectiveMaxRisk,
     assetFilter,
     externalAssetFilter,
+    externalAssetFilterSource,
     chainIds.join(','),
   ])
 
@@ -1027,6 +1067,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
             refetchBalances={refetchBalances}
             hasBorrowOnSelectedLender={hasBorrowOnSelectedLender}
             priceUsd={selectedPriceUsd}
+            vaultLegs={selectedVaultLegs}
           />
         </div>
       </div>
@@ -1054,6 +1095,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
               lenderKey={selectedEntry?.lenderKey}
               userPosition={selectedUserPosition}
               priceUsd={selectedPriceUsd}
+              vaultLegs={selectedVaultLegs}
             />
           </div>
         </div>

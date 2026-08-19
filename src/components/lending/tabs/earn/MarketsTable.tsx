@@ -495,9 +495,14 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
           </div>
         )}
 
-        {rows.map(({ pool: p, metrics }) => {
-          const { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr } = metrics
+        {rows.map(({ pool: p, metrics, legs }) => {
+          const { utilization, apr, borrowApr, intrinsicYield, price, depositRewardApr, aprLeg } =
+            metrics
           const utilPct = utilization * 100
+          // Same collapsed-vault identity as the desktop row. Without it a
+          // mobile user sees one token symbol carrying a rate that is not that
+          // token's, with nothing on screen saying so.
+          const lpLegs = lpSideLegs(p, legs)
           const totalDepositsUSD = parseFloat(p.totalDepositsUsd) || 0
           const totalLiquidityUSD = parseFloat(p.totalLiquidityUsd) || 0
           const selected = isRowSelected(p)
@@ -530,10 +535,21 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                   >
                     <div className="flex flex-col min-w-0">
                       <span
-                        className="font-semibold text-sm truncate"
-                        title={getAsset(p)?.name ?? p.name}
+                        className="font-semibold text-sm truncate flex items-center gap-1.5"
+                        title={
+                          lpLegs.length > 1
+                            ? autoBalancedExplainer(p)
+                            : (getAsset(p)?.name ?? p.name)
+                        }
                       >
-                        {getAsset(p)?.symbol ?? p.name}
+                        {lpLegs.length > 1 ? (
+                          <>
+                            <LpAssetIcons legs={lpLegs} size={16} />
+                            <LpPairLabel symbols={lpLegs.map((l) => l.symbol ?? '?')} />
+                          </>
+                        ) : (
+                          (getAsset(p)?.symbol ?? p.name)
+                        )}
                       </span>
                       <span
                         className="text-[10px] text-base-content/60 flex items-center gap-1 min-w-0"
@@ -547,6 +563,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                         />
                         {chainMarker(p)}
                         <span className="truncate">{p.lenderInfo?.name ?? p.lenderKey}</span>
+                        <AutoBalancedBadge row={p} className="shrink-0" />
                       </span>
                     </div>
                   </AssetPopover>
@@ -567,6 +584,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                 <div className="text-right shrink-0">
                   <div className="flex flex-wrap items-center justify-end gap-1">
                     <span className="font-bold text-sm text-success">{depTotal.toFixed(2)}%</span>
+                    <BasketRateHint row={p} side="supply" legRate={aprLeg} />
                     {intrinsicYield > 0 && (
                       <span
                         className="badge badge-xs bg-success/15 text-success border-0 whitespace-nowrap"

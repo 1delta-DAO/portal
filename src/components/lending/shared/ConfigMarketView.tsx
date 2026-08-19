@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import type {
   PoolConfigGroup,
   ConfigMarketItem,
@@ -19,6 +19,7 @@ import {
   displayConfigLabel,
 } from './configMarketConstants'
 import { ExpandChevron } from './ConfigMarketCells'
+import { basketIntrinsicYield, positionSupplyRate } from '../../../sdk/lending-helper/fluidSmart'
 import { CombinedDetailTable } from './CombinedDetailTable'
 
 // `buildDetailRows` moved to CombinedDetailTable.tsx; re-exported so the
@@ -230,6 +231,30 @@ export const ConfigMarketView: React.FC<Props> = ({
     return map
   }, [allPools])
 
+  /**
+   * The POSITION's supply rate for a config row, resolved through the market
+   * rows this view already holds. `/pools/by-config` carries no Fluid
+   * descriptor, so without this bridge every aggregate on this screen is a
+   * max/blend over LEG rates.
+   */
+  const positionRate = useCallback(
+    (marketUid: string, legRate: number) => positionSupplyRate(poolMap.get(marketUid), legRate),
+    [poolMap]
+  )
+
+  /** The same bridge for the token-level intrinsic yield. */
+  const intrinsicRate = useCallback(
+    (marketUid: string, legIntrinsic: number) =>
+      basketIntrinsicYield(
+        poolMap.get(marketUid),
+        'collateral',
+        allPools,
+        (p) => p.intrinsicYield ?? 0,
+        (p) => p.totalDepositsUSD ?? 0
+      ) ?? legIntrinsic,
+    [poolMap, allPools]
+  )
+
   // Highlight map for trading view, keyed by `${marketUid}|${side}` so the
   // role only lights up the row that actually corresponds to the action's
   // selection — without the side, the same asset's collateral and borrowable
@@ -317,7 +342,7 @@ export const ConfigMarketView: React.FC<Props> = ({
                 {pagedGroups.map((g) => {
                   const isActive = g.configId === selectedConfigId
                   const isUserMode = userActiveCategory != null && g.category === userActiveCategory
-                  const stats = computeConfigStats(g)
+                  const stats = computeConfigStats(g, positionRate, intrinsicRate)
                   const labelText = displayConfigLabel(g.label, g.configId)
 
                   return (
@@ -421,7 +446,7 @@ export const ConfigMarketView: React.FC<Props> = ({
             {pagedGroups.map((g) => {
               const isActive = g.configId === selectedConfigId
               const isUserMode = userActiveCategory != null && g.category === userActiveCategory
-              const stats = computeConfigStats(g)
+              const stats = computeConfigStats(g, positionRate, intrinsicRate)
               const labelText = displayConfigLabel(g.label, g.configId)
 
               return (

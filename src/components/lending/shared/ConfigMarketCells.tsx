@@ -3,6 +3,12 @@ import type { ConfigMarketItem } from '../../../sdk/lending-helper/marketTypes'
 import type { PoolRole } from '../tabs/trading/types'
 import { AssetPopover } from './AssetPopover'
 import { ROLE_CHIP_CLASS, ROLE_LABEL } from './configMarketConstants'
+import { AutoBalancedBadge, BasketRateHint } from './SmartVault'
+import {
+  positionBorrowRate,
+  positionSupplyRate,
+  type SmartVaultRow,
+} from '../../../sdk/lending-helper/fluidSmart'
 
 /**
  * Down-pointing chevron rotated -90° when collapsed (right-pointing).
@@ -84,7 +90,17 @@ export const AssetCell: React.FC<{
   item: ConfigMarketItem
   hasPosition: boolean
   entityName?: string
-}> = ({ item, hasPosition, entityName }) => {
+  /**
+   * The matching market row, when the caller has it.
+   *
+   * `/pools/by-config` does NOT carry the Fluid descriptor — only
+   * `/lending/pools` and `/lending/latest` do — so the config view has to learn
+   * that a row is an LP leg from the pool it already holds in `poolMap`.
+   * Without it the DEFAULT view of the Lending tab renders leg rates with no
+   * badge, which is the one screen a user lands on first.
+   */
+  row?: SmartVaultRow | null
+}> = ({ item, hasPosition, entityName, row }) => {
   const asset = item.underlyingInfo.asset
   const iy = item.intrinsicYield ?? 0
   return (
@@ -106,8 +122,12 @@ export const AssetCell: React.FC<{
         <span className="font-medium text-sm truncate" title={asset.symbol}>
           {asset.symbol}
         </span>
-        <span className="text-[10px] text-base-content/60 truncate" title={asset.name}>
-          {asset.name}
+        <span
+          className="text-[10px] text-base-content/60 truncate flex items-center gap-1"
+          title={asset.name}
+        >
+          <span className="truncate">{asset.name}</span>
+          <AutoBalancedBadge row={row} className="shrink-0" />
         </span>
       </div>
     </AssetPopover>
@@ -120,8 +140,15 @@ export const AprCell: React.FC<{
   color: 'success' | 'warning'
   reward?: number
   align?: 'start' | 'end'
-}> = ({ rate, iy, color, reward = 0, align = 'start' }) => {
-  const total = rate + iy
+  /** The matching market row — see {@link AssetCell}'s `row`. */
+  row?: SmartVaultRow | null
+}> = ({ rate, iy, color, reward = 0, align = 'start', row }) => {
+  // On an LP-backed side the rate passed in is one LEG's; the position earns
+  // the basket. Falls through untouched on every ordinary market.
+  const side = color === 'success' ? 'supply' : 'borrow'
+  const positionRate =
+    side === 'supply' ? positionSupplyRate(row, rate) : positionBorrowRate(row, rate)
+  const total = positionRate + iy
   // A deposit-side reward adds to what you earn; a borrow-side reward is a
   // rebate that lowers cost — show it in the opposite semantic colour.
   const isBorrow = color === 'warning'
@@ -131,10 +158,11 @@ export const AprCell: React.FC<{
         <span className={`text-sm font-medium tabular-nums text-${color}`}>
           {total.toFixed(2)}%
         </span>
+        <BasketRateHint row={row} side={side} legRate={rate} />
         {iy > 0 && (
           <span
             className={`badge badge-xs bg-${color}/15 text-${color} border-0 cursor-help whitespace-nowrap`}
-            title={`Base rate: ${rate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}%`}
+            title={`Base rate: ${positionRate.toFixed(2)}% + Intrinsic yield: ${iy.toFixed(2)}%`}
           >
             +{iy.toFixed(1)}%
           </span>

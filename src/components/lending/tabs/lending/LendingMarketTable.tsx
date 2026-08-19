@@ -15,12 +15,20 @@ import { OracleBadge } from '../../shared/OracleBadge'
 import { BrokeredAprCell } from '../../shared/BrokeredAprCell'
 import { useTablePagination } from '../../../../hooks/useTablePagination'
 import { AutoBalancedBadge, BasketRateHint } from '../../shared/SmartVault'
-import { positionBorrowRate, positionSupplyRate } from '../../../../sdk/lending-helper/fluidSmart'
+import {
+  basketIntrinsicYield,
+  positionBorrowRate,
+  positionSupplyRate,
+} from '../../../../sdk/lending-helper/fluidSmart'
 import { SortableHeader, SortIndicator } from '../../../common/SortableHeader'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
 import { TablePagination } from '../../../common/TablePagination'
 
 const PAGE_SIZE = 25
+
+/** Accessors for the value-weighted intrinsic blend — see `basketIntrinsicYield`. */
+const intrinsicOf = (p: PoolDataItem) => p.intrinsicYield ?? 0
+const weightOf = (p: PoolDataItem) => p.totalDepositsUSD ?? 0
 
 interface Props {
   pools: PoolDataItem[]
@@ -141,7 +149,13 @@ export const LendingMarketTable: React.FC<Props> = ({
               const userPos = userPositions.get(pool.marketUid)
               const hasPosition =
                 userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
-              const iy = pool.intrinsicYield ?? 0
+              // Intrinsic yield is a property of the TOKEN, so on an LP side
+              // it must be weighted across the legs too — adding this leg's to
+              // the basket rate claims the position earns all of it.
+              const iy =
+                basketIntrinsicYield(pool, 'collateral', pools, intrinsicOf, weightOf) ??
+                pool.intrinsicYield ??
+                0
               // The POSITION's rate on an LP-backed side; the row's own
               // everywhere else. Never render `pool.depositRate` directly on a
               // market that might be auto-balanced.
@@ -371,7 +385,10 @@ const MobilePoolCards: React.FC<{
         const isSelected = selectedMarketUid === pool.marketUid
         const userPos = userPositions.get(pool.marketUid)
         const hasPosition = userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
-        const mIy = pool.intrinsicYield ?? 0
+        const mIy =
+          basketIntrinsicYield(pool, 'collateral', pools, intrinsicOf, weightOf) ??
+          pool.intrinsicYield ??
+          0
         const mDepRate = positionSupplyRate(pool, pool.depositRate)
         const mBorRate = positionBorrowRate(pool, pool.variableBorrowRate)
         const mDepTotal = mDepRate + mIy

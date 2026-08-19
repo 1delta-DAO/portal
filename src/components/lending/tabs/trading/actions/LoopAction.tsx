@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react'
 import { isWNative, LendingMode, type RawCurrency } from '../../../../../lib/lib-utils'
 import { parseUnits, zeroAddress } from 'viem'
-import { leverageAvailability, smartInfo } from '../../../../../sdk/lending-helper/fluidSmart'
+import { smartInfo } from '../../../../../sdk/lending-helper/fluidSmart'
 import { useTokenLists } from '../../../../../hooks/useTokenLists'
 import type { PoolDataItem } from '../../../../../sdk/lending-helper/marketTypes'
 import type { TradingActionProps, SelectedPool } from '../types'
@@ -224,24 +224,6 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   const [payAmount, setPayAmount] = useState(
     initialSelection?.amount != null ? String(initialSelection.amount) : ''
   )
-
-  /**
-   * Why looping is refused on this pair, or null when it is offered.
-   *
-   * Read up front from the market descriptor rather than from the 400 the
-   * endpoint would return, so the user learns it before sizing a position
-   * instead of after pressing the button. The two smart refusals are NOT the
-   * same and the copy distinguishes them: T2 is a route that is not enabled
-   * yet, T3/T4 are structurally blocked because a smart DEBT side borrows a
-   * PAIR and unwinding it needs two swaps back to the flash asset.
-   */
-  const loopBlocked = useMemo(() => {
-    for (const p of [collateralPool, debtPool]) {
-      const availability = leverageAvailability(p)
-      if (!availability.available) return availability.reason
-    }
-    return null
-  }, [collateralPool, debtPool])
 
   // Pay currency
   const [payCurrencyAddress, setPayCurrencyAddress] = useState<string | null>(null)
@@ -888,30 +870,16 @@ export const LoopAction: React.FC<TradingActionProps> = ({
       {/* Slippage */}
       <SlippageInput value={slippage} onChange={setSlippage} />
 
-      {/* Looping unavailable on this market.
-          
-          Shown HERE and nowhere else, deliberately: `/loop/leverage` and
-          `/loop/close` answer 400 UNSUPPORTED_LENDER for every Fluid smart
-          vault, but deposit, borrow, withdraw and repay all work — so the
-          market must not be greyed out anywhere else, and the refusal belongs
-          on the tab that cannot serve it rather than on the market. */}
-      {loopBlocked && (
-        <div className="rounded-box border border-warning/30 bg-warning/5 p-2.5 text-xs">
-          <div className="font-medium text-warning mb-1">Looping unavailable here</div>
-          <p className="text-base-content/70 leading-snug">{loopBlocked}</p>
-        </div>
-      )}
-
       {/* Fetch quotes. The wallet-balance warning (`payOverMax`) is advisory and
           does NOT block quoting — the user can explore quotes and top up before
           executing; the on-chain send is the real guardrail. */}
       <button
         type="button"
         className="btn btn-primary btn-sm w-full"
-        disabled={!canFetch || loading || !!loopBlocked}
+        disabled={!canFetch || loading}
         onClick={handleFetchQuotes}
       >
-        {loopBlocked ? 'Looping unavailable' : loading ? 'Fetching quotes...' : 'Get Loop Quotes'}
+        {loading ? 'Fetching quotes...' : 'Get Loop Quotes'}
       </button>
 
       {/* Error */}

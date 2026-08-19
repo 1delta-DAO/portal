@@ -93,17 +93,29 @@ export const SmartLegInput: React.FC<Props> = ({
   const decimals = leg.secondary.decimals
   const symbol = secondarySymbol ?? 'second leg'
 
+  /**
+   * Is there a ratio to be balanced AGAINST?
+   *
+   * 18 live sides report `perShare: ['0','0']` — an empty pool. "Balanced" is
+   * not a meaningful choice there: there is no ratio, the pre-fill computes
+   * nothing, and the toggle would leave the user staring at a field that never
+   * fills. Fall back to single-sided and say why.
+   */
+  const hasRatio = balancedCounterAmount(leg.side, leg.primaryIndex, 10n ** 18n) !== null
+
   // Balanced when the wallet can plausibly cover the second leg. A zero or
   // unknown balance defaults to single-sided rather than pre-filling an amount
   // the user cannot pay.
   const canPaySecond = (parseFloat(secondaryBalance ?? '0') || 0) > 0
-  const [mode, setMode] = useState<'balanced' | 'single'>(canPaySecond ? 'balanced' : 'single')
+  const [mode, setMode] = useState<'balanced' | 'single'>(
+    canPaySecond && hasRatio ? 'balanced' : 'single'
+  )
   const [manual, setManual] = useState<string | null>(null)
 
   // Re-derive the default when the SIDE changes (a different market selected),
   // never on every balance tick — that would fight the user's own choice.
   useEffect(() => {
-    setMode(canPaySecond ? 'balanced' : 'single')
+    setMode(canPaySecond && hasRatio ? 'balanced' : 'single')
     setManual(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leg.secondary.underlying, leg.primaryIndex])
@@ -156,14 +168,18 @@ export const SmartLegInput: React.FC<Props> = ({
       <div className="flex items-center gap-0.5 bg-base-200 rounded-lg p-0.5 w-fit">
         <button
           type="button"
-          disabled={disabled}
+          disabled={disabled || !hasRatio}
           className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
             mode === 'balanced'
               ? 'bg-base-100 shadow-sm text-base-content'
               : 'text-base-content/60 hover:text-base-content'
-          }`}
-          onClick={() => setMode('balanced')}
-          title={`Supply both ${primarySymbol} and ${symbol} at the pool's current ratio. Cheaper at size — no imbalance fee, no price impact.`}
+          } ${!hasRatio ? 'opacity-40 cursor-not-allowed' : ''}`}
+          onClick={() => hasRatio && setMode('balanced')}
+          title={
+            hasRatio
+              ? `Supply both ${primarySymbol} and ${symbol} at the pool's current ratio. Cheaper at size — no imbalance fee, no price impact.`
+              : 'This pool holds no liquidity yet, so there is no ratio to match.'
+          }
         >
           Balanced
         </button>

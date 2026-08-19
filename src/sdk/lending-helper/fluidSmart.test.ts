@@ -1,22 +1,28 @@
 import { describe, it, expect } from 'vitest'
 import {
   balancedCounterAmount,
+  basketIntrinsicYield,
   groupByVault,
   isAutoBalanced,
+  isBasketRate,
   isSmartVault,
   legIndexOf,
   lenderKeyOf,
-  leverageAvailability,
   needsSequentialClose,
+  hasSmartCollateral,
   positionBorrowRate,
   positionSupplyRate,
+  rowAsset,
+  rowIsLegOf,
   sharesForLegAmount,
   sideInfo,
   splitForShares,
   vaultTypeLabel,
+  type FluidSideInfo,
   type FluidSmartInfo,
   type SmartVaultRow,
 } from './fluidSmart'
+import * as fluidSmart from './fluidSmart'
 
 const USDC = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
 const ETH = '0x0000000000000000000000000000000000000000'
@@ -95,7 +101,6 @@ describe('detection', () => {
     for (const row of [null, undefined]) {
       expect(isAutoBalanced(row)).toBe(false)
       expect(isSmartVault(row)).toBe(false)
-      expect(leverageAvailability(row).available).toBe(true)
     }
   })
 
@@ -217,24 +222,173 @@ describe('exits and leverage', () => {
     expect(needsSequentialClose(t2)).toBe(false)
   })
 
-  it('refuses leverage on smart vaults, with DIFFERENT reasons', () => {
-    const t4 = leverageAvailability(usdcLeg)
-    const two = leverageAvailability(t2)
-    expect(t4.available).toBe(false)
-    expect(two.available).toBe(false)
-    // T3/T4 are structurally blocked; T2 is merely not enabled — conflating
-    // them would promise a fix that cannot come for one of them.
-    expect(t4.reason).not.toBe(two.reason)
-    expect(t4.reason).toMatch(/two-token/i)
-    expect(two.reason).toMatch(/not yet/i)
-    // Both must say the position itself still works — the market is NOT dead.
-    for (const r of [t4.reason, two.reason]) {
-      expect(r).toMatch(/withdraw and repay/i)
-    }
+  it('states no opinion about route availability', () => {
+    // Deliberately not exported: looping is SERVED on T2/T3/T4 and migrate is
+    // refused on T3/T4, and neither is predictable from the row — see the
+    // module header. A client gate here was wrong in both directions.
+    expect(Object.keys(fluidSmart)).not.toContain('leverageAvailability')
+    expect(Object.keys(fluidSmart)).not.toContain('composerRouteAvailability')
+  })
+})
+
+/**
+ * Shapes that only the LIVE payload revealed. Every fixture below is a real row
+ * from `/v1/data/lending/pools?chainId=1&lender=FLUID` (377 rows, 158 of them
+ * auto-balanced), and each one broke something.
+ */
+describe('shapes found in live data', () => {
+  const OSETH = '0xf1c9acdc66974dfb6decb12aa385b9cd01190e38'
+  const WSTETH = '0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0'
+
+  /**
+   * A T2 emits THREE rows — two collateral legs and the plain loan token — and
+   * all three carry the same vault descriptor with `isSmartCol: true`. The loan
+   * row is not in the collateral basket and must not be given its rate.
+   * 17 Ethereum rows were showing exactly that.
+   */
+  const t2Loan: SmartVaultRow = {
+    marketUid: `FLUID_1_159:1:${WSTETH}`,
+    autoBalanced: false,
+    fluid: {
+      vaultType: 20000,
+      isSmartCol: true,
+      isSmartDebt: false,
+      basketSupplyRate: 0.00017192654710334741,
+      collateralPair: [OSETH, ETH],
+    },
+  }
+
+  it('does NOT give a T2 loan row the collateral basket rate', () => {
+    expect(positionSupplyRate(t2Loan, 3.4)).toBe(3.4)
+    expect(isBasketRate(t2Loan, 'supply')).toBe(false)
+    // The vault-level question still answers truthfully — the two must not be
+    // conflated, which is the whole reason `rowIsLegOf` exists.
+    expect(hasSmartCollateral(t2Loan)).toBe(true)
+    expect(rowIsLegOf(t2Loan, 'collateral')).toBe(false)
   })
 
-  it('leaves every other lender loopable', () => {
-    expect(leverageAvailability(plain).available).toBe(true)
-    expect(leverageAvailability(plain).reason).toBeNull()
+  it('still gives the T2 collateral legs the basket rate', () => {
+    const leg: SmartVaultRow = { ...t2Loan, marketUid: `FLUID_1_159:1:${ETH}`, autoBalanced: true }
+    expect(positionSupplyRate(leg, 1.71)).toBe(0.00017192654710334741)
+  })
+
+  /**
+   * A T4 whose two sides use DIFFERENT dexes. `Loan wstETH` is a leg of the
+   * debt basket but not of the collateral one, and its own deposit rate is 0 —
+   * it supplies nothing. Before the fix it advertised 1.72 % supply APR.
+   */
+  const t4CrossDexLoan: SmartVaultRow = {
+    marketUid: `FLUID_1_158:1:${WSTETH}`,
+    autoBalanced: true,
+    fluid: {
+      vaultType: 40000,
+      isSmartCol: true,
+      isSmartDebt: true,
+      basketSupplyRate: 1.72,
+      basketBorrowRate: 0.4,
+      collateralPair: [OSETH, ETH],
+      debtPair: [WSTETH, ETH],
+    },
+  }
+
+  it('applies the basket rate PER SIDE on a cross-dex T4', () => {
+    // Not a collateral leg → keeps its own 0 % supply rate…
+    expect(positionSupplyRate(t4CrossDexLoan, 0)).toBe(0)
+    // …but it IS a debt leg, so the borrow basket applies.
+    expect(positionBorrowRate(t4CrossDexLoan, 9.9)).toBe(0.4)
+  })
+
+  it('reads the row asset off the market uid, which both shapes carry', () => {
+    // `PoolEntry.underlyingAddress` is served on ZERO live Fluid rows.
+    expect(rowAsset(t2Loan)).toBe(WSTETH)
+    expect(rowAsset({ marketUid: 'NOPE' })).toBeNull()
+    expect(rowAsset(null)).toBeNull()
+  })
+
+  /**
+   * An EMPTY pool reports `perShare: ['0','0']` — 18 live sides do. Nothing may
+   * divide by it, and "balanced" is not a meaningful choice against it.
+   */
+  it('refuses every ratio computation on an empty pool', () => {
+    const empty: FluidSideInfo = {
+      assets: [
+        { underlying: OSETH, decimals: 18 },
+        { underlying: ETH, decimals: 18 },
+      ],
+      dex: '0xdead',
+      perShare: ['0', '0'],
+    }
+    expect(balancedCounterAmount(empty, 0, 10n ** 18n)).toBeNull()
+    expect(sharesForLegAmount(empty, 0, 10n ** 18n)).toBeNull()
+  })
+})
+
+describe('basketIntrinsicYield', () => {
+  // The live wstETH+ETH T4: wstETH carries the staking yield and ~8 % of the
+  // value; ETH carries none and the rest.
+  const WSTETH = '0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0'
+  const info: FluidSmartInfo = {
+    vaultType: 40000,
+    isSmartCol: true,
+    isSmartDebt: true,
+    basketSupplyRate: 1.7,
+    collateralPair: [WSTETH, ETH],
+    debtPair: [WSTETH, ETH],
+  }
+  type Row = SmartVaultRow & { iy: number; usd: number }
+  const wst: Row = {
+    marketUid: `FLUID_1_44:1:${WSTETH}`,
+    autoBalanced: true,
+    fluid: info,
+    iy: 1.96,
+    usd: 2_710_000,
+  }
+  const eth: Row = {
+    marketUid: `FLUID_1_44:1:${ETH}`,
+    autoBalanced: true,
+    fluid: info,
+    iy: 0,
+    usd: 32_920_000,
+  }
+  const legs = [wst, eth]
+  const get = (r: Row) => r.iy
+  const w = (r: Row) => r.usd
+
+  it('weights the intrinsic by each leg`s share, not by which row you asked', () => {
+    const a = basketIntrinsicYield(wst, 'collateral', legs, get, w)!
+    const b = basketIntrinsicYield(eth, 'collateral', legs, get, w)!
+    // Same position ⇒ same answer from either leg.
+    expect(a).toBeCloseTo(b, 10)
+    // 1.96 × 2.71M / 35.63M ≈ 0.149 — not 1.96.
+    expect(a).toBeCloseTo(0.149, 2)
+  })
+
+  it('returns null on an ordinary market so the caller keeps its own value', () => {
+    expect(
+      basketIntrinsicYield(
+        plain,
+        'collateral',
+        [plain as any],
+        () => 3,
+        () => 1
+      )
+    ).toBeNull()
+  })
+
+  it('returns null rather than guessing when the weights are unusable', () => {
+    const zeroed = legs.map((l) => ({ ...l, usd: 0 }))
+    expect(basketIntrinsicYield(wst, 'collateral', zeroed, get, w)).toBeNull()
+  })
+
+  it('ignores rows from a different vault', () => {
+    const other: Row = {
+      marketUid: `FLUID_1_77:1:${WSTETH}`,
+      autoBalanced: true,
+      fluid: info,
+      iy: 99,
+      usd: 1e9,
+    }
+    const v = basketIntrinsicYield(wst, 'collateral', [...legs, other], get, w)!
+    expect(v).toBeCloseTo(0.149, 2)
   })
 })

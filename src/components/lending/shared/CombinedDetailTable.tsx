@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import type {
   PoolConfigGroup,
   ConfigMarketItem,
@@ -20,6 +20,7 @@ import { EmptyState } from '../../common/EmptyState'
 import { nextSort } from '../../../hooks/useTableSort'
 import { DETAIL_PAGE_SIZE, ROLE_RAIL } from './configMarketConstants'
 import { AprCell, AssetCell, RoleChip, SideBadge } from './ConfigMarketCells'
+import { basketIntrinsicYield } from '../../../sdk/lending-helper/fluidSmart'
 
 type DetailSide = 'all' | 'collateral' | 'borrowable' | 'supply'
 type DetailSortKey = 'side' | 'liquidity' | 'apr' | 'ltv'
@@ -104,6 +105,27 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
   onRowClick,
   poolMap,
 }) => {
+  /**
+   * The POSITION's intrinsic yield for a row, or the row's own.
+   *
+   * `intrinsicYield` is a TOKEN property (wstETH's staking accrual), so on an
+   * LP-backed side it has to be weighted across the legs like everything else —
+   * otherwise the wstETH leg shows the basket rate plus 1.96 % of staking yield
+   * that only ~8 % of the position actually earns.
+   */
+  const allRowPools = useMemo(() => [...poolMap.values()], [poolMap])
+  const intrinsicFor = useCallback(
+    (pool: PoolDataItem | undefined, legIntrinsic: number) =>
+      basketIntrinsicYield(
+        pool,
+        'collateral',
+        allRowPools,
+        (p) => p.intrinsicYield ?? 0,
+        (p) => p.totalDepositsUSD ?? 0
+      ) ?? legIntrinsic,
+    [allRowPools]
+  )
+
   const [side, setSide] = useState<DetailSide>('all')
   const [sortKey, setSortKey] = useState<DetailSortKey>('liquidity')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
@@ -315,8 +337,9 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                   const userPos = userPositions.get(item.marketUid)
                   const hasPosition =
                     userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
-                  const iy = item.intrinsicYield ?? 0
                   const pool = poolMap.get(item.marketUid)
+                  // Weighted across the LP's legs — see `basketIntrinsicYield`.
+                  const iy = intrinsicFor(pool, item.intrinsicYield ?? 0)
                   const sym = item.underlyingInfo.asset.symbol
                   const liqUsd = item.totalLiquidityUsd ?? item.totalDepositsUsd - item.totalDebtUsd
                   const liqToken = item.totalLiquidity ?? pool?.totalLiquidity
@@ -340,6 +363,7 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                           item={item}
                           hasPosition={!!hasPosition}
                           entityName={pool?.name}
+                          row={pool}
                         />
                       </td>
                       <td>
@@ -351,6 +375,7 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                             iy={iy}
                             color="success"
                             reward={pool?.depositRewardApr}
+                            row={pool}
                           />
                         ) : isBrokered ? (
                           <BrokeredAprCell terms={pool?.terms} />
@@ -360,6 +385,7 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                             iy={iy}
                             color="warning"
                             reward={pool?.borrowRewardApr}
+                            row={pool}
                           />
                         )}
                       </td>
@@ -450,8 +476,8 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
               const userPos = userPositions.get(item.marketUid)
               const hasPosition =
                 userPos && (Number(userPos.deposits) > 0 || Number(userPos.debt) > 0)
-              const iy = item.intrinsicYield ?? 0
               const pool = poolMap.get(item.marketUid)
+              const iy = intrinsicFor(pool, item.intrinsicYield ?? 0)
               const sym = item.underlyingInfo.asset.symbol
               const liqUsd = item.totalLiquidityUsd ?? item.totalDepositsUsd - item.totalDebtUsd
               const liqToken = item.totalLiquidity ?? pool?.totalLiquidity
@@ -469,7 +495,12 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <SideBadge side={rowSide} />
-                      <AssetCell item={item} hasPosition={!!hasPosition} entityName={pool?.name} />
+                      <AssetCell
+                        item={item}
+                        hasPosition={!!hasPosition}
+                        entityName={pool?.name}
+                        row={pool}
+                      />
                     </div>
                     <div className="text-right shrink-0 flex flex-col items-end gap-1">
                       {role && <RoleChip role={role} />}
@@ -481,6 +512,7 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                             color="success"
                             reward={pool?.depositRewardApr}
                             align="end"
+                            row={pool}
                           />
                           <span className="text-[10px] text-base-content/50 block">
                             {rowSide === 'supply' ? 'Supply APR' : 'Deposit APR'}
@@ -499,6 +531,7 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                             color="warning"
                             reward={pool?.borrowRewardApr}
                             align="end"
+                            row={pool}
                           />
                           <span className="text-[10px] text-base-content/50 block">Borrow APR</span>
                         </>

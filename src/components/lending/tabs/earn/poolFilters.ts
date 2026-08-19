@@ -26,10 +26,24 @@ export interface PoolFilterCriteria {
   assetFilter: string
   /**
    * Parent-driven CSV of underlying addresses ("Your Assets" row clicks, the
-   * "owned only" toggle). When set, the numeric value-floors are SKIPPED so
-   * every market for those assets stays visible; risk score still applies.
+   * "owned only" toggle).
    */
   externalAssetFilter?: string
+  /**
+   * Why `externalAssetFilter` is set, which decides whether the numeric
+   * value-floors below still apply:
+   *
+   *   - `'explicit'` (default): the user named ONE asset by clicking its row,
+   *     so a default TVL/APR floor must not hide the markets holding it. The
+   *     floors are SKIPPED.
+   *   - `'owned'`: the "filter markets to owned assets" toggle, which is a
+   *     broad narrowing across the whole wallet rather than a request for a
+   *     specific market. The floors STILL APPLY — otherwise flipping the
+   *     toggle silently disables every other filter in the toolbar.
+   *
+   * The risk ceiling is enforced either way.
+   */
+  externalAssetFilterSource?: 'explicit' | 'owned'
   /** App-wide risk ceiling, already clamped. Always enforced. */
   effectiveMaxRisk: number
 
@@ -190,10 +204,14 @@ export function filterAndSortPools(
   result = result.filter(({ pool: p }) => (p.risk?.score ?? 0) <= c.effectiveMaxRisk)
 
   // The remaining filters are value-floors meant to trim the universe of pools
-  // when browsing freely. When the user has explicitly narrowed via the parent
-  // (row click / "owned only"), skip them so every market for those assets
-  // stays visible.
-  if (!hasExternalAssetFilter) {
+  // when browsing freely. Skip them only when the user narrowed to a specific
+  // asset by name (row click), so that every market holding it stays visible.
+  // The "owned assets" toggle does NOT skip them — it is a broad narrowing,
+  // and dropping the floors there would make the toolbar's other filters look
+  // broken the moment it is switched on.
+  const skipValueFloors =
+    hasExternalAssetFilter && (c.externalAssetFilterSource ?? 'explicit') === 'explicit'
+  if (!skipValueFloors) {
     const minU = parseFloat(c.minUtilPct)
     const maxU = parseFloat(c.maxUtilPct)
     if (!Number.isNaN(minU) || !Number.isNaN(maxU)) {

@@ -85,6 +85,104 @@ describe('fetchEarnAction', () => {
     expect(url).toContain('earnUid=')
   })
 
+  it('pairs each route with its numbers BY AGGREGATOR, not by index', async () => {
+    // `data.quotes` keeps a quote that produced no calldata; `alternatives`
+    // cannot. Pairing by index would hand Enso's transaction OpenOcean's
+    // output here — both halves plausible, the mismatch invisible.
+    vi.stubGlobal(
+      'fetch',
+      mockFetch({
+        success: true,
+        data: {
+          quotes: [
+            { aggregator: 'Pendle', tradeInput: 259, tradeOutput: 279.6 },
+            { aggregator: 'Unbuildable', tradeInput: 259, tradeOutput: 281 },
+            { aggregator: 'Enso', tradeInput: 259, tradeOutput: 277.9 },
+          ],
+        },
+        actions: {
+          transactions: [{ to: '0xc', data: '0xpendle', value: '0' }],
+          alternatives: [
+            { to: '0xc', data: '0xpendle', value: '0', aggregator: 'Pendle' },
+            { to: '0xc', data: '0xenso', value: '0', aggregator: 'Enso' },
+          ],
+          permissions: [],
+        },
+      })
+    )
+    const res = await fetchEarnAction(params)
+    expect(res.success).toBe(true)
+    if (!res.success) return
+    expect(res.result.routes.map((r) => [r.aggregator, r.tradeOutput])).toEqual([
+      ['Pendle', 279.6],
+      ['Enso', 277.9],
+    ])
+    expect(res.result.routes[1].tx.data).toBe('0xenso')
+  })
+
+  it('reads the zap quote shape, where the numbers sit under `deltas`', async () => {
+    // A composed pay-asset zap reports its aggregator and amounts inside
+    // `deltas`; only the trade paths put them at the top level. Reading one
+    // shape left every zap route named but priceless.
+    vi.stubGlobal(
+      'fetch',
+      mockFetch({
+        success: true,
+        data: {
+          quotes: [
+            { deltas: { aggregator: 'Fly', tradeInput: 100, tradeOutput: 99.96 } },
+            { deltas: { aggregator: 'Enso', tradeInput: 100, tradeOutput: 99.94 } },
+          ],
+        },
+        actions: {
+          transactions: [{ to: '0xc', data: '0xfly', value: '0' }],
+          alternatives: [
+            { to: '0xc', data: '0xfly', value: '0', aggregator: 'Fly' },
+            { to: '0xc', data: '0xenso', value: '0', aggregator: 'Enso' },
+          ],
+          permissions: [],
+        },
+      })
+    )
+    const res = await fetchEarnAction(params)
+    expect(res.success).toBe(true)
+    if (!res.success) return
+    expect(res.result.routes.map((r) => [r.aggregator, r.tradeOutput])).toEqual([
+      ['Fly', 99.96],
+      ['Enso', 99.94],
+    ])
+  })
+
+  it('offers no choice when the server built a single route', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch({
+        success: true,
+        data: { quotes: [{ aggregator: 'Enso', tradeOutput: 277.9 }] },
+        actions: {
+          transactions: [{ to: '0xc', data: '0xenso', value: '0' }],
+          alternatives: [{ to: '0xc', data: '0xenso', value: '0', aggregator: 'Enso' }],
+          permissions: [],
+        },
+      })
+    )
+    const res = await fetchEarnAction(params)
+    expect(res.success).toBe(true)
+    if (!res.success) return
+    // One route is not a choice — rendering it as one implies the others were
+    // rejected rather than never quoted.
+    expect(res.result.routes).toEqual([])
+    expect(res.result.transactions[0].data).toBe('0xenso')
+  })
+
+  it('leaves a plain deposit with no routes at all', async () => {
+    vi.stubGlobal('fetch', mockFetch(ENVELOPE))
+    const res = await fetchEarnAction(params)
+    expect(res.success).toBe(true)
+    if (!res.success) return
+    expect(res.result.routes).toEqual([])
+  })
+
   it('forwards venue-specific extras verbatim', async () => {
     // The dispatcher passes unknown params straight through, so a venue can
     // take a new input without a release here — but only if this does too.

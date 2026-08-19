@@ -127,18 +127,35 @@ describe('filterAndSortPools — floor exemptions', () => {
     expect(uids(result)).toEqual(['MORPHO_MIDNIGHT:1:0xusdc'])
   })
 
-  it('skips every numeric floor when an external asset filter is active', () => {
-    // Row click / "owned only": the user asked for these assets by name, so a
-    // default TVL floor must not hide the markets that hold them.
+  it('skips every numeric floor for an explicit asset pick', () => {
+    // Row click: the user asked for this asset by name, so a default TVL floor
+    // must not hide the markets that hold it.
     const tiny = pool({ marketUid: 'AAVE_V3:1:0xusdc', totalDepositsUsd: '5' })
 
     const result = filterAndSortPools(rows(tiny), {
       ...BASE,
       externalAssetFilter: '0xusdc',
+      externalAssetFilterSource: 'explicit',
       minDepositsUsd: '100000',
     })
 
     expect(uids(result)).toEqual(['AAVE_V3:1:0xusdc'])
+  })
+
+  it('keeps the numeric floors under the "owned assets" toggle', () => {
+    // The toggle narrows broadly rather than naming a market, so the toolbar's
+    // other filters must keep working while it is on.
+    const tiny = pool({ marketUid: 'AAVE_V3:1:0xusdc', totalDepositsUsd: '5' })
+    const big = pool({ marketUid: 'MORPHO:1:0xusdc', totalDepositsUsd: '500000' })
+
+    const result = filterAndSortPools(rows(tiny, big), {
+      ...BASE,
+      externalAssetFilter: '0xusdc',
+      externalAssetFilterSource: 'owned',
+      minDepositsUsd: '100000',
+    })
+
+    expect(uids(result)).toEqual(['MORPHO:1:0xusdc'])
   })
 
   it('still enforces the risk ceiling under an external asset filter', () => {

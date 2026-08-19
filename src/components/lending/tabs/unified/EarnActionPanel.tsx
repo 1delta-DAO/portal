@@ -187,6 +187,19 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab, position }) => {
       ? row.shareToken.symbol
       : row.asset.symbol
 
+  /**
+   * What a route PAYS OUT — the other end of the trade from `spendSymbol`.
+   *
+   * A deposit lands in the market's asset; an exit lands in whatever the user
+   * chose to receive, which is the same `payAsset` field read the other way
+   * round (see the `receiveAsset` argument below).
+   */
+  const receiveSymbol = isExit
+    ? isCustomSpend
+      ? (getCurrency(row.chainId, payAsset!)?.symbol ?? row.asset.symbol)
+      : row.asset.symbol
+    : row.asset.symbol
+
   // Typing more than you hold is worth catching before the button, not after
   // the wallet rejects it.
   const amountExceedsBalance =
@@ -542,6 +555,61 @@ export const EarnActionPanel: React.FC<Props> = ({ row, vocab, position }) => {
       {capability?.async && (
         <div className="text-xs text-base-content/70">
           Settles later — track it under pending withdrawals after submitting.
+        </div>
+      )}
+
+      {/* Route choice. Present only where the server actually quoted more than
+          one aggregator for the same action — which is the trades (a Pendle
+          PT, a secondary-market row, a pay-asset zap), never a plain deposit.
+          Showing the winner alone was hiding a real price difference: the
+          venue's own AMM and a general aggregator routing into it can be half
+          a percent apart on the same PT. */}
+      {exec.routes.length > 1 && (
+        <div>
+          <div className="mb-1 flex items-baseline justify-between">
+            <span className="text-xs text-base-content/50">Route</span>
+            <span className="text-[10px] text-base-content/40">
+              {exec.routes.length} quotes · best first
+            </span>
+          </div>
+          <div className="flex flex-col gap-1">
+            {exec.routes.map((r, i) => {
+              const selected = i === exec.selectedRoute
+              const best = exec.routes[0]?.tradeOutput
+              // Against the BEST quote, not against the selected one — the
+              // reference has to stay put as the user clicks through, or every
+              // route reads as 0 % the moment it is picked.
+              const delta =
+                r.tradeOutput != null && best != null && best > 0
+                  ? ((r.tradeOutput - best) / best) * 100
+                  : undefined
+              return (
+                <button
+                  key={`${r.aggregator}-${i}`}
+                  type="button"
+                  className={`flex items-center justify-between rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                    selected
+                      ? 'border-primary bg-primary/10'
+                      : 'border-base-300 bg-base-200/50 hover:bg-base-200'
+                  }`}
+                  onClick={() => exec.selectRoute(i)}
+                >
+                  <span className="font-semibold">{r.aggregator}</span>
+                  <span className="flex items-baseline gap-1.5 tabular-nums">
+                    {r.tradeOutput != null && (
+                      <span className="text-success">
+                        {formatTokenAmount(r.tradeOutput)} {receiveSymbol}
+                      </span>
+                    )}
+                    {delta != null && delta < -0.0001 && (
+                      <span className="text-base-content/40">{delta.toFixed(2)}%</span>
+                    )}
+                    {i === 0 && <span className="badge badge-ghost badge-xs">best</span>}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
 

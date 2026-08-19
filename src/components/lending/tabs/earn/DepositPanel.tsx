@@ -13,6 +13,7 @@ import { DepositAction, WithdrawAction } from '../../actions'
 import { WalletConnect } from '../../../connect'
 import { Logo } from '../../../common/Logo'
 import { SpyModeNotice } from '../../shared/SpyModeNotice'
+import { VaultLegBreakdown, type VaultLeg } from '../../shared/VaultLegBreakdown'
 
 type EarnAction = 'Deposit' | 'Withdraw'
 
@@ -37,6 +38,13 @@ interface DepositPanelProps {
   hasBorrowOnSelectedLender?: boolean
   /** Spot USD price of the selected pool's underlying asset (forwarded to Deposit for the monthly-earnings estimate). */
   priceUsd?: number
+  /**
+   * Every leg of the selected AUTO-BALANCED vault, when the row stands for one.
+   * Empty on an ordinary market. Collapsing the legs into a single row is what
+   * makes the table honest about identity; this is where the information the
+   * collapse hides comes back — see {@link VaultLegBreakdown}.
+   */
+  vaultLegs?: VaultLeg[]
 }
 
 export const DepositPanel: React.FC<DepositPanelProps> = ({
@@ -54,6 +62,7 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
   refetchBalances,
   hasBorrowOnSelectedLender,
   priceUsd,
+  vaultLegs,
 }) => {
   const [actionTab, setActionTab] = useState<EarnAction>('Deposit')
   const { syncChain, currentChainId } = useSyncChain()
@@ -80,6 +89,17 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
             Lender
           </span>
         </div>
+      )}
+
+      {/* What the pool has actually split the money into, and what each leg
+          earns inside it. Renders nothing unless this row is a whole
+          auto-balanced position. */}
+      {vaultLegs && vaultLegs.length > 1 && (
+        <VaultLegBreakdown
+          legs={vaultLegs}
+          basketRate={selectedEntry?.fluid?.basketSupplyRate}
+          side="supply"
+        />
       )}
 
       {/* Deposit / Withdraw tabs */}

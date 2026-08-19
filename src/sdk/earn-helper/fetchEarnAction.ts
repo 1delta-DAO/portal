@@ -6,6 +6,30 @@ export interface EarnTx extends ApiPermission {
   /** `erc20-approval`, `credit-delegation`, … where the backend states it. */
   type?: string
   spender?: string
+  /**
+   * Which aggregator built this route. Present on `alternatives` entries only,
+   * and the only reliable handle for pairing one to its quoted numbers.
+   */
+  aggregator?: string
+}
+
+/**
+ * One aggregator's version of the SAME action, with what it pays out.
+ *
+ * A route is not a step: every entry here is a complete transaction, and
+ * exactly one of them gets sent. The list exists because the price differs
+ * between them — on a Pendle PT the venue's own AMM and a general aggregator
+ * routing into it can be half a percent apart, which is the whole reason the
+ * user is offered the choice rather than handed the server's first pick.
+ */
+export interface EarnRoute {
+  /** `Pendle`, `Enso`, … — as the server labelled the alternative. */
+  aggregator: string
+  /** Pay-asset units in (human, not base units). */
+  tradeInput?: number
+  /** Market-asset units out. */
+  tradeOutput?: number
+  tx: EarnTx
 }
 
 export interface EarnActionResult {
@@ -26,6 +50,15 @@ export interface EarnActionResult {
    * with no allowance in place and revert.
    */
   signatures: unknown[]
+  /**
+   * Every aggregator route the server built for this action, best first, when
+   * it built more than one. Empty for an action that is not a trade — a plain
+   * 4626 deposit has one way to happen.
+   *
+   * `transactions` already holds the winner, so a client that ignores this
+   * behaves exactly as before.
+   */
+  routes: EarnRoute[]
 }
 
 /**
@@ -37,6 +70,32 @@ export interface EarnActionResult {
  * produced an empty `transactions` on every row, which reads as "the builder
  * declined" rather than "the client looked in the wrong place".
  */
+/**
+ * `data.quotes` — the informational half, with the calldata stripped out.
+ *
+ * TWO shapes reach here and both are load-bearing. A trade-shaped quote (a
+ * Pendle PT, a secondary-market row) carries its aggregator and amounts at the
+ * top level; a composed-zap quote (a pay-asset conversion into a lending
+ * market or a vault) carries the same fields under `deltas`, because that path
+ * also reports the position deltas the trade produces. Reading only one of
+ * them leaves half the surface with routes that have a name and no price.
+ */
+interface EarnQuoteInfo {
+  aggregator?: string
+  tradeInput?: number
+  tradeOutput?: number
+  deltas?: { aggregator?: string; tradeInput?: number; tradeOutput?: number }
+}
+
+/** Flatten either quote shape to `{aggregator, tradeInput, tradeOutput}`. */
+function normalizeQuote(q: EarnQuoteInfo): EarnQuoteInfo {
+  return {
+    aggregator: q.aggregator ?? q.deltas?.aggregator,
+    tradeInput: q.tradeInput ?? q.deltas?.tradeInput,
+    tradeOutput: q.tradeOutput ?? q.deltas?.tradeOutput,
+  }
+}
+
 interface EarnActionEnvelope {
   transactions?: EarnTx[]
   /**
@@ -98,37 +157,62 @@ export async function fetchEarnAction(
   params: FetchEarnActionParams
 ): Promise<{ success: true; result: EarnActionResult } | { success: false; error: string }> {
   try {
-    const { actions } = await apiFetchEnvelope<unknown, EarnActionEnvelope>(
-      `/v1/actions/earn/${params.action}`,
-      {
-        params: {
-          earnUid: params.earnUid,
-          amount: params.amount,
-          operator: params.operator,
-          receiver: params.receiver,
-          payAsset: params.payAsset,
-          receiveAsset: params.receiveAsset,
-          isAll: params.isAll ? 'true' : undefined,
-          isShares: params.isShares ? 'true' : undefined,
-          slippage:
-            params.slippage != null && Number.isFinite(params.slippage)
-              ? Math.round(params.slippage * 100)
-              : undefined,
-          ...(params.extra ?? {}),
-        },
-      }
-    )
+    const { data, actions } = await apiFetchEnvelope<
+      { quotes?: EarnQuoteInfo[] } | null,
+      EarnActionEnvelope
+    >(`/v1/actions/earn/${params.action}`, {
+      params: {
+        earnUid: params.earnUid,
+        amount: params.amount,
+        operator: params.operator,
+        receiver: params.receiver,
+        payAsset: params.payAsset,
+        receiveAsset: params.receiveAsset,
+        isAll: params.isAll ? 'true' : undefined,
+        isShares: params.isShares ? 'true' : undefined,
+        slippage:
+          params.slippage != null && Number.isFinite(params.slippage)
+            ? Math.round(params.slippage * 100)
+            : undefined,
+        ...(params.extra ?? {}),
+      },
+    })
 
-    // A conversion (pay-asset zap) comes back as `alternatives` — one built
-    // transaction per aggregator, sorted best-output-first by the server.
-    // Take the winner as THE transaction; the rest are the same action at a
-    // worse price, not steps to execute.
-    const transactions =
-      actions?.transactions?.length
-        ? actions.transactions
-        : actions?.alternatives?.length
-          ? [actions.alternatives[0]]
-          : []
+    // A conversion (pay-asset zap, a PT trade) comes back as `alternatives` —
+    // one built transaction per aggregator, sorted best-output-first by the
+    // server. Take the winner as THE transaction; the rest are the same action
+    // at a worse price, not steps to execute.
+    const transactions = actions?.transactions?.length
+      ? actions.transactions
+      : actions?.alternatives?.length
+        ? [actions.alternatives[0]]
+        : []
+
+    // Pair each alternative with its numbers. BY AGGREGATOR, not by index:
+    // `data.quotes` keeps a quote that produced no calldata while
+    // `alternatives` cannot, so on any such failure the index would pair one
+    // aggregator's transaction with another's output — a mis-pairing that is
+    // invisible, since both halves look right on their own.
+    const quoteInfo = new Map<string, EarnQuoteInfo>()
+    for (const raw of data?.quotes ?? []) {
+      const q = normalizeQuote(raw ?? {})
+      if (q.aggregator) quoteInfo.set(q.aggregator, q)
+    }
+
+    const routes: EarnRoute[] = (actions?.alternatives ?? [])
+      .map((tx, i) => {
+        const aggregator = tx.aggregator ?? tx.description ?? `Route ${i + 1}`
+        const info = quoteInfo.get(aggregator)
+        return {
+          aggregator,
+          tradeInput: info?.tradeInput,
+          tradeOutput: info?.tradeOutput,
+          tx,
+        }
+      })
+      // One route is not a choice — offering it as one implies the others were
+      // rejected rather than never existing.
+      .filter((_, _i, all) => all.length > 1)
 
     if (transactions.length === 0) {
       // A 200 with nothing to send is not success — it is a builder that
@@ -142,6 +226,7 @@ export async function fetchEarnAction(
       result: {
         permissions: actions?.permissions ?? [],
         transactions,
+        routes,
         postTransactions: actions?.postTransactions ?? [],
         signatures: actions?.signatures ?? [],
       },

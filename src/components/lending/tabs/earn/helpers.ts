@@ -3,6 +3,7 @@ import type { PoolEntry } from '../../../../sdk/lending-helper/poolTypes'
 import { totalRewardApr } from '../../shared/rewards'
 import type { PoolDataItem } from '../../../../sdk/lending-helper/marketTypes'
 import {
+  basketIntrinsicYield,
   isAutoBalanced,
   isBasketRate,
   lenderKeyOf,
@@ -162,7 +163,23 @@ export function collapseSmartVaults(rows: PoolWithMetrics[]): PoolWithMetrics[] 
         ? leg
         : best
     )
-    out[at] = { ...primary, legs }
+    // The intrinsic yield is a TOKEN property, and the collapsed row stands for
+    // the whole position — so it must be the value-weighted blend, not the
+    // representative leg's. Left as the leg's own value when the weights are
+    // unreadable, which is the same fallback every other basket figure uses.
+    const pools = legs.map((l) => l.pool)
+    const blended = basketIntrinsicYield(
+      primary.pool,
+      'collateral',
+      pools,
+      (p) => parseFloat(p.intrinsicYield ?? '') || 0,
+      (p) => parseFloat(p.totalDepositsUsd) || 0
+    )
+    out[at] = {
+      ...primary,
+      legs,
+      metrics: blended === null ? primary.metrics : { ...primary.metrics, intrinsicYield: blended },
+    }
   }
   return out
 }

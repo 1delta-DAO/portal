@@ -69,14 +69,39 @@ export interface ConfigStats {
   borrowLiquidity: number
 }
 
-export function computeConfigStats(g: PoolConfigGroup): ConfigStats {
+export function computeConfigStats(
+  g: PoolConfigGroup,
+  /**
+   * Map a collateral row's own deposit rate to the POSITION's, when the caller
+   * can (it needs the Fluid descriptor, which `/pools/by-config` does not
+   * carry — see `AssetCell`'s `row` prop).
+   *
+   * "Best APR" is a MAX OVER LEGS, and on an LP-backed side each leg reports
+   * its own rate while the position earns the weighted blend — so the max is
+   * the single most over-stated number this view can print. On the live
+   * wstETH+ETH vault it read 2.09 % against a position rate of 1.70 %. With the
+   * resolver every leg maps to the same basket figure, so the max becomes it.
+   */
+  positionRate?: (marketUid: string, legRate: number) => number,
+  /**
+   * Same bridge for the INTRINSIC leg. `intrinsicYield` is a property of the
+   * token, so on an LP side it is weighted across the legs too — otherwise the
+   * max picks whichever leg happens to carry the staking yield and claims the
+   * whole position earns it.
+   */
+  intrinsicRate?: (marketUid: string, legIntrinsic: number) => number
+): ConfigStats {
   let totalCollUsd = 0
   let maxLtv = 0
   let bestDepositApr = 0
   for (const c of g.collaterals ?? []) {
     totalCollUsd += c.totalDepositsUsd || 0
     maxLtv = Math.max(maxLtv, c.borrowCollateralFactor || 0)
-    const apr = (c.depositRate || 0) + (c.intrinsicYield ?? 0)
+    const base = c.depositRate || 0
+    const iy = c.intrinsicYield ?? 0
+    const apr =
+      (positionRate ? positionRate(c.marketUid, base) : base) +
+      (intrinsicRate ? intrinsicRate(c.marketUid, iy) : iy)
     bestDepositApr = Math.max(bestDepositApr, apr)
   }
   return {

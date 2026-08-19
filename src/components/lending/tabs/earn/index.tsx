@@ -51,6 +51,12 @@ export function EarnTab({
   const [filterOwned, setFilterOwned] = useState(false)
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
 
+  // A row click names ONE asset, so the markets table suspends its numeric
+  // floors to show every market holding it. The "owned assets" toggle is a
+  // broad narrowing instead and must leave those filters alone — see
+  // `PoolFilterCriteria.externalAssetFilterSource`.
+  const externalAssetFilterSource: 'explicit' | 'owned' = selectedAsset ? 'explicit' : 'owned'
+
   const externalAssetFilter = useMemo(() => {
     if (selectedAsset) return selectedAsset
     if (!filterOwned || lendingBalances.length === 0) return ''
@@ -153,6 +159,7 @@ export function EarnTab({
             chainIds={chainIds}
             account={account}
             externalAssetFilter={externalAssetFilter}
+            externalAssetFilterSource={externalAssetFilterSource}
             userData={userData}
           />
         </>

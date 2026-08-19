@@ -23,8 +23,12 @@ import { isMidnightMarket, fixedTermDetails } from '../actions/helpers'
 import { hasCapability } from '../../../sdk/lending-helper/poolTypes'
 import {
   isAutoBalanced,
+  legIndexOf,
+  lenderKeyOf,
   positionBorrowRate,
   positionSupplyRate,
+  sharesForLegAmount,
+  sideInfo,
 } from '../../../sdk/lending-helper/fluidSmart'
 import { AutoBalancedBadge, autoBalancedExplainer } from './SmartVault'
 import { RefinanceModal } from './RefinanceModal'
@@ -379,7 +383,26 @@ function PositionSection({
       <div className="relative rounded-md border border-base-300 overflow-hidden">
         <span className={`absolute left-0 top-0 bottom-0 w-0.5 ${accentBar}`} />
         <div className="divide-y divide-base-300">
-          {positions.map(({ position, pool }) => {
+          {positions.map(({ position, pool }, rowIndex) => {
+            /**
+             * Is this the FIRST row of an auto-balanced vault in this section?
+             *
+             * Two legs of one Fluid vault arrive here as two independent
+             * position rows, and nothing on them says they are one position —
+             * the §2.5 complaint, in the place it actually bites. The note is
+             * rendered once, above the first leg, rather than repeated on each.
+             */
+            const vaultKey = isAutoBalanced(pool) ? lenderKeyOf(pool.marketUid) : null
+            const isFirstOfVault =
+              vaultKey !== null &&
+              positions.findIndex(
+                (x) => isAutoBalanced(x.pool) && lenderKeyOf(x.pool.marketUid) === vaultKey
+              ) === rowIndex
+            const vaultLegRows = vaultKey
+              ? positions.filter(
+                  (x) => isAutoBalanced(x.pool) && lenderKeyOf(x.pool.marketUid) === vaultKey
+                )
+              : []
             const native = isDeposits ? Number(position.deposits) : debtNative(position)
             const usd = isDeposits ? position.depositsUSD : debtUsd(position)
             const isSelected = selectedPoolMarketUid === pool.marketUid
@@ -436,6 +459,13 @@ function PositionSection({
 
             return (
               <React.Fragment key={pool.marketUid}>
+                {isFirstOfVault && vaultLegRows.length > 1 && (
+                  <SmartPositionNote
+                    rows={vaultLegRows}
+                    pool={pool}
+                    side={isDeposits ? 'collateral' : 'debt'}
+                  />
+                )}
                 <div
                   className={`grid grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:grid-cols-[minmax(140px,1.4fr)_72px_minmax(80px,1fr)_96px_140px_40px] items-center gap-x-3 px-3 py-1 pl-4 transition-colors ${
                     onPoolSelect ? 'cursor-pointer' : ''
@@ -758,6 +788,75 @@ function LoanBreakdown({
           onClose={() => setRefinancing(null)}
         />
       )}
+    </div>
+  )
+}
+
+/**
+ * "These two rows are one position."
+ *
+ * A Fluid smart side arrives here as one position row PER LEG, and every row
+ * looks like an independent holding of a token the user never chose to hold.
+ * That is FLUID_SMART_UI_PLAN.md §2.5 in the place it actually costs something:
+ * a user reading the list sees two deposits and concludes they can withdraw
+ * either one.
+ *
+ * The unit is LP SHARES, derived from a leg's balance and the pool's current
+ * ratio because no endpoint serves a share balance. Derived from the LARGEST
+ * leg — an empty or dust leg divides badly, and the largest is the best
+ * conditioned. Absent rather than guessed when the ratio is unreadable (18 live
+ * sides report an empty pool), because a wrong share count here would be read
+ * as the thing the user can act on.
+ */
+const SmartPositionNote: React.FC<{
+  rows: { position: UserPositionEntry; pool: PoolDataItem }[]
+  pool: PoolDataItem
+  side: 'collateral' | 'debt'
+}> = ({ rows, pool, side }) => {
+  const info = sideInfo(pool, side)
+  const symbols = rows.map((r) => r.pool.asset.symbol)
+
+  let shares: string | null = null
+  if (info) {
+    const best = rows.reduce((a, b) =>
+      (b.position.depositsUSD ?? 0) > (a.position.depositsUSD ?? 0) ? b : a
+    )
+    const idx = legIndexOf(info, best.pool.underlying)
+    const decimals = best.pool.asset.decimals ?? 18
+    const human = String(side === 'collateral' ? best.position.deposits : best.position.debt)
+    const [whole, frac = ''] = human.split('.')
+    try {
+      const raw =
+        BigInt(whole || '0') * 10n ** BigInt(decimals) +
+        BigInt((frac + '0'.repeat(decimals)).slice(0, decimals) || '0')
+      const s = idx >= 0 ? sharesForLegAmount(info, idx, raw) : null
+      // Shares are 1e18-scaled; show a few decimals rather than a wei count.
+      if (s !== null && s > 0n)
+        shares = (Number(s) / 1e18).toLocaleString(undefined, {
+          maximumFractionDigits: 4,
+        })
+    } catch {
+      shares = null
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-1 pl-4 bg-info/5 border-b border-base-300/60 text-[10px] text-base-content/70">
+      <AutoBalancedBadge row={pool} />
+      <span className="font-medium">
+        {rows.length} rows below are ONE position — {symbols.join(' + ')}
+      </span>
+      {shares && (
+        <span
+          className="tabular-nums text-base-content/60"
+          title="Derived from the pool's current ratio; the protocol stores shares at its own precision."
+        >
+          ≈ {shares} LP shares
+        </span>
+      )}
+      <span className="text-base-content/50">
+        · the amounts are the pool&rsquo;s current split, not what you deposited
+      </span>
     </div>
   )
 }

@@ -16,6 +16,8 @@
  */
 
 /** Opaque. `AAVE_V3` or `vault.savings` — never parsed or switched on. */
+import type { MaturityTerms } from '../lending-helper/termSheets'
+
 export type EarnVenue = string
 
 /**
@@ -356,6 +358,22 @@ export interface EarnMarket {
   risk?: EarnRisk
   capabilities: EarnCapability[]
   refs?: EarnRefs
+
+  /**
+   * When the deal ENDS. Absent ⇒ perpetual.
+   *
+   * Present on every row that has a maturity — both PT providers (Pendle and
+   * Spectra) today, and the fixed-term lenders as the term-sheet adapter
+   * reaches them. Deliberately NOT provider-specific: anything the server
+   * stamps a maturity on renders the same way here.
+   *
+   * It lives on the ROW ROOT rather than inside the term sheet, and that is
+   * load-bearing: a 9% rate over eleven days and a 9% rate over two years are
+   * different offers, and a listing that has to fetch `?terms=full` to tell
+   * them apart sorts them into the same column. Reading it here is what stops
+   * that.
+   */
+  maturity?: MaturityTerms
   providerMeta?: Record<string, unknown>
 }
 

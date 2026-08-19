@@ -27,6 +27,27 @@
  * — and splitting on `-` yields `wstETH+ETH` twice, i.e. a market that looks
  * same-asset. Read `autoBalanced` and `fluid` and nothing else.
  *
+ * WHAT IS AND IS NOT REFUSED — and why there is no gate here for it.
+ *
+ * There is deliberately NO client-side availability check in this module. An
+ * earlier version had one, and it was inverted against reality on both counts:
+ *
+ *   - **Looping is SERVED on T2, T3 and T4.** The gate refused all three, on
+ *     the reading that a smart debt side must borrow the PAIR — two tokens out,
+ *     two swaps back, which the loop shape cannot express. That holds for a
+ *     BALANCED borrow only: Fluid accepts a single-sided move on either side
+ *     and rebalances internally, so the loop borrows one leg and repays one.
+ *     All three are fork-proven and production serves them; the gate was hiding
+ *     a working feature on 158 auto-balanced Ethereum rows.
+ *   - **Migrate is refused on T3/T4** (composer-routed; the smart debt side has
+ *     no sized path through that builder yet) and the gate said nothing.
+ *
+ * Both remaining refusals are things a client cannot predict: the loop's is
+ * ROUTE-dependent ("this loop's flash asset is neither leg of the debt LP"),
+ * and migrate's is a server capability that is being extended. Build the
+ * request and surface the 400 — which every call site already does, and which
+ * `MigrateModal` states as its own design rule.
+ *
  * See FLUID_SMART_UI_PLAN.md in the lending-sdks repo.
  */
 
@@ -120,14 +141,62 @@ export function isSmartVault(row: SmartVaultRow | null | undefined): boolean {
   return smartInfo(row) !== undefined
 }
 
-/** Is the SUPPLY side of this market a two-token LP? */
+/**
+ * Is the SUPPLY side of this VAULT a two-token LP?
+ *
+ * VAULT-level, not row-level. Every row of a smart vault carries the same
+ * descriptor, so this is true on rows that are not themselves collateral legs —
+ * see {@link rowIsLegOf}, which is what a per-row question must use.
+ */
 export function hasSmartCollateral(row: SmartVaultRow | null | undefined): boolean {
   return smartInfo(row)?.isSmartCol === true
 }
 
-/** Is the BORROW side of this market a two-token LP? */
+/** Is the BORROW side of this VAULT a two-token LP? Vault-level, as above. */
 export function hasSmartDebt(row: SmartVaultRow | null | undefined): boolean {
   return smartInfo(row)?.isSmartDebt === true
+}
+
+/**
+ * The underlying this row is keyed on, read off the market uid
+ * (`<LENDER_KEY>:<chainId>:<underlying>`).
+ *
+ * From the uid rather than from a field because the two market shapes disagree
+ * and one of them lies: `PoolEntry.underlyingAddress` is typed as a required
+ * string and is served on ZERO of the 377 live Fluid rows (the address is under
+ * `underlyingInfo.asset.address`). The uid is present and correct on both.
+ */
+export function rowAsset(row: SmartVaultRow | null | undefined): string | null {
+  const parts = row?.marketUid?.split(':')
+  return parts && parts.length >= 3 ? parts[2].toLowerCase() : null
+}
+
+/**
+ * Is THIS ROW one of the legs of that side's LP?
+ *
+ * The distinction {@link hasSmartCollateral} cannot make, and the one that
+ * decides whether a basket rate applies to the row in front of you.
+ *
+ * A **T2** (smart collateral, plain debt) emits three rows — two collateral
+ * legs and the loan token — and all three carry `isSmartCol: true`, because the
+ * descriptor describes the VAULT. The loan row is not in the collateral basket
+ * and does not earn its rate: on the live osETH+ETH / wstETH vault the two
+ * collateral legs earn 0.00017 % and the loan row's own deposit rate is a
+ * different number entirely. Attributing the basket rate to it is the same
+ * class of error as attributing a leg rate to the position — just pointing the
+ * other way. 17 Ethereum rows were doing exactly that.
+ */
+export function rowIsLegOf(
+  row: SmartVaultRow | null | undefined,
+  side: 'collateral' | 'debt'
+): boolean {
+  const info = smartInfo(row)
+  if (!info) return false
+  if (side === 'collateral' ? !info.isSmartCol : !info.isSmartDebt) return false
+  const pair = side === 'collateral' ? info.collateralPair : info.debtPair
+  const me = rowAsset(row)
+  if (!pair || !me) return false
+  return pair.some((a) => a.toLowerCase() === me)
 }
 
 /** `T2` / `T3` / `T4`, or null for an ordinary market. */
@@ -140,23 +209,28 @@ export function vaultTypeLabel(row: SmartVaultRow | null | undefined): string | 
 }
 
 /**
- * The POSITION's supply APR — the basket figure when this is a smart side,
- * the row's own rate otherwise.
+ * The POSITION's supply APR — the basket figure when THIS ROW is a leg of an
+ * LP collateral side, the row's own rate otherwise.
  *
  * Use this everywhere a rate is displayed or ranked. `legRate` is passed in
  * rather than read off the row because the two market shapes serialize it
  * differently (`depositRate` is a number on `/lending/latest` and a string on
  * `/lending/pools`).
+ *
+ * Gated on {@link rowIsLegOf}, NOT on the vault's `isSmartCol`: a T2's loan row
+ * shares the vault descriptor but is not in the collateral basket, and blending
+ * its rate into one is wrong in the same way that showing a leg rate as the
+ * position's is wrong.
  */
 export function positionSupplyRate(row: SmartVaultRow | null | undefined, legRate: number): number {
   const basket = smartInfo(row)?.basketSupplyRate
-  return hasSmartCollateral(row) && typeof basket === 'number' ? basket : legRate
+  return rowIsLegOf(row, 'collateral') && typeof basket === 'number' ? basket : legRate
 }
 
 /** The same for the borrow side. Can legitimately be NEGATIVE on a smart debt. */
 export function positionBorrowRate(row: SmartVaultRow | null | undefined, legRate: number): number {
   const basket = smartInfo(row)?.basketBorrowRate
-  return hasSmartDebt(row) && typeof basket === 'number' ? basket : legRate
+  return rowIsLegOf(row, 'debt') && typeof basket === 'number' ? basket : legRate
 }
 
 /** Does the displayed rate differ from this leg's own? Drives the "basket" hint. */
@@ -164,7 +238,7 @@ export function isBasketRate(
   row: SmartVaultRow | null | undefined,
   side: 'supply' | 'borrow'
 ): boolean {
-  return side === 'supply' ? hasSmartCollateral(row) : hasSmartDebt(row)
+  return rowIsLegOf(row, side === 'supply' ? 'collateral' : 'debt')
 }
 
 // ---------------------------------------------------------------------------
@@ -353,40 +427,30 @@ export function needsSequentialClose(row: SmartVaultRow | null | undefined): boo
   return hasSmartCollateral(row) && hasSmartDebt(row)
 }
 
-export interface LeverageAvailability {
-  available: boolean
-  /** Null when available. Rendered on the Looping tab only. */
-  reason: string | null
-}
+export function basketIntrinsicYield<T extends SmartVaultRow>(
+  row: T | null | undefined,
+  side: 'collateral' | 'debt',
+  siblings: readonly T[],
+  intrinsicOf: (r: T) => number,
+  weightOf: (r: T) => number
+): number | null {
+  if (!rowIsLegOf(row, side)) return null
+  const info = smartInfo(row)!
+  const pair = (side === 'collateral' ? info.collateralPair : info.debtPair) ?? []
+  const wanted = new Set(pair.map((a) => a.toLowerCase()))
+  const vault = lenderKeyOf(row!.marketUid)
 
-/**
- * Whether looping is offered on this market.
- *
- * `/v1/actions/loop/leverage` and `/loop/close` answer 400 `UNSUPPORTED_LENDER`
- * for every smart vault, and the two refusals are NOT the same: T2 is a
- * known-shaped gap, while T3/T4 are structurally blocked because a smart DEBT
- * side borrows a PAIR and unwinding it needs two swaps back to the flash asset,
- * which the one-asset-in / one-asset-out loop contract cannot express.
- *
- * DO NOT GREY THE MARKET OUT on the strength of this. Deposit, borrow, withdraw
- * and repay all work; only the Looping tab is unavailable.
- */
-export function leverageAvailability(row: SmartVaultRow | null | undefined): LeverageAvailability {
-  if (!isSmartVault(row)) return { available: true, reason: null }
-  if (hasSmartDebt(row)) {
-    return {
-      available: false,
-      reason:
-        'Looping is not available on this vault: its debt side is a two-token LP, ' +
-        'and unwinding one needs two swaps back to the flash-loan asset — which the ' +
-        'loop contract cannot express. Deposit, borrow, withdraw and repay all work.',
-    }
+  let weighted = 0
+  let total = 0
+  for (const s of siblings) {
+    if (lenderKeyOf(s.marketUid) !== vault) continue
+    const asset = rowAsset(s)
+    if (!asset || !wanted.has(asset)) continue
+    const w = weightOf(s)
+    if (!Number.isFinite(w) || w <= 0) continue
+    const iy = intrinsicOf(s)
+    weighted += (Number.isFinite(iy) ? iy : 0) * w
+    total += w
   }
-  return {
-    available: false,
-    reason:
-      'Looping is not yet available on this vault. Its collateral is a two-token LP; ' +
-      'the position itself is supported, but the loop route is not enabled here yet. ' +
-      'Deposit, borrow, withdraw and repay all work.',
-  }
+  return total > 0 ? weighted / total : null
 }

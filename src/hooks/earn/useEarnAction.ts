@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   fetchEarnAction,
   type EarnActionResult,
+  type EarnRoute,
   type FetchEarnActionParams,
 } from '../../sdk/earn-helper/fetchEarnAction'
 import { useSendLendingTransaction } from '../useSendLendingTransaction'
@@ -18,6 +19,14 @@ interface UseEarnActionParams extends Omit<FetchEarnActionParams, 'operator' | '
 
 export interface EarnActionExecution {
   result: EarnActionResult | null
+  /**
+   * The aggregator routes on offer, best first — empty unless the server
+   * quoted more than one.
+   */
+  routes: EarnRoute[]
+  /** Index into `routes` of the one that will be sent. */
+  selectedRoute: number
+  selectRoute: (index: number) => void
   loading: boolean
   error: string | null
   /** Approvals still to run, in order. */
@@ -57,6 +66,9 @@ export function useEarnAction(params: UseEarnActionParams): EarnActionExecution 
   const [permissionsCompleted, setPermissionsCompleted] = useState(0)
   const [executing, setExecuting] = useState(false)
   const [txHash, setTxHash] = useState<string | null>(null)
+  // Index, not the route object: a re-quote replaces every object, and holding
+  // the old one would send calldata priced at a stale block.
+  const [selectedRoute, setSelectedRoute] = useState(0)
 
   const debouncedAmount = useDebounce(amount ?? '', 500)
   // Guards against an out-of-order response overwriting a newer one — the
@@ -73,6 +85,7 @@ export function useEarnAction(params: UseEarnActionParams): EarnActionExecution 
     setError(null)
     setPermissionsCompleted(0)
     setTxHash(null)
+    setSelectedRoute(0)
   }, [])
 
   useEffect(() => {
@@ -104,6 +117,10 @@ export function useEarnAction(params: UseEarnActionParams): EarnActionExecution 
         if (id !== fetchIdRef.current) return
         if (res.success) {
           setResult(res.result)
+          // Back to the server's best on every re-quote. Keeping the user's
+          // pick across a new amount would silently re-rank it: route 2 of the
+          // old list is a different aggregator in the new one.
+          setSelectedRoute(0)
         } else {
           setResult(null)
           setError(res.error)
@@ -136,8 +153,20 @@ export function useEarnAction(params: UseEarnActionParams): EarnActionExecution 
     else setError(res.error ?? 'Approval failed')
   }, [permissions, permissionsCompleted, send])
 
+  const routes = result?.routes ?? []
+
+  const selectRoute = useCallback((index: number) => {
+    setSelectedRoute(index)
+  }, [])
+
   const executeMain = useCallback(async () => {
     if (!result || !allPermissionsDone || needsSignature) return
+    // A chosen route REPLACES the action, it does not precede it: every entry
+    // in `routes` is the same deposit at a different price. Only the main call
+    // is swapped — approvals and post-steps are route-independent (they act on
+    // the pay asset and the composer, which every route shares).
+    const chosen = routes[selectedRoute]?.tx
+    const main = chosen ? [chosen, ...result.transactions.slice(1)] : result.transactions
     setExecuting(true)
     setError(null)
     // Multi-step actions come back as an ORDERED array (an LST that mints then
@@ -145,7 +174,7 @@ export function useEarnAction(params: UseEarnActionParams): EarnActionExecution 
     // after them (unwrapping the WETH a close freed). Stopping on the first
     // failure is deliberate: step two on top of a failed step one is not a
     // partial success, it is a different transaction.
-    for (const tx of [...result.transactions, ...result.postTransactions]) {
+    for (const tx of [...main, ...result.postTransactions]) {
       const res = await send(tx)
       if (!res.ok) {
         setExecuting(false)
@@ -159,10 +188,13 @@ export function useEarnAction(params: UseEarnActionParams): EarnActionExecution 
     // exists. Clearing forces a rebuild rather than leaving a stale one armed.
     setResult(null)
     setPermissionsCompleted(0)
-  }, [result, allPermissionsDone, needsSignature, send])
+  }, [result, allPermissionsDone, needsSignature, send, routes, selectedRoute])
 
   return {
     result,
+    routes,
+    selectedRoute,
+    selectRoute,
     loading,
     error,
     permissionsCompleted,

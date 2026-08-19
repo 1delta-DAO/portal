@@ -103,6 +103,44 @@ function venueNote(row: EarnMarket): string | null {
   return `venue ${formatPercent(marketOwn)}`
 }
 
+/**
+ * The term, for rows that HAVE one.
+ *
+ * Provider-agnostic by construction: it reads `row.maturity`, which the server
+ * stamps on both PT providers (Pendle, Spectra) and will stamp on the
+ * fixed-term lenders as the term-sheet adapter reaches them. Nothing here
+ * branches on a venue.
+ *
+ * Days are recomputed from the maturity TIMESTAMP against the clock, not read
+ * off `secondsToMaturity` — that field is a snapshot from fetch time, and a
+ * cached page would keep counting down from whenever it was built. Same rule
+ * the server applies when it decides a PT is still live.
+ *
+ * Without this the listing shows "Fixed 3.19%" identically for a market that
+ * matures in nine days and one that matures in 2031 — which is the whole
+ * reason `maturity` sits on the row root rather than inside the term sheet.
+ */
+function termNote(row: EarnMarket): { label: string; title: string } | null {
+  const m = row.maturity
+  if (!m || m.kind === 'perpetual') return null
+  const at = typeof m.maturity === 'number' ? m.maturity : null
+  const secs =
+    at != null
+      ? at - Math.floor(Date.now() / 1000)
+      : typeof m.secondsToMaturity === 'number'
+        ? m.secondsToMaturity
+        : null
+  if (secs == null) return null
+  const iso = m.maturityIso ?? (at != null ? new Date(at * 1000).toISOString() : null)
+  const on = iso ? ` (${iso.slice(0, 10)})` : ''
+  if (secs <= 0) return { label: 'matured', title: `Matured${on}` }
+  const days = secs / 86_400
+  return {
+    label: `${Math.max(1, Math.round(days))}-day`,
+    title: `${days.toFixed(2)} days to maturity${on}`,
+  }
+}
+
 export const EarnMarketsTable: React.FC<Props> = ({
   items,
   vocab,
@@ -158,6 +196,7 @@ export const EarnMarketsTable: React.FC<Props> = ({
         {items.map((row) => {
           const isSel = selected?.earnUid === row.earnUid
           const note = venueNote(row)
+          const term = termNote(row)
           const lendingPath = lendingPathForRow(row)
           return (
             <tr
@@ -251,6 +290,17 @@ export const EarnMarketsTable: React.FC<Props> = ({
                     headline — i.e. when part of the yield is the asset's own.
                     As its own column it was empty on the large majority of
                     rows, which read as "this venue pays nothing". */}
+                {/* The TERM qualifies the headline, so it sits directly under
+                    it. A fixed rate with no term beside it is the same number
+                    whether it runs nine days or five years. */}
+                {term && (
+                  <div
+                    className="text-[10px] font-normal text-base-content/50"
+                    title={term.title}
+                  >
+                    {term.label}
+                  </div>
+                )}
                 {note && (
                   <div
                     className={`text-[10px] font-normal ${

@@ -182,7 +182,15 @@ export interface PoolEntry {
   lenderKey: string
   lenderInfo?: LenderInfo
   flags?: PoolFlags
-  underlyingAddress: string
+  /**
+   * NOT ALWAYS SERVED. Absent on every Fluid row (0 of 377 live rows on
+   * Ethereum carry it) and on other lenders that key the asset only under
+   * `underlyingInfo`. Optional so the type stops promising a value the endpoint
+   * does not send — read it through `poolAssetAddress()` in
+   * `tabs/earn/poolFilters.ts`, which falls back to
+   * `underlyingInfo.asset.address`.
+   */
+  underlyingAddress?: string
   depositRate: string
   variableBorrowRate: string
   stableBorrowRate: string
