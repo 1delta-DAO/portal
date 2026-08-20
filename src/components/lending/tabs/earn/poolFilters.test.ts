@@ -209,3 +209,49 @@ describe('filterAndSortPools — sorting', () => {
     expect(uids(input)).toEqual(before)
   })
 })
+
+describe('filterAndSortPools — markets with no deposit side', () => {
+  it('drops a market whose deposits are not enabled', () => {
+    // A Gearbox credit-manager row: it is the BORROW side of a shared passive
+    // pool. The pool's own deposit surface is one vault row under Earn →
+    // Vaults; republishing it here once per credit manager listed the same
+    // pool seven times, each opening a Deposit panel that cannot build.
+    const gearbox = pool({
+      marketUid: 'GEARBOX_V3_0X123:1:0xweth',
+      lenderKey: 'GEARBOX_V3_0X123',
+      name: 'Loan WETH',
+      depositRate: '2.2',
+      flags: { borrowingEnabled: true, depositsEnabled: false },
+    })
+    const normal = pool({ marketUid: 'AAVE_V3:1:0xusdc' })
+
+    const result = filterAndSortPools(rows(gearbox, normal), BASE)
+
+    expect(uids(result)).toEqual(['AAVE_V3:1:0xusdc'])
+  })
+
+  it('keeps it dropped even when the user picks that asset explicitly', () => {
+    // The explicit single-asset pick suspends the numeric floors. It must not
+    // suspend this one — the panel would still have nothing to build.
+    const gearbox = pool({
+      marketUid: 'GEARBOX_V3_0X123:1:0xweth',
+      underlyingAddress: '0xweth',
+      flags: { depositsEnabled: false },
+    })
+
+    const result = filterAndSortPools(rows(gearbox), {
+      ...BASE,
+      externalAssetFilter: '0xweth',
+      externalAssetFilterSource: 'explicit',
+    })
+
+    expect(result).toEqual([])
+  })
+
+  it('keeps markets that say nothing about deposits', () => {
+    // Absent flags mean "not stated", never "disabled".
+    const noFlags = pool({ marketUid: 'AAVE_V3:1:0xdai' })
+
+    expect(uids(filterAndSortPools(rows(noFlags), BASE))).toEqual(['AAVE_V3:1:0xdai'])
+  })
+})

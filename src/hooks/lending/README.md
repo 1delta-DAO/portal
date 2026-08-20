@@ -32,7 +32,11 @@ the top-level [../README.md](../README.md).
     `ConfigMarketItem`.
 - [useFlattenedPools.ts](useFlattenedPools.ts) — `useFlattenedPoolsMultiChain`:
   one query per selected chain against `/v1/data/lending/pools`, paged and
-  merged, degrading to a partial result when a chain fails. The response types
+  merged, degrading to a partial result when a chain fails. Paging is
+  *streamed* (`streamedQuery`): the first page renders immediately and the rest
+  of the page budget is requested in one parallel wave, so a four-page chain
+  costs one round-trip of latency instead of four
+  ([useFlattenedPools.test.ts](useFlattenedPools.test.ts)). The response types
   (`PoolEntry`, `PoolRisk`, `LenderInfo`, …) live in
   [`sdk/lending-helper/poolTypes.ts`](../../sdk/lending-helper/poolTypes.ts).
 - [useIrmData.ts](useIrmData.ts) — Interest-rate-model curves for a

@@ -1,5 +1,9 @@
 import { useCallback, useMemo } from 'react'
-import { useQueries, type UseQueryResult } from '@tanstack/react-query'
+import {
+  useQueries,
+  experimental_streamedQuery as streamedQuery,
+  type UseQueryResult,
+} from '@tanstack/react-query'
 import { apiFetch, type ApiParams } from '../../sdk/http'
 import type { PoolEntry, PoolsFilters } from '../../sdk/lending-helper/poolTypes'
 
@@ -82,26 +86,82 @@ interface ChainPoolsPage {
   truncated: boolean
 }
 
-/** Fetch every page for one chain, up to {@link MAX_PAGES_PER_CHAIN}. */
-async function fetchAllPoolsForChain(
+/** A single page as it comes off the wire, before the reducer merges it. */
+interface PoolsChunk {
+  items: PoolEntry[]
+  /** Set on the final chunk when the page budget cut the chain short. */
+  truncated: boolean
+}
+
+/**
+ * Stream one chain's pages.
+ *
+ * Two things here are deliberate, and both exist because Ethereum alone
+ * returns ~2000 markets at the default risk ceiling — four full pages, several
+ * MB of JSON:
+ *
+ *   1. **Yield per page instead of returning the merged list.** The table
+ *      renders as soon as page 1 lands and grows underneath the user, rather
+ *      than showing a spinner until the last page arrives. The view already
+ *      surfaces `isPoolsFetching` as a "loading more" note.
+ *   2. **Pages 2..N go out together, not one after another.** Paging is only
+ *      sequential because a short page is the sole end-of-list signal — but
+ *      once page 1 comes back full, the remaining pages of the budget can be
+ *      requested at once. Cost of guessing wrong is a couple of empty
+ *      responses (the backend answers those in ~0.5s); the win is that a
+ *      four-page chain costs one round-trip of latency rather than four.
+ */
+export async function* streamPoolsForChain(
   chainId: string,
   lender: string | undefined,
   maxRiskScore: number | undefined,
   pageSize: number,
-  filters: PoolsFilters | undefined
-): Promise<ChainPoolsPage> {
-  const items: PoolEntry[] = []
-
-  for (let page = 0; page < MAX_PAGES_PER_CHAIN; page++) {
-    const data = await apiFetch<{ items: PoolEntry[] }>(endpointPools, {
-      params: buildPoolsParams(chainId, lender, items.length, pageSize, maxRiskScore, filters),
+  filters: PoolsFilters | undefined,
+  signal: AbortSignal | undefined
+): AsyncGenerator<PoolsChunk> {
+  const fetchPage = (start: number) =>
+    apiFetch<{ items: PoolEntry[] }>(endpointPools, {
+      params: buildPoolsParams(chainId, lender, start, pageSize, maxRiskScore, filters),
+      signal,
     })
 
-    items.push(...data.items)
-    if (data.items.length < pageSize) return { items, truncated: false }
+  const first = await fetchPage(0)
+  yield { items: first.items, truncated: false }
+  if (first.items.length < pageSize) return
+
+  // Settle rather than await directly: once a short page tells us the list is
+  // over, the speculative pages behind it are irrelevant, and an unobserved
+  // rejection from one of them must not fail a query that already has the
+  // complete result.
+  const pending = Array.from({ length: MAX_PAGES_PER_CHAIN - 1 }, (_, i) =>
+    fetchPage((i + 1) * pageSize).then(
+      (data) => ({ ok: true as const, data }),
+      (error) => ({ ok: false as const, error })
+    )
+  )
+
+  let lastPageFull = true
+  for (const p of pending) {
+    const settled = await p
+    if (!lastPageFull) continue // list already ended; drain and discard
+    if (!settled.ok) throw settled.error
+    lastPageFull = settled.data.items.length === pageSize
+    yield { items: settled.data.items, truncated: false }
   }
 
-  return { items, truncated: true }
+  // Every page of the budget came back full, so there is more we did not ask
+  // for. Flag it so the view can say the list is a capped slice.
+  if (lastPageFull) yield { items: [], truncated: true }
+}
+
+const EMPTY_CHAIN_PAGE: ChainPoolsPage = { items: [], truncated: false }
+
+/** Exported for the paging tests. */
+export function mergeChunk(acc: ChainPoolsPage, chunk: PoolsChunk): ChainPoolsPage {
+  return {
+    items: chunk.items.length ? [...acc.items, ...chunk.items] : acc.items,
+    truncated: acc.truncated || chunk.truncated,
+  }
 }
 
 export interface MultiChainPoolsResult {
@@ -188,7 +248,16 @@ export function useFlattenedPoolsMultiChain(params: {
     queries: sortedChainIds.map((chainId) => ({
       queryKey: ['flattenedPoolsChain', chainId, lender ?? '', maxRiskScore, pageSize, filtersKey],
       enabled,
-      queryFn: () => fetchAllPoolsForChain(chainId, lender, maxRiskScore, pageSize, filters),
+      // `replace` keeps the previous list on screen through a background
+      // refetch — with `reset` the table would blank out every 8 minutes and
+      // refill page by page.
+      queryFn: streamedQuery<PoolsChunk, ChainPoolsPage>({
+        streamFn: ({ signal }) =>
+          streamPoolsForChain(chainId, lender, maxRiskScore, pageSize, filters, signal),
+        reducer: mergeChunk,
+        initialValue: EMPTY_CHAIN_PAGE,
+        refetchMode: 'replace',
+      }),
       refetchInterval: 8 * 60 * 1000,
       staleTime: 30_000,
       retry: 1,

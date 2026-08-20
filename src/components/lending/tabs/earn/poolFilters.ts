@@ -89,6 +89,26 @@ function isDepositOnly(p: PoolEntry): boolean {
 }
 
 /**
+ * Whether the row has a deposit side AT ALL.
+ *
+ * This table is the Earn tab's deposit surface — every row opens a
+ * Deposit/Withdraw panel — so a market the protocol does not take deposits on
+ * has no business being listed, however good its APR looks. The flag is a
+ * per-market fact from the backend, not a heuristic.
+ *
+ * It is not only a cosmetic filter. The Gearbox rows are the case that forced
+ * it: each `GEARBOX_V3_<creditManager>` market is the BORROW side of a shared
+ * passive pool, so seven credit managers republished the same WETH pool at the
+ * same 2.20 % — one pool rendered as seven earn rows — while a deposit on any
+ * of them is not a thing the credit manager does. That pool IS depositable, as
+ * exactly one row, under Earn → Vaults (provider `gearbox`), which is where it
+ * belongs. Dolomite's closing markets are the other current case.
+ */
+export function hasDepositSide(p: PoolEntry): boolean {
+  return p.flags?.depositsEnabled !== false
+}
+
+/**
  * Fixed-rate earn markets (Midnight order book, Term repo listings, Exactly
  * fixed pools) have structurally low/zero pool utilization — the yield is a
  * book or a fixed pool, not a variable pool rate.
@@ -161,7 +181,10 @@ export function filterAndSortPools(
   rows: PoolWithMetrics[],
   c: PoolFilterCriteria
 ): PoolWithMetrics[] {
-  let result = rows
+  // Rows with no deposit side are dropped before anything else — no filter
+  // combination, not even an explicit single-asset row click, should surface a
+  // market whose Deposit panel cannot build a transaction.
+  let result = rows.filter(({ pool: p }) => hasDepositSide(p))
 
   if (c.selectedLender !== 'all') {
     result = result.filter(({ pool: p }) => p.lenderKey === c.selectedLender)

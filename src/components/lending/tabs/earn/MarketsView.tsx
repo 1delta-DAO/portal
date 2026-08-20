@@ -13,7 +13,7 @@ import {
   type PoolWithMetrics,
   type SortKey,
 } from './helpers'
-import { filterAndSortPools } from './poolFilters'
+import { filterAndSortPools, hasDepositSide } from './poolFilters'
 import type { VaultLeg } from '../../shared/VaultLegBreakdown'
 import { MarketsTable } from './MarketsTable'
 import { DepositPanel } from './DepositPanel'
@@ -365,10 +365,16 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
     return null
   }, [selectedEntry, selectedSubAccounts])
 
+  // Lenders that actually have a row here. Built off the same deposit-side
+  // predicate the table filters on, so the dropdown can never offer a lender
+  // whose every market was dropped — picking Gearbox used to empty the table,
+  // because all seven of its credit-manager markets are borrow-side only.
   const lenders = useMemo(() => {
-    const keys = Array.from(new Set(pools.map((p) => p.lenderKey)))
+    const depositable = pools.filter(hasDepositSide)
+    const keys = Array.from(new Set(depositable.map((p) => p.lenderKey)))
     return keys.sort(
-      (a, b) => computeLenderTvlFromPools(pools, b) - computeLenderTvlFromPools(pools, a)
+      (a, b) =>
+        computeLenderTvlFromPools(depositable, b) - computeLenderTvlFromPools(depositable, a)
     )
   }, [pools])
 
