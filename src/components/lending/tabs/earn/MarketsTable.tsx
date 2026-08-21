@@ -332,7 +332,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                               src={p.lenderInfo?.logoURI}
                               alt={p.lenderInfo?.name ?? p.lenderKey}
                               fallbackText={p.lenderInfo?.name ?? p.lenderKey}
-                              className="rounded-full object-contain w-3 h-3 shrink-0 token-logo"
+                              className="protocol-logo w-3 h-3 shrink-0"
                             />
                             {chainMarker(p)}
                             <span className="truncate">{p.lenderInfo?.name ?? p.lenderKey}</span>
@@ -559,7 +559,7 @@ export const MarketsTable: React.FC<MarketsTableProps> = ({
                           src={p.lenderInfo?.logoURI}
                           alt={p.lenderInfo?.name ?? p.lenderKey}
                           fallbackText={p.lenderInfo?.name ?? p.lenderKey}
-                          className="rounded-full object-contain w-3 h-3 shrink-0 token-logo"
+                          className="protocol-logo w-3 h-3 shrink-0"
                         />
                         {chainMarker(p)}
                         <span className="truncate">{p.lenderInfo?.name ?? p.lenderKey}</span>

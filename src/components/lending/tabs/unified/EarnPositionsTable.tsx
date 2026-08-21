@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Logo } from '../../../common/Logo'
+import { ChainBadgedLogo } from '../../../common/ChainBadgedLogo'
 import { Badge } from '../../../common/Badge'
 import { Chevron } from '../../../common/Chevron'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
@@ -269,15 +270,14 @@ const VaultRow: React.FC<{
     >
       <td>
         <div className="flex items-center gap-2">
-          <span className="shrink-0 overflow-hidden rounded-full">
-            <Logo
-              src={row.logoURI}
-              alt={row.venue}
-              size={24}
-              fallbackText={row.brand ?? row.venue}
-              className="rounded-full"
-            />
-          </span>
+          <ChainBadgedLogo
+            src={row.logoURI}
+            alt={row.venue}
+            chainId={row.chainId}
+            size={28}
+            fallbackText={row.brand ?? row.venue}
+            round={false}
+          />
           <div className="min-w-0 leading-tight">
             <div className="truncate text-xs font-medium" title={row.name}>
               {row.name || row.brand || row.venue}
@@ -348,15 +348,17 @@ const LendingRows: React.FC<{
       <tr className={multi ? 'hover cursor-pointer' : ''} onClick={multi ? onToggle : undefined}>
         <td>
           <div className="flex items-center gap-2">
-            <span className="shrink-0 overflow-hidden rounded-full">
-              <Logo
-                src={row.logoURI}
-                alt={row.venue}
-                size={24}
-                fallbackText={row.brand ?? row.lender}
-                className="rounded-full"
-              />
-            </span>
+            {/* Chain rides the venue logo: this table interleaves positions
+                from every selected chain, and the same lender on two chains is
+                two positions, not one. */}
+            <ChainBadgedLogo
+              src={row.logoURI}
+              alt={row.venue}
+              chainId={row.chainId}
+              size={28}
+              fallbackText={row.brand ?? row.lender}
+              round={false}
+            />
             <div className="min-w-0 leading-tight">
               <div className="truncate text-xs font-medium" title={row.lender}>
                 {row.name || row.brand || row.lender}

@@ -123,7 +123,7 @@ const SelectedAssetBadge: React.FC<{
               src={lenderInfo.logoURI}
               alt={lenderInfo.name}
               fallbackText={lenderInfo.name}
-              className="rounded-full object-contain w-3.5 h-3.5"
+              className="protocol-logo w-3.5 h-3.5"
             />
             {lenderInfo.name}
           </span>

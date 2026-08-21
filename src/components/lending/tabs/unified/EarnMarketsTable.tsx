@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { Logo } from '../../../common/Logo'
+import { ChainBadgedLogo } from '../../../common/ChainBadgedLogo'
 import { Badge } from '../../../common/Badge'
 import { RiskFindings } from '../../shared/RiskFindings'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
@@ -206,18 +206,17 @@ export const EarnMarketsTable: React.FC<Props> = ({
             >
               <td>
                 <div className="flex items-center gap-2">
-                  {/* Circular crop: token art is a mix of square and round
-                      source images, so clip them to one shape rather than
-                      letting each provider's asset decide. */}
-                  <span className="shrink-0 overflow-hidden rounded-full">
-                    <Logo
-                      src={row.logoURI}
-                      alt={row.venue}
-                      size={24}
-                      fallbackText={row.brand ?? row.venue}
-                      className="rounded-full"
-                    />
-                  </span>
+                  {/* Chain badged onto the venue logo — rows from every
+                      selected chain are interleaved here, and a row is only
+                      actionable on its own. */}
+                  <ChainBadgedLogo
+                    src={row.logoURI}
+                    alt={row.venue}
+                    chainId={row.chainId}
+                    size={24}
+                    fallbackText={row.brand ?? row.venue}
+                    round={false}
+                  />
                   <div className="min-w-0 leading-tight">
                     {/* MARKET first, brand second. The brand is shared by every
                         row of a protocol — Pendle alone has ~50 — so leading
@@ -294,10 +293,7 @@ export const EarnMarketsTable: React.FC<Props> = ({
                     it. A fixed rate with no term beside it is the same number
                     whether it runs nine days or five years. */}
                 {term && (
-                  <div
-                    className="text-[10px] font-normal text-base-content/50"
-                    title={term.title}
-                  >
+                  <div className="text-[10px] font-normal text-base-content/50" title={term.title}>
                     {term.label}
                   </div>
                 )}

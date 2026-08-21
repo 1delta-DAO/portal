@@ -936,7 +936,7 @@ export function PairActionPanel({ row, account, onClose, lenderName, lenderLogo 
                   src={lenderLogo}
                   alt={displayLender}
                   fallbackText={displayLender}
-                  className="w-3.5 h-3.5 rounded-full shrink-0"
+                  className="protocol-logo w-3.5 h-3.5 shrink-0"
                 />
               )}
               <span className="text-[11px] text-base-content/60 truncate" title={row.lenderKey}>

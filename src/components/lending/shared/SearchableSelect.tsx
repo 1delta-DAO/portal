@@ -63,6 +63,12 @@ interface SearchableSelectBaseProps {
    * (~6 rows); bump it to show more options at once.
    */
   listMaxHeightClassName?: string
+  /**
+   * Shape of the option icons. `'round'` (default) suits chains and tokens;
+   * `'protocol'` leaves lender artwork uncropped — a wordmark inside a circle
+   * loses the part that names it.
+   */
+  iconShape?: 'round' | 'protocol'
 }
 
 /**
@@ -99,7 +105,10 @@ export function SearchableSelect(props: SearchableSelectProps) {
     className = '',
     menuClassName = 'min-w-full w-max max-w-xs',
     listMaxHeightClassName = 'max-h-52',
+    iconShape = 'round',
   } = props
+
+  const iconClass = iconShape === 'round' ? 'rounded-full token-logo' : 'protocol-logo'
 
   const isMulti = props.multiple === true
   const selectedValues = useMemo(
@@ -232,7 +241,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
                 src={o.icon}
                 alt={o.label}
                 fallbackText={o.label}
-                className="w-4 h-4 rounded-full ring-1 ring-base-100 token-logo"
+                className={`w-4 h-4 ring-1 ring-base-100 ${iconClass}`}
               />
             ))}
           </span>
@@ -250,7 +259,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
             src={selectedOption.icon}
             alt={selectedOption.label}
             fallbackText={selectedOption.label}
-            className="w-4 h-4 rounded-full token-logo"
+            className={`w-4 h-4 ${iconClass}`}
           />
         )}
         {selectedOption.indicator && <span className="opacity-60">{selectedOption.indicator}</span>}
@@ -345,7 +354,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
                         src={opt.icon}
                         alt={opt.label}
                         fallbackText={opt.label}
-                        className="w-4 h-4 rounded-full shrink-0 token-logo"
+                        className={`w-4 h-4 shrink-0 ${iconClass}`}
                       />
                     )}
                     {opt.indicator && (
@@ -439,7 +448,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
                       src={opt.icon}
                       alt={opt.label}
                       fallbackText={opt.label}
-                      className="w-4 h-4 rounded-full shrink-0 token-logo"
+                      className={`w-4 h-4 shrink-0 ${iconClass}`}
                     />
                   )}
                   {opt.indicator && (

@@ -250,7 +250,7 @@ export const VaultActionPanel: React.FC<VaultActionPanelProps> = ({
             src={PROVIDER_LOGOS[selected.provider]}
             alt={PROVIDER_LABELS[selected.provider]}
             fallbackText={PROVIDER_LABELS[selected.provider]}
-            className="rounded-full object-contain w-5 h-5 shrink-0"
+            className="protocol-logo w-5 h-5 shrink-0"
           />
           <span className="font-semibold text-sm truncate">
             {PROVIDER_LABELS[selected.provider]}

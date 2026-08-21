@@ -4,10 +4,9 @@ import type { ChainTokenBalance } from '../../../../hooks/lending/useLendingBala
 import { AssetPopover } from '../../shared/AssetPopover'
 import { EmptyState } from '../../../common/EmptyState'
 import { ErrorAlert } from '../../../common/ErrorAlert'
-import { Logo } from '../../../common/Logo'
+import { ChainBadgedLogo } from '../../../common/ChainBadgedLogo'
 import { formatUsd } from '../../../../utils/format'
 import { getChainName } from '../../../../lib/lib-utils'
-import { chainLogoUrl } from '../../../../config/assets'
 
 interface UserAssetsTableProps {
   balances: ChainTokenBalance[]
@@ -17,7 +16,7 @@ interface UserAssetsTableProps {
   failedChains?: string[]
   /** Token metadata keyed by chain; balances can span chains. */
   tokensByChain: Record<string, Record<string, RawCurrency>>
-  /** Show the chain column. Defaults on — balances can span chains. */
+  /** Badge each row's chain onto its token icon. Defaults on — balances can span chains. */
   showChain?: boolean
   filterOwned: boolean
   onFilterOwnedChange: (v: boolean) => void
@@ -99,8 +98,7 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
           <table className="table table-sm table-fixed w-full [&_td]:overflow-hidden [&_th]:overflow-hidden">
             <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-base-100 [&_th]:border-b [&_th]:border-base-300">
               <tr>
-                <th className={showChain ? 'w-[38%]' : 'w-[50%]'}>Asset</th>
-                {showChain && <th className="w-[12%]">Chain</th>}
+                <th className="w-[50%]">Asset</th>
                 <th className="w-[25%] text-right">Balance</th>
                 <th className="w-[25%] text-right">USD Value</th>
               </tr>
@@ -113,6 +111,14 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
                 const name = b.name || token?.name || ''
 
                 const isSelected = selectedAsset === b.address.toLowerCase()
+                // Chain first — it is what tells two rows of the same token
+                // apart; the token's long name only qualifies the symbol.
+                const subLine = [
+                  showChain ? getChainName(b.chainId) : '',
+                  name !== symbol ? name : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
 
                 return (
                   <tr
@@ -129,31 +135,31 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
                         symbol={symbol}
                         logoURI={logoURI}
                       >
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-semibold text-xs truncate">{symbol}</span>
-                          {name && name !== symbol && (
-                            <span className="text-[10px] text-base-content/60 truncate">
-                              {name}
-                            </span>
-                          )}
+                        <div className="flex items-center gap-2 min-w-0">
+                          {/* The same token on two chains is two rows, so the
+                              chain rides the token icon here exactly as it does
+                              on the earn tables. It replaces the old Chain
+                              column: one small mark instead of 12% of the
+                              table width spent repeating the name. */}
+                          <ChainBadgedLogo
+                            src={logoURI}
+                            alt={symbol || b.address}
+                            chainId={b.chainId}
+                            showChain={showChain}
+                            size={20}
+                            fallbackText={symbol || b.address}
+                          />
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-semibold text-xs truncate">{symbol}</span>
+                            {subLine && (
+                              <span className="text-[10px] text-base-content/60 truncate">
+                                {subLine}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </AssetPopover>
                     </td>
-                    {showChain && (
-                      <td>
-                        <div className="flex items-center gap-1 min-w-0">
-                          <Logo
-                            src={chainLogoUrl(b.chainId)}
-                            alt={getChainName(b.chainId)}
-                            fallbackText={getChainName(b.chainId)}
-                            className="w-3.5 h-3.5 rounded-full shrink-0"
-                          />
-                          <span className="text-[10px] text-base-content/60 truncate">
-                            {getChainName(b.chainId)}
-                          </span>
-                        </div>
-                      </td>
-                    )}
                     <td className="text-right font-mono text-xs">
                       {Number(b.balance).toLocaleString(undefined, {
                         maximumFractionDigits: 6,

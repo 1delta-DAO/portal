@@ -80,7 +80,7 @@ export const DepositPanel: React.FC<DepositPanelProps> = ({
             src={selectedEntry.lenderInfo.logoURI}
             alt={selectedEntry.lenderInfo.name}
             fallbackText={selectedEntry.lenderInfo.name}
-            className="rounded-full object-contain w-5 h-5 shrink-0"
+            className="protocol-logo w-5 h-5 shrink-0"
           />
           <span className="font-semibold text-sm truncate" title={selectedEntry.lenderInfo.name}>
             {selectedEntry.lenderInfo.name}

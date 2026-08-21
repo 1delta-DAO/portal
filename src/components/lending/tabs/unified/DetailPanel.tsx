@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
-import { Logo } from '../../../common/Logo'
+import { ChainBadgedLogo } from '../../../common/ChainBadgedLogo'
 import { Badge } from '../../../common/Badge'
 import { Chevron } from '../../../common/Chevron'
+import { getChainName } from '../../../../lib/lib-utils'
 import { EmptyState } from '../../../common/EmptyState'
 import { useEarnHistory } from '../../../../hooks/earn/useEarnHistory'
 import { HistoryChart } from './HistoryChart'
@@ -98,24 +99,28 @@ export const DetailPanel: React.FC<Props> = ({
         <div className="flex min-w-0 items-center gap-2">
           {/* Circular crop matches the table: token art mixes square and round
               sources, so the shape is ours to decide, not the provider's.
-              `ring` keeps a light-on-light logo from dissolving into the card. */}
-          <span className="shrink-0 overflow-hidden rounded-full ring-1 ring-base-300">
-            <Logo
-              src={row.logoURI}
-              alt={row.venue}
-              size={32}
-              fallbackText={row.brand ?? row.venue}
-              className="rounded-full"
-            />
-          </span>
+              `ring` keeps a light-on-light logo from dissolving into the card.
+              The chain badge matches the row that opened this rail. */}
+          <ChainBadgedLogo
+            src={row.logoURI}
+            alt={row.venue}
+            chainId={row.chainId}
+            size={32}
+            fallbackText={row.brand ?? row.venue}
+            round={false}
+          />
           <div className="min-w-0">
             {/* Market first, brand second — same ordering as the table, so the
                 header does not disagree with the row that opened it. */}
             <div className="truncate text-sm font-semibold leading-tight" title={row.name}>
               {row.name || row.brand || row.venue}
             </div>
+            {/* The chain is spelled out here — the rail has the room the table
+                rows do not, and it is what says which network an action on
+                this row will run on. */}
             <div className="truncate text-[10px] text-base-content/50" title={row.venue}>
               {row.subtitle ?? row.brand ?? row.venue}
+              {row.chainId ? ` · ${getChainName(row.chainId)}` : ''}
             </div>
           </div>
         </div>

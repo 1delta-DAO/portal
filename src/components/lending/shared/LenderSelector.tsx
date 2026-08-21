@@ -164,6 +164,7 @@ export const LenderSelector: React.FC<LenderSelectorProps> = ({
         placeholder="Search lenders..."
         menuClassName="min-w-full w-max max-w-md"
         listMaxHeightClassName="max-h-[28rem]"
+        iconShape="protocol"
       />
     </div>
     {hasBalances && (

@@ -177,7 +177,7 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                         src={PROVIDER_LOGOS[v.provider]}
                         alt={PROVIDER_LABELS[v.provider]}
                         fallbackText={PROVIDER_LABELS[v.provider]}
-                        className="rounded-full object-contain w-4 h-4 shrink-0 token-logo"
+                        className="protocol-logo w-4 h-4 shrink-0"
                       />
                       <span className="text-xs font-medium truncate">
                         {PROVIDER_LABELS[v.provider]}
@@ -362,7 +362,7 @@ export const VaultsTable: React.FC<VaultsTableProps> = ({
                         src={PROVIDER_LOGOS[v.provider]}
                         alt={PROVIDER_LABELS[v.provider]}
                         fallbackText={PROVIDER_LABELS[v.provider]}
-                        className="rounded-full object-contain w-3 h-3 shrink-0 token-logo"
+                        className="protocol-logo w-3 h-3 shrink-0"
                       />
                       <span className="truncate">{PROVIDER_LABELS[v.provider]}</span>
                     </span>

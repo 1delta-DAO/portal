@@ -50,7 +50,7 @@ export const LenderBadge: React.FC<LenderBadgeProps> = ({
         src={logoURI}
         alt={display}
         fallbackText={display}
-        className="rounded-full object-contain w-3 h-3 shrink-0"
+        className="protocol-logo w-3 h-3 shrink-0"
       />
       <span className="truncate">{truncated}</span>
     </span>

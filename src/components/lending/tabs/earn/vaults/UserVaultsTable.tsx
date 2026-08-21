@@ -141,7 +141,7 @@ export const UserVaultsTable: React.FC<UserVaultsTableProps> = ({
                             src={PROVIDER_LOGOS[provider]}
                             alt={PROVIDER_LABELS[provider]}
                             fallbackText={PROVIDER_LABELS[provider]}
-                            className="rounded-full object-contain w-4 h-4 shrink-0 token-logo"
+                            className="protocol-logo w-4 h-4 shrink-0"
                           />
                           <span className="text-xs">{PROVIDER_LABELS[provider]}</span>
                         </div>
@@ -213,7 +213,7 @@ export const UserVaultsTable: React.FC<UserVaultsTableProps> = ({
                             src={PROVIDER_LOGOS[provider]}
                             alt={PROVIDER_LABELS[provider]}
                             fallbackText={PROVIDER_LABELS[provider]}
-                            className="rounded-full object-contain w-3 h-3 shrink-0 token-logo"
+                            className="protocol-logo w-3 h-3 shrink-0"
                           />
                           <span>{PROVIDER_LABELS[provider]}</span>
                         </span>

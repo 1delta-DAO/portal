@@ -43,6 +43,19 @@
     border-radius: 9999px;
     object-fit: contain;
   }
+
+  /*
+   * Lender / protocol / venue artwork.
+   *
+   * Deliberately NOT a circle and NOT plated on white: only coins and chains
+   * are conventionally round, and a protocol wordmark clipped into a circle
+   * loses the parts that identify it. Contain-fit so a wide mark scales inside
+   * its box instead of being cropped to the box's shorter side.
+   */
+  .protocol-logo {
+    border-radius: 0;
+    object-fit: contain;
+  }
 }
 
 @plugin "daisyui" {

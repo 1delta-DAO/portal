@@ -16,6 +16,7 @@ import { fetchCollateralToggle } from '../../../../sdk/lending-helper/fetchLendi
 import { useIsMobile } from '../../../../hooks/useIsMobile'
 import { HealthBadge } from '../../../common/HealthBadge'
 import { Logo } from '../../../common/Logo'
+import { ChainBadgedLogo } from '../../../common/ChainBadgedLogo'
 import { termLabel, loanRatePct, maturityDisplay } from '../../shared/brokeredLoans'
 
 interface UserLenderPositionsTableProps {
@@ -431,13 +432,15 @@ const MobileLenderCard: React.FC<{
         {/* Lender header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Logo
+            <ChainBadgedLogo
               src={entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI}
               alt={entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
               fallbackText={
                 entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender
               }
-              className="w-5 h-5 rounded-full object-contain"
+              chainId={entry.chainId}
+              size={24}
+              round={false}
             />
             <h3 className="font-semibold text-base">
               {entry.lenderInfo?.name ?? lenderInfoMap?.[entry.lender]?.name ?? entry.lender}
@@ -703,7 +706,11 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                     <tr className="bg-base-200/50">
                       <td colSpan={hasSingleSub ? 1 : 7}>
                         <div className="flex items-center gap-2 min-w-0">
-                          <Logo
+                          {/* Chain badged onto the lender logo. This list mixes
+                              chains — the same lender on two of them is two
+                              separate accounts with separate solvency — and
+                              every action on the row targets `entry.chainId`. */}
+                          <ChainBadgedLogo
                             src={
                               entry.lenderInfo?.logoUri ?? lenderInfoMap?.[entry.lender]?.logoURI
                             }
@@ -717,7 +724,9 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
                               lenderInfoMap?.[entry.lender]?.name ??
                               entry.lender
                             }
-                            className="w-4 h-4 rounded-full object-contain shrink-0"
+                            chainId={entry.chainId}
+                            size={24}
+                            round={false}
                           />
                           <span
                             className="font-semibold text-sm truncate min-w-0"
