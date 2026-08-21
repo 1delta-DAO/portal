@@ -4,7 +4,6 @@ import type { ChainTokenBalance } from '../../../../hooks/lending/useLendingBala
 import { AssetPopover } from '../../shared/AssetPopover'
 import { EmptyState } from '../../../common/EmptyState'
 import { ErrorAlert } from '../../../common/ErrorAlert'
-import { ChainBadgedLogo } from '../../../common/ChainBadgedLogo'
 import { formatUsd } from '../../../../utils/format'
 import { getChainName } from '../../../../lib/lib-utils'
 
@@ -129,34 +128,27 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
                     onClick={() => onAssetClick(b.address)}
                   >
                     <td>
+                      {/* The chain rides the popover's OWN icon — that icon is
+                          the row's only one, and drawing a second badged copy
+                          beside it is what produced the doubled marks here.
+                          The same token on two chains is two rows, so the badge
+                          is what tells them apart; it replaced the old Chain
+                          column. */}
                       <AssetPopover
                         address={b.address}
                         name={name}
                         symbol={symbol}
                         logoURI={logoURI}
+                        chainId={b.chainId}
+                        chainBadge={showChain ? b.chainId : undefined}
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          {/* The same token on two chains is two rows, so the
-                              chain rides the token icon here exactly as it does
-                              on the earn tables. It replaces the old Chain
-                              column: one small mark instead of 12% of the
-                              table width spent repeating the name. */}
-                          <ChainBadgedLogo
-                            src={logoURI}
-                            alt={symbol || b.address}
-                            chainId={b.chainId}
-                            showChain={showChain}
-                            size={20}
-                            fallbackText={symbol || b.address}
-                          />
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-semibold text-xs truncate">{symbol}</span>
-                            {subLine && (
-                              <span className="text-[10px] text-base-content/60 truncate">
-                                {subLine}
-                              </span>
-                            )}
-                          </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-semibold text-xs truncate">{symbol}</span>
+                          {subLine && (
+                            <span className="text-[10px] text-base-content/60 truncate">
+                              {subLine}
+                            </span>
+                          )}
                         </div>
                       </AssetPopover>
                     </td>

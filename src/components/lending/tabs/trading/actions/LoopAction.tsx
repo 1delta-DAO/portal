@@ -610,6 +610,29 @@ export const LoopAction: React.FC<TradingActionProps> = ({
                 Variable borrow unavailable — pick a term
               </span>
             </div>
+            {/* Terminal 1 fill-now (Term Finance): the shown rate is a standing
+                limit order settled INSTANTLY at that rate — unlike an auction
+                round, it is the rate you actually get, capped by book depth. */}
+            {(() => {
+              const fillNow = (debtPool as any)?.fixedTerm?.fillNow
+              if (!fillNow?.canBorrow) return null
+              return (
+                <div className="flex items-center gap-1.5 text-[10px] text-base-content/60">
+                  <span className="inline-flex items-center rounded-md bg-success/20 px-1.5 py-0.5 font-semibold uppercase tracking-wide leading-none text-success whitespace-nowrap">
+                    Instant fill
+                  </span>
+                  <span>
+                    standing orders
+                    {typeof fillNow.borrowAprPct === 'number'
+                      ? ` at ${fillNow.borrowAprPct.toFixed(2)}%`
+                      : ''}
+                    {typeof fillNow.borrowLiquidity === 'number'
+                      ? ` · depth ${fillNow.borrowLiquidity.toLocaleString(undefined, { maximumFractionDigits: 0 })} ${debtPool?.asset.symbol ?? ''}`
+                      : ''}
+                  </span>
+                </div>
+              )
+            })()}
             {debtTerms.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
                 {debtTerms.map((t) => {

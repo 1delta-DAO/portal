@@ -2,6 +2,7 @@ import React from 'react'
 import { IrmDetailsButton } from './IrmDock'
 import { PortalPopover, PopoverField, CopyRow } from '../../common/PortalPopover'
 import { formatPrice } from '../../../utils/format'
+import { getChainName } from '../../../lib/lib-utils'
 
 interface AssetPopoverProps {
   address?: string
@@ -20,6 +21,8 @@ interface AssetPopoverProps {
   oraclePriceUsd?: number
   /** Chain ID for display */
   chainId?: string
+  /** Badge the asset icon with its chain — see `PortalPopover.chainBadge`. */
+  chainBadge?: string
 }
 
 /**
@@ -44,6 +47,7 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
   priceUsd,
   oraclePriceUsd,
   chainId,
+  chainBadge,
 }) => (
   <PortalPopover
     logoURI={logoURI}
@@ -51,11 +55,12 @@ export const AssetPopover: React.FC<AssetPopoverProps> = ({
     fallbackText={symbol || name}
     positionDot={positionDot}
     trigger={children}
+    chainBadge={chainBadge}
   >
     {marketName && <PopoverField label="Market" value={marketName} />}
     <PopoverField label="Symbol" value={symbol} />
     {name && name !== symbol && <PopoverField label="Name" value={name} />}
-    {chainId && <PopoverField label="Chain" value={chainId} />}
+    {chainId && <PopoverField label="Chain" value={`${getChainName(chainId)} (${chainId})`} />}
     {address && <CopyRow label="Address" value={address} />}
     {(priceUsd != null || oraclePriceUsd != null) && (
       <div className="flex items-start gap-2">

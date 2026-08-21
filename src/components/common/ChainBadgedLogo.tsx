@@ -69,7 +69,7 @@ export const ChainBadgedLogo: React.FC<Props> = ({
           alt={alt}
           size={size}
           fallbackText={fallbackText ?? alt}
-          className={round ? 'rounded-full' : 'protocol-logo'}
+          className={round ? 'rounded-full object-contain' : 'protocol-logo'}
         />
       </span>
       {withBadge && (

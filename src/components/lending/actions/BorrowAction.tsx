@@ -343,6 +343,28 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
       {isBrokered && (
         <div className="space-y-1.5">
           <span className="text-xs text-base-content/60 px-1">Fixed term</span>
+          {/* Terminal 1 fill-now (Term Finance): the rate is a standing limit
+              order settled instantly — the executable rate, capped by depth. */}
+          {(() => {
+            const fillNow = (pool as any)?.fixedTerm?.fillNow
+            if (!fillNow?.canBorrow) return null
+            return (
+              <div className="flex items-center gap-1.5 px-1 text-[10px] text-base-content/60">
+                <span className="inline-flex items-center rounded-md bg-success/20 px-1.5 py-0.5 font-semibold uppercase tracking-wide leading-none text-success whitespace-nowrap">
+                  Instant fill
+                </span>
+                <span>
+                  standing orders
+                  {typeof fillNow.borrowAprPct === 'number'
+                    ? ` at ${fillNow.borrowAprPct.toFixed(2)}%`
+                    : ''}
+                  {typeof fillNow.borrowLiquidity === 'number'
+                    ? ` · depth ${fillNow.borrowLiquidity.toLocaleString(undefined, { maximumFractionDigits: 0 })} ${pool?.asset.symbol ?? ''}`
+                    : ''}
+                </span>
+              </div>
+            )
+          })()}
           {hasTerms ? (
             <div className="flex flex-wrap gap-1.5">
               {terms.map((t) => {

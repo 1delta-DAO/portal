@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Logo } from './Logo'
+import { ChainBadgedLogo } from './ChainBadgedLogo'
 
 // ---------------------------------------------------------------------------
 // Shared field rows used inside popover bodies
@@ -290,6 +291,12 @@ interface PortalPopoverProps {
   triggerTitle?: string
   /** Trigger label content (rendered next to the icon). */
   trigger: React.ReactNode
+  /**
+   * Badge the trigger icon with this chain. Opt-in per call site: the popover
+   * icon is the row's ONLY icon, so a caller that wants the chain shown must
+   * say so here rather than drawing a second icon beside the trigger.
+   */
+  chainBadge?: string
   /** Popover body — a stack of `PopoverField` / `CopyRow` rows. */
   children: React.ReactNode
 }
@@ -309,6 +316,7 @@ export const PortalPopover: React.FC<PortalPopoverProps> = ({
   positionDot,
   triggerTitle = 'Click for details',
   trigger,
+  chainBadge,
   children,
 }) => (
   <PopoverShell
@@ -328,11 +336,13 @@ export const PortalPopover: React.FC<PortalPopoverProps> = ({
     trigger={
       <>
         <div className="relative shrink-0 group-hover:opacity-75 transition-opacity">
-          <Logo
+          <ChainBadgedLogo
             src={logoURI}
             alt={symbol}
             fallbackText={fallbackText ?? symbol}
-            className="rounded-full object-contain w-6 h-6 token-logo"
+            chainId={chainBadge}
+            size={24}
+            className="token-logo"
           />
           {positionDot && (
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-base-100" />
