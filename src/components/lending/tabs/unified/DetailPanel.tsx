@@ -107,7 +107,7 @@ export const DetailPanel: React.FC<Props> = ({
             chainId={row.chainId}
             size={32}
             fallbackText={row.brand ?? row.venue}
-            round={false}
+            className="ring-1 ring-base-300"
           />
           <div className="min-w-0">
             {/* Market first, brand second — same ordering as the table, so the

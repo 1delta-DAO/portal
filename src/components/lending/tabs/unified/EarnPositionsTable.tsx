@@ -276,7 +276,6 @@ const VaultRow: React.FC<{
             chainId={row.chainId}
             size={28}
             fallbackText={row.brand ?? row.venue}
-            round={false}
           />
           <div className="min-w-0 leading-tight">
             <div className="truncate text-xs font-medium" title={row.name}>
@@ -357,7 +356,6 @@ const LendingRows: React.FC<{
               chainId={row.chainId}
               size={28}
               fallbackText={row.brand ?? row.lender}
-              round={false}
             />
             <div className="min-w-0 leading-tight">
               <div className="truncate text-xs font-medium" title={row.lender}>

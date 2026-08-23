@@ -61,13 +61,15 @@ export const HistoryPanel: React.FC<Props> = ({ row, vocab, open, onToggleOpen }
 
         {row ? (
           <>
-            <Logo
-              src={row.logoURI}
-              alt={row.venue}
-              size={22}
-              fallbackText={row.brand ?? row.venue}
-              className="protocol-logo shrink-0"
-            />
+            <span className="shrink-0 overflow-hidden rounded-full">
+              <Logo
+                src={row.logoURI}
+                alt={row.venue}
+                size={22}
+                fallbackText={row.brand ?? row.venue}
+                className="rounded-full object-contain"
+              />
+            </span>
             <div className="min-w-0 leading-tight">
               <div className="truncate text-xs font-medium" title={row.name ?? row.venue}>
                 {row.name || row.brand || row.venue}

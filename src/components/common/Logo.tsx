@@ -59,7 +59,7 @@ export function Logo({ src, alt = '', size, fallbackText, className = '', width,
     return (
       <div
         className={
-          'inline-flex items-center justify-center font-semibold leading-none select-none ' +
+          'logo-fallback inline-flex items-center justify-center font-semibold leading-none select-none ' +
           className
         }
         style={fallbackStyle}

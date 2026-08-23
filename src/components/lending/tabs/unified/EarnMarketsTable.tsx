@@ -215,7 +215,6 @@ export const EarnMarketsTable: React.FC<Props> = ({
                     chainId={row.chainId}
                     size={24}
                     fallbackText={row.brand ?? row.venue}
-                    round={false}
                   />
                   <div className="min-w-0 leading-tight">
                     {/* MARKET first, brand second. The brand is shared by every

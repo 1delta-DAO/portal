@@ -21,9 +21,16 @@ interface Props {
   showChain?: boolean
   /**
    * Circular crop for the subject. True for coins and chains, which read as
-   * round everywhere; false for lender / venue artwork, which is square or a
-   * wordmark and loses its identifying parts inside a circle. The chain badge
-   * itself is always round — it is a chain.
+   * round everywhere; false for genuine lender artwork, which is square or a
+   * wordmark and loses its identifying parts inside a circle.
+   *
+   * Judge it by what the URL actually points at, not by what the field is
+   * called: the unified tab's `row.logoURI` is the UNDERLYING TOKEN's art on
+   * most rows, so those stay round, while the lender tables resolve a real
+   * protocol mark and do not. A logo that fails to resolve falls back to an
+   * initials chip, which is round either way — see `.logo-fallback`.
+   *
+   * The chain badge itself is always round: it is a chain.
    */
   round?: boolean
   /** Appended to the subject's own tooltip, e.g. `Morpho · Base`. */

@@ -56,6 +56,16 @@
     border-radius: 0;
     object-fit: contain;
   }
+
+  /*
+   * The initials tile `Logo` draws when artwork fails to resolve. It is a
+   * generated chip, not a logo — nothing about it is a wordmark — so it stays
+   * round even where the real artwork would not be cropped. Two classes, so it
+   * outranks `.protocol-logo` without either rule caring about source order.
+   */
+  .protocol-logo.logo-fallback {
+    border-radius: 9999px;
+  }
 }
 
 @plugin "daisyui" {
