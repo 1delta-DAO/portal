@@ -17,6 +17,7 @@ import type { RawCurrency } from '../../../../types/currency'
 import { Logo } from '../../../common/Logo'
 import { useSpyMode } from '../../../../contexts/SpyMode'
 import { SpyModeNotice } from '../../shared/SpyModeNotice'
+import { VaultLegBreakdown, vaultLegsFor } from '../../shared/VaultLegBreakdown'
 
 interface ActionContentProps {
   actionTab: ActionType
@@ -104,35 +105,49 @@ export const ActionTabs: React.FC<{
 const SelectedAssetBadge: React.FC<{
   pool: PoolDataItem | null
   lenderInfo?: { name: string; logoURI: string }
-}> = ({ pool, lenderInfo }) =>
+  /**
+   * Every market of the selected lender, so an auto-balanced row can show what
+   * the pool has actually split the money into. The earn tab got this via the
+   * collapsed row's `legs`; the lending tab is scoped to one lender already, so
+   * the legs are simply its other markets.
+   */
+  allPools?: PoolDataItem[]
+}> = ({ pool, lenderInfo, allPools }) =>
   pool ? (
-    <div className="flex items-center gap-2 p-2 rounded-lg bg-base-200">
-      <Logo
-        src={pool.asset.logoURI}
-        alt={pool.asset.symbol}
-        fallbackText={pool.asset.symbol}
-        className="rounded-full object-contain w-8 h-8 shrink-0 token-logo"
-      />
-      <div className="flex flex-col min-w-0">
-        <span className="font-medium text-sm truncate" title={pool.name}>
-          {pool.asset.symbol}
-        </span>
-        {lenderInfo ? (
-          <span className="text-xs text-base-content/60 truncate flex items-center gap-1">
-            <Logo
-              src={lenderInfo.logoURI}
-              alt={lenderInfo.name}
-              fallbackText={lenderInfo.name}
-              className="protocol-logo w-3.5 h-3.5"
-            />
-            {lenderInfo.name}
-          </span>
-        ) : (
-          <span className="text-xs text-base-content/60 truncate" title={pool.asset.symbol}>
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 p-2 rounded-lg bg-base-200">
+        <Logo
+          src={pool.asset.logoURI}
+          alt={pool.asset.symbol}
+          fallbackText={pool.asset.symbol}
+          className="rounded-full object-contain w-8 h-8 shrink-0 token-logo"
+        />
+        <div className="flex flex-col min-w-0">
+          <span className="font-medium text-sm truncate" title={pool.name}>
             {pool.asset.symbol}
           </span>
-        )}
+          {lenderInfo ? (
+            <span className="text-xs text-base-content/60 truncate flex items-center gap-1">
+              <Logo
+                src={lenderInfo.logoURI}
+                alt={lenderInfo.name}
+                fallbackText={lenderInfo.name}
+                className="protocol-logo w-3.5 h-3.5"
+              />
+              {lenderInfo.name}
+            </span>
+          ) : (
+            <span className="text-xs text-base-content/60 truncate" title={pool.asset.symbol}>
+              {pool.asset.symbol}
+            </span>
+          )}
+        </div>
       </div>
+      <VaultLegBreakdown
+        legs={vaultLegsFor(pool, allPools ?? [])}
+        basketRate={pool.fluid?.basketSupplyRate}
+        side="supply"
+      />
     </div>
   ) : (
     <div className="text-sm text-base-content/60 text-center p-3 rounded-lg border border-dashed border-base-300">
@@ -145,6 +160,8 @@ const SelectedAssetBadge: React.FC<{
 interface WalletGateProps extends ActionContentProps {
   isWrongChain: boolean
   syncChain: (chainId: number) => void
+  /** This lender's other markets — the legs of an auto-balanced vault. */
+  allPools?: PoolDataItem[]
 }
 
 const WalletGate: React.FC<Omit<WalletGateProps, 'account'> & { account?: string }> = ({
@@ -208,6 +225,8 @@ export interface ActionPanelProps {
   lenderInfo?: { name: string; logoURI: string }
   isBalancesFetching?: boolean
   refetchBalances?: () => void
+  /** This lender's other markets — the legs of an auto-balanced vault. */
+  allPools?: PoolDataItem[]
 }
 
 export const ActionPanel: React.FC<ActionPanelProps> = ({
@@ -215,11 +234,12 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   onTabChange,
   selectedPool,
   lenderInfo,
+  allPools,
   ...rest
 }) => (
   <div className="hidden md:block w-72 shrink-0 rounded-box border border-base-300 p-3 space-y-3 sticky top-4">
     <ActionTabs actionTab={actionTab} onTabChange={onTabChange} />
-    <SelectedAssetBadge pool={selectedPool} lenderInfo={lenderInfo} />
+    <SelectedAssetBadge pool={selectedPool} lenderInfo={lenderInfo} allPools={allPools} />
     <WalletGate actionTab={actionTab} selectedPool={selectedPool} {...rest} />
   </div>
 )
@@ -232,6 +252,7 @@ export const MobileActionModal: React.FC<ActionPanelProps & { onClose: () => voi
   onTabChange,
   selectedPool,
   lenderInfo,
+  allPools,
   ...rest
 }) => {
   if (!selectedPool) return null
@@ -248,7 +269,7 @@ export const MobileActionModal: React.FC<ActionPanelProps & { onClose: () => voi
         </button>
         <div className="space-y-3">
           <ActionTabs actionTab={actionTab} onTabChange={onTabChange} />
-          <SelectedAssetBadge pool={selectedPool} lenderInfo={lenderInfo} />
+          <SelectedAssetBadge pool={selectedPool} lenderInfo={lenderInfo} allPools={allPools} />
           <WalletGate actionTab={actionTab} selectedPool={selectedPool} {...rest} />
         </div>
       </div>

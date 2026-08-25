@@ -1,8 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { formatUnits, parseUnits } from 'viem'
 import { AmountInput } from '../../common/AmountInput'
 import {
-  balancedCounterAmount,
+  defaultLegMode,
+  legRequest,
+  sideHasRatio,
+  suggestedCounterAmount,
+  type LegMode,
+} from './smartLegForm'
+import {
   hasSmartCollateral,
   hasSmartDebt,
   legIndexOf,
@@ -74,6 +79,15 @@ interface Props {
   secondaryLogoURI?: string
   /** Human wallet balance of the second leg, when known. */
   secondaryBalance?: string
+  /**
+   * Is this side funded FROM the wallet (deposit / repay) or does it RECEIVE
+   * (borrow / withdraw)?
+   *
+   * Only a paying side should fall back to single-sided over a missing balance.
+   * A borrow hands the user both tokens, so gating it on a balance would make
+   * them pay the pool's imbalance fee for no reason.
+   */
+  requiresBalance?: boolean
   /** Called whenever the resulting request changes. */
   onChange: (state: SmartLegState) => void
   disabled?: boolean
@@ -87,35 +101,26 @@ export const SmartLegInput: React.FC<Props> = ({
   secondarySymbol,
   secondaryLogoURI,
   secondaryBalance,
+  requiresBalance = true,
   onChange,
   disabled,
 }) => {
   const decimals = leg.secondary.decimals
   const symbol = secondarySymbol ?? 'second leg'
 
-  /**
-   * Is there a ratio to be balanced AGAINST?
-   *
-   * 18 live sides report `perShare: ['0','0']` — an empty pool. "Balanced" is
-   * not a meaningful choice there: there is no ratio, the pre-fill computes
-   * nothing, and the toggle would leave the user staring at a field that never
-   * fills. Fall back to single-sided and say why.
-   */
-  const hasRatio = balancedCounterAmount(leg.side, leg.primaryIndex, 10n ** 18n) !== null
-
-  // Balanced when the wallet can plausibly cover the second leg. A zero or
-  // unknown balance defaults to single-sided rather than pre-filling an amount
-  // the user cannot pay.
-  const canPaySecond = (parseFloat(secondaryBalance ?? '0') || 0) > 0
-  const [mode, setMode] = useState<'balanced' | 'single'>(
-    canPaySecond && hasRatio ? 'balanced' : 'single'
+  // Every rule below lives in `smartLegForm.ts` so it can be tested — this
+  // repo's suite has no DOM, so logic left in a component is logic nothing
+  // checks, and each of these produces a wrong TRANSACTION when it is wrong.
+  const hasRatio = sideHasRatio(leg.side, leg.primaryIndex)
+  const [mode, setMode] = useState<LegMode>(() =>
+    defaultLegMode({ hasRatio, secondaryBalance, requiresBalance })
   )
   const [manual, setManual] = useState<string | null>(null)
 
   // Re-derive the default when the SIDE changes (a different market selected),
   // never on every balance tick — that would fight the user's own choice.
   useEffect(() => {
-    setMode(canPaySecond && hasRatio ? 'balanced' : 'single')
+    setMode(defaultLegMode({ hasRatio, secondaryBalance, requiresBalance }))
     setManual(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leg.secondary.underlying, leg.primaryIndex])
@@ -127,18 +132,10 @@ export const SmartLegInput: React.FC<Props> = ({
    * the user can overwrite, not a constraint. Null when the ratio is
    * unreadable, in which case the field simply starts empty.
    */
-  const suggested = useMemo(() => {
-    const primary = parseFloat(primaryAmount || '0')
-    if (!Number.isFinite(primary) || primary <= 0) return null
-    let primaryRaw: bigint
-    try {
-      primaryRaw = parseUnits(primaryAmount, leg.side.assets[leg.primaryIndex].decimals)
-    } catch {
-      return null
-    }
-    const counter = balancedCounterAmount(leg.side, leg.primaryIndex, primaryRaw)
-    return counter === null ? null : formatUnits(counter, decimals)
-  }, [primaryAmount, leg, decimals])
+  const suggested = useMemo(
+    () => suggestedCounterAmount(leg.side, leg.primaryIndex, primaryAmount),
+    [primaryAmount, leg]
+  )
 
   const value = mode === 'single' ? '' : (manual ?? suggested ?? '')
 
@@ -146,18 +143,7 @@ export const SmartLegInput: React.FC<Props> = ({
   // the API still knows this is a two-leg side; sending `amount1` alone is a
   // server-side error by design.
   useEffect(() => {
-    if (mode === 'single' || !value) {
-      onChange({})
-      return
-    }
-    try {
-      onChange({
-        asset1: leg.secondary.underlying,
-        amount1: parseUnits(value, decimals).toString(),
-      })
-    } catch {
-      onChange({})
-    }
+    onChange(legRequest(mode, leg.secondary.underlying, value, decimals))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, value, decimals, leg.secondary.underlying])
 

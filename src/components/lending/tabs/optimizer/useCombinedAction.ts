@@ -25,6 +25,8 @@ import {
 import { useTermSheet } from '../../../../hooks/lending/useTermSheet'
 import { isFullSheet } from '../../../lending/terms/types'
 import type { BandSetterState } from '../../../lending/terms/BandSetterRow'
+import { useVaultLegs } from '../../../../hooks/lending/useVaultLegs'
+import { resolveSmartLeg, type SmartLegState } from '../../shared/SmartLegInput'
 
 // ---------------------------------------------------------------------------
 // Small helpers shared with the presentational form.
@@ -92,6 +94,38 @@ export function useCombinedAction({
   const chainId = row.chainId
   const collateralUid = row.marketLongUid ?? ''
   const debtUid = row.marketShortUid ?? ''
+
+  /**
+   * Fluid smart sides need a SECOND amount, and the pair row cannot supply the
+   * legs — it carries a derived `isBasketLong` flag and nothing else. Fetch the
+   * vault's markets, which carry the descriptor.
+   *
+   * Without this the optimizer's open and close could only move a smart side
+   * single-sided, i.e. always paying the pool's imbalance fee — a silent cost,
+   * on the surface whose whole purpose is to price a position well.
+   */
+  const { row: collateralRow } = useVaultLegs(chainId, collateralUid || undefined)
+  const { row: debtRow } = useVaultLegs(chainId, debtUid || undefined)
+  const collateralLeg = useMemo(
+    () =>
+      collateralRow
+        ? resolveSmartLeg(
+            collateralRow,
+            collateralRow.underlyingInfo?.asset?.address ?? '',
+            'collateral'
+          )
+        : null,
+    [collateralRow]
+  )
+  const debtLeg = useMemo(
+    () =>
+      debtRow
+        ? resolveSmartLeg(debtRow, debtRow.underlyingInfo?.asset?.address ?? '', 'debt')
+        : null,
+    [debtRow]
+  )
+  const [collateralLegState, setCollateralLegState] = useState<SmartLegState>({})
+  const [debtLegState, setDebtLegState] = useState<SmartLegState>({})
 
   // Per-mode role mapping. `primary` is the leg the user drives first; the
   // range endpoint fills `secondary`'s max off it.
@@ -307,6 +341,10 @@ export function useCombinedAction({
             bands: bandsForRequest,
             accountId,
             debtTermId: isDebtBrokered && termId != null ? Number(termId) : undefined,
+            collateralAsset1: collateralLegState.asset1,
+            collateralAmount1: collateralLegState.amount1,
+            debtAsset1: debtLegState.asset1,
+            debtAmount1: debtLegState.amount1,
             simulate: true,
           })
         : await fetchWithdrawAndRepay({
@@ -318,6 +356,10 @@ export function useCombinedAction({
             payAsset,
             receiveAsset,
             accountId,
+            collateralAsset1: collateralLegState.asset1,
+            collateralAmount1: collateralLegState.amount1,
+            debtAsset1: debtLegState.asset1,
+            debtAmount1: debtLegState.amount1,
             simulate: true,
           })
       if (cancelled) return
@@ -350,6 +392,10 @@ export function useCombinedAction({
     isDebtBrokered,
     primaryToken.decimals,
     secondaryToken.decimals,
+    collateralLegState.asset1,
+    collateralLegState.amount1,
+    debtLegState.asset1,
+    debtLegState.amount1,
   ])
 
   // Flatten the built response into an ordered list of transactions to send
@@ -490,6 +536,14 @@ export function useCombinedAction({
       isOpen && debtSheet && isFullSheet(debtSheet) ? debtSheet.borrow?.liquidation : undefined,
     bandValue: bandState?.bands,
     setBandState,
+    // Fluid smart legs — null on every ordinary market, so the form renders
+    // exactly as before.
+    collateralRow,
+    debtRow,
+    collateralLeg,
+    debtLeg,
+    setCollateralLegState,
+    setDebtLegState,
     // build result
     building,
     result,

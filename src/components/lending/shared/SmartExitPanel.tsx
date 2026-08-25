@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { formatUnits } from 'viem'
+import { deriveTotalShares, exitRequestFor } from './smartLegForm'
 import {
-  sharesForLegAmount,
   splitForShares,
   type FluidSideInfo,
   type SmartVaultRow,
@@ -74,43 +74,29 @@ export const SmartExitPanel: React.FC<Props> = ({
    * ratio. Null when either is unreadable, in which case the panel says so
    * rather than offering a size it cannot compute.
    */
-  const totalShares = useMemo(() => {
-    const bal = parseFloat(legBalance || '0')
-    if (!Number.isFinite(bal) || bal <= 0) return null
-    let raw: bigint
-    try {
-      // `legBalance` is a decimal string in this leg's own decimals.
-      const [whole, frac = ''] = legBalance.split('.')
-      const d = decimals[legIndex] ?? 18
-      raw =
-        BigInt(whole || '0') * 10n ** BigInt(d) + BigInt((frac + '0'.repeat(d)).slice(0, d) || '0')
-    } catch {
-      return null
-    }
-    return sharesForLegAmount(side, legIndex, raw)
-  }, [legBalance, side, legIndex, decimals])
+  // Derivation and sizing live in `smartLegForm.ts` so they can be tested —
+  // this repo's suite has no DOM, and a wrong share count here is a wrong burn
+  // amount, not a wrong pixel.
+  const totalShares = useMemo(
+    () => deriveTotalShares(side, legIndex, legBalance, decimals[legIndex] ?? 18),
+    [legBalance, side, legIndex, decimals]
+  )
 
-  const requestedShares = useMemo(() => {
-    if (totalShares === null || pct >= 100) return null
-    return (totalShares * BigInt(Math.round(pct * 100))) / 10000n
-  }, [totalShares, pct])
+  const request = useMemo(() => exitRequestFor(pct, totalShares), [pct, totalShares])
 
   const estimatedSplit = useMemo(() => {
-    const shares = pct >= 100 ? totalShares : requestedShares
+    const shares = request.isAll
+      ? totalShares
+      : request.shares != null
+        ? BigInt(request.shares)
+        : null
     return shares === null ? null : splitForShares(side, shares)
-  }, [pct, totalShares, requestedShares, side])
+  }, [request, totalShares, side])
 
   useEffect(() => {
-    if (pct >= 100) {
-      onChange({ isAll: true })
-      return
-    }
-    onChange({
-      isAll: false,
-      shares: requestedShares === null ? undefined : requestedShares.toString(),
-    })
+    onChange(request)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pct, requestedShares])
+  }, [request.isAll, request.shares])
 
   return (
     <div className="space-y-2">

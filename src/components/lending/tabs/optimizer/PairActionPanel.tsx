@@ -8,6 +8,15 @@ import {
 } from '../../../../hooks/lending/useOptimizerPairs'
 import type { LendingTx } from '../../../../hooks/useSendLendingTransaction'
 import { AmountInput } from '../../../common/AmountInput'
+import { SmartLegInput, type SmartLegDescriptor } from '../../shared/SmartLegInput'
+
+/**
+ * A readable name for the second leg when the pair row has no token metadata
+ * for it — the optimizer works from pair rows, so the only thing guaranteed
+ * here is the address.
+ */
+const legSymbol = (leg: SmartLegDescriptor) =>
+  `${leg.secondary.underlying.slice(0, 6)}…${leg.secondary.underlying.slice(-4)}`
 import { BatchExecuteButton } from '../../../common/BatchExecuteButton'
 import { HealthFactorProjection } from '../../actions/HealthFactorProjection'
 import { NativeCurrencySelector } from '../../actions/NativeCurrencySelector'
@@ -654,6 +663,33 @@ function CombinedForm({
         refetchBalances={refetchBalances}
       />
 
+      {/* The SECOND leg of whichever side this input drives.
+          On an open the primary leg is collateral; on a close it is debt. Both
+          render nothing on an ordinary market. Without them this form could
+          only move a smart side single-sided — always paying the pool's
+          imbalance fee, on the surface whose whole point is pricing. */}
+      {a.isOpen
+        ? a.collateralLeg && (
+            <SmartLegInput
+              row={a.collateralRow}
+              leg={a.collateralLeg}
+              primaryAmount={a.primary}
+              primarySymbol={a.primaryToken.symbol ?? 'this token'}
+              secondarySymbol={legSymbol(a.collateralLeg)}
+              onChange={a.setCollateralLegState}
+            />
+          )
+        : a.debtLeg && (
+            <SmartLegInput
+              row={a.debtRow}
+              leg={a.debtLeg}
+              primaryAmount={a.primary}
+              primarySymbol={a.primaryToken.symbol ?? 'this token'}
+              secondarySymbol={legSymbol(a.debtLeg)}
+              onChange={a.setDebtLegState}
+            />
+          )}
+
       {/* Auction window (Term Finance). Shown on the borrow leg only — the
           window gates ORIGINATION; repaying/withdrawing an existing position is
           unaffected by it. Placed above the term picker because when the round
@@ -695,6 +731,31 @@ function CombinedForm({
         onChange={a.setSecondary}
         priceUsd={a.priceS}
       />
+
+      {/* …and the second leg of the OTHER side, under the leg that drives it. */}
+      {a.isOpen
+        ? a.debtLeg && (
+            <SmartLegInput
+              row={a.debtRow}
+              leg={a.debtLeg}
+              primaryAmount={a.secondary}
+              primarySymbol={a.secondaryToken.symbol ?? 'this token'}
+              secondarySymbol={legSymbol(a.debtLeg)}
+              requiresBalance={false}
+              onChange={a.setDebtLegState}
+            />
+          )
+        : a.collateralLeg && (
+            <SmartLegInput
+              row={a.collateralRow}
+              leg={a.collateralLeg}
+              primaryAmount={a.secondary}
+              primarySymbol={a.secondaryToken.symbol ?? 'this token'}
+              secondarySymbol={legSymbol(a.collateralLeg)}
+              requiresBalance={false}
+              onChange={a.setCollateralLegState}
+            />
+          )}
 
       {/* "What would this borrow cost elsewhere?" — the best comparable venues
           for this exact pair, priced at the entered size and, when a fixed term

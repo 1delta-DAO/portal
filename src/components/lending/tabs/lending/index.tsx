@@ -429,6 +429,9 @@ export function LendingDashboard({
     lenderInfo: activeLenderInfo,
     isBalancesFetching,
     refetchBalances,
+    // Every market of this lender — an auto-balanced row needs its siblings to
+    // show what the pool has split the position into.
+    allPools,
   }
 
   if (isPublicDataLoading) {

@@ -1,6 +1,13 @@
 import React from 'react'
 import { abbreviateUsd, formatUsd } from '../../../utils/format'
 import { LpAssetIcons } from './SmartVault'
+import {
+  lenderKeyOf,
+  rowAsset,
+  rowIsLegOf,
+  smartInfo,
+  type SmartVaultRow,
+} from '../../../sdk/lending-helper/fluidSmart'
 
 /**
  * What each leg of an auto-balanced position actually holds and earns.
@@ -30,6 +37,48 @@ export interface VaultLeg {
   depositsUsd: number
   /** Token units held, for the tooltip. */
   amount?: number
+}
+
+/**
+ * Build the leg list for a row, from the sibling markets of its own vault.
+ *
+ * ONE definition, used by both tabs. The earn tab has the legs already grouped
+ * by `collapseSmartVaults`; the lending tab is scoped to a single lender, so
+ * the legs are simply its other markets — and re-deriving "same vault" a second
+ * way is how two surfaces start disagreeing about what a position is.
+ *
+ * Returns `[]` on an ordinary market, which renders nothing.
+ */
+export function vaultLegsFor(
+  row: (SmartVaultRow & { asset?: { symbol?: string; logoURI?: string } }) | null | undefined,
+  siblings: readonly (SmartVaultRow & {
+    asset?: { symbol?: string; logoURI?: string }
+    name?: string
+    intrinsicYield?: number | null
+    depositRate?: number
+    totalDepositsUSD?: number
+  })[]
+): VaultLeg[] {
+  if (!rowIsLegOf(row, 'collateral')) return []
+  const pair = smartInfo(row)?.collateralPair ?? []
+  const vault = lenderKeyOf(row!.marketUid)
+  const byAsset = new Map(
+    siblings.filter((s) => lenderKeyOf(s.marketUid) === vault).map((s) => [rowAsset(s) ?? '', s])
+  )
+  const out: VaultLeg[] = []
+  for (const addr of pair) {
+    const leg = byAsset.get(addr.toLowerCase())
+    if (!leg) continue
+    out.push({
+      key: leg.marketUid,
+      symbol: leg.asset?.symbol ?? leg.name ?? addr.slice(0, 6),
+      logoURI: leg.asset?.logoURI,
+      // The LEG's own rate — the headline above it is the weighted blend.
+      legRate: leg.depositRate ?? 0,
+      depositsUsd: leg.totalDepositsUSD ?? 0,
+    })
+  }
+  return out
 }
 
 interface Props {

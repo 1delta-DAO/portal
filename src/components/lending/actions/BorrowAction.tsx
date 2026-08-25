@@ -558,6 +558,9 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
           primarySymbol={pool.asset.symbol}
           secondarySymbol={secondaryToken?.symbol}
           secondaryLogoURI={secondaryToken?.logoURI}
+          // A borrow hands you BOTH tokens — there is nothing to pay, so the
+          // form must not fall back to single-sided over a missing balance.
+          requiresBalance={false}
           onChange={setLegState}
         />
       )}

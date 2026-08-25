@@ -127,6 +127,19 @@ export interface DepositAndBorrowParams {
   /** Delivery currency for the borrowed debt (native sentinel → unwrap and
    *  deliver native, e.g. borrow WBNB → receive BNB). */
   receiveAsset?: string
+  /**
+   * Fluid smart vaults — the SECOND leg of a two-token side.
+   *
+   * `*Asset1` names the other leg (matched by address server-side; an amount
+   * without it is an error, by design — the order is load-bearing) and
+   * `*Amount1` is its RAW amount. Omitted ⇒ that side moves SINGLE-SIDED,
+   * which is legal and is what the pool rebalances internally, but pays its
+   * imbalance fee plus price impact. Balanced is materially cheaper at size.
+   */
+  collateralAsset1?: string
+  collateralAmount1?: string
+  debtAsset1?: string
+  debtAmount1?: string
   simulate?: boolean
 }
 
@@ -147,6 +160,18 @@ export async function fetchDepositAndBorrow(
   if (p.bands != null) qs.set('bands', String(p.bands))
   if (p.debtTermId != null) qs.set('debtTermId', String(p.debtTermId))
   if (p.receiveAsset) qs.set('receiveAsset', p.receiveAsset)
+  // The second leg of each smart side. `*Amount1` is sent only WITH its
+  // `*Asset1` — the server rejects the pair the other way round rather than
+  // guessing a leg, and reproducing that guard here keeps the failure in the
+  // UI instead of in a 400.
+  if (p.collateralAsset1) {
+    qs.set('collateralAsset1', p.collateralAsset1)
+    if (p.collateralAmount1 != null) qs.set('collateralAmount1', p.collateralAmount1)
+  }
+  if (p.debtAsset1) {
+    qs.set('debtAsset1', p.debtAsset1)
+    if (p.debtAmount1 != null) qs.set('debtAmount1', p.debtAmount1)
+  }
   if (p.simulate) qs.set('simulate', 'true')
   return callCombined('deposit-and-borrow', qs)
 }
@@ -174,6 +199,19 @@ export interface WithdrawAndRepayParams {
   receiveAsset?: string
   borrowMode?: string
   accountId?: string
+  /**
+   * Fluid smart vaults — the SECOND leg of a two-token side.
+   *
+   * `*Asset1` names the other leg (matched by address server-side; an amount
+   * without it is an error, by design — the order is load-bearing) and
+   * `*Amount1` is its RAW amount. Omitted ⇒ that side moves SINGLE-SIDED,
+   * which is legal and is what the pool rebalances internally, but pays its
+   * imbalance fee plus price impact. Balanced is materially cheaper at size.
+   */
+  collateralAsset1?: string
+  collateralAmount1?: string
+  debtAsset1?: string
+  debtAmount1?: string
   simulate?: boolean
 }
 
@@ -193,6 +231,18 @@ export async function fetchWithdrawAndRepay(
   if (p.receiveAsset) qs.set('receiveAsset', p.receiveAsset)
   if (p.borrowMode) qs.set('borrowMode', p.borrowMode)
   if (p.accountId) qs.set('accountId', p.accountId)
+  // The second leg of each smart side. `*Amount1` is sent only WITH its
+  // `*Asset1` — the server rejects the pair the other way round rather than
+  // guessing a leg, and reproducing that guard here keeps the failure in the
+  // UI instead of in a 400.
+  if (p.collateralAsset1) {
+    qs.set('collateralAsset1', p.collateralAsset1)
+    if (p.collateralAmount1 != null) qs.set('collateralAmount1', p.collateralAmount1)
+  }
+  if (p.debtAsset1) {
+    qs.set('debtAsset1', p.debtAsset1)
+    if (p.debtAmount1 != null) qs.set('debtAmount1', p.debtAmount1)
+  }
   if (p.simulate) qs.set('simulate', 'true')
   return callCombined('withdraw-and-repay', qs)
 }
