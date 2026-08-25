@@ -2,16 +2,19 @@ import React, { useEffect, useRef, useState } from 'react'
 import { riskDotColor } from '../tabs/earn/helpers'
 
 /**
- * Ceilings, one per risk band — see `scoreToRiskLabel`: 1–2 low, 3 medium,
- * 4–5 high.
+ * Ceilings, one per risk band — see `riskBand`: 1–2 low, 3–4 medium, 5 high.
  *
- * "Up to medium" is 3, not 4. It was 4, which let a score-4 market through
- * under a label promising medium risk — the same off-by-one band that made a
- * 4 render amber in the tables.
+ * "Up to medium" is 4, because the backend's `risk_labels` table bands 4 as
+ * medium and every row we render carries ITS label. This was briefly 3, on the
+ * theory that a score-4 market slipping through was an off-by-one; it is not —
+ * the value here is sent as `maxRiskScore` and the server filters
+ * `config_risk_score <= n`, so a 3 dropped exactly the rows that were on screen
+ * wearing a "medium" chip. Whatever number sits here must match wherever
+ * `riskBand` draws the medium/high line.
  */
 const OPTIONS = [
   { value: 2, label: 'Low', dropdownLabel: 'Low only', risk: 'low' },
-  { value: 3, label: 'Up to medium', dropdownLabel: 'Up to medium', risk: 'medium' },
+  { value: 4, label: 'Up to medium', dropdownLabel: 'Up to medium', risk: 'medium' },
   { value: 5, label: 'Up to high', dropdownLabel: 'Up to high', risk: 'high' },
 ] as const
 

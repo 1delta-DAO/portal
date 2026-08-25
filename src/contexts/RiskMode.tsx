@@ -39,6 +39,27 @@ const URL_PARAM = 'riskTolerance'
  */
 const DEFAULT_MAX_RISK = 5
 
+/**
+ * The ceilings `RiskSelect` offers, one per band (see `riskBand`: 1–2 low,
+ * 3–4 medium, 5 high).
+ *
+ * Every ceiling that reaches state is snapped up to its band's ceiling, so the
+ * number we send as `maxRiskScore` always admits the whole band the selector
+ * is naming. Two things make this load-bearing rather than tidy-up:
+ *
+ *  - a mid-band value serves less than its label promises — a 3 reads as "Up
+ *    to medium" in the selector while the server filters `<= 3`, which is how
+ *    a table full of amber "medium" rows came back empty;
+ *  - the previous build persisted exactly that 3 to `localStorage` for anyone
+ *    who picked "Up to medium", so without the snap the fix would not reach
+ *    the users who already hit the bug.
+ */
+const BAND_CEILINGS = [2, 4, 5] as const
+
+function snapToBandCeiling(score: number): number {
+  return BAND_CEILINGS.find((c) => c >= score) ?? DEFAULT_MAX_RISK
+}
+
 /** Parse a `riskTolerance` value (numeric 1-5, or low/medium/high) → score, or null. */
 function parseRiskTolerance(raw: string | null | undefined): number | null {
   if (raw == null) return null
@@ -49,13 +70,13 @@ function parseRiskTolerance(raw: string | null | undefined): number | null {
   if (trimmed === 'high') return 5
   const n = parseInt(trimmed, 10)
   if (Number.isNaN(n)) return null
-  return Math.min(Math.max(n, 1), 5)
+  return snapToBandCeiling(Math.min(Math.max(n, 1), 5))
 }
 
 function readStoredMaxRisk(): number {
   try {
     const parsed = parseInt(localStorage.getItem(STORAGE_KEY) ?? '', 10)
-    return Number.isNaN(parsed) ? DEFAULT_MAX_RISK : parsed
+    return Number.isNaN(parsed) ? DEFAULT_MAX_RISK : snapToBandCeiling(parsed)
   } catch {
     return DEFAULT_MAX_RISK
   }

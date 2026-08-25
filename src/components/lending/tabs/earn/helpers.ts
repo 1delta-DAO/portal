@@ -27,11 +27,9 @@ export type SortKey =
 /**
  * Derive a risk band from a numeric score (1 best … 5 worst).
  *
- * **1–2 low · 3 medium · 4–5 high.** Four is HIGH, not medium — it was the
- * other way round here while `riskScoreClass` in `terms/format.ts` already
- * used these bands, so the same score rendered amber in one place and red in
- * another. This is now the single definition; everything that bands a score
- * calls it.
+ * **1–2 low · 3–4 medium · 5 high**, per {@link riskBand} — which mirrors the
+ * backend `risk_labels` table that stamps the labels we render. Do not re-band
+ * a score locally; call `riskBand` so one line moves in one place.
  */
 export function scoreToRiskLabel(score: number | null | undefined): string {
   if (score == null) return '—'

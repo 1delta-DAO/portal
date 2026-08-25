@@ -8,6 +8,7 @@ import type {
   SupplyExitTerms,
   TermTag,
 } from './types'
+import { riskBand } from '../../../sdk/lending-helper/risk'
 
 /**
  * Display formatting for term sheets.
@@ -320,12 +321,25 @@ export function oracleBandClass(band: OracleBand | undefined): string {
   }
 }
 
-/** Asset risk score 1 (best) … 5 (worst) → a colour. */
+/**
+ * Asset risk score 1 (best) … 5 (worst) → a colour.
+ *
+ * Bands via {@link riskBand} rather than re-deriving the thresholds: this was
+ * the second copy, and it drew the medium/high line in a different place than
+ * the badges did.
+ */
 export function riskScoreClass(score: number | undefined): string {
   if (score == null) return 'text-base-content/50'
-  if (score <= 2) return 'text-success'
-  if (score === 3) return 'text-warning'
-  return 'text-error'
+  switch (riskBand(score)) {
+    case 'low':
+      return 'text-success'
+    case 'medium':
+      return 'text-warning'
+    case 'high':
+      return 'text-error'
+    default:
+      return 'text-base-content/50'
+  }
 }
 
 /**
