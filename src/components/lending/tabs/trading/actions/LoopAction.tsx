@@ -31,6 +31,7 @@ import { AutoBalancedNotice } from '../../../shared/SmartVault'
 import { TermsSummary, type BandSetterState } from '../../../terms'
 import { BandSetterRow } from '../../../terms/BandSetterRow'
 import { openLoanBandCount } from '../../../../../sdk/lending-helper/userPositionTypes'
+import { deriveMarginSources } from './marginSources'
 import { isFullSheet } from '../../../terms/types'
 import { useTermSheet } from '../../../../../hooks/lending/useTermSheet'
 import {
@@ -158,6 +159,12 @@ function InsufficientPayBalance({
   )
 }
 
+/** `DOLOMITE` → `Dolomite`, for a toggle sitting next to the word "Wallet". */
+function lenderLabel(lender: string): string {
+  const word = lender.split('_')[0]
+  return word.charAt(0) + word.slice(1).toLowerCase()
+}
+
 export const LoopAction: React.FC<TradingActionProps> = ({
   collateralPools,
   borrowablePools,
@@ -228,6 +235,18 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   // Pay currency
   const [payCurrencyAddress, setPayCurrencyAddress] = useState<string | null>(null)
 
+  /**
+   * Where the margin comes from. `'wallet'` is the default and the only source
+   * every lender supports; `'lender'` funds from an existing sub-account, which
+   * on Dolomite makes the open a SINGLE transaction (the proxy can transfer
+   * between the caller's own sub-accounts inside the leverage call, but cannot
+   * reach the wallet at all). Deliberately an explicit choice, never inferred
+   * from balances: silently spending in-protocol funds because the wallet is
+   * short changes where the user's money comes from without them asking.
+   */
+  const [payFrom, setPayFrom] = useState<'wallet' | 'lender'>('wallet')
+  const [marginSourceId, setMarginSourceId] = useState<string | null>(null)
+
   // Options
   const [slippage, setSlippage] = useState('0.3')
 
@@ -284,6 +303,52 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   }, [collateralPool, debtPool, chainTokens])
 
   const selectedPayCurrency = payCurrencies.find((c) => c.address === payCurrencyAddress) ?? null
+
+  /**
+   * The market whose deposits ARE the pay asset inside the lender.
+   *
+   * Native is resolved to the wrapped market on purpose: there is no native
+   * balance inside a lender — an "ETH" margin held in Dolomite is WETH — and
+   * the API applies the same mapping (`isNativeAddress(payAsset) ? wrapped`),
+   * so the two agree on which market gets transferred.
+   */
+  const payMarketUid = useMemo(() => {
+    if (!selectedPayCurrency) return undefined
+    const addr = selectedPayCurrency.address.toLowerCase()
+    const isNative = addr === zeroAddress
+    const match = [collateralPool, debtPool].find((pool) =>
+      isNative
+        ? !!pool?.asset && isWNative(pool.asset)
+        : pool?.asset?.address?.toLowerCase() === addr
+    )
+    return match?.marketUid
+  }, [selectedPayCurrency, collateralPool, debtPool])
+
+  const marginSources = useMemo(
+    () =>
+      deriveMarginSources({
+        subAccounts,
+        tradeAccountId: accountId,
+        marketUid: payMarketUid,
+      }),
+    [subAccounts, accountId, payMarketUid]
+  )
+  const canPayFromLender = marginSources.length > 0
+  const activeMarginSource =
+    marginSources.find((m) => m.accountId === marginSourceId) ?? marginSources[0] ?? null
+  // `payFrom` alone is not enough to act on: the sources are derived from data
+  // that reloads, so a stale `'lender'` must never survive them disappearing —
+  // it would drop `marginFromAccountId` while still hiding the wallet balance.
+  const payFromLender = payFrom === 'lender' && !!activeMarginSource
+
+  // Fall back to the wallet whenever the chosen source stops existing (pool
+  // change, pay-asset change, sub-account switch, user data reload).
+  useEffect(() => {
+    if (!canPayFromLender) {
+      setPayFrom('wallet')
+      setMarginSourceId(null)
+    }
+  }, [canPayFromLender])
 
   // Reset pay currency + clear stale quotes when the user picks a different
   // collateral or debt pool — old quotes reference the previous pair and are
@@ -476,12 +541,27 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   const payWalletBalance = selectedPayCurrency
     ? (walletBalances.get(selectedPayCurrency.address.toLowerCase()) ?? null)
     : null
-  const payWalletStr = payWalletBalance?.balance ?? '0'
+
+  /**
+   * The balance the margin is actually drawn from — wallet or sub-account.
+   *
+   * Everything downstream (Max, the shortfall warning, the price-impact
+   * correction) reads THIS rather than the wallet, or a lender-funded open
+   * would size and validate itself against a balance it never touches.
+   */
+  // Memoised: a fresh object literal every render would re-run the
+  // `payAmountUSD` memo that depends on it, defeating the point of the memo.
+  const payBalance = useMemo(
+    () =>
+      payFromLender
+        ? { balance: activeMarginSource!.balance, balanceUSD: activeMarginSource!.balanceUSD }
+        : payWalletBalance,
+    [payFromLender, activeMarginSource, payWalletBalance]
+  )
+  const payBalanceStr = payBalance?.balance ?? '0'
   const payOverMax =
-    !!payWalletBalance &&
-    parseAmount(payAmount) > 0 &&
-    compareAmountStrings(payAmount, payWalletStr) > 0
-  const payShortfall = payOverMax ? parseAmount(payAmount) - parseAmount(payWalletStr) : 0
+    !!payBalance && parseAmount(payAmount) > 0 && compareAmountStrings(payAmount, payBalanceStr) > 0
+  const payShortfall = payOverMax ? parseAmount(payAmount) - parseAmount(payBalanceStr) : 0
 
   // USD value of the paid-in margin — used to correct the loop price impact so
   // the margin isn't booked as a swap penalty. Prefer the wallet balance's
@@ -490,8 +570,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
   const payAmountUSD = useMemo(() => {
     const amt = parseAmount(payAmount)
     if (!selectedPayCurrency || !(amt > 0)) return 0
-    const balNum = parseAmount(payWalletBalance?.balance ?? '0')
-    const balUSD = payWalletBalance?.balanceUSD
+    const balNum = parseAmount(payBalance?.balance ?? '0')
+    const balUSD = payBalance?.balanceUSD
     if (balUSD != null && balNum > 0) {
       const price = balUSD / balNum
       if (Number.isFinite(price) && price > 0) return price * amt
@@ -500,7 +580,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     const match = [collateralPool, debtPool].find((p) => p?.asset?.address?.toLowerCase() === addr)
     if (match?.oraclePriceUSD != null) return match.oraclePriceUSD * amt
     return 0
-  }, [selectedPayCurrency, payAmount, payWalletBalance, collateralPool, debtPool])
+  }, [selectedPayCurrency, payAmount, payBalance, collateralPool, debtPool])
 
   const handleFetchQuotes = () => {
     if (!collateralPool || !debtPool) return
@@ -526,6 +606,10 @@ export const LoopAction: React.FC<TradingActionProps> = ({
           ? { payAmount: parseUnits(payAmount, selectedPayCurrency.decimals).toString() }
           : {}),
         ...(accountId ? { accountId } : {}),
+        // Fund the margin from inside the lender: the transfer rides in the
+        // leverage tx and the deposit + approval disappear. `Number(...)`, not
+        // truthiness — `0` is the DEFAULT sub-account and a valid source.
+        ...(payFromLender ? { marginFromAccountId: Number(activeMarginSource!.accountId) } : {}),
       },
       account,
       activeSubAccount ? buildSimulationBody(activeSubAccount) : undefined,
@@ -791,16 +875,75 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               Select collateral & debt pools first
             </span>
           )}
+
+          {/* Margin source. Rendered only when a sub-account actually holds the
+              pay asset, so the common wallet-only case looks exactly as before.
+              Funding from inside the lender removes the separate deposit AND
+              its approval — Dolomite's trader proxy can transfer between the
+              caller's own sub-accounts inside the leverage call, but cannot
+              reach the wallet at all. */}
+          {selectedPayCurrency && canPayFromLender && (
+            <div className="flex items-center flex-wrap gap-1.5 mt-1.5 text-xs">
+              <span className="text-base-content/60">From:</span>
+              <div className="join">
+                {(['wallet', 'lender'] as const).map((src) => (
+                  <button
+                    key={src}
+                    type="button"
+                    className={`join-item btn btn-xs ${
+                      (src === 'lender') === payFromLender ? 'btn-primary' : 'btn-ghost'
+                    }`}
+                    onClick={() => {
+                      setPayFrom(src)
+                      // There is no native balance inside a lender — margin held
+                      // in Dolomite is WETH, not ETH. Switch the chip rather
+                      // than show a wrapped balance under a native label.
+                      if (src === 'lender' && selectedPayCurrency.address === zeroAddress) {
+                        const wrapped = payCurrencies.find((c) => isWNative(c))
+                        if (wrapped) setPayCurrencyAddress(wrapped.address)
+                      }
+                      setPayAmount('')
+                      reset()
+                    }}
+                  >
+                    {src === 'wallet' ? 'Wallet' : lenderLabel(selectedLender)}
+                  </button>
+                ))}
+              </div>
+              {payFromLender && marginSources.length > 1 && (
+                <select
+                  className="select select-xs select-bordered"
+                  value={activeMarginSource!.accountId}
+                  onChange={(e) => {
+                    setMarginSourceId(e.target.value)
+                    setPayAmount('')
+                    reset()
+                  }}
+                >
+                  {marginSources.map((m) => (
+                    <option key={m.accountId} value={m.accountId}>
+                      #{m.accountId} · {formatTokenAmount(m.balance)}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Pay amount + wallet balance */}
         {selectedPayCurrency && (
           <div className="form-control mt-1.5">
-            {payWalletBalance && (
+            {payBalance && (
               <div className="text-xs flex justify-between px-1 mb-1">
                 <span className="text-base-content/60 flex items-center gap-1">
-                  Wallet balance:
-                  {refetchBalances && (
+                  {payFromLender
+                    ? `In ${lenderLabel(selectedLender)} #${activeMarginSource!.accountId}:`
+                    : 'Wallet balance:'}
+                  {/* The refresh control belongs to the wallet-balance hook; a
+                      sub-account balance comes from user data and has no
+                      equivalent here. */}
+                  {!payFromLender && refetchBalances && (
                     <button
                       type="button"
                       className="text-base-content/30 hover:text-base-content/60 transition-colors"
@@ -829,18 +972,43 @@ export const LoopAction: React.FC<TradingActionProps> = ({
                   )}
                 </span>
                 <span
-                  className={`font-medium ${parseAmount(payWalletStr) === 0 ? 'text-base-content/40' : ''}`}
+                  className={`font-medium ${parseAmount(payBalanceStr) === 0 ? 'text-base-content/40' : ''}`}
                 >
-                  {formatTokenAmount(payWalletBalance.balance)} {selectedPayCurrency.symbol} ($
-                  {formatUsd(payWalletBalance.balanceUSD)})
+                  {formatTokenAmount(payBalance.balance)} {selectedPayCurrency.symbol} ($
+                  {formatUsd(payBalance.balanceUSD)})
                 </span>
+              </div>
+            )}
+
+            {/* What the user gets, and what it costs. The transaction saving is
+                the entire point of the source toggle, so state it; and a source
+                account that carries debt is LOSING collateral, which its health
+                does not show until after the move. Dolomite re-checks
+                collateralization at the end of the batch, so an unsafe move
+                reverts rather than executing — but a revert is a poor way to
+                find out. No projected health is shown: per-asset collateral
+                factors make a naive scaling wrong, and a wrong number here is
+                worse than none. */}
+            {payFromLender && (
+              <div className="text-[11px] px-1 mb-1 space-y-0.5">
+                <div className="text-success">
+                  Moves from #{activeMarginSource!.accountId} into #{accountId ?? '0'} inside the
+                  loop — no deposit transaction.
+                </div>
+                {activeMarginSource!.health != null && (
+                  <div className="text-warning">
+                    #{activeMarginSource!.accountId} has debt (health{' '}
+                    {activeMarginSource!.health.toFixed(2)}). Moving margin out lowers its
+                    collateral; the transaction reverts if that would leave it undercollateralized.
+                  </div>
+                )}
               </div>
             )}
             <div className="flex items-center justify-between mb-0.5">
               <label className="label-text text-xs">Pay Amount</label>
-              {payWalletBalance ? (
+              {payBalance ? (
                 <AmountQuickButtons
-                  maxAmount={payWalletStr}
+                  maxAmount={payBalanceStr}
                   onSelect={setPayAmount}
                   decimals={selectedPayCurrency.decimals}
                 />
@@ -863,7 +1031,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               <div className="mt-1">
                 <InsufficientPayBalance
                   symbol={selectedPayCurrency.symbol}
-                  balanceStr={payWalletStr}
+                  balanceStr={payBalanceStr}
                   shortfall={payShortfall}
                 />
               </div>
@@ -1051,7 +1219,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
           {payOverMax && (
             <InsufficientPayBalance
               symbol={selectedPayCurrency?.symbol}
-              balanceStr={payWalletStr}
+              balanceStr={payBalanceStr}
               shortfall={payShortfall}
             />
           )}
