@@ -6,6 +6,7 @@ import { EmptyState } from '../../../common/EmptyState'
 import { ErrorAlert } from '../../../common/ErrorAlert'
 import { formatUsd } from '../../../../utils/format'
 import { getChainName } from '../../../../lib/lib-utils'
+import { Spinner } from '../../../common/Loader'
 
 interface UserAssetsTableProps {
   balances: ChainTokenBalance[]
@@ -46,7 +47,7 @@ export const UserAssetsTable: React.FC<UserAssetsTableProps> = ({
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-10">
-        <span className="loading loading-spinner loading-lg" />
+        <Spinner size="lg" />
       </div>
     )
   }

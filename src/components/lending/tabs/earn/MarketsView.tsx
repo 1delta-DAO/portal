@@ -22,6 +22,7 @@ import { useDebounce } from '../../../../hooks/useDebounce'
 import { nextSort } from '../../../../hooks/useTableSort'
 import { usePersistedFilters } from '../../../../hooks/usePersistedFilters'
 import { useRiskMode } from '../../../../contexts/RiskMode'
+import { Spinner } from '../../../common/Loader'
 
 const HIGH_LIQUIDITY_CHAINS: ReadonlySet<string> = new Set([
   SupportedChainId.PLASMA_MAINNET,
@@ -594,7 +595,7 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
   if (loading) {
     return (
       <div className="flex justify-center items-center py-10">
-        <span className="loading loading-spinner loading-lg" />
+        <Spinner size="lg" />
       </div>
     )
   }

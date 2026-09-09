@@ -18,6 +18,7 @@ import { HealthBadge } from '../../../common/HealthBadge'
 import { Logo } from '../../../common/Logo'
 import { ChainBadgedLogo } from '../../../common/ChainBadgedLogo'
 import { termLabel, loanRatePct, maturityDisplay } from '../../shared/brokeredLoans'
+import { Spinner } from '../../../common/Loader'
 
 interface UserLenderPositionsTableProps {
   account?: string
@@ -551,7 +552,7 @@ export const UserLenderPositionsTable: React.FC<UserLenderPositionsTableProps> =
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-10">
-        <span className="loading loading-spinner loading-lg" />
+        <Spinner size="lg" />
       </div>
     )
   }

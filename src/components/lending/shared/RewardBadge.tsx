@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { RewardEntry, rewardApr, rewardsForSide, totalRewardApr, hasPointsProgram } from './rewards'
+import { PopoverShell } from '../../common/PortalPopover'
 
 const num = (v: unknown): number => {
   const n = typeof v === 'number' ? v : Number(v)
@@ -108,6 +108,15 @@ function RewardLine({ reward, side }: { reward: RewardEntry; side: 'deposit' | '
  * Replaces a `title=` tooltip that could only show a summed APR and a list of
  * mechanism tags ('merkle'), which told a user neither which token they were
  * being paid nor which program was paying it.
+ *
+ * The panel is rendered through {@link PopoverShell} — i.e. a portal — because
+ * this badge lives in a table cell, and the market tables carry
+ * `[&_td]:overflow-hidden` (fixed layout needs it to keep columns from being
+ * blown open by long names) inside an `overflow-x-auto` scroller. An
+ * absolutely positioned panel was being clipped by both: on most rows it
+ * opened invisibly. The portal also brings the flip-above-when-there-is-no-room
+ * and reposition-on-scroll behaviour the hand-rolled panel never had, which is
+ * what a badge on the LAST row of a long table needs.
  */
 export function RewardBadge({
   rewards,
@@ -118,7 +127,6 @@ export function RewardBadge({
   side: 'deposit' | 'borrow'
   className?: string
 }) {
-  const [open, setOpen] = useState(false)
   const entries = rewardsForSide(rewards, side)
   if (!entries.length) return null
 
@@ -130,63 +138,50 @@ export function RewardBadge({
 
   const tone = side === 'borrow' ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'
   const sign = side === 'borrow' ? '−' : '+'
+  const title =
+    side === 'borrow'
+      ? 'Borrow reward — lowers your net borrow cost. Click for the program details.'
+      : 'Supply reward. Click for the program details.'
+  const heading = side === 'borrow' ? 'Borrow rewards' : 'Supply rewards'
 
   return (
-    <div className={`relative inline-block ${className}`}>
-      <button
-        type="button"
-        className={`badge badge-xs cursor-pointer whitespace-nowrap border-0 ${tone}`}
-        onClick={(e) => {
-          e.stopPropagation()
-          setOpen((v) => !v)
-        }}
-        title={
-          side === 'borrow'
-            ? 'Borrow reward — lowers your net borrow cost. Click for the program details.'
-            : 'Supply reward. Click for the program details.'
-        }
-      >
-        {Math.abs(total) > 0.005 ? `${sign}${Math.abs(total).toFixed(1)}% ` : ''}
-        rwd
-        {points ? ' +pts' : ''}
-      </button>
-
-      {open ? (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={(e) => {
-              e.stopPropagation()
-              setOpen(false)
-            }}
+    <PopoverShell
+      // A SECONDARY control in a row: opening it must not also toggle the row
+      // selection underneath the panel that just opened.
+      stopPropagation
+      triggerClassName={`inline-flex ${className}`}
+      triggerTitle={title}
+      ariaLabel={heading}
+      widthClassName="w-72"
+      widthPx={288}
+      header={<span className="truncate text-xs font-semibold">{heading}</span>}
+      trigger={
+        <span
+          className={`badge badge-xs whitespace-nowrap border-0 transition-opacity group-hover:opacity-75 ${tone}`}
+        >
+          {Math.abs(total) > 0.005 ? `${sign}${Math.abs(total).toFixed(1)}% ` : ''}
+          rwd
+          {points ? ' +pts' : ''}
+        </span>
+      }
+    >
+      <div className="divide-y divide-base-300/60">
+        {entries.map((r, i) => (
+          <RewardLine
+            key={`${r.asset ?? 'x'}-${r.sourceId ?? r.source ?? i}`}
+            reward={r}
+            side={side}
           />
-          <div
-            className="absolute right-0 z-50 mt-1 w-64 rounded-lg border border-base-300 bg-base-100 p-2 text-left text-xs shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-1 font-semibold opacity-70">
-              {side === 'borrow' ? 'Borrow rewards' : 'Supply rewards'}
-            </div>
-            <div className="divide-y divide-base-300/60">
-              {entries.map((r, i) => (
-                <RewardLine
-                  key={`${r.asset ?? 'x'}-${r.sourceId ?? r.source ?? i}`}
-                  reward={r}
-                  side={side}
-                />
-              ))}
-            </div>
-            {points ? (
-              <div className="mt-1 border-t border-base-300/60 pt-1 text-[11px] opacity-60">
-                Points programs are excluded from the headline APR — they have no priceable value.
-              </div>
-            ) : null}
-            <div className="mt-1 text-[11px] opacity-50">
-              Rewards are transient and are not used in health-factor or liquidation math.
-            </div>
-          </div>
-        </>
+        ))}
+      </div>
+      {points ? (
+        <div className="border-t border-base-300/60 pt-1.5 text-[10px] text-base-content/50">
+          Points programs are excluded from the headline APR — they have no priceable value.
+        </div>
       ) : null}
-    </div>
+      <div className="text-[10px] text-base-content/40">
+        Rewards are transient and are not used in health-factor or liquidation math.
+      </div>
+    </PopoverShell>
   )
 }

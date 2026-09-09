@@ -4,6 +4,7 @@ import type { RawCurrency } from '../../types/currency'
 import type { TokenRowData } from './types'
 import { TokenRow } from './TokenRow'
 import { Logo } from '../common/Logo'
+import { Spinner } from '../common/Loader'
 
 interface TokenSelectorDropdownModeProps {
   dropdownRef: React.RefObject<HTMLDivElement>
@@ -91,7 +92,7 @@ export const TokenSelectorDropdownMode: React.FC<TokenSelectorDropdownModeProps>
           <div className="flex-1 overflow-y-auto p-1">
             {listsLoading ? (
               <div className="flex justify-center py-4">
-                <span className="loading loading-spinner loading-sm" />
+                <Spinner size="sm" />
               </div>
             ) : rows.length === 0 ? (
               <div className="text-center py-4 text-base-content/50 text-sm">No tokens found</div>

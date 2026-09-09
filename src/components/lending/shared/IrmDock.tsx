@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useIrmData } from '../../../hooks/lending/useIrmData'
 import { IrmCurveChart } from './IrmChart'
 import { EmptyState } from '../../common/EmptyState'
+import { Spinner } from '../../common/Loader'
 
 // Resolved at render time from the active DaisyUI theme so legend swatches
 // and stat numbers re-color on theme switch instead of staying neon.
@@ -135,7 +136,7 @@ function IrmDockedPanel({
       <div className="p-3 flex-1">
         {isLoading && (
           <div className="flex items-center justify-center h-24 gap-2 text-base-content/40 text-sm">
-            <span className="loading loading-spinner loading-sm" />
+            <Spinner size="sm" />
             Loading…
           </div>
         )}

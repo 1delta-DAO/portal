@@ -3,6 +3,7 @@ import type { Address } from 'viem'
 import type { RawCurrency } from '../../types/currency'
 import type { TokenRowData } from './types'
 import { TokenRow } from './TokenRow'
+import { Spinner } from '../common/Loader'
 
 interface TokenSelectorListModeProps {
   chainId: string
@@ -29,7 +30,7 @@ export const TokenSelectorListMode: React.FC<TokenSelectorListModeProps> = ({
   if (listsLoading && rows.length === 0) {
     return (
       <div className="flex justify-center py-6">
-        <span className="loading loading-spinner loading-sm" />
+        <Spinner size="sm" />
       </div>
     )
   }

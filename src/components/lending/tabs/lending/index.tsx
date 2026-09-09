@@ -40,6 +40,7 @@ import { LendingMarketTable } from './LendingMarketTable'
 import { ActionPanel, MobileActionModal } from './ActionPanel'
 import { usePersistedFilters } from '../../../../hooks/usePersistedFilters'
 import { nextSort } from '../../../../hooks/useTableSort'
+import { Spinner } from '../../../common/Loader'
 
 interface Props {
   /**
@@ -437,7 +438,7 @@ export function LendingDashboard({
   if (isPublicDataLoading) {
     return (
       <div className="flex justify-center items-center py-10">
-        <span className="loading loading-spinner loading-lg" />
+        <Spinner size="lg" />
       </div>
     )
   }
@@ -455,7 +456,7 @@ export function LendingDashboard({
       {/* User positions grouped by sub-account */}
       {account && isUserDataLoading && (
         <div className="rounded-box border border-base-300 p-3 sm:p-4 flex items-center gap-2">
-          <span className="loading loading-spinner loading-sm" />
+          <Spinner size="sm" />
           <span className="text-sm text-base-content/60">Loading positions...</span>
         </div>
       )}

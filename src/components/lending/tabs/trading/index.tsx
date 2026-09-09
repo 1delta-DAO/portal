@@ -42,6 +42,7 @@ import type { TradingOperation, SelectedPool, TableHighlight } from './types'
 import { usePersistedFilters } from '../../../../hooks/usePersistedFilters'
 import { YourPositions, type PositionSummary } from '../../shared/YourPositions'
 import { useIsMobile } from '../../../../hooks/useIsMobile'
+import { Spinner } from '../../../common/Loader'
 
 interface Props {
   /**
@@ -454,7 +455,7 @@ export function TradingDashboard({
   if (isPublicDataLoading) {
     return (
       <div className="flex justify-center items-center py-10">
-        <span className="loading loading-spinner loading-lg" />
+        <Spinner size="lg" />
       </div>
     )
   }
@@ -494,7 +495,7 @@ export function TradingDashboard({
       {/* User positions + sub-account selector */}
       {account && isUserDataLoading && (
         <div className="rounded-box border border-base-300 p-3 sm:p-4 flex items-center gap-2">
-          <span className="loading loading-spinner loading-sm" />
+          <Spinner size="sm" />
           <span className="text-sm text-base-content/60">Loading positions...</span>
         </div>
       )}

@@ -1,6 +1,7 @@
 import React, { useId, useMemo, useState } from 'react'
 import type { EarnHistoryPoint } from '../../../../hooks/earn/useEarnHistory'
 import { Badge } from '../../../common/Badge'
+import { Skeleton } from '../../../common/Loader'
 import { EMPTY_VALUE, abbreviateUsd, formatPercent } from '../../../../utils/format'
 
 type Metric = 'apr' | 'tvlUsd' | 'sharePrice'
@@ -291,7 +292,7 @@ export const HistoryChart: React.FC<Props> = ({
       {isLoading ? (
         // A skeleton, not a spinner: the block keeps its shape while it fills.
         <>
-          <div className={`skeleton ${plotH} w-full rounded-box`} />
+          <Skeleton className={`${plotH} w-full`} />
           <div className={AXIS_ROW_H} />
         </>
       ) : error ? (

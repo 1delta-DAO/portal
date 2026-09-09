@@ -66,6 +66,41 @@
   .protocol-logo.logo-fallback {
     border-radius: 9999px;
   }
+
+  /*
+   * Loading skeleton sweep (see components/common/Loader.tsx).
+   *
+   * The block itself is tinted from `base-content`, not from a surface token,
+   * so it stays visible on the page ground, on a card and on a lifted inner
+   * panel — the DaisyUI `skeleton` (bg-base-300) all but disappears on the
+   * pure-black themes here. The sweep is drawn from `currentColor` for the
+   * same reason, so it tracks the text color of whatever it sits in. The
+   * global prefers-reduced-motion rule above stops it.
+   */
+  .skeleton-sweep {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .skeleton-sweep::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, currentColor 10%, transparent),
+      transparent
+    );
+    animation: skeleton-sweep 1.6s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-sweep {
+    100% {
+      transform: translateX(100%);
+    }
+  }
 }
 
 @plugin "daisyui" {

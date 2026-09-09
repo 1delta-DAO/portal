@@ -4,6 +4,7 @@ import { abbreviateUsd, formatUsd, formatTokenAmount } from '../../../../../util
 import type { RawCurrency } from '../../../../../types/currency'
 import type { UserVaultItem, VaultEntry } from '../../../../../sdk/vaults-helper'
 import { PROVIDER_LABELS, PROVIDER_LOGOS } from './helpers'
+import { Spinner } from '../../../../common/Loader'
 
 interface UserVaultsTableProps {
   account?: string
@@ -42,7 +43,7 @@ export const UserVaultsTable: React.FC<UserVaultsTableProps> = ({
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-8">
-        <span className="loading loading-spinner loading-md" />
+        <Spinner size="md" />
       </div>
     )
   }

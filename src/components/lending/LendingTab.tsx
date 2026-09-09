@@ -41,6 +41,7 @@ const XChainSwapPanel = lazy(() =>
 )
 
 import { OPTIMIZER_ENABLED, BRIDGE_UI_ENABLED, UNIFIED_EARN_ENABLED } from '../../config/flags'
+import { Spinner } from '../common/Loader'
 
 export type { SubTab } from '../../utils/routes'
 
@@ -246,7 +247,7 @@ export function LenderTab() {
   if (isChainsLoading) {
     return (
       <div className="flex items-center justify-center gap-2 py-12 text-base-content/50">
-        <span className="loading loading-spinner loading-md" />
+        <Spinner size="md" />
         <span className="text-sm">Loading chains...</span>
       </div>
     )
@@ -427,7 +428,7 @@ export function LenderTab() {
 function TabFallback() {
   return (
     <div className="flex items-center justify-center gap-2 py-12 text-base-content/50">
-      <span className="loading loading-spinner loading-md" />
+      <Spinner size="md" />
       <span className="text-sm">Loading…</span>
     </div>
   )

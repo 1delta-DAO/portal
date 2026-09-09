@@ -13,6 +13,7 @@ import {
 import { ModalHeader } from '../../common/ModalHeader'
 import { ErrorAlert } from '../../common/ErrorAlert'
 import { EmptyState } from '../../common/EmptyState'
+import { Spinner } from '../../common/Loader'
 
 // ============================================================================
 // Mode Button — shows current borrow mode, opens the analysis modal on click
@@ -309,7 +310,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
 
           {loading && (
             <div className="flex justify-center py-8">
-              <span className="loading loading-spinner loading-md" />
+              <Spinner size="md" />
             </div>
           )}
 

@@ -21,6 +21,7 @@ import {
 import { ExpandChevron } from './ConfigMarketCells'
 import { basketIntrinsicYield, positionSupplyRate } from '../../../sdk/lending-helper/fluidSmart'
 import { CombinedDetailTable } from './CombinedDetailTable'
+import { Spinner } from '../../common/Loader'
 
 // `buildDetailRows` moved to CombinedDetailTable.tsx; re-exported so the
 // existing test and any consumer keep their import path.
@@ -275,7 +276,7 @@ export const ConfigMarketView: React.FC<Props> = ({
   if (isLoading) {
     return (
       <div className="rounded-box border border-base-300 p-4 sm:p-6 flex justify-center">
-        <span className="loading loading-spinner loading-md" />
+        <Spinner size="md" />
       </div>
     )
   }
