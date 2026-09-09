@@ -13,6 +13,12 @@ import { SpyModeProvider } from './contexts/SpyMode'
 import { RiskModeProvider } from './contexts/RiskMode'
 import { BatchModeProvider } from './contexts/BatchMode'
 import { rainbowDaisyTheme } from './rainbowkitTheme'
+import { installChunkErrorReload } from './utils/lazyChunk'
+
+// A deploy that lands while the app is open leaves this tab naming chunk files
+// the server no longer has. Catch the preloads that fail before any component
+// renders; `lazyChunk` covers the ones a `lazy()` importer requests.
+installChunkErrorReload()
 
 const client = new QueryClient()
 

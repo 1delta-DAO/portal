@@ -20,28 +20,34 @@ import { Badge } from '../common/Badge'
 // component actually renders, and the flag checks below sit *outside* the JSX,
 // so a build with the Optimizer disabled never requests its chunk at all.
 // Keep the flag test and the lazy element together when adding a tab.
-const EarnTab = lazy(() => import('./tabs/earn').then((m) => ({ default: m.EarnTab })))
-const UnifiedEarnTab = lazy(() =>
-  import('./tabs/unified').then((m) => ({ default: m.UnifiedEarnTab }))
+//
+// `lazyChunk` wraps every importer so that a chunk which was deployed away
+// while this tab was open reloads the page instead of failing permanently —
+// React's `lazy` caches the rejection, so without it the tab is dead until the
+// user works out that a hard refresh is the fix.
+const EarnTab = lazy(lazyChunk(() => import('./tabs/earn').then((m) => ({ default: m.EarnTab }))))
+const UnifiedEarnTab = lazy(
+  lazyChunk(() => import('./tabs/unified').then((m) => ({ default: m.UnifiedEarnTab })))
 )
-const LendingDashboard = lazy(() =>
-  import('./tabs/lending').then((m) => ({ default: m.LendingDashboard }))
+const LendingDashboard = lazy(
+  lazyChunk(() => import('./tabs/lending').then((m) => ({ default: m.LendingDashboard })))
 )
-const TradingDashboard = lazy(() =>
-  import('./tabs/trading').then((m) => ({ default: m.TradingDashboard }))
+const TradingDashboard = lazy(
+  lazyChunk(() => import('./tabs/trading').then((m) => ({ default: m.TradingDashboard })))
 )
-const OptimizerTab = lazy(() =>
-  import('./tabs/optimizer').then((m) => ({ default: m.OptimizerTab }))
+const OptimizerTab = lazy(
+  lazyChunk(() => import('./tabs/optimizer').then((m) => ({ default: m.OptimizerTab })))
 )
-const SpotSwapPanel = lazy(() =>
-  import('../swap/SpotSwapPanel').then((m) => ({ default: m.SpotSwapPanel }))
+const SpotSwapPanel = lazy(
+  lazyChunk(() => import('../swap/SpotSwapPanel').then((m) => ({ default: m.SpotSwapPanel })))
 )
-const XChainSwapPanel = lazy(() =>
-  import('../swap/XChainSwapPanel').then((m) => ({ default: m.XChainSwapPanel }))
+const XChainSwapPanel = lazy(
+  lazyChunk(() => import('../swap/XChainSwapPanel').then((m) => ({ default: m.XChainSwapPanel })))
 )
 
 import { OPTIMIZER_ENABLED, BRIDGE_UI_ENABLED, UNIFIED_EARN_ENABLED } from '../../config/flags'
 import { Spinner } from '../common/Loader'
+import { lazyChunk } from '../../utils/lazyChunk'
 
 export type { SubTab } from '../../utils/routes'
 
