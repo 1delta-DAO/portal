@@ -72,6 +72,35 @@ export interface UseEarnCatalogResult {
   refetch: () => void
 }
 
+/** One query's worth of filters: the catalog request minus the chain. */
+export type EarnCatalogRequest = Omit<UseEarnCatalogParams, 'chainIds' | 'enabled'>
+
+/**
+ * A deterministic cache key for a catalog request.
+ *
+ * Derived from the request OBJECT rather than from a hand-written list of
+ * fields, because the hand-written list is what broke: `search` was sent to the
+ * server but left out of the key, so React Query kept serving the entry fetched
+ * without it and never called the queryFn again. Typing a name did nothing
+ * until some other control moved the key and dragged the search term along.
+ * A parameter that is in the request but not the key is not a filter that
+ * arrives late — it is one that never arrives.
+ *
+ * Field order is normalised away, and array values are sorted so that
+ * re-ordering the same multi-select does not re-key (and so re-fetch) an
+ * identical query. Everything else is taken verbatim.
+ */
+export function earnRequestKey(request: EarnCatalogRequest): string {
+  return JSON.stringify(
+    Object.keys(request)
+      .sort()
+      .map((field) => {
+        const value = (request as Record<string, unknown>)[field]
+        return [field, Array.isArray(value) ? [...value].map(String).sort() : (value ?? null)]
+      })
+  )
+}
+
 /** What a chain's query holds while it is still streaming pages. */
 interface ChainChunk extends EarnCatalogChunk {
   /** False until the last page has landed. */
@@ -139,27 +168,35 @@ export function useEarnCatalog(params: UseEarnCatalogParams): UseEarnCatalogResu
   const protocolKey = protocol?.length ? [...protocol].sort().join(',') : ''
   const curatorKey = curator?.length ? [...curator].sort().join(',') : ''
 
-  // Everything except the chain. The chain is prepended per query so that one
-  // chain's entry is addressable on its own — which is what makes the streaming
-  // writes below land on the right row.
-  const filterKey = useMemo(
-    () => [
-      brandKey,
-      protocolKey,
-      curatorKey,
-      venueKey,
-      venueKind ?? '',
-      assetGroup ?? '',
-      assetSymbol ?? '',
-      asset ?? '',
-      terms ?? '',
-      depositableOnly ? '1' : '0',
-      includePassthrough ? '1' : '0',
-      includeIlliquid ? '1' : '0',
-      String(minTvlUsd ?? ''),
-      String(maxRiskScore ?? ''),
+  /**
+   * Every server-visible parameter in ONE object, so the query key and the
+   * request cannot disagree about what was asked for. Adding a filter means
+   * adding it here, once — {@link earnRequestKey} picks it up for free, and
+   * the queryFn spreads this same object.
+   */
+  const request = useMemo<EarnCatalogRequest>(
+    () => ({
+      brand,
+      protocol,
+      curator,
+      venue,
+      venueKind,
+      assetGroup,
+      assetSymbol,
+      asset,
+      search,
+      terms,
+      depositableOnly,
+      includePassthrough,
+      includeIlliquid,
+      minTvlUsd,
+      maxRiskScore,
       sort,
-    ],
+    }),
+    // The array filters are depended on by their sorted CSV, not by identity:
+    // a caller rebuilding `['a','b']` on every render must not re-key a query,
+    // and neither must re-ordering the same selection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       brandKey,
       protocolKey,
@@ -180,39 +217,24 @@ export function useEarnCatalog(params: UseEarnCatalogParams): UseEarnCatalogResu
     ]
   )
 
+  // The chain is prepended per query so that one chain's entry is addressable
+  // on its own — which is what makes the streaming writes below land on the
+  // right row.
+  const filterKey = useMemo(() => earnRequestKey(request), [request])
+
   const queryEnabled = enabled && chains.length > 0
 
   const results = useQueries({
     queries: chains.map((chainId) => {
-      const queryKey: QueryKey = ['earnCatalog', chainId, ...filterKey]
+      const queryKey: QueryKey = ['earnCatalog', chainId, filterKey]
       return {
         queryKey,
         enabled: queryEnabled,
         queryFn: async ({ signal }: { signal: AbortSignal }): Promise<ChainChunk> => {
           const acc: ChainChunk = { items: [], total: 0, complete: false }
 
-          for await (const page of fetchEarnPages(
-            {
-              chainIds: [chainId],
-              brand,
-              protocol,
-              curator,
-              venue,
-              venueKind,
-              assetGroup,
-              assetSymbol,
-              asset,
-              search,
-              terms,
-              depositableOnly,
-              includePassthrough,
-              includeIlliquid,
-              minTvlUsd,
-              maxRiskScore,
-              sort,
-            },
-            signal
-          )) {
+          // The SAME object the key was built from — see `request` above.
+          for await (const page of fetchEarnPages({ ...request, chainIds: [chainId] }, signal)) {
             acc.items = [...(acc.items ?? []), ...page.items]
             acc.facets = page.facets ?? acc.facets
             acc.sources = page.sources ?? acc.sources

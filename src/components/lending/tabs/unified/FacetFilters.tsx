@@ -381,6 +381,9 @@ function MinTvlInput({
   )
 }
 
+/** How long the search box waits after the last keystroke before querying. */
+const SEARCH_DEBOUNCE_MS = 350
+
 /**
  * Asset filter that accepts either an ADDRESS or a SYMBOL.
  *
@@ -409,8 +412,25 @@ function AssetInput({
 }) {
   const current = asset ?? assetSymbol ?? search ?? ''
   const [draft, setDraft] = React.useState(current)
+  const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** The last value THIS box put into the selection — see the effect below. */
+  const committed = React.useRef(current)
 
+  React.useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    []
+  )
+
+  // Refill the box when the selection changes from OUTSIDE it — a reset, a
+  // cleared chip, the asset dropdown picking a symbol. Our OWN commits are
+  // skipped: what lands in the selection is the trimmed draft, so re-seeding
+  // from it would eat a trailing space out from under the cursor the moment
+  // the debounce fired mid-word.
   React.useEffect(() => {
+    if (current === committed.current) return
+    committed.current = current
     setDraft(current)
   }, [current])
 
@@ -418,14 +438,20 @@ function AssetInput({
   // different questions — a row's asset is what you deposit, not what the row
   // is called — and letting the box set an asset filter is what hid the
   // svZCHF vault behind the two markets that take svZCHF as collateral.
-  const commit = () => {
-    const r = resolveAssetFilter(draft)
-    onChange({
-      search: r.kind === 'search' ? r.search : undefined,
-      asset: undefined,
-      assetSymbol: undefined,
-    })
-  }
+  const commit = React.useCallback(
+    (value: string) => {
+      if (timer.current) clearTimeout(timer.current)
+      // Nothing was typed. Without this, blurring the box would convert an
+      // ADDRESS filter picked from the dropdown into a text search of the same
+      // string, which is a different question with a different answer.
+      if (value === current) return
+      const r = resolveAssetFilter(value)
+      const next = r.kind === 'search' ? r.search : undefined
+      committed.current = next ?? ''
+      onChange({ search: next, asset: undefined, assetSymbol: undefined })
+    },
+    [current, onChange]
+  )
 
   return (
     <label
@@ -438,11 +464,24 @@ function AssetInput({
         className="input input-bordered input-xs w-40"
         placeholder="name, curator, symbol…"
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
+        // Debounced rather than commit-on-Enter: a search box that does nothing
+        // until you leave it reads as broken, and every keystroke is a request
+        // per selected chain over a ~1.3k-row catalogue. ~1/3 s is long enough
+        // that a typed word is one query, short enough that a pause answers.
+        onChange={(e) => {
+          const value = e.target.value
+          setDraft(value)
+          if (timer.current) clearTimeout(timer.current)
+          timer.current = setTimeout(() => commit(value), SEARCH_DEBOUNCE_MS)
+        }}
+        onBlur={() => commit(draft)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') commit()
-          if (e.key === 'Escape') setDraft(current)
+          // Enter and Escape both mean "now" — neither should wait out a timer.
+          if (e.key === 'Enter') commit(draft)
+          if (e.key === 'Escape') {
+            if (timer.current) clearTimeout(timer.current)
+            setDraft(current)
+          }
         }}
       />
       {/* The empty state is the TABLE's job now, not this control's. A query
