@@ -13,7 +13,14 @@ import { TokenSelectorListMode } from './ListMode'
 import type { TokenRowData } from './types'
 import { useSpyAccount } from '../../contexts/SpyMode'
 import { getMainTokensCache, isMainToken } from '../../lib/assetLists'
-import { getUserTokensForChain, addUserToken, isUserToken } from '../../lib/userTokens'
+import {
+  getUserTokensForChain,
+  getUserTokenEntriesForChain,
+  addUserToken,
+  isUserToken,
+} from '../../lib/userTokens'
+import { isTokenAddress, primeResolvedToken } from '../../lib/data/tokenMetadataCache'
+import { useResolvedToken } from '../../hooks/useResolvedToken'
 import { useDebounce } from '../../hooks/useDebounce'
 import { NO_MATCH, compareTokenMatches, normalizeTokenQuery, scoreTokenMatch } from './tokenSearch'
 
@@ -73,7 +80,61 @@ export function TokenSelector({
     }
   }, [open, listMode])
 
-  const tokensMap = lists || {}
+  const [userTokensVersion, setUserTokensVersion] = useState(0)
+
+  // Memoized because it feeds `handleTokenChange`'s dependency list — as a
+  // bare `lists || {}` it took a new identity every render and rebuilt the
+  // callback each time.
+  const curatedMap = useMemo(() => lists || {}, [lists])
+
+  // Persisted on-chain-resolved tokens are re-registered into the shared token
+  // cache on mount, so `getCurrency` — and through it the balance and price
+  // queries — sees them exactly like a curated token. Without this a pasted
+  // token would be gone on reload despite being in localStorage.
+  useEffect(() => {
+    for (const entry of getUserTokenEntriesForChain(chainId)) {
+      if (entry.currency) primeResolvedToken(chainId, entry.currency)
+    }
+  }, [chainId, lists])
+
+  // Is the search box holding an address the curated list already covers? The
+  // resolver only runs when it does not.
+  const isQueryListed = !!curatedMap[searchQuery.trim().toLowerCase()]
+
+  const queryIsAddress = isTokenAddress(searchQuery)
+
+  const { token: resolvedToken, isLoading: resolvingToken } = useResolvedToken(
+    chainId,
+    searchQuery,
+    isQueryListed
+  )
+
+  /**
+   * The map every downstream consumer reads: curated list, plus tokens the
+   * user brought in themselves, plus whatever the current query resolved to.
+   *
+   * Merging here rather than special-casing the resolved token in the search,
+   * the rows, the balance query and the price query is what keeps a pasted
+   * token behaving like any other one.
+   */
+  const tokensMap = useMemo(() => {
+    const persisted = getUserTokenEntriesForChain(chainId).filter(
+      (e) => e.currency && !curatedMap[e.address]
+    )
+    if (persisted.length === 0 && !resolvedToken) return curatedMap
+
+    const merged: Record<string, RawCurrency> = { ...curatedMap }
+    for (const entry of persisted) {
+      if (entry.currency) merged[entry.address] = entry.currency
+    }
+    // Curated always wins — a resolved entry has no logo and no price key.
+    if (resolvedToken && !merged[resolvedToken.address.toLowerCase()]) {
+      merged[resolvedToken.address.toLowerCase()] = resolvedToken
+    }
+    return merged
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curatedMap, resolvedToken, chainId, userTokensVersion])
+
   const allAddrs = useMemo(() => Object.keys(tokensMap) as Address[], [tokensMap])
   const nativeCurrencySymbol = chains?.[chainId]?.data?.nativeCurrency?.symbol?.toUpperCase() || ''
 
@@ -89,7 +150,6 @@ export function TokenSelector({
     return mainTokensCache?.[chainId] || new Set<string>()
   }, [chainId, lists])
 
-  const [userTokensVersion, setUserTokensVersion] = useState(0)
   const userTokensForChain = useMemo(() => {
     return getUserTokensForChain(chainId)
   }, [chainId, userTokensVersion])
@@ -413,12 +473,17 @@ export function TokenSelector({
   const handleTokenChange = useCallback(
     (address: Address) => {
       if (!isMainToken(chainId, address) && !isUserToken(chainId, address)) {
-        addUserToken(chainId, address)
+        // A token the curated list does not carry is persisted WITH its
+        // metadata — this store is then the only record of its decimals, and
+        // an address without decimals cannot size an amount after a reload.
+        const lower = address.toLowerCase()
+        const uncurated = !curatedMap[lower] ? tokensMap[lower] : undefined
+        addUserToken(chainId, address, uncurated)
         setUserTokensVersion((v) => v + 1)
       }
       onChange(address)
     },
-    [chainId, onChange]
+    [chainId, onChange, curatedMap, tokensMap]
   )
 
   // List mode: just show the token list without dropdown button
@@ -434,6 +499,8 @@ export function TokenSelector({
         prices={prices}
         balancesLoading={balancesLoading}
         pricesLoading={pricesLoading}
+        resolvingToken={resolvingToken}
+        queryIsAddress={queryIsAddress}
         userAddress={userAddress}
         listsLoading={listsLoading}
         onChange={handleTokenChange}
@@ -456,6 +523,8 @@ export function TokenSelector({
       prices={prices}
       balancesLoading={balancesLoading}
       pricesLoading={pricesLoading}
+      resolvingToken={resolvingToken}
+      queryIsAddress={queryIsAddress}
       userAddress={userAddress}
       searchQuery={searchQuery}
       setSearchQuery={setSearchQuery}

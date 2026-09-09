@@ -24,6 +24,10 @@ interface TokenSelectorDropdownModeProps {
   setSearchQuery: (v: string) => void
   showSearch: boolean
   listsLoading: boolean
+  /** An address is being resolved on-chain because no list carries it. */
+  resolvingToken?: boolean
+  /** The current query is a well-formed address. */
+  queryIsAddress?: boolean
   selected: RawCurrency | undefined
   onChange: (address: Address) => void
 }
@@ -37,6 +41,8 @@ export const TokenSelectorDropdownMode: React.FC<TokenSelectorDropdownModeProps>
   setSearchQuery,
   showSearch,
   listsLoading,
+  resolvingToken,
+  queryIsAddress,
   selected,
   onChange,
 }) => {
@@ -90,12 +96,17 @@ export const TokenSelectorDropdownMode: React.FC<TokenSelectorDropdownModeProps>
             </div>
           )}
           <div className="flex-1 overflow-y-auto p-1">
-            {listsLoading ? (
-              <div className="flex justify-center py-4">
+            {listsLoading || (resolvingToken && rows.length === 0) ? (
+              <div className="flex flex-col items-center gap-2 py-4">
                 <Spinner size="sm" />
+                {resolvingToken && (
+                  <span className="text-xs text-base-content/50">Looking up token…</span>
+                )}
               </div>
             ) : rows.length === 0 ? (
-              <div className="text-center py-4 text-base-content/50 text-sm">No tokens found</div>
+              <div className="text-center py-4 text-base-content/50 text-sm">
+                {queryIsAddress ? 'No token at this address on this chain' : 'No tokens found'}
+              </div>
             ) : (
               <div className="space-y-0.5">
                 {rows.map((row) => (

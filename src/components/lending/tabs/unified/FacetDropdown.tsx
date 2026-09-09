@@ -7,12 +7,30 @@ interface Props {
   options: EarnFacetBucket[]
   selected: string[]
   onChange: (next: string[]) => void
+  /**
+   * `multi` (default) accumulates values — the server ORs them.
+   *
+   * `single` REPLACES, and renders radios rather than checkboxes, for the
+   * dimensions the endpoint only accepts one of (`assetGroup`, `assetSymbol`).
+   * The mode is not cosmetic: shown as checkboxes, the asset dropdown let a
+   * user tick USDC *and* USDT and then silently dropped one of them, which is
+   * a control that lies about what it did.
+   */
+  mode?: 'multi' | 'single'
   /** Show the filter box above ~this many options. */
   searchThreshold?: number
+  /**
+   * Render only this many options before a "show all" — for dimensions whose
+   * tail is long and uninteresting (246 asset symbols on Ethereum alone, most
+   * of them on one market). The filter box always searches the WHOLE list, so
+   * nothing is unreachable; the cap only decides what you scroll by default.
+   */
+  maxVisible?: number
 }
 
 /**
- * Multi-select over a facet dimension.
+ * A dropdown over one facet dimension — multi-select by default, single-select
+ * where the endpoint takes one value (see `mode`).
  *
  * Replaces the inline chip cloud, which did not survive contact with real data:
  * one chain renders 60+ venues, so the chips pushed the table three screens
@@ -29,15 +47,18 @@ interface Props {
  * settings and theme menus) is the ref + outside-mousedown pattern below; this
  * was the odd one out.
  */
-export const MultiSelectDropdown: React.FC<Props> = ({
+export const FacetDropdown: React.FC<Props> = ({
   placeholder,
   options,
   selected,
   onChange,
+  mode = 'multi',
   searchThreshold = 8,
+  maxVisible,
 }) => {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [showAll, setShowAll] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
   // Dropping the filter text on close: reopening onto a stale "silo" query
@@ -45,6 +66,7 @@ export const MultiSelectDropdown: React.FC<Props> = ({
   const close = useCallback(() => {
     setOpen(false)
     setQuery('')
+    setShowAll(false)
   }, [])
 
   useEffect(() => {
@@ -63,7 +85,7 @@ export const MultiSelectDropdown: React.FC<Props> = ({
     }
   }, [open, close])
 
-  const filtered = useMemo(() => {
+  const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return options
     return options.filter(
@@ -71,8 +93,27 @@ export const MultiSelectDropdown: React.FC<Props> = ({
     )
   }, [options, query])
 
-  const toggle = (key: string) =>
+  // A capped list still shows what is SELECTED. Hiding the active value behind
+  // "show all" would leave the menu contradicting its own button label.
+  const visible = useMemo(() => {
+    if (query.trim() || showAll || !maxVisible || matches.length <= maxVisible) return matches
+    const head = matches.slice(0, maxVisible)
+    const pinned = matches.filter((o) => selected.includes(o.key) && !head.includes(o))
+    return [...head, ...pinned]
+  }, [matches, query, showAll, maxVisible, selected])
+
+  const hidden = matches.length - visible.length
+
+  const toggle = (key: string) => {
+    if (mode === 'single') {
+      // Picking the active value again clears it — the only way to get back to
+      // "all" without reaching for the Clear button.
+      onChange(selected.includes(key) ? [] : [key])
+      close()
+      return
+    }
     onChange(selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key])
+  }
 
   const summary =
     selected.length === 0
@@ -112,10 +153,8 @@ export const MultiSelectDropdown: React.FC<Props> = ({
           )}
 
           <div className="max-h-72 overflow-y-auto">
-            {filtered.length === 0 && (
-              <div className="px-1 py-2 text-xs opacity-60">No matches</div>
-            )}
-            {filtered.map((o) => (
+            {visible.length === 0 && <div className="px-1 py-2 text-xs opacity-60">No matches</div>}
+            {visible.map((o) => (
               <label
                 key={o.key}
                 className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-base-200"
@@ -124,8 +163,8 @@ export const MultiSelectDropdown: React.FC<Props> = ({
                 title={o.description ? `${o.key} — ${o.description}` : o.key}
               >
                 <input
-                  type="checkbox"
-                  className="checkbox checkbox-xs shrink-0"
+                  type={mode === 'single' ? 'radio' : 'checkbox'}
+                  className={`${mode === 'single' ? 'radio' : 'checkbox'} ${mode === 'single' ? 'radio-xs' : 'checkbox-xs'} shrink-0`}
                   checked={selected.includes(o.key)}
                   onChange={() => toggle(o.key)}
                 />
@@ -135,13 +174,23 @@ export const MultiSelectDropdown: React.FC<Props> = ({
             ))}
           </div>
 
+          {hidden > 0 && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs mt-1 w-full"
+              onClick={() => setShowAll(true)}
+            >
+              Show all {matches.length}
+            </button>
+          )}
+
           {selected.length > 0 && (
             <button
               type="button"
               className="btn btn-ghost btn-xs mt-1 w-full"
               onClick={() => onChange([])}
             >
-              Clear {selected.length}
+              {mode === 'single' ? 'Clear' : `Clear ${selected.length}`}
             </button>
           )}
         </div>

@@ -1,7 +1,12 @@
 import React from 'react'
 import type { EarnFacetBucket, EarnFacets } from '../../../../sdk/earn-helper'
-import { MultiSelectDropdown } from './MultiSelectDropdown'
-import { formatUsdShort, parseMinTvl, resolveAssetFilter } from './filterParsing'
+import { FacetDropdown } from './FacetDropdown'
+import {
+  assetFilterVocabulary,
+  formatUsdShort,
+  parseMinTvl,
+  resolveAssetFilter,
+} from './filterParsing'
 
 export interface FacetSelection {
   /**
@@ -32,8 +37,23 @@ export interface FacetSelection {
   /** Reserved for a deep link that names exact markets; no UI control. */
   venues: string[]
   venueKind?: string
+  /**
+   * The UNDERLYING asset — what the "All assets" dropdown sets.
+   *
+   * Preferred over `assetSymbol` because it is the question people ask: an
+   * `ETH` group covers both the 99 WETH rows and the 29 ETH ones, where the
+   * symbol axis makes those two separate choices and shows neither as
+   * incomplete. The server matches the group key exactly and case-sensitively,
+   * so it is echoed back verbatim from `facets.assetGroups` — see
+   * `assetFilterVocabulary`.
+   */
   assetGroup?: string
-  /** Underlying symbol — exact match, chosen from the facet list. */
+  /**
+   * Underlying SYMBOL — exact match. The fallback axis, used when a response
+   * carries no groups. Only one of this and `assetGroup` is ever set: the
+   * endpoint takes one asset filter, and repeating the parameter does not OR
+   * the values.
+   */
   assetSymbol?: string
   /**
    * Underlying token ADDRESS.
@@ -121,6 +141,11 @@ export const FacetFilters: React.FC<FacetFiltersProps> = ({
 }) => {
   const set = (patch: Partial<FacetSelection>) => onChange({ ...selection, ...patch })
 
+  // Which asset axis this response supports, and its options — see
+  // `assetFilterVocabulary`.
+  const assets = React.useMemo(() => assetFilterVocabulary(facets), [facets])
+  const assetSelected = assets.param === 'assetGroup' ? selection.assetGroup : selection.assetSymbol
+
   const hasFilters =
     selection.protocols.length > 0 ||
     selection.curators.length > 0 ||
@@ -172,7 +197,7 @@ export const FacetFilters: React.FC<FacetFiltersProps> = ({
       {/* Protocol = what it is built on (Morpho, Euler, Aave). Curator =
           who runs it (Steakhouse, Gauntlet). Both are useful axes and they
           are NOT the same question. */}
-      <MultiSelectDropdown
+      <FacetDropdown
         placeholder="All protocols"
         options={facets.protocols}
         selected={selection.protocols}
@@ -183,7 +208,7 @@ export const FacetFilters: React.FC<FacetFiltersProps> = ({
           reads as a broken control, and on a chain with no curated vaults the
           honest answer is that the axis does not apply. */}
       {facets.curators.length > 0 && (
-        <MultiSelectDropdown
+        <FacetDropdown
           placeholder="All curators"
           options={facets.curators}
           selected={selection.curators}
@@ -191,23 +216,30 @@ export const FacetFilters: React.FC<FacetFiltersProps> = ({
         />
       )}
 
-      {/* Keyed on SYMBOL: `assetGroup` is null on most rows, which left this
-          dropdown nearly empty. The server takes one at a time, so keep the
-          most recent pick. */}
-      <MultiSelectDropdown
+      {/* The UNDERLYING, from `facets.assetGroups` where the response has them
+          — one `ETH` entry covering WETH and ETH, rather than two a user has
+          to know to check both of. Single-select because the endpoint takes
+          one value: sending two `assetSymbol`s does not OR them.
+
+          Capped to the head of the list. The tail is long and thin (246
+          symbols on Ethereum alone, most on a single market) and the filter
+          box searches all of it. */}
+      <FacetDropdown
+        mode="single"
         placeholder="All assets"
-        options={facets.assets}
-        selected={selection.assetSymbol ? [selection.assetSymbol] : []}
-        onChange={(next) => set({ assetSymbol: next[next.length - 1], asset: undefined })}
+        options={assets.options}
+        maxVisible={12}
+        selected={assetSelected ? [assetSelected] : []}
+        onChange={(next) =>
+          set(
+            assets.param === 'assetGroup'
+              ? { assetGroup: next[0], assetSymbol: undefined, asset: undefined }
+              : { assetSymbol: next[0], assetGroup: undefined, asset: undefined }
+          )
+        }
       />
 
-      <AssetInput
-        options={facets.assets}
-        assetSymbol={selection.assetSymbol}
-        asset={selection.asset}
-        search={selection.search}
-        onChange={(next) => set(next)}
-      />
+      <SearchInput search={selection.search} onChange={(search) => set({ search })} />
 
       <label className="label cursor-pointer gap-2 py-0">
         <input
@@ -385,32 +417,27 @@ function MinTvlInput({
 const SEARCH_DEBOUNCE_MS = 350
 
 /**
- * Asset filter that accepts either an ADDRESS or a SYMBOL.
+ * Free-text search over the listing.
  *
- * The dropdown beside it can only offer symbols that are already in view, and
- * a symbol is not always enough to name a token — three unrelated tokens ship
- * as `USD3` and three more as `USDP`. An address names exactly one.
+ * The loosest of the "which rows" controls and the only one that can find a
+ * row by what it is CALLED — the asset dropdown beside it filters on the
+ * DEPOSIT TOKEN, which is a different question: the Frankencoin svZCHF vault's
+ * asset is ZCHF, so no asset filter finds it by the name on the row.
  *
- * Symbols are RESOLVED against the facet list rather than sent verbatim,
- * because the server matches symbols exactly: typing `usdc` would otherwise
- * return an empty table that looks identical to "there are no USDC markets".
- * An exact case-insensitive hit wins; failing that a unique substring match is
- * accepted; anything else is reported as no match instead of being sent.
+ * It no longer touches the asset filters. It used to clear them on every
+ * commit, because the box doubled as their display and would otherwise have
+ * read "USDC" while searching for something else; now that the dropdown owns
+ * that axis, the two compose — "Gauntlet, in USDC" is a question a user can
+ * ask — and typing no longer silently drops a filter they set.
  */
-function AssetInput({
-  options,
-  assetSymbol,
-  asset,
+function SearchInput({
   search,
   onChange,
 }: {
-  options: EarnFacetBucket[]
-  assetSymbol?: string
-  asset?: string
   search?: string
-  onChange: (next: { assetSymbol?: string; asset?: string; search?: string }) => void
+  onChange: (search: string | undefined) => void
 }) {
-  const current = asset ?? assetSymbol ?? search ?? ''
+  const current = search ?? ''
   const [draft, setDraft] = React.useState(current)
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   /** The last value THIS box put into the selection — see the effect below. */
@@ -423,32 +450,24 @@ function AssetInput({
     []
   )
 
-  // Refill the box when the selection changes from OUTSIDE it — a reset, a
-  // cleared chip, the asset dropdown picking a symbol. Our OWN commits are
-  // skipped: what lands in the selection is the trimmed draft, so re-seeding
-  // from it would eat a trailing space out from under the cursor the moment
-  // the debounce fired mid-word.
+  // Refill the box when the search term changes from OUTSIDE it — a reset, a
+  // cleared chip. Our OWN commits are skipped: what lands in the selection is
+  // the trimmed draft, so re-seeding from it would eat a trailing space out
+  // from under the cursor the moment the debounce fired mid-word.
   React.useEffect(() => {
     if (current === committed.current) return
     committed.current = current
     setDraft(current)
   }, [current])
 
-  // Searching CLEARS the asset filters rather than setting one. They are
-  // different questions — a row's asset is what you deposit, not what the row
-  // is called — and letting the box set an asset filter is what hid the
-  // svZCHF vault behind the two markets that take svZCHF as collateral.
   const commit = React.useCallback(
     (value: string) => {
       if (timer.current) clearTimeout(timer.current)
-      // Nothing was typed. Without this, blurring the box would convert an
-      // ADDRESS filter picked from the dropdown into a text search of the same
-      // string, which is a different question with a different answer.
       if (value === current) return
       const r = resolveAssetFilter(value)
       const next = r.kind === 'search' ? r.search : undefined
       committed.current = next ?? ''
-      onChange({ search: next, asset: undefined, assetSymbol: undefined })
+      onChange(next)
     },
     [current, onChange]
   )
@@ -484,10 +503,9 @@ function AssetInput({
           }
         }}
       />
-      {/* The empty state is the TABLE's job now, not this control's. A query
-          that matches nothing is a real answer about the listing, and the row
-          count already says so — an inline "no match" was only ever needed
-          because the old resolver refused to send the query at all. */}
+      {/* The empty state is the TABLE's job, not this control's. A query that
+          matches nothing is a real answer about the listing, and the row count
+          already says so. */}
     </label>
   )
 }

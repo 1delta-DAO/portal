@@ -93,6 +93,33 @@ export function getTokenFromCache(chainId: string, address: string): RawCurrency
   return cachedTokenLists[chainId]?.[address.toLowerCase()]
 }
 
+/**
+ * Add a token that the curated list does not carry — one resolved on-chain
+ * through `/v1/data/token/metadata`.
+ *
+ * It goes into the SAME per-chain map the curated list uses, deliberately:
+ * everything downstream (`getCurrency`, the balance query, the price query,
+ * the search index) reads that map, so registering here is what makes a
+ * pasted address behave like any other token instead of needing a parallel
+ * code path in each of them.
+ *
+ * A curated entry is never overwritten. The curated row is the one with a
+ * logo, an `assetGroup` and a price; an on-chain read has none of those, so
+ * letting it win would silently downgrade a known token.
+ *
+ * @returns the entry now in the cache — the existing curated one if there was
+ *   a collision, otherwise the one just registered.
+ */
+export function registerResolvedToken(chainId: string, token: RawCurrency): RawCurrency {
+  const address = token.address.toLowerCase()
+  const existing = cachedTokenLists[chainId]?.[address]
+  if (existing) return existing
+
+  if (!cachedTokenLists[chainId]) cachedTokenLists[chainId] = {}
+  cachedTokenLists[chainId][address] = { ...token, address }
+  return cachedTokenLists[chainId][address]
+}
+
 export function isTokenListsReady(): boolean {
   return Object.keys(cachedTokenLists).length > 0
 }

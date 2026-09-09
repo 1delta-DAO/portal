@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { formatUsdShort, parseMinTvl, resolveAssetFilter } from './filterParsing'
+import {
+  assetFilterVocabulary,
+  formatUsdShort,
+  parseMinTvl,
+  resolveAssetFilter,
+} from './filterParsing'
 import type { EarnFacetBucket } from '../../../../sdk/earn-helper'
 
 const opts = (...keys: string[]): EarnFacetBucket[] =>
@@ -100,5 +105,67 @@ describe('formatUsdShort', () => {
   it('leaves small numbers alone', () => {
     expect(formatUsdShort(0)).toBe('0')
     expect(formatUsdShort(250)).toBe('250')
+  })
+})
+
+describe('assetFilterVocabulary — filtering by the underlying', () => {
+  // Shapes taken from a live /v1/data/earn response for chain 1: group keys are
+  // upper-cased and sometimes carry the token NAME as a prefix, while the
+  // symbol facet keeps the casing people recognise.
+  const assets: EarnFacetBucket[] = [
+    { key: 'USDC', count: 282 },
+    { key: 'WETH', count: 99 },
+    { key: 'cbBTC', count: 49 },
+    { key: 'ETH', count: 29 },
+    { key: 'PYUSD', count: 22 },
+    { key: 'wstETH', count: 21 },
+  ]
+  const assetGroups: EarnFacetBucket[] = [
+    { key: 'USDC', count: 282 },
+    { key: 'ETH', count: 128 },
+    { key: 'CBBTC', count: 49 },
+    { key: 'PayPal USD::PYUSD', count: 22 },
+    { key: 'WSTETH', count: 21 },
+  ]
+
+  it('prefers the group axis, so WETH and ETH are ONE entry', () => {
+    // The whole point of filtering by underlying: 99 + 29 rows behind one
+    // choice, instead of two entries a user has to know to check both of.
+    const v = assetFilterVocabulary({ assets, assetGroups })
+    expect(v.param).toBe('assetGroup')
+    expect(v.options.find((o) => o.key === 'ETH')?.count).toBe(128)
+  })
+
+  it('sends the raw key and only prettifies the label', () => {
+    const v = assetFilterVocabulary({ assets, assetGroups })
+    const cbbtc = v.options.find((o) => o.key === 'CBBTC')
+    // The server matches the group key EXACTLY and is case-sensitive —
+    // labelling must never leak into what is sent.
+    expect(cbbtc?.key).toBe('CBBTC')
+    expect(cbbtc?.label).toBe('cbBTC')
+  })
+
+  it('strips the name prefix the server uses for unresolved groups', () => {
+    const v = assetFilterVocabulary({ assets, assetGroups })
+    const pyusd = v.options.find((o) => o.key === 'PayPal USD::PYUSD')
+    expect(pyusd?.label).toBe('PYUSD')
+  })
+
+  it('falls back to raw symbols when a response carries no groups', () => {
+    // Degrades to the previous behaviour rather than to an empty menu.
+    const v = assetFilterVocabulary({ assets, assetGroups: [] })
+    expect(v.param).toBe('assetSymbol')
+    expect(v.options.map((o) => o.key)).toEqual(['USDC', 'WETH', 'cbBTC', 'ETH', 'PYUSD', 'wstETH'])
+  })
+
+  it('orders by row count, not alphabetically', () => {
+    // The list is 246 long on one chain; opening it on whatever starts with "a"
+    // buries the assets anyone actually holds.
+    const v = assetFilterVocabulary({ assets, assetGroups })
+    expect(v.options.map((o) => o.label)).toEqual(['USDC', 'ETH', 'cbBTC', 'PYUSD', 'wstETH'])
+  })
+
+  it('survives an empty facet payload', () => {
+    expect(assetFilterVocabulary({}).options).toEqual([])
   })
 })

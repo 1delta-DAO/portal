@@ -59,6 +59,20 @@ export const TokenRow: React.FC<TokenRowProps> = ({
       <div className="flex items-center gap-1.5 min-w-0 max-w-full">
         <span className="font-medium text-sm truncate">{token.symbol}</span>
         {price > 0 && <span className="text-[10px] text-base-content/40">{fmtPrice(price)}</span>}
+        {/*
+          Read off the contract, not from a curated list — so the symbol and
+          name are whatever the token's author chose, and there is no price.
+          Saying so is the whole mitigation: a token can call itself USDC, and
+          the only defence a user has is being told this one is unverified.
+        */}
+        {token.props?.unlisted && (
+          <span
+            className="text-[9px] uppercase tracking-wide px-1 py-px rounded bg-warning/15 text-warning shrink-0"
+            title="Not in the token list — name and symbol come from the contract itself, and this token has no price. Verify the address before trading."
+          >
+            Unlisted
+          </span>
+        )}
       </div>
       <span className="text-xs text-base-content/50 truncate">{token.name}</span>
       <span

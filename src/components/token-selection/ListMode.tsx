@@ -17,12 +17,18 @@ interface TokenSelectorListModeProps {
   pricesLoading: boolean
   userAddress?: string
   listsLoading?: boolean
+  /** An address is being resolved on-chain because no list carries it. */
+  resolvingToken?: boolean
+  /** The current query is a well-formed address. */
+  queryIsAddress?: boolean
   onChange: (address: Address) => void
 }
 
 export const TokenSelectorListMode: React.FC<TokenSelectorListModeProps> = ({
   rows,
   listsLoading,
+  resolvingToken,
+  queryIsAddress,
   onChange,
 }) => {
   // A chain whose list is still being fetched has no rows yet — saying "no
@@ -35,8 +41,25 @@ export const TokenSelectorListMode: React.FC<TokenSelectorListModeProps> = ({
     )
   }
 
+  // A pasted address is still being read off the chain — not an empty result.
+  if (resolvingToken && rows.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-6">
+        <Spinner size="sm" />
+        <span className="text-xs text-base-content/50">Looking up token…</span>
+      </div>
+    )
+  }
+
   if (rows.length === 0) {
-    return <div className="text-center py-6 text-base-content/50 text-sm">No tokens found</div>
+    // "No tokens found" for a well-formed address reads as "we do not support
+    // this token", when what actually happened is that nothing at that address
+    // answers as an ERC-20 on this chain — usually a wrong-chain paste.
+    return (
+      <div className="text-center py-6 text-base-content/50 text-sm">
+        {queryIsAddress ? 'No token at this address on this chain' : 'No tokens found'}
+      </div>
+    )
   }
 
   return (

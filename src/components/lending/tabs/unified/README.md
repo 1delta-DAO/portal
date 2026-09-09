@@ -81,8 +81,13 @@ included — as a sheet.
   snapshot).
 - [FacetFilters.tsx](FacetFilters.tsx) — every control rendered from the
   server's own `facets`; no venue/provider constant lives here.
-- [MultiSelectDropdown.tsx](MultiSelectDropdown.tsx) — the dropdown those
-  controls are built from.
+- [FacetDropdown.tsx](FacetDropdown.tsx) — the dropdown those controls are
+  built from. Multi-select by default; single-select (radios) for the asset
+  axis, which the endpoint only accepts one value of.
+- [filterParsing.ts](filterParsing.ts) — the pure half of the controls: what
+  the search box resolves to, the min-TVL three-state parse, and the
+  underlying-asset vocabulary (`assetGroups` where the response has them, so
+  WETH and ETH are one entry).
 - [EarnMarketsTable.tsx](EarnMarketsTable.tsx) — the listing.
 - [EarnPositionsTable.tsx](EarnPositionsTable.tsx) — the portfolio rows. Vaults
   are one row; a lending account is one row per (chain, lender) and only
