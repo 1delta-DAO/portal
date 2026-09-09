@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { isChunkLoadError, lazyChunk } from './lazyChunk'
+import { isChunkLoadError, isChunkUnreachable, lazyChunk, parseChunkUrl } from './lazyChunk'
 
 describe('isChunkLoadError — every engine words it differently', () => {
   it.each([
@@ -28,27 +28,64 @@ describe('isChunkLoadError — every engine words it differently', () => {
   })
 })
 
+describe('parseChunkUrl — what the retry is allowed to import', () => {
+  const origin = 'https://app.portal.1delta.io'
+
+  it("lifts the chunk URL out of the engine's message", () => {
+    expect(
+      parseChunkUrl(
+        'Failed to fetch dynamically imported module: https://app.portal.1delta.io/assets/trading-C0R142va.js',
+        origin
+      )
+    ).toBe('https://app.portal.1delta.io/assets/trading-C0R142va.js')
+  })
+
+  it('refuses a URL from another origin', () => {
+    // The value decides what gets `import()`ed. An error message is a string
+    // from the platform, and a string is never allowed to point the app at
+    // someone else's script.
+    expect(
+      parseChunkUrl(
+        'Failed to fetch dynamically imported module: https://evil.example/x.js',
+        origin
+      )
+    ).toBeUndefined()
+  })
+
+  it('returns nothing when the message carries no URL', () => {
+    expect(parseChunkUrl('Importing a module script failed.', origin)).toBeUndefined()
+  })
+})
+
 describe('lazyChunk', () => {
-  it('passes a module through untouched when the import works', async () => {
-    const load = vi.fn().mockResolvedValue({ default: 'Tab' })
-    await expect(lazyChunk(load)()).resolves.toEqual({ default: 'Tab' })
+  it('hands back the named export as the default', async () => {
+    const load = vi.fn(async () => ({ EarnTab: 'Tab', other: 'x' }))
+    await expect(lazyChunk(load, 'EarnTab')()).resolves.toEqual({ default: 'Tab' })
     expect(load).toHaveBeenCalledTimes(1)
   })
 
-  it('retries once, so a dropped request does not cost a reload', async () => {
+  it('retries once, so a dropped request costs a retry and not a reload', async () => {
     const load = vi
-      .fn()
+      .fn<() => Promise<{ EarnTab: string }>>()
       .mockRejectedValueOnce(new Error('Failed to fetch dynamically imported module: /a.js'))
-      .mockResolvedValueOnce({ default: 'Tab' })
-    await expect(lazyChunk(load)()).resolves.toEqual({ default: 'Tab' })
+      .mockResolvedValueOnce({ EarnTab: 'Tab' })
+    await expect(lazyChunk(load, 'EarnTab')()).resolves.toEqual({ default: 'Tab' })
     expect(load).toHaveBeenCalledTimes(2)
   })
 
   it('rethrows a non-chunk error immediately — no retry, no reload', async () => {
-    // A component that throws on import is a bug to surface, not a stale
-    // deployment to reload away.
-    const load = vi.fn().mockRejectedValue(new TypeError('boom'))
-    await expect(lazyChunk(load)()).rejects.toThrow('boom')
+    // A component that throws on import is a bug to surface, not a bad download
+    // to recover from.
+    const load = vi
+      .fn<() => Promise<{ EarnTab: string }>>()
+      .mockRejectedValue(new TypeError('boom'))
+    await expect(lazyChunk(load, 'EarnTab')()).rejects.toThrow('boom')
     expect(load).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not claim an error is unreachable until it has been proven', () => {
+    expect(
+      isChunkUnreachable(new Error('Failed to fetch dynamically imported module: /a.js'))
+    ).toBe(false)
   })
 })

@@ -21,29 +21,19 @@ import { Badge } from '../common/Badge'
 // so a build with the Optimizer disabled never requests its chunk at all.
 // Keep the flag test and the lazy element together when adding a tab.
 //
-// `lazyChunk` wraps every importer so that a chunk which was deployed away
-// while this tab was open reloads the page instead of failing permanently —
-// React's `lazy` caches the rejection, so without it the tab is dead until the
-// user works out that a hard refresh is the fix.
-const EarnTab = lazy(lazyChunk(() => import('./tabs/earn').then((m) => ({ default: m.EarnTab }))))
-const UnifiedEarnTab = lazy(
-  lazyChunk(() => import('./tabs/unified').then((m) => ({ default: m.UnifiedEarnTab })))
-)
-const LendingDashboard = lazy(
-  lazyChunk(() => import('./tabs/lending').then((m) => ({ default: m.LendingDashboard })))
-)
-const TradingDashboard = lazy(
-  lazyChunk(() => import('./tabs/trading').then((m) => ({ default: m.TradingDashboard })))
-)
-const OptimizerTab = lazy(
-  lazyChunk(() => import('./tabs/optimizer').then((m) => ({ default: m.OptimizerTab })))
-)
-const SpotSwapPanel = lazy(
-  lazyChunk(() => import('../swap/SpotSwapPanel').then((m) => ({ default: m.SpotSwapPanel })))
-)
-const XChainSwapPanel = lazy(
-  lazyChunk(() => import('../swap/XChainSwapPanel').then((m) => ({ default: m.XChainSwapPanel })))
-)
+// `lazyChunk` wraps every importer so a chunk that fails to download recovers
+// — retry, then a cache-busted re-import, then a reload, depending on what the
+// network says is wrong. Without it the tab is dead until the user works out
+// that a hard refresh is the fix, because React's `lazy` caches the rejection.
+// It takes the export name rather than a `.then(m => ({ default: m.X }))`
+// mapping because the retry needs to know which export to pick.
+const EarnTab = lazy(lazyChunk(() => import('./tabs/earn'), 'EarnTab'))
+const UnifiedEarnTab = lazy(lazyChunk(() => import('./tabs/unified'), 'UnifiedEarnTab'))
+const LendingDashboard = lazy(lazyChunk(() => import('./tabs/lending'), 'LendingDashboard'))
+const TradingDashboard = lazy(lazyChunk(() => import('./tabs/trading'), 'TradingDashboard'))
+const OptimizerTab = lazy(lazyChunk(() => import('./tabs/optimizer'), 'OptimizerTab'))
+const SpotSwapPanel = lazy(lazyChunk(() => import('../swap/SpotSwapPanel'), 'SpotSwapPanel'))
+const XChainSwapPanel = lazy(lazyChunk(() => import('../swap/XChainSwapPanel'), 'XChainSwapPanel'))
 
 import { OPTIMIZER_ENABLED, BRIDGE_UI_ENABLED, UNIFIED_EARN_ENABLED } from '../../config/flags'
 import { Spinner } from '../common/Loader'

@@ -1,5 +1,5 @@
 import React from 'react'
-import { isChunkLoadError } from '../../utils/lazyChunk'
+import { isChunkLoadError, isChunkUnreachable } from '../../utils/lazyChunk'
 
 interface State {
   error: Error | null
@@ -25,23 +25,28 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
 
   render() {
     if (this.state.error) {
-      // A chunk that 404s is not a bug in this build — it is a tab holding an
-      // index.html from before the last deploy. It gets its own copy and its
-      // own button, because "Try again" CANNOT fix it: React's `lazy` caches
-      // the rejected promise, so re-rendering re-throws the same error forever.
-      // `lazyChunk` reloads automatically; this is what the user sees when that
-      // reload was suppressed (offline, or one already happened just now).
-      const stale = isChunkLoadError(this.state.error)
+      // A failed chunk download is not a bug in this build, and it gets its own
+      // copy and its own button because "Try again" CANNOT fix it: React's
+      // `lazy` caches the rejected promise, so re-rendering re-throws the same
+      // error forever. `lazyChunk` has already retried, re-imported past the
+      // cache and, where a reload would help, reloaded — so by the time this
+      // renders, those did not work.
+      const chunk = isChunkLoadError(this.state.error)
+      // ...and this says the file could not be fetched AT ALL, which a reload
+      // does not change. Blaming a stale deploy here would send the user round
+      // a loop that cannot end.
+      const blocked = chunk && isChunkUnreachable(this.state.error)
 
       return (
         <div className="p-4 m-4 rounded-lg border border-error/30 bg-error/5">
           <h2 className="text-error font-bold mb-2">
-            {stale ? 'This page is out of date' : 'Something went wrong'}
+            {chunk ? "Couldn't load part of the app" : 'Something went wrong'}
           </h2>
-          {stale && (
+          {chunk && (
             <p className="text-xs text-base-content/70 mb-2">
-              The app was updated while this tab was open, so part of it is no longer available at
-              the address this page has. Reloading picks up the new version.
+              {blocked
+                ? 'The browser could not fetch one of this app’s files. A content blocker, browser shield, VPN or network filter is the usual cause — check whether one is blocking this site, then reload.'
+                : 'One of this app’s files could not be downloaded. That usually means the app was updated while this tab was open, or a cached copy is damaged. Reloading fixes both.'}
             </p>
           )}
           <pre className="text-xs text-error/80 whitespace-pre-wrap break-words mb-2">
@@ -55,7 +60,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
               </pre>
             </details>
           )}
-          {stale ? (
+          {chunk ? (
             <button
               className="btn btn-sm btn-primary mt-2"
               onClick={() => window.location.reload()}
