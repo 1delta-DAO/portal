@@ -126,6 +126,49 @@ const Side: React.FC<SideProps> = ({ amount, symbol, usd, logoURI, side }) => {
   )
 }
 
+/** One rate-bearing leg of a trade, as the net-APR math needs it. */
+export interface NetAprLeg {
+  side: 'deposit' | 'borrow'
+  /** Absolute USD size of the leg (position delta). */
+  usd: number
+  /** Signed $/yr this leg contributes, rewards included. */
+  annual: number
+  /** Same, excluding transient reward incentives. */
+  annualNoRwd: number
+}
+
+/**
+ * Net carry of a trade and the rate it works out to.
+ *
+ * Exported for tests: the choice of PERCENT BASIS is the whole subtlety, and
+ * it is where the leverage multiple was getting divided out.
+ */
+export function computeNetApr(netLegs: NetAprLeg[]) {
+  if (!netLegs.length) return null
+  const annualUsd = netLegs.reduce((s, l) => s + l.annual, 0)
+  const annualUsdNoRwd = netLegs.reduce((s, l) => s + l.annualNoRwd, 0)
+  const equity = netLegs.reduce((s, l) => s + (l.side === 'borrow' ? -l.usd : l.usd), 0)
+  const maxLeg = Math.max(...netLegs.map((l) => Math.abs(l.usd)))
+  // Percent basis: the equity contributed (≈ margin) when meaningful;
+  // otherwise (pure leverage, swaps — no net equity added) the position
+  // size moved, so the chip can always show a rate, not just $/yr.
+  //
+  // The test has to be RELATIVE to the position. An absolute dollar floor
+  // here silently demotes a small-but-entirely-real margin to the position
+  // basis, and the chip then reports the UNLEVERAGED carry: a $0.92 margin
+  // behind an $8.07 loop showed +11.05% where the position actually earns
+  // ~97%, i.e. the leverage multiple got divided out. Equity below ~0.5% of
+  // the biggest leg is the degenerate case this guards (pure leverage on an
+  // existing position, a same-role swap), and there `equity` is float noise
+  // around zero rather than a margin — 0.5% is a 200x position, past any
+  // LTV we serve (98% => 50x), so nothing real lands under it.
+  const hasEquity = equity > Math.max(maxLeg * 0.005, 0.01)
+  const basis = hasEquity ? equity : maxLeg
+  const aprPct = basis > 0.01 ? (annualUsd / basis) * 100 : null
+  const aprPctNoRwd = basis > 0.01 ? (annualUsdNoRwd / basis) * 100 : null
+  return { annualUsd, annualUsdNoRwd, equity, hasEquity, basis, aprPct, aprPctNoRwd }
+}
+
 export const QuoteCard: React.FC<QuoteCardProps> = ({
   quote,
   index,
@@ -205,21 +248,7 @@ export const QuoteCard: React.FC<QuoteCardProps> = ({
     ]
   })
 
-  const netApr = (() => {
-    if (!netLegs.length) return null
-    const annualUsd = netLegs.reduce((s, l) => s + l.annual, 0)
-    const annualUsdNoRwd = netLegs.reduce((s, l) => s + l.annualNoRwd, 0)
-    const equity = netLegs.reduce((s, l) => s + (l.side === 'borrow' ? -l.usd : l.usd), 0)
-    const maxLeg = Math.max(...netLegs.map((l) => Math.abs(l.usd)))
-    // Percent basis: the equity contributed (≈ margin) when meaningful;
-    // otherwise (pure leverage, swaps — no net equity added) the position
-    // size moved, so the chip can always show a rate, not just $/yr.
-    const hasEquity = equity > Math.max(maxLeg * 0.02, 1)
-    const basis = hasEquity ? equity : maxLeg
-    const aprPct = basis > 1 ? (annualUsd / basis) * 100 : null
-    const aprPctNoRwd = basis > 1 ? (annualUsdNoRwd / basis) * 100 : null
-    return { annualUsd, annualUsdNoRwd, equity, hasEquity, basis, aprPct, aprPctNoRwd }
-  })()
+  const netApr = computeNetApr(netLegs)
 
   const netAprTitle = netApr
     ? (() => {
