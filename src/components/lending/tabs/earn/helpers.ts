@@ -283,16 +283,13 @@ export function poolEntryToPoolDataItem(entry: PoolEntry): PoolDataItem {
     isFrozen: entry.flags?.isFrozen ?? false,
     oraclePrice: info.oraclePrice?.oraclePrice ?? undefined,
     oraclePriceUSD: info.oraclePrice?.oraclePriceUsd ?? undefined,
-    // A rate card is a borrow-side fact — none on a row with no borrow side.
-    // See `rawMarketToPoolDataItem` for the case that forced this.
-    terms:
-      entry.flags?.borrowingEnabled !== false && entry.terms
-        ? entry.terms.map((t) => ({
-            termId: Number(t.termId),
-            durationDays: Number(t.durationDays),
-            apr: Number(t.apr),
-          }))
-        : null,
+    terms: entry.terms
+      ? entry.terms.map((t) => ({
+          termId: Number(t.termId),
+          durationDays: Number(t.durationDays),
+          apr: Number(t.apr),
+        }))
+      : null,
     variableBorrowDisabled:
       entry.variableBorrowDisabled ?? entry.flags?.variableBorrowDisabled ?? false,
     // The action panel is built from this item, and the deposit form's second

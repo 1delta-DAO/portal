@@ -62,10 +62,12 @@ decided "fixed-term borrow" from `terms.length > 0` alone — the collateral
 leg was seen carrying a stale rate card and rendered "Fixed from 4.82 %" on a
 row nobody can borrow, beside the real loan row's "Fixed from 4.86 %".
 
-The rules, all in `sdk/lending-helper/marketSides.ts`: a rate card is a
-borrow-side fact (`rawMarketToPoolDataItem` drops it when
-`borrowingEnabled === false`); `isBrokeredBorrow()` is the ONLY way to ask
-for the fixed-term cell or term picker; a collateral-only row renders
+The data is fixed at the source — a rate card is a borrow-side fact and the
+API guarantees a row with `flags.borrowingEnabled === false` never carries
+one (origin migration 0140) — so the transforms pass rows through unedited.
+The presentation rules, all in `sdk/lending-helper/marketSides.ts`:
+`isBrokeredBorrow()` is the ONLY way to ask for the fixed-term cell or term
+picker; a collateral-only row renders
 `CollateralOnlyCell` in the borrow column; and an address-only hand-off
 resolves to the row that fits the leg (`resolveDeepLinkPool(…, side)`).
 The uid's ref is the market's own key, not always an address — read it

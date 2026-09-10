@@ -82,12 +82,19 @@ const loanRow = rawRow({
   terms: [{ termId: '0', durationDays: '15.173', apr: '4.85980308' }],
 })
 
-describe('rawMarketToPoolDataItem — a rate card is a borrow-side fact', () => {
-  it('drops the card on a row where borrowing is not offered', () => {
+describe('rawMarketToPoolDataItem — the row is passed through as served', () => {
+  it('keeps the side flags and does not edit the card away', () => {
+    // The API guarantees a non-borrowable row carries no card (origin
+    // migration 0140). The transform must not paper over a payload that
+    // breaks that — integrators reading the raw API and this UI must see the
+    // same data. The presentation rules in `marketSides` are what keep a
+    // leftover card from rendering as a borrow offer.
     const pool = rawMarketToPoolDataItem(collateralLeg)
     expect(pool.borrowingEnabled).toBe(false)
     expect(pool.collateralActive).toBe(true)
-    expect(pool.terms).toBeNull()
+    expect(pool.terms).toEqual([{ termId: 0, durationDays: 15.909, apr: 4.82365791 }])
+    expect(isBrokeredBorrow(pool)).toBe(false)
+    expect(borrowTerms(pool)).toEqual([])
   })
 
   it('keeps the card on the borrowable row', () => {

@@ -37,7 +37,7 @@ const XChainSwapPanel = lazy(lazyChunk(() => import('../swap/XChainSwapPanel'), 
 
 import { OPTIMIZER_ENABLED, BRIDGE_UI_ENABLED, UNIFIED_EARN_ENABLED } from '../../config/flags'
 import { Spinner } from '../common/Loader'
-import { lazyChunk } from '../../utils/lazyChunk'
+import { lazyChunk, prefetchChunks } from '../../utils/lazyChunk'
 
 export type { SubTab } from '../../utils/routes'
 
@@ -55,6 +55,25 @@ const DISABLED_TABS: ReadonlySet<SubTab> = new Set<SubTab>([
   ...(UNIFIED_EARN_ENABLED ? [] : (['unified'] as SubTab[])),
   ...(OPTIMIZER_ENABLED ? [] : (['optimize'] as SubTab[])),
 ])
+
+/**
+ * The other tabs' chunks, warmed once the app is idle.
+ *
+ * A module that is already loaded cannot be deployed away, and cannot be
+ * blocked or half-downloaded later — so fetching these shortly after boot is
+ * what makes the everyday case ("the app was open, you shipped, I clicked a
+ * tab") stop failing. Flag-gated tabs stay out of the list: a build with the
+ * Optimizer off must still never request its chunk.
+ */
+const PREFETCHABLE = [
+  () => import('./tabs/lending'),
+  () => import('./tabs/trading'),
+  () => import('./tabs/earn'),
+  ...(UNIFIED_EARN_ENABLED ? [() => import('./tabs/unified')] : []),
+  ...(OPTIMIZER_ENABLED ? [() => import('./tabs/optimizer')] : []),
+  ...(BRIDGE_UI_ENABLED ? [() => import('../swap/XChainSwapPanel')] : []),
+  () => import('../swap/SpotSwapPanel'),
+]
 
 /** Stable empty list so the token-list effect doesn't re-run on every render. */
 const EMPTY_CHAINS: string[] = []
@@ -84,6 +103,11 @@ export function LenderTab() {
   } = useChainSelection(activeTab, chainIdParam)
   const persistChains = usePersistChainSelection()
   const isMultiChain = chainMode === 'multi'
+
+  // Warm the other tabs' chunks on idle — see PREFETCHABLE. Once, on mount:
+  // the set does not depend on which tab is open, and re-running it would only
+  // re-enter the module cache.
+  useEffect(() => prefetchChunks(PREFETCHABLE), [])
 
   // Mirror the resolved selection into localStorage so the *other* kind of tab
   // restores it later. Done in an effect rather than in the setters below

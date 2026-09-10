@@ -1,5 +1,5 @@
 import React from 'react'
-import { isChunkLoadError, isChunkUnreachable } from '../../utils/lazyChunk'
+import { chunkDiagnosis, isChunkLoadError } from '../../utils/lazyChunk'
 
 interface State {
   error: Error | null
@@ -32,10 +32,10 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
       // cache and, where a reload would help, reloaded — so by the time this
       // renders, those did not work.
       const chunk = isChunkLoadError(this.state.error)
-      // ...and this says the file could not be fetched AT ALL, which a reload
-      // does not change. Blaming a stale deploy here would send the user round
-      // a loop that cannot end.
-      const blocked = chunk && isChunkUnreachable(this.state.error)
+      // Which of the three failures it turned out to be. Only `stale` is fixed
+      // by reloading, and telling a user to reload for the other two sends
+      // them round a loop that cannot end.
+      const diagnosis = chunkDiagnosis(this.state.error)
 
       return (
         <div className="p-4 m-4 rounded-lg border border-error/30 bg-error/5">
@@ -44,9 +44,11 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
           </h2>
           {chunk && (
             <p className="text-xs text-base-content/70 mb-2">
-              {blocked
-                ? 'The browser could not fetch one of this app’s files. A content blocker, browser shield, VPN or network filter is the usual cause — check whether one is blocking this site, then reload.'
-                : 'One of this app’s files could not be downloaded. That usually means the app was updated while this tab was open, or a cached copy is damaged. Reloading fixes both.'}
+              {diagnosis === 'unreachable'
+                ? 'The browser could not fetch one of this app’s files at all. A content blocker, browser shield, VPN or network filter is the usual cause — check whether one is blocking this site, then reload.'
+                : diagnosis === 'unavailable'
+                  ? 'This tab is running the current version, but one of its files could not be downloaded after several tries. That can happen for a minute or so right after an update while the file is still being published. Reloading in a moment should work.'
+                  : 'One of this app’s files could not be downloaded. That usually means the app was updated while this tab was open, or a cached copy is damaged. Reloading fixes both.'}
             </p>
           )}
           <pre className="text-xs text-error/80 whitespace-pre-wrap break-words mb-2">

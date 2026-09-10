@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { isChunkLoadError, isChunkUnreachable, lazyChunk, parseChunkUrl } from './lazyChunk'
+import { chunkDiagnosis, isChunkLoadError, lazyChunk, parseChunkUrl } from './lazyChunk'
 
 describe('isChunkLoadError — every engine words it differently', () => {
   it.each([
@@ -83,9 +83,34 @@ describe('lazyChunk', () => {
     expect(load).toHaveBeenCalledTimes(1)
   })
 
-  it('does not claim an error is unreachable until it has been proven', () => {
+  it('rides out a deploy window instead of failing on the first miss', async () => {
+    // The case behind "we get this after every single update": the HTML is
+    // current and names a chunk the CDN has not started serving yet. Retrying
+    // in the same millisecond re-asks the same edge; waiting a moment works.
+    vi.useFakeTimers()
+    try {
+      const chunkError = new Error('Failed to fetch dynamically imported module: /assets/x.js')
+      const load = vi
+        .fn<() => Promise<{ Tab: string }>>()
+        .mockRejectedValueOnce(chunkError)
+        .mockRejectedValueOnce(chunkError)
+        .mockResolvedValueOnce({ Tab: 'Tab' })
+
+      const pending = lazyChunk(load, 'Tab')()
+      await vi.runAllTimersAsync()
+
+      await expect(pending).resolves.toEqual({ default: 'Tab' })
+      expect(load).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('carries no diagnosis until the recovery has established one', () => {
+    // The error boundary keys its wording off this; an unproven guess there is
+    // how a user gets told to reload for something a reload cannot fix.
     expect(
-      isChunkUnreachable(new Error('Failed to fetch dynamically imported module: /a.js'))
-    ).toBe(false)
+      chunkDiagnosis(new Error('Failed to fetch dynamically imported module: /a.js'))
+    ).toBeUndefined()
   })
 })
