@@ -41,6 +41,15 @@ const RELOAD_COOLDOWN_MS = 30_000
 /** Loop guard that works when storage does not — see `reloadForNewDeployment`. */
 let reloadedThisPage = false
 
+/**
+ * The most recent error Vite handed to `vite:preloadError`, and when.
+ *
+ * `installChunkErrorReload` cancels that event, which makes Vite's preload
+ * helper RESOLVE WITH `undefined` instead of throwing (see `readModule`). The
+ * real cause would be lost otherwise, and with it the chunk URL the retry needs.
+ */
+let lastPreloadError: { error: unknown; at: number } | undefined
+
 /** What the recovery attempts concluded. Read by the error boundary. */
 export type ChunkDiagnosis =
   /** The deployment moved on; this document is out of date. */
@@ -193,11 +202,27 @@ export function lazyChunk<M extends object, K extends keyof M>(
   load: () => Promise<M>,
   exportName: K
 ): () => Promise<{ default: M[K] }> {
-  const pick = (module: M) => ({ default: module[exportName] })
+  /**
+   * Load the chunk and take the export — treating "resolved with nothing" as
+   * the failure it is.
+   *
+   * Vite's preload helper ends in `baseModule().catch(handlePreloadError)`, and
+   * `handlePreloadError` re-throws ONLY when the `vite:preloadError` event was
+   * not cancelled. Since this app cancels it (so the failure is handled here
+   * rather than surfacing as an unhandled window error), a failed import
+   * arrives as a promise that resolves with `undefined` — which read as
+   * "Cannot read properties of undefined (reading 'LendingDashboard')", an
+   * error boundary blaming the app for what was a failed download.
+   */
+  const readModule = async (): Promise<{ default: M[K] }> => {
+    const module = await load()
+    if (module == null) throw swallowedPreloadError()
+    return { default: module[exportName] }
+  }
 
   return async () => {
     try {
-      return pick(await load())
+      return await readModule()
     } catch (error) {
       if (!isChunkLoadError(error)) throw error
 
@@ -208,15 +233,20 @@ export function lazyChunk<M extends object, K extends keyof M>(
       for (const delay of RETRY_DELAYS_MS) {
         await sleep(delay)
         try {
-          return pick(await load())
+          return await readModule()
         } catch {
           /* keep trying */
         }
         // A fresh cache key, in case the copy this browser holds is the broken
         // part. Skipped when the message named no URL of ours.
+        // A raw import of a fresh URL: a different cache key, and — the reason
+        // this matters more than it looks — a different entry in the browser's
+        // MODULE MAP, which remembers a failed load for the life of the page
+        // and rejects a repeat import of the same specifier without retrying it.
         if (url) {
           try {
-            return pick((await import(/* @vite-ignore */ cacheBusted(url))) as M)
+            const module = (await import(/* @vite-ignore */ cacheBusted(url))) as M | undefined
+            if (module != null) return { default: module[exportName] }
           } catch {
             /* keep trying */
           }
@@ -240,6 +270,27 @@ export function lazyChunk<M extends object, K extends keyof M>(
       throw error
     }
   }
+}
+
+/**
+ * The error to raise when an import resolved with nothing.
+ *
+ * Reuses the cause Vite reported moments ago where there is one, because it
+ * names the chunk URL — which is what lets the retry above rebuild it with a
+ * fresh cache key. Anything older than a few seconds belongs to a different
+ * failure and is ignored.
+ */
+function swallowedPreloadError(): Error {
+  const recent =
+    lastPreloadError && Date.now() - lastPreloadError.at < 5_000
+      ? lastPreloadError.error
+      : undefined
+  const message = recent instanceof Error ? recent.message : String(recent ?? '')
+  return new Error(
+    isChunkLoadError(message)
+      ? message
+      : 'Failed to fetch dynamically imported module (the import resolved with nothing)'
+  )
 }
 
 /** Whether the browser can fetch a URL at all — false means blocked or offline. */
@@ -304,7 +355,9 @@ export function prefetchChunks(loaders: (() => Promise<unknown>)[]): () => void 
  * a reload was actually started; otherwise the error must stay visible.
  */
 export function installChunkErrorReload(): void {
-  window.addEventListener('vite:preloadError', ((event: Event) => {
+  window.addEventListener('vite:preloadError', ((event: Event & { payload?: unknown }) => {
+    // Keep the cause: cancelling the event below is what loses it.
+    lastPreloadError = { error: event.payload, at: Date.now() }
     // Synchronously, because Vite reads `defaultPrevented` the moment this
     // returns. Swallowing it is right either way: a failed PRELOAD is not a
     // failed import — the module has not been asked for yet, and when it is,

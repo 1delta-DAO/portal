@@ -106,6 +106,25 @@ describe('lazyChunk', () => {
     }
   })
 
+  it('treats an import that resolved with nothing as a failed download', async () => {
+    // Vite's preload helper resolves with `undefined` when the app cancels
+    // `vite:preloadError`, which this app does. Read naively that becomes
+    // "Cannot read properties of undefined (reading 'LendingDashboard')" — a
+    // crash report blaming the app for a file that did not arrive.
+    vi.useFakeTimers()
+    try {
+      const load = vi.fn(async () => undefined as unknown as { LendingDashboard: string })
+      const pending = lazyChunk(load, 'LendingDashboard')()
+      const assertion = expect(pending).rejects.toThrow(/dynamically imported module/i)
+      await vi.runAllTimersAsync()
+      await assertion
+      // Retried rather than failing on the first miss.
+      expect(load).toHaveBeenCalledTimes(1 + 3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('carries no diagnosis until the recovery has established one', () => {
     // The error boundary keys its wording off this; an unproven guess there is
     // how a user gets told to reload for something a reload cannot fix.
