@@ -51,6 +51,8 @@
  * See FLUID_SMART_UI_PLAN.md in the lending-sdks repo.
  */
 
+import { marketUidParts, refToken } from './marketUid'
+
 /**
  * One side of a Fluid vault. `dex` and `perShare` are null on a SIMPLE side —
  * which covers T1 entirely and the debt side of a T2.
@@ -167,8 +169,11 @@ export function hasSmartDebt(row: SmartVaultRow | null | undefined): boolean {
  * `underlyingInfo.asset.address`). The uid is present and correct on both.
  */
 export function rowAsset(row: SmartVaultRow | null | undefined): string | null {
-  const parts = row?.marketUid?.split(':')
-  return parts && parts.length >= 3 ? parts[2].toLowerCase() : null
+  if (!row?.marketUid) return null
+  const ref = marketUidParts(row.marketUid).ref
+  // A leg-keyed ref (`<token>-c<index>`, Morpho Midnight) names the token
+  // plus its leg — strip the marker so the TOKEN is what comes back.
+  return ref ? refToken(ref).toLowerCase() : null
 }
 
 /**

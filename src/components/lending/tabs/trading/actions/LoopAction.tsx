@@ -31,6 +31,7 @@ import { AutoBalancedNotice } from '../../../shared/SmartVault'
 import { TermsSummary, type BandSetterState } from '../../../terms'
 import { BandSetterRow } from '../../../terms/BandSetterRow'
 import { openLoanBandCount } from '../../../../../sdk/lending-helper/userPositionTypes'
+import { borrowTerms, isBrokeredBorrow } from '../../../../../sdk/lending-helper/marketSides'
 import { deriveMarginSources } from './marginSources'
 import { isFullSheet } from '../../../terms/types'
 import { useTermSheet } from '../../../../../hooks/lending/useTermSheet'
@@ -492,9 +493,8 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
   // Brokered (Lista) debt markets borrow at a fixed term — pick one from the
   // rate card; variable borrow isn't offered through the app. (BROKERED_MARKETS.md §6)
-  const debtTerms = debtPool?.terms ?? []
-  const isDebtBrokered =
-    !!debtPool && (debtPool.variableBorrowDisabled === true || debtTerms.length > 0)
+  const debtTerms = borrowTerms(debtPool)
+  const isDebtBrokered = !!debtPool && isBrokeredBorrow(debtPool)
   const [selectedTermId, setSelectedTermId] = useState<number | null>(null)
   useEffect(() => {
     setSelectedTermId(debtTerms.length > 0 ? debtTerms[0].termId : null)

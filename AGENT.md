@@ -29,6 +29,10 @@ src/
 │   │                        #   poolTypes.ts         /lending/pools → PoolEntry
 │   │                        #   marketTypes.ts       /lending/latest → PoolDataItem
 │   │                        #   userPositionTypes.ts /lending/user-positions
+│   │                        #   marketSides.ts       which side(s) a row offers (the
+│   │                        #                        one place to ask "can this be borrowed?")
+│   │                        #   marketUid.ts         uid parsing; a ref is the market's key,
+│   │                        #                        not always an address (`<token>-c<n>`)
 │   ├── earn-helper/         # Earn listing, positions, merge logic
 │   └── vaults-helper/       # Vault catalog, actions, withdrawals, validators
 │

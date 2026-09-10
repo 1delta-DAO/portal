@@ -273,20 +273,26 @@ export function poolEntryToPoolDataItem(entry: PoolEntry): PoolDataItem {
     borrowCap: 0,
     supplyCap: 0,
     debtCeiling: 0,
-    collateralActive: true,
-    borrowingEnabled: true,
-    hasStable: false,
-    isActive: true,
-    isFrozen: false,
+    // Side flags come from the row — they used to be hardcoded `true`, which
+    // made a collateral-only leg (Midnight `…-c<n>`, Fluid "Collateral X")
+    // look borrowable to the action panel built from this item.
+    collateralActive: entry.flags?.collateralActive ?? true,
+    borrowingEnabled: entry.flags?.borrowingEnabled ?? true,
+    hasStable: entry.flags?.hasStable ?? false,
+    isActive: entry.flags?.isActive ?? true,
+    isFrozen: entry.flags?.isFrozen ?? false,
     oraclePrice: info.oraclePrice?.oraclePrice ?? undefined,
     oraclePriceUSD: info.oraclePrice?.oraclePriceUsd ?? undefined,
-    terms: entry.terms
-      ? entry.terms.map((t) => ({
-          termId: Number(t.termId),
-          durationDays: Number(t.durationDays),
-          apr: Number(t.apr),
-        }))
-      : null,
+    // A rate card is a borrow-side fact — none on a row with no borrow side.
+    // See `rawMarketToPoolDataItem` for the case that forced this.
+    terms:
+      entry.flags?.borrowingEnabled !== false && entry.terms
+        ? entry.terms.map((t) => ({
+            termId: Number(t.termId),
+            durationDays: Number(t.durationDays),
+            apr: Number(t.apr),
+          }))
+        : null,
     variableBorrowDisabled:
       entry.variableBorrowDisabled ?? entry.flags?.variableBorrowDisabled ?? false,
     // The action panel is built from this item, and the deposit form's second

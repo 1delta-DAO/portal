@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { marketUidParts, refCollateralIndex, refToken } from '../../../sdk/lending-helper/marketUid'
 import { parseUnits } from 'viem'
 import { usePermissionLadder } from '../../../hooks/usePermissionLadder'
 import { ExecutionLadder } from '../actions/ExecutionLadder'
@@ -299,8 +300,15 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({ source, onClose }) =
     if (row.maxLeverage > 0) parts.push(`${row.maxLeverage.toFixed(1)}×`)
     if (row.eModeConfigId) parts.push(`e-mode ${row.eModeConfigId}`)
     if (parts.length) return parts.join(' · ')
-    const id = row.marketShortUid?.split(':')[2] ?? row.marketLongUid?.split(':')[2]
-    return id ? `${id.slice(0, 6)}…${id.slice(-4)}` : undefined
+    // The ref is the market's own key, not always an address (a Midnight
+    // collateral leg is `<token>-c<index>`) — read it through the uid helper.
+    const uid = row.marketShortUid ?? row.marketLongUid
+    if (!uid) return undefined
+    const ref = marketUidParts(uid).ref
+    const id = refToken(ref)
+    const leg = refCollateralIndex(ref)
+    const short = id ? `${id.slice(0, 6)}…${id.slice(-4)}` : undefined
+    return short && leg !== undefined ? `${short} · leg ${leg}` : short
   }
 
   const [selected, setSelected] = useState<MigrateTargetRow | null>(null)

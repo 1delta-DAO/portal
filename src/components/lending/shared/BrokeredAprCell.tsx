@@ -72,3 +72,19 @@ export const BrokeredAprCell: React.FC<{ terms?: PoolTerm[] | null }> = ({ terms
     </div>
   )
 }
+
+/**
+ * Borrow-side cell for a row that has NO borrow side — a collateral-only leg.
+ * Rendered in place of a rate (which would read "0.00 %") or a fixed-term pill
+ * (which a leftover rate card could otherwise produce). The Midnight loan
+ * asset that is also a collateral leg is the row this was written for: its
+ * "Collateral USDC" leg sits directly above the borrowable "Loan USDC" row.
+ */
+export const CollateralOnlyCell: React.FC<{ inline?: boolean }> = ({ inline }) => (
+  <span
+    className={`text-[11px] text-base-content/50 whitespace-nowrap ${inline ? '' : 'inline-flex justify-end w-full'}`}
+    title="Collateral only — this row cannot be borrowed. The same asset's borrowable side, if any, is its own row."
+  >
+    Collateral only
+  </span>
+)

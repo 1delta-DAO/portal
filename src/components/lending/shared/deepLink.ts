@@ -1,5 +1,6 @@
 import type { PoolConfigGroup, PoolDataItem } from '../../../sdk/lending-helper/marketTypes'
 import { OPTIMIZER_DEEPLINK_KEYS } from '../../../utils/routes'
+import { fitsSide } from '../../../sdk/lending-helper/marketSides'
 
 /**
  * Resolve one leg of an optimizer hand-off to a market.
@@ -11,11 +12,19 @@ import { OPTIMIZER_DEEPLINK_KEYS } from '../../../utils/routes'
  * the one whose rate the user clicked. The fallback is kept only so links that
  * predate the UID params (and rows whose UID is missing) still land somewhere
  * sensible rather than nowhere.
+ *
+ * The address fallback is ambiguous a second way: one market can carry the
+ * same token on BOTH sides (Morpho Midnight serves "Collateral USDC" and
+ * "Loan USDC" as two rows under one lender). So when the caller knows which
+ * leg it is resolving, `side` prefers a row that can take that leg — the
+ * collateral leg lands on the collateral row, the debt leg on the loan row —
+ * and only then falls back to the first row over the address.
  */
 export function resolveDeepLinkPool(
   allPools: PoolDataItem[],
   marketUid?: string | null,
-  address?: string | null
+  address?: string | null,
+  side?: 'deposits' | 'debt'
 ): PoolDataItem | undefined {
   if (marketUid) {
     const byUid = allPools.find((p) => p.marketUid === marketUid)
@@ -23,7 +32,8 @@ export function resolveDeepLinkPool(
   }
   if (address) {
     const lower = address.toLowerCase()
-    return allPools.find((p) => p.underlying.toLowerCase() === lower)
+    const overAddress = allPools.filter((p) => p.underlying.toLowerCase() === lower)
+    return (side ? overAddress.find((p) => fitsSide(p, side)) : undefined) ?? overAddress[0]
   }
   return undefined
 }

@@ -186,3 +186,46 @@ describe('stripDeepLinkParams', () => {
     expect(params.get('colm')).toBe('U1')
   })
 })
+
+describe('resolveDeepLinkPool — one token on both sides of a market', () => {
+  const USDC = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
+  const LENDER = 'MORPHO_MIDNIGHT_2A9AE59053A64E409E819D3B76750948E06065B3164278915EB80CB1B7474B65'
+  // Morpho Midnight serves a loan asset that is also a collateral leg as TWO
+  // rows under one lender. The collateral leg sorts first here on purpose: an
+  // address-only debt hand-off used to land on it.
+  const legs = [
+    {
+      ...pool(`${LENDER}:1:${USDC}-c0`, USDC),
+      borrowingEnabled: false,
+      collateralActive: true,
+    } as PoolDataItem,
+    {
+      ...pool(`${LENDER}:1:${USDC}`, USDC),
+      borrowingEnabled: true,
+      collateralActive: false,
+    } as PoolDataItem,
+  ]
+
+  it('lands the debt leg on the borrowable row, not the first row over the address', () => {
+    expect(resolveDeepLinkPool(legs, null, USDC, 'debt')?.marketUid).toBe(`${LENDER}:1:${USDC}`)
+  })
+
+  it('lands the collateral leg on the collateral row', () => {
+    expect(resolveDeepLinkPool(legs, null, USDC, 'deposits')?.marketUid).toBe(
+      `${LENDER}:1:${USDC}-c0`
+    )
+  })
+
+  it('still resolves a UID exactly, whichever side is asked for', () => {
+    expect(resolveDeepLinkPool(legs, `${LENDER}:1:${USDC}-c0`, USDC, 'debt')?.marketUid).toBe(
+      `${LENDER}:1:${USDC}-c0`
+    )
+  })
+
+  it('falls back to the first row over the address when no row fits the side', () => {
+    const collateralOnly = [legs[0]]
+    expect(resolveDeepLinkPool(collateralOnly, null, USDC, 'debt')?.marketUid).toBe(
+      `${LENDER}:1:${USDC}-c0`
+    )
+  })
+})

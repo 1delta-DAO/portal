@@ -196,7 +196,8 @@ export function LendingDashboard({
     const match = resolveDeepLinkPool(
       allPools,
       wantsDebtLeg ? link.debtMarketUid : link.colMarketUid,
-      wantsDebtLeg ? link.debtAddr : link.colAddr
+      wantsDebtLeg ? link.debtAddr : link.colAddr,
+      wantsDebtLeg ? 'debt' : 'deposits'
     )
     if (match) {
       setSelectedPool(match)

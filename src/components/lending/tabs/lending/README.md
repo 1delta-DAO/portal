@@ -27,7 +27,12 @@ positions plus the active action panel
   pool selection and action routing.
 - [LendingMarketTable.tsx](LendingMarketTable.tsx) — Paginated
   markets table with LTV badges, TVL, APRs and risk scores; supports
-  column sorting.
+  column sorting. The borrow column has three states, decided by
+  `sdk/lending-helper/marketSides.ts` and never by the presence of a
+  rate card alone: variable rate, fixed-term (`isBrokeredBorrow`), or
+  "Collateral only" (`isCollateralOnly`) — the last is what a Midnight
+  collateral leg of a loan asset renders; see
+  [../trading/README.md](../trading/README.md#one-asset-on-both-sides-of-a-market).
 - [ActionPanel.tsx](ActionPanel.tsx) — Switches between
   `DepositAction`, `WithdrawAction`, `BorrowAction` and `RepayAction`
   from [../../actions/](../../actions/) based on the selected action

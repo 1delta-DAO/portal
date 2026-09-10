@@ -38,11 +38,12 @@ export function OptimizerLoopPanel({ row, account }: { row: OptimizerPairRow; ac
   // fallback. Shared with the Lending / Loop tab hand-offs so all three
   // resolve a pair the same way.
   const collateralPool = useMemo(
-    () => resolveDeepLinkPool(allPools, row.marketLongUid, row.collateral.address) ?? null,
+    () =>
+      resolveDeepLinkPool(allPools, row.marketLongUid, row.collateral.address, 'deposits') ?? null,
     [allPools, row.marketLongUid, row.collateral.address]
   )
   const debtPool = useMemo(
-    () => resolveDeepLinkPool(allPools, row.marketShortUid, row.debt.address) ?? null,
+    () => resolveDeepLinkPool(allPools, row.marketShortUid, row.debt.address, 'debt') ?? null,
     [allPools, row.marketShortUid, row.debt.address]
   )
 

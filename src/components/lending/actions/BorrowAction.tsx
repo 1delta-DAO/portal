@@ -22,6 +22,7 @@ import { useTokenLists } from '../../../hooks/useTokenLists'
 import { resolveSmartLeg, SmartLegInput, type SmartLegState } from '../shared/SmartLegInput'
 import type { RateSetterState } from '../terms/RateSetterRow'
 import { aprPercentToWad } from '../../../sdk/lending-helper/fetchLiquityRate'
+import { borrowTerms, isBrokeredBorrow } from '../../../sdk/lending-helper/marketSides'
 import { isLiquityFamily, isLlamaLend } from '@1delta/lender-registry'
 import { LiquityOpenPanel } from './LiquityOpenPanel'
 import { LlamaLendOpenNotice } from './LlamaLendOpenNotice'
@@ -114,8 +115,10 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
 
   // Brokered (Lista) markets only offer fixed-term borrowing — pick a term from
   // the rate card; variable borrow isn't available through the app. (Spec §3-4.)
-  const terms = pool?.terms ?? []
-  const isBrokered = !!pool && (pool.variableBorrowDisabled === true || terms.length > 0)
+  // Read through `marketSides` so a collateral-only leg (no borrow side) can
+  // never present a fixed-term borrow form, whatever its payload carries.
+  const terms = borrowTerms(pool)
+  const isBrokered = !!pool && isBrokeredBorrow(pool)
   // Take (fill existing offers) vs Make (post your own limit offer) — order books only.
   const [obMode, setObMode] = useState<'take' | 'make'>('take')
   const hasTerms = terms.length > 0

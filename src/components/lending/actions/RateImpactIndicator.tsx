@@ -1,4 +1,5 @@
 import React from 'react'
+import { shortMarketLabel } from '../../../sdk/lending-helper/marketUid'
 import type { RateImpactEntry } from '../../../sdk/lending-helper/fetchLendingAction'
 
 /** Per-market yield extras — folded into the displayed totals so the panel
@@ -36,14 +37,8 @@ function safeNum(v: unknown): number | null {
   return Number.isNaN(n) ? null : n
 }
 
-/** Extract a short label from marketUid, e.g. "AAVE_V3:1:0xc02a…cc2" → "AAVE_V3 · 0xc02a…cc2" */
-function marketLabel(uid: string): string {
-  const parts = uid.split(':')
-  const lender = parts[0] ?? uid
-  const addr = parts[2]
-  if (!addr) return lender
-  return `${lender} · ${addr.slice(0, 6)}…${addr.slice(-4)}`
-}
+/** Short label from a marketUid, e.g. "AAVE_V3:1:0xc02a…cc2" → "AAVE_V3 · 0xc02a…cc2". */
+const marketLabel = shortMarketLabel
 
 /** One rate row: `<label>: total% → total%` with base+intrinsic folded into the
  *  totals (breakdown in the tooltip) and the reward APR as a separate badge —

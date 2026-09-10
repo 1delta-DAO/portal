@@ -196,13 +196,23 @@ export function rawMarketToPoolDataItem(raw: RawMarket, entry?: LenderEntryRaw):
     // whole point is that the client adds no interpretation of its own.
     capabilities: Array.isArray(raw.capabilities) ? raw.capabilities : [],
     // Coerce the string-serialized rate card into clean numbers.
-    terms: raw.terms
-      ? raw.terms.map((t) => ({
-          termId: Number(t.termId),
-          durationDays: Number(t.durationDays),
-          apr: Number(t.apr),
-        }))
-      : null,
+    //
+    // A rate card is a BORROW-side fact, so a row on which borrowing is not
+    // offered carries none — whatever the payload says. The case that forced
+    // this: Morpho Midnight serves a loan asset that is also a collateral leg
+    // as two rows (`…:0xusdc-c0` "Collateral USDC" and `…:0xusdc` "Loan
+    // USDC"), and the collateral leg was observed with a stale card from
+    // before the rows were split — which the tables then rendered as "Fixed
+    // from 4.82 %" on a row nobody can borrow. Same rule the origin's ingest
+    // sweep applies (a card on a collateral-leg uid is wrong by construction).
+    terms:
+      raw.flags?.borrowingEnabled !== false && raw.terms
+        ? raw.terms.map((t) => ({
+            termId: Number(t.termId),
+            durationDays: Number(t.durationDays),
+            apr: Number(t.apr),
+          }))
+        : null,
     variableBorrowDisabled: raw.flags?.variableBorrowDisabled ?? false,
     // Passed through verbatim. Absent on every non-smart market, which is what
     // every `fluidSmart.ts` helper treats as "ordinary single-asset pool" — so

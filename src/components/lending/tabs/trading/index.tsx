@@ -218,8 +218,13 @@ export function TradingDashboard({
     // alone picks whichever vault sorts first for that underlying, which on
     // Euler is routinely a different market than the row the user clicked —
     // the loop would then be priced off markets they never chose.
-    const collateralPool = resolveDeepLinkPool(allPools, link.colMarketUid, link.colAddr)
-    const debtPool = resolveDeepLinkPool(allPools, link.debtMarketUid, link.debtAddr)
+    const collateralPool = resolveDeepLinkPool(
+      allPools,
+      link.colMarketUid,
+      link.colAddr,
+      'deposits'
+    )
+    const debtPool = resolveDeepLinkPool(allPools, link.debtMarketUid, link.debtAddr, 'debt')
 
     if (collateralPool || debtPool) {
       setPendingSelection({

@@ -13,6 +13,7 @@ import {
   formatTokenAmount,
 } from '../../../utils/format'
 import { BrokeredAprCell } from './BrokeredAprCell'
+import { isBrokeredBorrow } from '../../../sdk/lending-helper/marketSides'
 import { useTablePagination } from '../../../hooks/useTablePagination'
 import { TablePagination } from '../../common/TablePagination'
 import { SortIndicator } from '../../common/SortableHeader'
@@ -343,9 +344,7 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
                   const sym = item.underlyingInfo.asset.symbol
                   const liqUsd = item.totalLiquidityUsd ?? item.totalDepositsUsd - item.totalDebtUsd
                   const liqToken = item.totalLiquidity ?? pool?.totalLiquidity
-                  const isBrokered =
-                    !!pool &&
-                    (pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0)
+                  const isBrokered = !!pool && isBrokeredBorrow(pool)
 
                   return (
                     <tr
@@ -481,8 +480,7 @@ export const CombinedDetailTable: React.FC<CombinedDetailTableProps> = ({
               const sym = item.underlyingInfo.asset.symbol
               const liqUsd = item.totalLiquidityUsd ?? item.totalDepositsUsd - item.totalDebtUsd
               const liqToken = item.totalLiquidity ?? pool?.totalLiquidity
-              const isBrokered =
-                !!pool && (pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0)
+              const isBrokered = !!pool && isBrokeredBorrow(pool)
 
               return (
                 <div

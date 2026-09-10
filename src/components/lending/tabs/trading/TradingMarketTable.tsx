@@ -10,7 +10,12 @@ import {
   formatTokenAmount,
 } from '../../../../utils/format'
 import { AssetPopover } from '../../shared/AssetPopover'
-import { BrokeredAprCell } from '../../shared/BrokeredAprCell'
+import { BrokeredAprCell, CollateralOnlyCell } from '../../shared/BrokeredAprCell'
+import {
+  bestTermApr,
+  isBrokeredBorrow,
+  isCollateralOnly,
+} from '../../../../sdk/lending-helper/marketSides'
 import { sortPools, type SortKey, LtvBadge } from '../../dashboard'
 import { RiskBadge } from '../../shared/RiskBadge'
 import { useTableSort } from '../../../../hooks/useTableSort'
@@ -170,8 +175,8 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
               const iy = pool.intrinsicYield ?? 0
               const depositTotal = pool.depositRate + iy
               const borrowTotal = pool.variableBorrowRate + iy
-              const isBrokered =
-                pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0
+              const isBrokered = isBrokeredBorrow(pool)
+              const collateralOnly = isCollateralOnly(pool)
 
               return (
                 <tr
@@ -232,7 +237,9 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                     </div>
                   </td>
                   <td className="text-right">
-                    {isBrokered ? (
+                    {collateralOnly ? (
+                      <CollateralOnlyCell />
+                    ) : isBrokered ? (
                       <BrokeredAprCell terms={pool.terms} />
                     ) : (
                       <div className="flex flex-col items-end gap-0.5">
@@ -346,8 +353,9 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
           const mIy = pool.intrinsicYield ?? 0
           const mDepTotal = pool.depositRate + mIy
           const mBorTotal = pool.variableBorrowRate + mIy
-          const mIsBrokered = pool.variableBorrowDisabled === true || (pool.terms?.length ?? 0) > 0
-          const mBestTermApr = pool.terms?.length ? Math.min(...pool.terms.map((t) => t.apr)) : null
+          const mIsBrokered = isBrokeredBorrow(pool)
+          const mCollateralOnly = isCollateralOnly(pool)
+          const mBestTermApr = bestTermApr(pool.terms)
 
           return (
             <div
@@ -401,7 +409,11 @@ export const TradingMarketTable: React.FC<Props> = ({ pools, userPositions, high
                 </div>
               </div>
               <div className="flex items-center justify-between mt-2 text-xs text-base-content/70">
-                {mIsBrokered ? (
+                {mCollateralOnly ? (
+                  <span>
+                    Borrow: <CollateralOnlyCell inline />
+                  </span>
+                ) : mIsBrokered ? (
                   <span title="Fixed-term borrowing only — variable borrow unavailable">
                     Borrow:{' '}
                     <span className="badge badge-xs bg-warning/15 text-warning border-0 font-medium ml-0.5">

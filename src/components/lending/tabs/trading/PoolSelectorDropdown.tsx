@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState, useEffect } from 'react'
 import type { PoolDataItem } from '../../../../sdk/lending-helper/marketTypes'
 import type { UserPositionEntry } from '../../../../sdk/lending-helper/userPositionTypes'
 import { Logo } from '../../../common/Logo'
+import { fitsSide } from '../../../../sdk/lending-helper/marketSides'
 
 interface PoolSelectorDropdownProps {
   pools: PoolDataItem[]
@@ -94,8 +95,19 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
   // Filter + sort. With a config active, default to only the selectable assets;
   // `showAll` reveals the rest. The selected asset is always kept visible so a
   // prior out-of-config selection doesn't vanish from the list.
-  const { visible, configCount, otherCount } = useMemo(() => {
+  const { visible, configCount, otherCount, dupAssets } = useMemo(() => {
     const q = search.toLowerCase()
+    // Assets that appear on more than one row of this lender. A pooled lender
+    // has one row per asset, but a market can carry the same token on both
+    // sides (Morpho Midnight: "Collateral USDC" + "Loan USDC"), and Euler-style
+    // lenders run several vaults over one underlying. For those the asset name
+    // says nothing — the MARKET name is what tells the rows apart.
+    const assetCounts = new Map<string, number>()
+    for (const p of pools) {
+      const k = p.underlying.toLowerCase()
+      assetCounts.set(k, (assetCounts.get(k) ?? 0) + 1)
+    }
+    const dupAssets = new Set([...assetCounts.entries()].filter(([, n]) => n > 1).map(([k]) => k))
     const textFiltered = pools.filter(
       (p) =>
         !q || p.asset.symbol.toLowerCase().includes(q) || p.asset.name.toLowerCase().includes(q)
@@ -123,6 +135,15 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
         if (prefB && !prefA) return 1
       }
 
+      // Then rows that fit this slot: a collateral-only leg has no business
+      // near the top of the DEBT list, nor a lend-only row near the top of
+      // the collateral list. They stay reachable — "Show all" is the user's
+      // choice — but sink below every row that can actually take the side.
+      const fitA = fitsSide(a, positionType)
+      const fitB = fitsSide(b, positionType)
+      if (fitA && !fitB) return -1
+      if (fitB && !fitA) return 1
+
       // Then by position balance
       const posA = userPositions.get(a.marketUid)
       const posB = userPositions.get(b.marketUid)
@@ -141,8 +162,19 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
       return a.asset.symbol.localeCompare(b.asset.symbol)
     })
 
-    return { visible, configCount, otherCount }
+    return { visible, configCount, otherCount, dupAssets }
   }, [pools, search, userPositions, positionType, preferredUids, hasPreferred, showAll, value])
+
+  /** Second line under the symbol: the market name where the asset alone is ambiguous. */
+  const subtitle = (pool: PoolDataItem): string =>
+    dupAssets.has(pool.underlying.toLowerCase()) ? pool.name : pool.asset.name
+  /** Why a row does not fit this slot, else null. */
+  const misfit = (pool: PoolDataItem): string | null =>
+    fitsSide(pool, positionType)
+      ? null
+      : positionType === 'debt'
+        ? 'collateral only'
+        : 'not collateral'
 
   const getPosition = (pool: PoolDataItem): PositionInfo | null => {
     const pos = userPositions.get(pool.marketUid)
@@ -189,7 +221,7 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
                 {value.asset.symbol}
               </span>
               <span className="text-[10px] text-base-content/50 truncate w-full text-left">
-                {value.asset.name}
+                {subtitle(value)}
               </span>
             </div>
             <ChevronDown />
@@ -279,6 +311,18 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
                     <div className="flex flex-col min-w-0 flex-1 leading-tight">
                       <div className="flex items-center justify-between gap-1.5 min-w-0">
                         <span className="font-medium truncate">{pool.asset.symbol}</span>
+                        {misfit(pool) && (
+                          <span
+                            className="shrink-0 text-[9px] uppercase tracking-wide text-base-content/40 border border-base-300 px-1 py-0.5 rounded"
+                            title={
+                              positionType === 'debt'
+                                ? 'This row cannot be borrowed — it is a collateral leg.'
+                                : 'This row cannot be posted as collateral.'
+                            }
+                          >
+                            {misfit(pool)}
+                          </span>
+                        )}
                         {isPreferred && (
                           <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-primary/80 bg-primary/10 px-1 py-0.5 rounded">
                             config
@@ -287,9 +331,9 @@ export const PoolSelectorDropdown: React.FC<PoolSelectorDropdownProps> = ({
                       </div>
                       <span
                         className="text-[10px] text-base-content/50 truncate"
-                        title={pool.asset.name}
+                        title={subtitle(pool)}
                       >
-                        {pool.asset.name}
+                        {subtitle(pool)}
                       </span>
                     </div>
 
