@@ -16,26 +16,26 @@
  *    and if the file that failed was a DEPENDENCY, nothing in this page can
  *    reach it again — a fresh URL for the top-level chunk still resolves the
  *    same dependency URL. Only a reload gets a fresh module map.
- *  - **The server is usually fine by the time anyone looks.** Every instance
- *    investigated so far had the tab on the current build and the whole module
- *    graph serving 200 minutes later. What fails is the window right after a
- *    publish, when the new HTML is already out and some of the new files are
- *    not yet being served everywhere.
+ *  - **The browser's HTTP cache can hold the failure too.** A chunk requested
+ *    in the moment before it was published came back as the SPA fallback —
+ *    `index.html`, status 200 — stamped `immutable, max-age=1y` because the
+ *    request path matched the `/assets/*` header rule. From then on that URL
+ *    was an HTML page as far as the browser was concerned: every import
+ *    failed, every reload reused the entry, clearing cookies changed nothing.
+ *    This is what "we get this after every update" was. `chunkProbe` detects
+ *    and repairs it (see there); `functions/assets/[[path]].js` stops the
+ *    server producing it.
  *
- * So the recovery is: re-import the top-level chunk under fresh URLs a few
- * times (this covers the top-level file itself arriving late, and a damaged
- * cache entry), then — unless the browser cannot fetch the file at all —
- * reload, with a growing delay across attempts so a publish window of a minute
- * is ridden out by "retrying in 20 s…" rather than by an error screen after
- * every update. React's `lazy` caches the rejected promise, so without any of
- * this a single failed request leaves the tab broken until the user works out
- * that a hard refresh is the fix.
+ * So the recovery is: probe the chunk's graph and repair any poisoned cache
+ * entries; give up without reloading only if a file is blocked or refused by
+ * this browser; try the top-level chunk once under a fresh URL; then reload,
+ * with a growing delay across attempts so a publish window is ridden out by
+ * "retrying in 20 s…" rather than by an error screen. React's `lazy` caches
+ * the rejected promise, so without any of this a single failed request leaves
+ * the tab broken until the user works out that a hard refresh is the fix.
  */
 
-import { probeChunkGraph, type ChunkProbe } from './chunkProbe'
-
-/** Waits before each fresh-URL re-import of the top-level chunk. */
-const CACHE_BUST_DELAYS_MS = [0, 1_500, 4_000]
+import { probeChunkGraph, reloadCanHelp, type ChunkProbe } from './chunkProbe'
 
 /**
  * Wait before reload attempt N. Attempt 0 is immediate — the common case is a
@@ -132,8 +132,6 @@ function cacheBusted(url: string): string {
   u.searchParams.set('reload', String(Date.now()))
   return u.href
 }
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // ---------------------------------------------------------------------------
 // Reload attempts — remembered ACROSS reloads, which is the whole difficulty
@@ -274,33 +272,32 @@ export function lazyChunk<M extends object, K extends keyof M>(
       const url =
         typeof window === 'undefined' ? undefined : parseChunkUrl(message, window.location.origin)
 
-      // Fresh URLs for the top-level chunk. This is the only in-page retry that
-      // can work at all (the original URL is now memoised as failed), and it
-      // works only when the top-level file was the problem — a late or damaged
-      // copy of it. A failed DEPENDENCY is beyond reach until the reload below.
-      if (url) {
-        for (const delay of CACHE_BUST_DELAYS_MS) {
-          if (delay) await sleep(delay)
-          try {
-            const module = (await import(/* @vite-ignore */ cacheBusted(url))) as M | undefined
-            if (module != null) {
-              clearAttempts()
-              return pick(module)
-            }
-          } catch {
-            /* keep trying */
-          }
-        }
-      }
-
-      // Ask the browser which file it cannot load, and how it failed. This is
-      // what decides whether a reload can help: a file the server does not
-      // have yet may arrive; a request this browser drops, or a response it
-      // refuses as a script, will fail the same way after every reload.
+      // First, find out what actually failed — and repair what can be repaired
+      // from here. The probe re-fetches every file in the chunk's graph under
+      // its REAL URL with `cache: 'reload'`, which replaces a poisoned HTTP
+      // cache entry (an HTML fallback cached as a script) with the file the
+      // server serves now. That is the one fix a reload alone cannot perform:
+      // a reload reuses an `immutable` entry without asking.
       const probes = url ? await probeChunkGraph(url).catch(() => undefined) : undefined
-      if (probes?.some((p) => p.verdict === 'blocked' || p.verdict === 'not-script')) {
+      if (probes && !reloadCanHelp(probes)) {
         diagnose(error, { kind: 'unreachable', probes })
         throw error
+      }
+
+      // One fresh-URL import of the top-level chunk. Works when the top-level
+      // file itself was the problem (late, or a damaged copy); a dependency
+      // that failed is memoised as failed for the life of this page, and only
+      // the reload below gets past that.
+      if (url) {
+        try {
+          const module = (await import(/* @vite-ignore */ cacheBusted(url))) as M | undefined
+          if (module != null) {
+            clearAttempts()
+            return pick(module)
+          }
+        } catch {
+          /* fall through to the reload */
+        }
       }
 
       const delay = scheduleReload(error, probes)

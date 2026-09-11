@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeProbes, parseStaticImports } from './chunkProbe'
+import { describeProbes, parseStaticImports, reloadCanHelp } from './chunkProbe'
 
 const base = 'https://app.portal.1delta.io/assets/unified-D3H-CFFz.js'
 
@@ -36,14 +36,14 @@ describe('describeProbes — a report a person can act on', () => {
       { file: 'unified-D3H-CFFz.js', verdict: 'ok', status: 200 },
       {
         file: 'token-selection-C6PzR7wh.js',
-        verdict: 'not-script',
+        verdict: 'poisoned',
         status: 200,
-        contentType: 'text/html',
+        contentType: 'application/javascript',
       },
     ])
     expect(text).toContain('token-selection-C6PzR7wh.js')
-    expect(text).toContain('refused to load it as a script')
-    expect(text).toContain('HTTP 200, text/html')
+    expect(text).toContain('cached a non-script response')
+    expect(text).toContain('now replaced')
     expect(text).not.toContain('unified-D3H-CFFz.js')
   })
 
@@ -51,5 +51,21 @@ describe('describeProbes — a report a person can act on', () => {
     // The honest report when the probe runs after a transient failure: no
     // culprit, and no invented one.
     expect(describeProbes([{ file: 'a.js', verdict: 'ok' }])).toMatch(/transient/)
+  })
+})
+
+describe('reloadCanHelp — when to stop reloading', () => {
+  it('reloads for anything the server or the cache can still fix', () => {
+    for (const verdict of ['ok', 'poisoned', 'missing', 'unpublished', 'timeout'] as const) {
+      expect(reloadCanHelp([{ file: 'a.js', verdict }])).toBe(true)
+    }
+  })
+
+  it('does not reload for a failure that lives in this browser', () => {
+    // A dropped request or a refused script fails identically after a reload;
+    // reloading only spends the user's state finding that out.
+    for (const verdict of ['blocked', 'refused'] as const) {
+      expect(reloadCanHelp([{ file: 'a.js', verdict }])).toBe(false)
+    }
   })
 })

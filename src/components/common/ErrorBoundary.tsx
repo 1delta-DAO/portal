@@ -85,9 +85,11 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
             <p className="text-xs text-base-content/70 mb-2">
               {diagnosis?.kind === 'unreachable'
                 ? 'This browser will not load one of this app’s files, and reloading will not change that — the file named below is served correctly but the request is being dropped or refused on this machine. A content blocker, browser shield, VPN or network filter is the usual cause; try the site with shields off or in a clean profile.'
-                : diagnosis?.retryAt
-                  ? 'One of this app’s files could not be downloaded. This usually happens for a minute or so right after an update, while the new files are still being published — the page will keep retrying on its own.'
-                  : 'One of this app’s files could not be downloaded, and several automatic retries did not help. If this keeps happening, check for a content blocker or network filter on this site.'}
+                : diagnosis?.probes?.some((p) => p.verdict === 'poisoned')
+                  ? 'This browser had cached an error page in place of one of this app’s files — it happens when a file is requested in the moment before an update finishes publishing. The cached copy has been replaced with the real file; reloading will pick it up.'
+                  : diagnosis?.retryAt
+                    ? 'One of this app’s files could not be downloaded. This usually happens for a minute or so right after an update, while the new files are still being published — the page will keep retrying on its own.'
+                    : 'One of this app’s files could not be downloaded, and several automatic retries did not help. If this keeps happening, check for a content blocker or network filter on this site.'}
             </p>
           )}
           {diagnosis?.probes && (
