@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { chunkDiagnosis, isChunkLoadError, lazyChunk, parseChunkUrl } from './lazyChunk'
+import {
+  chunkDiagnosis,
+  isChunkLoadError,
+  lazyChunk,
+  parseChunkUrl,
+  reloadDelayForAttempt,
+} from './lazyChunk'
 
 describe('isChunkLoadError — every engine words it differently', () => {
   it.each([
@@ -64,15 +70,6 @@ describe('lazyChunk', () => {
     expect(load).toHaveBeenCalledTimes(1)
   })
 
-  it('retries once, so a dropped request costs a retry and not a reload', async () => {
-    const load = vi
-      .fn<() => Promise<{ EarnTab: string }>>()
-      .mockRejectedValueOnce(new Error('Failed to fetch dynamically imported module: /a.js'))
-      .mockResolvedValueOnce({ EarnTab: 'Tab' })
-    await expect(lazyChunk(load, 'EarnTab')()).resolves.toEqual({ default: 'Tab' })
-    expect(load).toHaveBeenCalledTimes(2)
-  })
-
   it('rethrows a non-chunk error immediately — no retry, no reload', async () => {
     // A component that throws on import is a bug to surface, not a bad download
     // to recover from.
@@ -83,46 +80,26 @@ describe('lazyChunk', () => {
     expect(load).toHaveBeenCalledTimes(1)
   })
 
-  it('rides out a deploy window instead of failing on the first miss', async () => {
-    // The case behind "we get this after every single update": the HTML is
-    // current and names a chunk the CDN has not started serving yet. Retrying
-    // in the same millisecond re-asks the same edge; waiting a moment works.
-    vi.useFakeTimers()
-    try {
-      const chunkError = new Error('Failed to fetch dynamically imported module: /assets/x.js')
-      const load = vi
-        .fn<() => Promise<{ Tab: string }>>()
-        .mockRejectedValueOnce(chunkError)
-        .mockRejectedValueOnce(chunkError)
-        .mockResolvedValueOnce({ Tab: 'Tab' })
-
-      const pending = lazyChunk(load, 'Tab')()
-      await vi.runAllTimersAsync()
-
-      await expect(pending).resolves.toEqual({ default: 'Tab' })
-      expect(load).toHaveBeenCalledTimes(3)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
   it('treats an import that resolved with nothing as a failed download', async () => {
     // Vite's preload helper resolves with `undefined` when the app cancels
     // `vite:preloadError`, which this app does. Read naively that becomes
     // "Cannot read properties of undefined (reading 'LendingDashboard')" — a
     // crash report blaming the app for a file that did not arrive.
-    vi.useFakeTimers()
-    try {
-      const load = vi.fn(async () => undefined as unknown as { LendingDashboard: string })
-      const pending = lazyChunk(load, 'LendingDashboard')()
-      const assertion = expect(pending).rejects.toThrow(/dynamically imported module/i)
-      await vi.runAllTimersAsync()
-      await assertion
-      // Retried rather than failing on the first miss.
-      expect(load).toHaveBeenCalledTimes(1 + 3)
-    } finally {
-      vi.useRealTimers()
-    }
+    const load = vi.fn(async () => undefined as unknown as { LendingDashboard: string })
+    await expect(lazyChunk(load, 'LendingDashboard')()).rejects.toThrow(
+      /dynamically imported module/i
+    )
+  })
+
+  it('does not retry the same specifier', async () => {
+    // The browser memoises a failed module URL for the life of the page, so a
+    // second import of it is answered from the module map without a request.
+    // Re-asking would only add latency before the reload that actually helps.
+    const load = vi
+      .fn<() => Promise<{ Tab: string }>>()
+      .mockRejectedValue(new Error('Importing a module script failed.'))
+    await expect(lazyChunk(load, 'Tab')()).rejects.toThrow()
+    expect(load).toHaveBeenCalledTimes(1)
   })
 
   it('carries no diagnosis until the recovery has established one', () => {
@@ -131,5 +108,28 @@ describe('lazyChunk', () => {
     expect(
       chunkDiagnosis(new Error('Failed to fetch dynamically imported module: /a.js'))
     ).toBeUndefined()
+  })
+})
+
+describe('reloadDelayForAttempt — riding out a publish window', () => {
+  it('reloads at once the first time, then waits longer each time', () => {
+    // The first failure is usually a blip a fresh module map fixes; if it is
+    // not, the files are still being published and hammering does not help.
+    const delays = [0, 1, 2, 3].map(reloadDelayForAttempt)
+    expect(delays[0]).toBe(0)
+    for (let i = 1; i < delays.length; i++) expect(delays[i]!).toBeGreaterThan(delays[i - 1]!)
+  })
+
+  it('eventually stops and leaves it to the user', () => {
+    // A page that reloads forever is worse than the error it is hiding.
+    expect(reloadDelayForAttempt(4)).toBeUndefined()
+  })
+
+  it('covers about a minute in total', () => {
+    // The window observed after publishes. Shorter and the last attempt lands
+    // inside it; much longer and a genuinely broken deploy hides for too long.
+    const total = [0, 1, 2, 3].reduce((sum, n) => sum + (reloadDelayForAttempt(n) ?? 0), 0)
+    expect(total).toBeGreaterThanOrEqual(60_000)
+    expect(total).toBeLessThanOrEqual(120_000)
   })
 })

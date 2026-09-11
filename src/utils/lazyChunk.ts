@@ -2,44 +2,69 @@
  * Recovering from "Failed to fetch dynamically imported module".
  *
  * The tab panels are code-split, so the HTML a tab loaded names chunks by
- * content hash (`assets/unified-DZ1o3XA6.js`). When one of those imports fails,
- * React's `lazy` CACHES THE REJECTED PROMISE: every later render of that
- * component re-throws the same rejection, so the tab stays broken until the
- * page is reloaded. That is what turns a single failed request into a fault
- * that looks permanent.
+ * content hash (`assets/unified-D3H-CFFz.js`), and each of those statically
+ * imports a dozen shared chunks. When any file in that graph fails to load, the
+ * `import()` rejects with that one message, naming only the top-level chunk.
  *
- * Three different things produce that one error message, and the remedies are
- * not interchangeable:
+ * Two facts decide what can be done about it, and both were learned the hard
+ * way in production:
  *
- *  1. **The file is not there yet.** The window right after a deploy: the HTML
- *     is new, names new chunks, and an edge has not finished serving them. This
- *     is the one that shows up "after every single update", and it is why the
- *     retries below are SPACED — re-asking the same edge in the same
- *     millisecond just fails again, while waiting a second or two succeeds.
- *  2. **The file is gone.** A deploy replaced the chunks while this tab was
- *     open, so the HTML it holds names files that no longer exist. Only fresh
- *     HTML fixes that → reload.
- *  3. **The request never left, or came back damaged.** A content blocker, a
- *     shield, a filter, a dead connection — or a truncated response cached
- *     under `immutable` for a year, which a plain reload will not bypass.
+ *  - **The browser memoises the failure.** Per the HTML spec, a module URL
+ *    whose fetch failed is recorded as failed in the document's module map for
+ *    the life of the page; a later import of the same URL is answered from the
+ *    map without a request. So retrying the same specifier can never succeed,
+ *    and if the file that failed was a DEPENDENCY, nothing in this page can
+ *    reach it again — a fresh URL for the top-level chunk still resolves the
+ *    same dependency URL. Only a reload gets a fresh module map.
+ *  - **The server is usually fine by the time anyone looks.** Every instance
+ *    investigated so far had the tab on the current build and the whole module
+ *    graph serving 200 minutes later. What fails is the window right after a
+ *    publish, when the new HTML is already out and some of the new files are
+ *    not yet being served everywhere.
  *
- * Telling 1 and 2 apart matters, because reloading for a case-1 failure throws
- * the user's work away and lands on the same error. So this checks whether the
- * DOCUMENT is actually out of date (`documentIsStale`) instead of assuming it,
- * and reloads only then.
+ * So the recovery is: re-import the top-level chunk under fresh URLs a few
+ * times (this covers the top-level file itself arriving late, and a damaged
+ * cache entry), then — unless the browser cannot fetch the file at all —
+ * reload, with a growing delay across attempts so a publish window of a minute
+ * is ridden out by "retrying in 20 s…" rather than by an error screen after
+ * every update. React's `lazy` caches the rejected promise, so without any of
+ * this a single failed request leaves the tab broken until the user works out
+ * that a hard refresh is the fix.
  */
 
-/** How long to wait before each retry. Spaced, to ride out a deploy window. */
-const RETRY_DELAYS_MS = [400, 1200, 3000]
+import { probeChunkGraph, type ChunkProbe } from './chunkProbe'
 
-/** Timestamp of the last reload this module triggered, per tab. */
-const RELOAD_KEY = 'chunkReloadAt'
+/** Waits before each fresh-URL re-import of the top-level chunk. */
+const CACHE_BUST_DELAYS_MS = [0, 1_500, 4_000]
 
-/** A second automatic reload is not allowed within this window. */
-const RELOAD_COOLDOWN_MS = 30_000
+/**
+ * Wait before reload attempt N. Attempt 0 is immediate — the common case is a
+ * blip that a fresh module map fixes. Beyond the last entry the page stops
+ * reloading itself and asks the user.
+ */
+const RELOAD_DELAYS_MS = [0, 10_000, 20_000, 40_000]
 
-/** Loop guard that works when storage does not — see `reloadForNewDeployment`. */
-let reloadedThisPage = false
+/** Attempts older than this belong to a previous incident and are forgotten. */
+const ATTEMPT_WINDOW_MS = 5 * 60_000
+
+const ATTEMPTS_KEY = 'chunkReloadAttempts'
+
+/** How the error boundary should describe a chunk failure. */
+export interface ChunkDiagnosis {
+  /**
+   * `unreachable`: the browser cannot fetch the file at all — blocked, filtered
+   * or offline — so reloading is pointless and is not attempted.
+   * `unavailable`: the file is not loading right now; the page will reload
+   * itself at `retryAt` if that is set, and has given up if it is not.
+   */
+  kind: 'unreachable' | 'unavailable'
+  /** Epoch ms of the scheduled automatic reload, when one is scheduled. */
+  retryAt?: number
+  /** What the browser found when it examined the chunk's import graph. */
+  probes?: ChunkProbe[]
+}
+
+const DIAGNOSIS = Symbol.for('1delta.chunkDiagnosis')
 
 /**
  * The most recent error Vite handed to `vite:preloadError`, and when.
@@ -49,17 +74,6 @@ let reloadedThisPage = false
  * real cause would be lost otherwise, and with it the chunk URL the retry needs.
  */
 let lastPreloadError: { error: unknown; at: number } | undefined
-
-/** What the recovery attempts concluded. Read by the error boundary. */
-export type ChunkDiagnosis =
-  /** The deployment moved on; this document is out of date. */
-  | 'stale'
-  /** The file could not be fetched at all — blocked, filtered or offline. */
-  | 'unreachable'
-  /** The app is current and the file is simply not being served right now. */
-  | 'unavailable'
-
-const DIAGNOSIS = Symbol.for('1delta.chunkDiagnosis')
 
 /**
  * Whether an error is a failed module fetch rather than a bug in the module.
@@ -79,7 +93,7 @@ export function isChunkLoadError(error: unknown): boolean {
   )
 }
 
-/** What the recovery attempts concluded about a chunk error, if anything. */
+/** What the recovery concluded about a chunk error, if anything. */
 export function chunkDiagnosis(error: unknown): ChunkDiagnosis | undefined {
   if (!error || typeof error !== 'object') return undefined
   return (error as Record<symbol, ChunkDiagnosis | undefined>)[DIAGNOSIS]
@@ -112,7 +126,7 @@ export function parseChunkUrl(message: string, origin: string): string | undefin
   }
 }
 
-/** Same file, new cache key — defeats a damaged `immutable` cache entry. */
+/** Same file, new URL — a new module-map entry and a new cache key. */
 function cacheBusted(url: string): string {
   const u = new URL(url)
   u.searchParams.set('reload', String(Date.now()))
@@ -121,66 +135,92 @@ function cacheBusted(url: string): string {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-/** The entry script this page is running, e.g. `index-C18Z1r3Y.js`. */
-function currentEntryFile(): string | undefined {
-  if (typeof document === 'undefined') return undefined
-  const scripts = Array.from(document.querySelectorAll<HTMLScriptElement>('script[type="module"]'))
-  for (const script of scripts) {
-    const file = script.src.split('/').pop()
-    if (file?.startsWith('index-')) return file
-  }
-  return undefined
-}
+// ---------------------------------------------------------------------------
+// Reload attempts — remembered ACROSS reloads, which is the whole difficulty
+// ---------------------------------------------------------------------------
 
 /**
- * Whether the server has moved on from the HTML this page is running.
- *
- * The whole point of asking: a deploy that lands while a tab is open and a
- * chunk that is briefly unavailable RIGHT AFTER a deploy produce the same
- * error, and a reload fixes only the first. Reloading for the second discards
- * whatever the user was doing and arrives at the same failure — which is
- * exactly the loop this app was showing after every update.
+ * The attempt counter survives the reload it counts, so it cannot live in
+ * memory. `sessionStorage` is the natural home; `window.name` is the fallback
+ * for browsers that block storage (a hardened profile, a shield), because it
+ * is per-tab, survives same-tab navigation, and is not gated by storage
+ * settings. Without a fallback, a blocked-storage browser would reload without
+ * limit.
  */
-async function documentIsStale(): Promise<boolean> {
-  const entry = currentEntryFile()
-  if (!entry || typeof window === 'undefined') return false
+const NAME_TAG = /(^|;)chunkReloadAttempts=([^;]*)/
+
+function readRaw(): string | null {
+  if (typeof window === 'undefined') return null
   try {
-    const res = await fetch(`${window.location.origin}/?_=${Date.now()}`, { cache: 'reload' })
-    if (!res.ok) return false
-    const html = await res.text()
-    // The freshly served HTML no longer names the script this page is running,
-    // so this page is a generation behind.
-    return !html.includes(entry)
+    return window.sessionStorage.getItem(ATTEMPTS_KEY)
   } catch {
-    return false
+    return NAME_TAG.exec(window.name ?? '')?.[2] ?? null
   }
 }
 
-/**
- * Reload for fresh HTML, unless this tab already did so recently.
- *
- * Returns whether the reload was started — the caller stops doing anything
- * else when it was, because the page is on its way out.
- */
-function reloadForNewDeployment(): boolean {
-  if (typeof window === 'undefined') return false
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) return false
-  // In-memory first, so the guard still holds where storage is blocked (a
-  // privacy-hardened browser, a shield, private mode). It is safe on its own
-  // because the caller has already established that the document is stale, and
-  // after the reload it will not be.
-  if (reloadedThisPage) return false
+function writeRaw(value: string | null): void {
+  if (typeof window === 'undefined') return
   try {
-    const last = Number(window.sessionStorage.getItem(RELOAD_KEY) ?? 0)
-    if (Number.isFinite(last) && last > 0 && Date.now() - last < RELOAD_COOLDOWN_MS) return false
-    window.sessionStorage.setItem(RELOAD_KEY, String(Date.now()))
+    if (value === null) window.sessionStorage.removeItem(ATTEMPTS_KEY)
+    else window.sessionStorage.setItem(ATTEMPTS_KEY, value)
+    return
   } catch {
-    /* no storage: the in-memory guard above carries it */
+    /* fall through to window.name */
   }
-  reloadedThisPage = true
-  window.location.reload()
-  return true
+  const rest = (window.name ?? '').replace(NAME_TAG, '')
+  window.name = value === null ? rest : `${rest};chunkReloadAttempts=${value}`
 }
+
+/** Reload attempts so far in the current incident. */
+function readAttempts(): number {
+  const raw = readRaw()
+  if (!raw) return 0
+  const [n, at] = raw.split(':').map(Number)
+  if (!Number.isFinite(n) || !Number.isFinite(at)) return 0
+  return Date.now() - at > ATTEMPT_WINDOW_MS ? 0 : n
+}
+
+function writeAttempts(n: number): void {
+  writeRaw(`${n}:${Date.now()}`)
+}
+
+/**
+ * Forget the incident. Called when a chunk loads, so the NEXT publish starts
+ * with a full allowance of reloads rather than the remainder of the last one.
+ */
+function clearAttempts(): void {
+  if (readRaw() !== null) writeRaw(null)
+}
+
+/**
+ * Reload now, or schedule one, or give up — depending on how many times this
+ * tab has already tried for this incident.
+ *
+ * Returns the delay of the reload it arranged, or `null` when it arranged none.
+ * A `0` means the page is already going away.
+ */
+/** Wait before reload attempt `n`, or `undefined` once the page should stop. */
+export function reloadDelayForAttempt(n: number): number | undefined {
+  return RELOAD_DELAYS_MS[n]
+}
+
+function scheduleReload(error: unknown, probes?: ChunkProbe[]): number | null {
+  if (typeof window === 'undefined') return null
+  const n = readAttempts()
+  const delay = reloadDelayForAttempt(n)
+  if (delay === undefined) {
+    diagnose(error, { kind: 'unavailable', probes })
+    return null
+  }
+  writeAttempts(n + 1)
+  diagnose(error, { kind: 'unavailable', retryAt: Date.now() + delay, probes })
+  window.setTimeout(() => window.location.reload(), delay)
+  return delay
+}
+
+// ---------------------------------------------------------------------------
+// The wrapper
+// ---------------------------------------------------------------------------
 
 /**
  * Wrap a `lazy()` importer so a chunk that fails to download recovers.
@@ -188,9 +228,9 @@ function reloadForNewDeployment(): boolean {
  *     const EarnTab = lazy(lazyChunk(() => import('./tabs/earn'), 'EarnTab'))
  *
  * The export name is passed rather than mapped by the caller (`.then(m => ({
- * default: m.EarnTab }))`) because the retry needs it: recovering a damaged
- * cache entry means importing the chunk from a different URL, and this has to
- * know which export to hand back from it.
+ * default: m.EarnTab }))`) because the retry needs it: recovering means
+ * importing the chunk from a different URL, and this has to know which export
+ * to hand back from it.
  *
  * While it retries, the promise stays pending — so the user sees the tab's
  * loading state, which is what is actually happening, rather than an error.
@@ -202,6 +242,8 @@ export function lazyChunk<M extends object, K extends keyof M>(
   load: () => Promise<M>,
   exportName: K
 ): () => Promise<{ default: M[K] }> {
+  const pick = (module: M) => ({ default: module[exportName] })
+
   /**
    * Load the chunk and take the export — treating "resolved with nothing" as
    * the failure it is.
@@ -217,12 +259,14 @@ export function lazyChunk<M extends object, K extends keyof M>(
   const readModule = async (): Promise<{ default: M[K] }> => {
     const module = await load()
     if (module == null) throw swallowedPreloadError()
-    return { default: module[exportName] }
+    return pick(module)
   }
 
   return async () => {
     try {
-      return await readModule()
+      const result = await readModule()
+      clearAttempts()
+      return result
     } catch (error) {
       if (!isChunkLoadError(error)) throw error
 
@@ -230,43 +274,41 @@ export function lazyChunk<M extends object, K extends keyof M>(
       const url =
         typeof window === 'undefined' ? undefined : parseChunkUrl(message, window.location.origin)
 
-      for (const delay of RETRY_DELAYS_MS) {
-        await sleep(delay)
-        try {
-          return await readModule()
-        } catch {
-          /* keep trying */
-        }
-        // A fresh cache key, in case the copy this browser holds is the broken
-        // part. Skipped when the message named no URL of ours.
-        // A raw import of a fresh URL: a different cache key, and — the reason
-        // this matters more than it looks — a different entry in the browser's
-        // MODULE MAP, which remembers a failed load for the life of the page
-        // and rejects a repeat import of the same specifier without retrying it.
-        if (url) {
+      // Fresh URLs for the top-level chunk. This is the only in-page retry that
+      // can work at all (the original URL is now memoised as failed), and it
+      // works only when the top-level file was the problem — a late or damaged
+      // copy of it. A failed DEPENDENCY is beyond reach until the reload below.
+      if (url) {
+        for (const delay of CACHE_BUST_DELAYS_MS) {
+          if (delay) await sleep(delay)
           try {
             const module = (await import(/* @vite-ignore */ cacheBusted(url))) as M | undefined
-            if (module != null) return { default: module[exportName] }
+            if (module != null) {
+              clearAttempts()
+              return pick(module)
+            }
           } catch {
             /* keep trying */
           }
         }
       }
 
-      // Out of retries. Now it is worth asking what kind of failure this is,
-      // because only one of the three is fixed by reloading.
-      if (await documentIsStale()) {
-        diagnose(error, 'stale')
-        // Never resolves: the reload is in flight, and resolving here would
-        // render a component from HTML that is about to be replaced.
-        if (reloadForNewDeployment()) return new Promise<{ default: M[K] }>(() => {})
+      // Ask the browser which file it cannot load, and how it failed. This is
+      // what decides whether a reload can help: a file the server does not
+      // have yet may arrive; a request this browser drops, or a response it
+      // refuses as a script, will fail the same way after every reload.
+      const probes = url ? await probeChunkGraph(url).catch(() => undefined) : undefined
+      if (probes?.some((p) => p.verdict === 'blocked' || p.verdict === 'not-script')) {
+        diagnose(error, { kind: 'unreachable', probes })
         throw error
       }
 
-      // The app is current, so a reload lands on this same error. Say which of
-      // the two remaining cases it is instead of spending the user's state on
-      // a reload that cannot help.
-      diagnose(error, url && (await isFetchable(url)) === false ? 'unreachable' : 'unavailable')
+      const delay = scheduleReload(error, probes)
+      // Never resolves: the page is going away, and resolving would render a
+      // component from a module map that is about to be discarded.
+      if (delay === 0) return new Promise<{ default: M[K] }>(() => {})
+      // Either a countdown to the next reload, or the end of the road — both
+      // are the error boundary's to show.
       throw error
     }
   }
@@ -291,16 +333,6 @@ function swallowedPreloadError(): Error {
       ? message
       : 'Failed to fetch dynamically imported module (the import resolved with nothing)'
   )
-}
-
-/** Whether the browser can fetch a URL at all — false means blocked or offline. */
-async function isFetchable(url: string): Promise<boolean> {
-  try {
-    await fetch(url, { cache: 'reload' })
-    return true
-  } catch {
-    return false
-  }
 }
 
 /**
@@ -347,25 +379,17 @@ export function prefetchChunks(loaders: (() => Promise<unknown>)[]): () => void 
 }
 
 /**
- * Catch the chunk failures `lazyChunk` cannot see.
+ * Route Vite's preload failures into the recovery above.
  *
- * Vite fires `vite:preloadError` when a `modulepreload` it emitted fails —
- * before any component renders, so no importer is involved and no error
- * boundary is reached. `preventDefault()` stops Vite re-throwing, but only when
- * a reload was actually started; otherwise the error must stay visible.
+ * Vite fires `vite:preloadError` when a `modulepreload` it emitted fails.
+ * Cancelling it stops Vite re-throwing, so a failed preload of a DEPENDENCY
+ * falls through to the real import (which may still succeed), and a failed
+ * import surfaces in `lazyChunk` as a module that resolved with nothing — which
+ * `readModule` turns back into the chunk error it was, cause attached.
  */
 export function installChunkErrorReload(): void {
   window.addEventListener('vite:preloadError', ((event: Event & { payload?: unknown }) => {
-    // Keep the cause: cancelling the event below is what loses it.
     lastPreloadError = { error: event.payload, at: Date.now() }
-    // Synchronously, because Vite reads `defaultPrevented` the moment this
-    // returns. Swallowing it is right either way: a failed PRELOAD is not a
-    // failed import — the module has not been asked for yet, and when it is,
-    // `lazyChunk` runs the whole recovery. All that is left to decide is
-    // whether this document is a generation behind, which needs the network.
     event.preventDefault()
-    void documentIsStale().then((stale) => {
-      if (stale) reloadForNewDeployment()
-    })
   }) as EventListener)
 }

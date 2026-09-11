@@ -1,9 +1,48 @@
 import React from 'react'
 import { chunkDiagnosis, isChunkLoadError } from '../../utils/lazyChunk'
+import { describeProbes } from '../../utils/chunkProbe'
 
 interface State {
   error: Error | null
   errorInfo: React.ErrorInfo | null
+}
+
+/**
+ * "Retrying in 12 s" for a reload `lazyChunk` has already scheduled — so the
+ * screen reads as the app handling it, not as the app having given up. The
+ * button beside it lets an impatient user go now.
+ */
+function ReloadCountdown({ at }: { at: number }) {
+  const [now, setNow] = React.useState(Date.now())
+  React.useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 500)
+    return () => window.clearInterval(id)
+  }, [])
+  const seconds = Math.max(0, Math.ceil((at - now) / 1000))
+  return (
+    <span className="text-xs text-base-content/70 tabular-nums">
+      {seconds > 0 ? `Retrying automatically in ${seconds} s…` : 'Retrying…'}
+    </span>
+  )
+}
+
+/** Puts the report on the clipboard, so it can be pasted into a bug report as-is. */
+function CopyDetails({ text }: { text: string }) {
+  const [copied, setCopied] = React.useState(false)
+  return (
+    <button
+      type="button"
+      className="btn btn-ghost btn-xs"
+      onClick={() => {
+        void navigator.clipboard?.writeText(text).then(() => {
+          setCopied(true)
+          window.setTimeout(() => setCopied(false), 1500)
+        })
+      }}
+    >
+      {copied ? 'Copied' : 'Copy details'}
+    </button>
+  )
 }
 
 export class ErrorBoundary extends React.Component<{ children: React.ReactNode }, State> {
@@ -44,12 +83,19 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
           </h2>
           {chunk && (
             <p className="text-xs text-base-content/70 mb-2">
-              {diagnosis === 'unreachable'
-                ? 'The browser could not fetch one of this app’s files at all. A content blocker, browser shield, VPN or network filter is the usual cause — check whether one is blocking this site, then reload.'
-                : diagnosis === 'unavailable'
-                  ? 'This tab is running the current version, but one of its files could not be downloaded after several tries. That can happen for a minute or so right after an update while the file is still being published. Reloading in a moment should work.'
-                  : 'One of this app’s files could not be downloaded. That usually means the app was updated while this tab was open, or a cached copy is damaged. Reloading fixes both.'}
+              {diagnosis?.kind === 'unreachable'
+                ? 'This browser will not load one of this app’s files, and reloading will not change that — the file named below is served correctly but the request is being dropped or refused on this machine. A content blocker, browser shield, VPN or network filter is the usual cause; try the site with shields off or in a clean profile.'
+                : diagnosis?.retryAt
+                  ? 'One of this app’s files could not be downloaded. This usually happens for a minute or so right after an update, while the new files are still being published — the page will keep retrying on its own.'
+                  : 'One of this app’s files could not be downloaded, and several automatic retries did not help. If this keeps happening, check for a content blocker or network filter on this site.'}
             </p>
+          )}
+          {diagnosis?.probes && (
+            // Which file, and how it failed — the one fact the import error
+            // itself withholds, and the one that ends the guessing.
+            <pre className="text-xs text-base-content/70 whitespace-pre-wrap break-words mb-2 rounded border border-base-300 bg-base-200/50 p-2">
+              {describeProbes(diagnosis.probes)}
+            </pre>
           )}
           <pre className="text-xs text-error/80 whitespace-pre-wrap break-words mb-2">
             {this.state.error.message}
@@ -63,12 +109,22 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
             </details>
           )}
           {chunk ? (
-            <button
-              className="btn btn-sm btn-primary mt-2"
-              onClick={() => window.location.reload()}
-            >
-              Reload
-            </button>
+            <div className="mt-2 flex items-center gap-3">
+              <button className="btn btn-sm btn-primary" onClick={() => window.location.reload()}>
+                {diagnosis?.retryAt ? 'Reload now' : 'Reload'}
+              </button>
+              {diagnosis?.retryAt && <ReloadCountdown at={diagnosis.retryAt} />}
+              <CopyDetails
+                text={[
+                  this.state.error.message,
+                  diagnosis?.probes ? describeProbes(diagnosis.probes) : '',
+                  `page: ${window.location.href}`,
+                  `browser: ${navigator.userAgent}`,
+                ]
+                  .filter(Boolean)
+                  .join('\n')}
+              />
+            </div>
           ) : (
             <button
               className="btn btn-sm btn-outline mt-2"
