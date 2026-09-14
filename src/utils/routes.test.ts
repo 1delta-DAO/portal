@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lenderToSlug, slugToLender } from './routes'
+import { buildPath, lenderToSlug, slugToLender } from './routes'
 
 /**
  * The slug round-trip must be LOSSLESS. It silently was not: Sky/USDD market
@@ -62,5 +62,28 @@ describe('lender slug round-trip', () => {
     // Defence in depth: if a hyphenated key ever reappears, it must resolve to
     // itself rather than silently collapse onto a different lender.
     expect(slugToLender(lenderToSlug('SKY_1_WBTC-A'))).toBe('SKY_1_WBTC-A')
+  })
+})
+
+/**
+ * The lender segment belongs to the single-lender tabs only. Earn / Unified /
+ * Optimizer aggregate across lenders, so a lender in their URL is noise —
+ * `/unified/43111/river-43111-5` used to leak out of the auto-select effect.
+ */
+describe('buildPath lender segment', () => {
+  it('keeps the lender on Lending and Loop', () => {
+    expect(buildPath('lending', '1', 'AAVE_V3')).toBe('/lending/1/aave-v3')
+    expect(buildPath('trading', '1', 'AAVE_V3')).toBe('/loop/1/aave-v3')
+  })
+
+  it('drops the lender on every other tab', () => {
+    expect(buildPath('unified', '43111', 'RIVER_43111_5')).toBe('/unified/43111')
+    expect(buildPath('earn', ['1', '8453'], 'AAVE_V3')).toBe('/earn/1,8453')
+    expect(buildPath('optimize', '1', 'AAVE_V3')).toBe('/optimize/1')
+    expect(buildPath('swap', '1', 'AAVE_V3')).toBe('/swap/1')
+  })
+
+  it('still appends the query string when the lender is dropped', () => {
+    expect(buildPath('unified', '1', 'AAVE_V3', { q: 'x' })).toBe('/unified/1?q=x')
   })
 })

@@ -17,6 +17,12 @@ import { getCurrency } from '../../lib/trade-helpers/utils'
 import { useDebounce } from '../../hooks/useDebounce'
 import { Logo } from '../common/Logo'
 import { BatchExecuteButton } from '../common/BatchExecuteButton'
+import {
+  PermitAppliedChip,
+  PermitSignCard,
+  PermitSkippedHint,
+  PermitToggle,
+} from './PermitControls'
 
 interface SpotSwapPanelProps {
   chainId: string
@@ -179,6 +185,9 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
   // Slippage
   const [slippage, setSlippage] = useState('0.5')
 
+  // The permit switch (two-call gasless-approval flow, see sdk/permits.ts)
+  const [permitEnabled, setPermitEnabled] = useState(false)
+
   // Swap hook
   const {
     quotes,
@@ -197,7 +206,12 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
     batchNeedsUpgrade,
     dismissSuccess,
     reset,
-  } = useSpotSwapQuote({ chainId, account })
+    signatures,
+    permitSkipped,
+    permitApplied,
+    signing,
+    signAndApplyPermit,
+  } = useSpotSwapQuote({ chainId, account, permitEnabled })
 
   const selectedQuote = selectedIndex !== null ? quotes[selectedIndex] : null
 
@@ -361,7 +375,15 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
     if (!canFetchQuote) return
     if (!debouncedActiveAmount || parseFloat(debouncedActiveAmount) <= 0) return
     handleFetchQuoteRef.current()
-  }, [debouncedActiveAmount, canFetchQuote, resolvedTokenInAddress, resolvedTokenOutAddress])
+    // `permitEnabled` re-quotes on toggle: the offer/buildIds only exist on a
+    // quote that asked for them (`permit=auto`).
+  }, [
+    debouncedActiveAmount,
+    canFetchQuote,
+    resolvedTokenInAddress,
+    resolvedTokenOutAddress,
+    permitEnabled,
+  ])
 
   // Excluded addresses for each modal
   const excludeIn = useMemo(() => (tokenOut ? [tokenOut.address as Address] : []), [tokenOut])
@@ -702,6 +724,19 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
               />
             </div>
 
+            {/* Permit switch — asks the quote for a signature offer next to
+                the approve; whether one comes back is per-token */}
+            <div className="pt-1">
+              <PermitToggle
+                enabled={permitEnabled}
+                disabled={!account}
+                onChange={(v) => {
+                  setPermitEnabled(v)
+                  reset()
+                }}
+              />
+            </div>
+
             {/* Loading indicator */}
             {loading && (
               <div className="flex items-center justify-center gap-2 py-1 text-xs text-base-content/50">
@@ -772,6 +807,19 @@ export function SpotSwapPanel({ chainId }: SpotSwapPanelProps) {
                   </button>
                 ) : (
                   <>
+                    {/* Permit flow: offer → sign → the spliced quotes replace
+                        these, with the approve permission gone */}
+                    {permitApplied && <PermitAppliedChip />}
+                    {!permitApplied && signatures.length > 0 && (
+                      <PermitSignCard
+                        offer={signatures[0]}
+                        signing={signing}
+                        onSign={signAndApplyPermit}
+                      />
+                    )}
+                    {permitEnabled && signatures.length === 0 && !permitApplied && (
+                      <PermitSkippedHint skipped={permitSkipped} />
+                    )}
                     {batchSupported ? (
                       <BatchExecuteButton
                         steps={[

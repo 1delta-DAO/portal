@@ -87,6 +87,34 @@ export interface EarnExit {
   settlement?: 'sync' | 'async'
   cooldownSecs?: number
   feeBps?: number
+  /**
+   * The measured half of "how likely is it that my funds get stuck": a 30-day
+   * digest of the instant leg's observed capacity. ABSENT when the origin has
+   * no history for the row, and WITHHELD for modes with no instant leg
+   * (cooldown / queued / request-based) — their liquidity is 0 by definition,
+   * which is a wait, not a lockup probability. Everything in it is a LOWER
+   * BOUND (hourly samples). `/v1/data/earn/metrics?earnUid=` has the full
+   * picture (p_horizon at a size, episodes, realized-vs-quoted rate).
+   */
+  history?: EarnExitHistory
+}
+
+export interface EarnExitHistory {
+  days: number
+  samples: number
+  /** share of the window actually observed, 0..1 */
+  coverage: number
+  /** USD withdrawable at once: worst hour, 5th percentile, median */
+  capacityUsd: { worst: number | null; p05: number | null; median: number | null }
+  /** the same as a share of TVL, 0..1 */
+  capacityRatio: { worst: number | null; p05: number | null; median: number | null }
+  /** share of observed hours with < max($1k, 0.5 % of TVL) withdrawable */
+  dryShare: number | null
+  dryEpisodes: number
+  /** longest dry run, hours; null = never dry */
+  worstDrySpellHours: number | null
+  currentlyDry: boolean
+  lowerBound: true
 }
 
 export interface EarnAvailability {

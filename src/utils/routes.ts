@@ -69,6 +69,23 @@ export const TAB_CHAIN_MODE: Record<SubTab, ChainMode> = {
   xswap: 'none',
 }
 
+/**
+ * Which tabs carry a `:lender` segment in their URL. Only the single-lender
+ * position views do — Lending and Loop render one lender's markets at a time,
+ * so the lender is part of the view's identity. Every other tab aggregates
+ * across lenders (Earn, Unified, Optimizer) or has none (Swap, Bridge), and a
+ * lender in their URL is meaningless noise; `buildPath` drops it for them.
+ */
+export const TAB_HAS_LENDER: Record<SubTab, boolean> = {
+  earn: false,
+  unified: false,
+  optimize: false,
+  lending: true,
+  trading: true,
+  swap: false,
+  xswap: false,
+}
+
 /** Parse a `:chainId` route segment (`"1"` or `"1,8453"`) into chain ids. */
 export function parseChainIds(segment: string | undefined): string[] {
   if (!segment) return []
@@ -135,7 +152,7 @@ export function buildPath(
   const chainSegment = Array.isArray(chainId) ? serializeChainIds(chainId) : chainId
   if (chainSegment) {
     parts.push(chainSegment)
-    if (lender) parts.push(lenderToSlug(lender))
+    if (lender && TAB_HAS_LENDER[tab]) parts.push(lenderToSlug(lender))
   }
   let path = parts.join('/')
   if (query) {

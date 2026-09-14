@@ -177,6 +177,20 @@ against, so dropping them makes the claim a silent no-op).
 ### Swap Tab (`swap/`)
 
 - `SpotSwapPanel.tsx` - Token swap interface with route selection
+- `XChainSwapPanel.tsx` - Cross-chain (bridge) swap
+- `PermitControls.tsx` - The "Gasless approval (Permit)" switch + sign card
+  shared by both panels. Off by default; on, quotes fetch with `permit=auto`
+  and a token that supports a permit gets an EIP-712 signature offer next to
+  the approve. Signing runs the backend's two-call flow (`src/sdk/permits.ts`):
+  spot POSTs `{permits, builds}` and the SAME quoted builds come back with the
+  permit spliced in (no re-quote, approve gone); cross-chain POSTs `{permits}`
+  and re-quotes with the permit inside every composed route's calldata
+  (`permitApplied` per route — router-spender bridges keep their approve, named
+  in `permitSkipped`). `BUILD_EXPIRED` (builds live ~3 min) is recovered
+  transparently: re-quote and resubmit the SAME signature — the permit binds
+  token/spender/value, not the route, so the user never signs twice. The
+  typed error codes ride on non-2xx envelopes, which is why `sdk/http.ts`
+  parses the error body for `code` instead of throwing raw text.
 
 ## State Management
 

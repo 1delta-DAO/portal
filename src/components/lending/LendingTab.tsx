@@ -10,7 +10,7 @@ import { useLendingLatest, useLenders } from '../../hooks/lending/usePoolData'
 import type { LenderInfoMap } from '../../sdk/lending-helper/marketTypes'
 import { useLendingBalancesMultiChain } from '../../hooks/lending/useLendingBalances'
 import { useTokenListsMultiChain } from '../../hooks/useTokenLists'
-import { tabFromSlug, slugToLender, buildPath, TAB_CHAIN_MODE } from '../../utils/routes'
+import { tabFromSlug, slugToLender, buildPath, TAB_CHAIN_MODE, TAB_HAS_LENDER } from '../../utils/routes'
 import type { SubTab } from '../../utils/routes'
 import { useChainSelection, usePersistChainSelection } from '../../hooks/useChainSelection'
 import { Badge } from '../common/Badge'
@@ -90,6 +90,10 @@ export function LenderTab() {
   const rawTab = tabFromSlug(tabSlug)
   const activeTab = DISABLED_TABS.has(rawTab) ? 'earn' : rawTab
   const initialLender = lenderParam ? slugToLender(lenderParam) : ''
+  // Only Lending / Loop address a single lender; on every other tab the URL
+  // has no lender segment (`buildPath` drops it) and nothing below may write
+  // one back.
+  const tabHasLender = TAB_HAS_LENDER[activeTab]
 
   // Chain selection is per-tab: Earn and Optimizer browse across chains, the
   // position-management tabs stay on one, and the bridge tab hides the
@@ -200,6 +204,7 @@ export function LenderTab() {
   // user can deep-link back to the same view.
   const autoSelectedForChain = useRef<string | null>(null)
   useEffect(() => {
+    if (!tabHasLender) return
     if (!activeLender) return
     if (initialLender === activeLender) return
     const summaryKeys = lenderSummaries?.map((l) => l.lenderInfo.key) ?? []
@@ -208,11 +213,21 @@ export function LenderTab() {
     if (autoSelectedForChain.current === effectiveChainId) return
     autoSelectedForChain.current = effectiveChainId
     setSelectedLender(activeLender)
-  }, [activeLender, initialLender, lenderSummaries, effectiveChainId, setSelectedLender])
+  }, [tabHasLender, activeLender, initialLender, lenderSummaries, effectiveChainId, setSelectedLender])
 
   useEffect(() => {
     autoSelectedForChain.current = null
   }, [effectiveChainId])
+
+  // Scrub a lender segment off tabs that don't take one (older shared links
+  // still carry it, e.g. `/unified/43111/river-43111-5`) so what's in the
+  // address bar is what the user would want to copy.
+  useEffect(() => {
+    if (tabHasLender || !lenderParam || chainIds.length === 0) return
+    navigate(buildPath(activeTab, chainIds), { replace: true })
+    // chainIds is rebuilt per render; the join is the stable identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabHasLender, lenderParam, activeTab, chainIds.join(','), navigate])
 
   const lenderKeysToFetch = useMemo(() => (activeLender ? [activeLender] : []), [activeLender])
   const { lenderData, lenderInfoMap, isPublicDataLoading } = useLendingLatest(

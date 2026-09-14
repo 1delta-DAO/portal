@@ -201,6 +201,24 @@ export async function apiFetchEnvelope<T, A = ApiActions>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => '')
+    // A non-2xx body is usually still the envelope, and the code in it is
+    // actionable — the permit flow branches on `BUILD_EXPIRED` (re-quote and
+    // resubmit the same signature) vs `PERMIT_STALE` (sign again). Surface it
+    // instead of burying it in a raw-text message.
+    try {
+      const parsed = JSON.parse(text) as ApiEnvelope<unknown>
+      const { message, code } = envelopeError(parsed?.error)
+      if (message || code) {
+        throw new ApiError(message ?? `HTTP ${res.status}`, {
+          path,
+          status: res.status,
+          code,
+        })
+      }
+    } catch (err) {
+      if (err instanceof ApiError) throw err
+      // not JSON — fall through to the raw-text error
+    }
     throw new ApiError(`HTTP ${res.status}: ${text || res.statusText}`, {
       path,
       status: res.status,

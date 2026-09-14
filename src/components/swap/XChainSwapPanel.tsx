@@ -21,6 +21,12 @@ import { WalletConnect } from '../connect'
 import { getCurrency } from '../../lib/trade-helpers/utils'
 import { useDebounce } from '../../hooks/useDebounce'
 import { Logo } from '../common/Logo'
+import {
+  PermitAppliedChip,
+  PermitSignCard,
+  PermitSkippedHint,
+  PermitToggle,
+} from './PermitControls'
 
 interface XChainSwapPanelProps {
   chainId: string
@@ -198,6 +204,9 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
   const [inputAmount, setInputAmount] = useState('')
   const [slippage, setSlippage] = useState('0.5')
 
+  // The permit switch (two-call gasless-approval flow, see sdk/permits.ts)
+  const [permitEnabled, setPermitEnabled] = useState(false)
+
   const {
     quotes,
     selectedIndex,
@@ -210,11 +219,16 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
     fetchQuote,
     selectQuote,
     permissionsForQuote,
+    signatures,
+    permitSkipped,
+    permitApplied,
+    signing,
+    signAndApplyPermit,
     executePermission,
     executeSwap,
     dismissSuccess,
     reset,
-  } = useXChainSwapQuote({ fromChainId, account })
+  } = useXChainSwapQuote({ fromChainId, account, permitEnabled })
 
   const selectedQuote = selectedIndex !== null ? quotes[selectedIndex] : null
   const selectedPermissions = useMemo(
@@ -320,7 +334,9 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
     if (!canFetchQuote) return
     if (!debouncedInputAmount || parseFloat(debouncedInputAmount) <= 0) return
     handleFetchQuoteRef.current()
-  }, [debouncedInputAmount, canFetchQuote, tokenIn, tokenOut])
+    // `permitEnabled` re-quotes on toggle: the offer only exists on a quote
+    // that asked for it (`permit=auto`).
+  }, [debouncedInputAmount, canFetchQuote, tokenIn, tokenOut, permitEnabled])
 
   const excludeIn = useMemo(
     () => (tokenOut && tokenOut.chainId === fromChainId ? [tokenOut.address as Address] : []),
@@ -666,6 +682,19 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
                 />
               </div>
 
+              {/* Permit switch — one composer-scoped signature covers every
+                  composed route; router-spender bridges keep their approve */}
+              <div className="pt-1">
+                <PermitToggle
+                  enabled={permitEnabled}
+                  disabled={!account}
+                  onChange={(v) => {
+                    setPermitEnabled(v)
+                    reset()
+                  }}
+                />
+              </div>
+
               {loading && (
                 <div className="flex items-center justify-center gap-2 py-1 text-xs text-base-content/50">
                   <span className="loading loading-spinner loading-xs" />
@@ -759,6 +788,29 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
                     </button>
                   ) : (
                     <>
+                      {/* Permit flow: sign once, composed routes carry the
+                          permit inside their calldata and lose the approve.
+                          On the same-chain spot fallback coverage is
+                          request-wide rather than per route. */}
+                      {permitApplied && (isSpotFallback || selectedQuote?.permitApplied) && (
+                        <PermitAppliedChip />
+                      )}
+                      {!permitApplied && signatures.length > 0 && (
+                        <PermitSignCard
+                          offer={signatures[0]}
+                          signing={signing}
+                          onSign={signAndApplyPermit}
+                        />
+                      )}
+                      {permitEnabled && signatures.length === 0 && !permitApplied && (
+                        <PermitSkippedHint skipped={permitSkipped} />
+                      )}
+                      {permitApplied && !isSpotFallback && selectedQuote && !selectedQuote.permitApplied && (
+                        <div className="text-[10px] text-base-content/40 px-1">
+                          This route is paid through its own bridge router, which accepts no
+                          permit — the approval below still applies.
+                        </div>
+                      )}
                       {selectedPermissions.map((tx, i) => (
                         <button
                           key={`perm-${i}`}

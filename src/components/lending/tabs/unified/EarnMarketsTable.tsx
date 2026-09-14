@@ -20,6 +20,7 @@ import {
 } from '../../../../sdk/earn-helper'
 import { buildPath, OPTIMIZER_DEEPLINK_KEYS } from '../../../../utils/routes'
 import { AutoBalancedPill, basketExplainer } from '../../shared/SmartVault'
+import { ExitHistoryHint } from './ExitHistory'
 
 export type EarnSortKey = 'rate' | 'marketRate' | 'tvl' | 'liquidity'
 
@@ -375,6 +376,10 @@ export const EarnMarketsTable: React.FC<Props> = ({
                     {Math.round(row.exit.cooldownSecs / 86400)}d
                   </span>
                 ) : null}
+                {/* Measured: was the money actually able to leave over the
+                    last 30 days. Absent on cooldown rows by design — see
+                    ExitHistory.tsx. */}
+                <ExitHistoryHint history={row.exit.history} />
               </td>
             </tr>
           )

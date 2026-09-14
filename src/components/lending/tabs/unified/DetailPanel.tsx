@@ -8,6 +8,7 @@ import { useEarnHistory } from '../../../../hooks/earn/useEarnHistory'
 import { HistoryChart } from './HistoryChart'
 import { EarnActionPanel } from './EarnActionPanel'
 import { TermSheetPanel } from './TermSheetPanel'
+import { exitHistoryFields } from './ExitHistory'
 import { EMPTY_VALUE, abbreviateUsd, formatPercent, riskBand } from '../../../../utils/format'
 import {
   vocabDescription,
@@ -352,6 +353,19 @@ export const DetailPanel: React.FC<Props> = ({
           {vocabDescription(vocab, 'exitMode', row.exit.mode)}
         </div>
       </Section>
+
+      {row.exit.history && (
+        <Section title={`Withdrawability · last ${row.exit.history.days}d`}>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+            {exitHistoryFields(row.exit.history, Field)}
+          </div>
+          <div className="mt-2 text-[10px] text-base-content/40">
+            How much could actually have been withdrawn at once, measured from hourly samples. Lower
+            bounds throughout. The liquidity mechanism only — cooldowns and maturities are the Exit
+            field above.
+          </div>
+        </Section>
+      )}
 
       {hasTerms && (
         <Section title="Terms">
