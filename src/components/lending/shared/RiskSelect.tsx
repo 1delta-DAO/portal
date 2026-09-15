@@ -2,20 +2,22 @@ import React, { useEffect, useRef, useState } from 'react'
 import { riskDotColor } from '../tabs/earn/helpers'
 
 /**
- * Ceilings, one per risk band — see `riskBand`: 1–2 low, 3–4 medium, 5 high.
- *
- * "Up to medium" is 4, because the backend's `risk_labels` table bands 4 as
- * medium and every row we render carries ITS label. This was briefly 3, on the
- * theory that a score-4 market slipping through was an off-by-one; it is not —
- * the value here is sent as `maxRiskScore` and the server filters
- * `config_risk_score <= n`, so a 3 dropped exactly the rows that were on screen
- * wearing a "medium" chip. Whatever number sits here must match wherever
- * `riskBand` draws the medium/high line.
+ * One ceiling per score, 1–6. The value is sent verbatim as `maxRiskScore` and
+ * the server filters `risk_score <= n`, so every integer is a real, distinct
+ * cut — a 3 admits the score-3 rows and hides the 4s that wear the same
+ * "medium" chip. That is the point of offering all six instead of the three
+ * bands this used to collapse to: a user who wants "medium but not 4" can say
+ * so, and one who wants 6 (`compromised` — drained / insolvent / abandoned, see
+ * `riskBand`) has to ask for it by name. The band name next to each number is
+ * `riskBand`'s, so the dot colour matches the chip the row will carry.
  */
 const OPTIONS = [
-  { value: 2, label: 'Low', dropdownLabel: 'Low only', risk: 'low' },
-  { value: 4, label: 'Up to medium', dropdownLabel: 'Up to medium', risk: 'medium' },
-  { value: 5, label: 'Up to high', dropdownLabel: 'Up to high', risk: 'high' },
+  { value: 1, label: 'Risk ≤ 1', dropdownLabel: '1 · low', risk: 'low' },
+  { value: 2, label: 'Risk ≤ 2', dropdownLabel: '2 · low', risk: 'low' },
+  { value: 3, label: 'Risk ≤ 3', dropdownLabel: '3 · medium', risk: 'medium' },
+  { value: 4, label: 'Risk ≤ 4', dropdownLabel: '4 · medium', risk: 'medium' },
+  { value: 5, label: 'Risk ≤ 5', dropdownLabel: '5 · high', risk: 'high' },
+  { value: 6, label: 'Risk ≤ 6', dropdownLabel: '6 · compromised', risk: 'compromised' },
 ] as const
 
 interface RiskSelectProps {
@@ -36,10 +38,9 @@ export const RiskSelect: React.FC<RiskSelectProps> = ({ value, onChange }) => {
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  // The narrowest band that still ADMITS everything the current ceiling
-  // admits. A stored or URL-supplied 4 is not an option value, and falling
-  // back to a fixed entry (this used to be OPTIONS[1]) displayed "Up to
-  // medium" while high-risk rows were being served.
+  // The narrowest option that still ADMITS everything the current ceiling
+  // admits, so an out-of-range value (a stale `100` from an old link, say)
+  // never displays a ceiling tighter than what is being served.
   const current = OPTIONS.find((o) => o.value >= value) ?? OPTIONS[OPTIONS.length - 1]
 
   return (

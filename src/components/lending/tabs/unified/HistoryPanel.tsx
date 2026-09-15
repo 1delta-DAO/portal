@@ -9,7 +9,13 @@ import type { EarnMarket, EarnVocabulary } from '../../../../sdk/earn-helper'
 
 const WINDOWS = [7, 30, 90] as const
 
-const RISK_TONE = { low: 'neutral', medium: 'warning', high: 'error', unknown: 'neutral' } as const
+const RISK_TONE = {
+  low: 'neutral',
+  medium: 'warning',
+  high: 'error',
+  compromised: 'critical',
+  unknown: 'neutral',
+} as const
 
 interface Props {
   /** The selected row, or null — the band keeps its place either way. */

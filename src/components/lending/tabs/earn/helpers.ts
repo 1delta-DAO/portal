@@ -25,9 +25,9 @@ export type SortKey =
   | 'riskScore'
 
 /**
- * Derive a risk band from a numeric score (1 best … 5 worst).
+ * Derive a risk band from a numeric score (1 best … 5 worst, 6 = compromised).
  *
- * **1–2 low · 3–4 medium · 5 high**, per {@link riskBand} — which mirrors the
+ * **1–2 low · 3–4 medium · 5 high · 6 compromised**, per {@link riskBand} — which mirrors the
  * backend `risk_labels` table that stamps the labels we render. Do not re-band
  * a score locally; call `riskBand` so one line moves in one place.
  */
@@ -45,6 +45,8 @@ export function scoreToRiskLabel(score: number | null | undefined): string {
  */
 export function riskBadgeClass(score: number | null | undefined): string {
   switch (scoreToRiskLabel(score)) {
+    case 'compromised':
+      return 'badge-error ring-2 ring-error/40 font-semibold'
     case 'high':
       return 'badge-error'
     case 'medium':
@@ -62,6 +64,8 @@ export function riskDotColor(label: string): string {
       return 'bg-warning'
     case 'high':
       return 'bg-error'
+    case 'compromised':
+      return 'bg-error ring-2 ring-error/40'
     default:
       return 'bg-base-content/20'
   }

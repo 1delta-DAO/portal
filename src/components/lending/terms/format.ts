@@ -322,7 +322,7 @@ export function oracleBandClass(band: OracleBand | undefined): string {
 }
 
 /**
- * Asset risk score 1 (best) … 5 (worst) → a colour.
+ * Asset risk score 1 (best) … 5 (worst), 6 = compromised → a colour.
  *
  * Bands via {@link riskBand} rather than re-deriving the thresholds: this was
  * the second copy, and it drew the medium/high line in a different place than
@@ -337,6 +337,8 @@ export function riskScoreClass(score: number | undefined): string {
       return 'text-warning'
     case 'high':
       return 'text-error'
+    case 'compromised':
+      return 'text-error font-semibold'
     default:
       return 'text-base-content/50'
   }

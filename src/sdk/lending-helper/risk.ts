@@ -1,7 +1,7 @@
 /**
  * Risk-score banding.
  *
- * Bands 1–5 risk scores into the three tones the UI renders. This exists
+ * Bands risk scores into the tones the UI renders. This exists
  * because three places banded scores independently and drew the lines
  * differently — the same score rendered amber in one table and red in another.
  * This is the single definition; everything that bands a score calls it.
@@ -15,10 +15,20 @@
  * server filters `config_risk_score <= 3`, so every score-4 config vanished
  * under a ceiling that claimed to admit medium. On Avalanche/Euler that was
  * all 33 medium configs and the table came back empty.
+ *
+ * **6 is `compromised`, not "very high".** The backend (migration 0145) reserves
+ * it for objects that are currently drained, insolvent or abandoned — an exit
+ * scam, an unremediated exploit, an asset whose backing is gone — and for every
+ * config that accepts such an asset as collateral. 5 is the ceiling for a venue
+ * that is risky but functioning. Render 6 as its own thing; the API's own
+ * label for it is `compromised`.
  */
-export function riskBand(score: number | null | undefined): 'low' | 'medium' | 'high' | 'unknown' {
+export type RiskBand = 'low' | 'medium' | 'high' | 'compromised' | 'unknown'
+
+export function riskBand(score: number | null | undefined): RiskBand {
   if (score == null || score === 0) return 'unknown'
   if (score <= 2) return 'low'
   if (score <= 4) return 'medium'
-  return 'high'
+  if (score <= 5) return 'high'
+  return 'compromised'
 }

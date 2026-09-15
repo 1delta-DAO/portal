@@ -12,8 +12,8 @@ import { useSearchParams } from 'react-router-dom'
 import { riskSyncStep } from './riskUrlSync'
 
 /**
- * App-wide risk ceiling. A single `maxRiskScore` (2 = low, 4 = up to medium,
- * 5 = up to high) that gates how much risk any tab is allowed to surface.
+ * App-wide risk ceiling. A single `maxRiskScore` (1–6, every integer a real
+ * cut; 6 = compromised) that gates how much risk any tab is allowed to surface.
  * Lending and Looping follow it directly; Earn may override it *downwards*
  * (never above).
  *
@@ -40,27 +40,24 @@ const URL_PARAM = 'riskTolerance'
 const DEFAULT_MAX_RISK = 5
 
 /**
- * The ceilings `RiskSelect` offers, one per band (see `riskBand`: 1–2 low,
- * 3–4 medium, 5 high).
+ * The ceilings `RiskSelect` offers: every integer 1–6 (see `riskBand`: 1–2
+ * low, 3–4 medium, 5 high, 6 compromised). Each is a distinct server-side cut
+ * (`risk_score <= n`), so nothing is snapped to a band any more — the selector
+ * shows exactly the number that is being served. Out-of-range values (an old
+ * link's `100`, a hand-typed 0) are clamped, not defaulted, so a stored
+ * preference survives.
  *
- * Every ceiling that reaches state is snapped up to its band's ceiling, so the
- * number we send as `maxRiskScore` always admits the whole band the selector
- * is naming. Two things make this load-bearing rather than tidy-up:
- *
- *  - a mid-band value serves less than its label promises — a 3 reads as "Up
- *    to medium" in the selector while the server filters `<= 3`, which is how
- *    a table full of amber "medium" rows came back empty;
- *  - the previous build persisted exactly that 3 to `localStorage` for anyone
- *    who picked "Up to medium", so without the snap the fix would not reach
- *    the users who already hit the bug.
+ * 6 is deliberately reachable only by asking for it: no band word maps to it
+ * except `compromised` itself, and the default stays 5.
  */
-const BAND_CEILINGS = [2, 4, 5] as const
+const MIN_RISK = 1
+const MAX_RISK = 6
 
-function snapToBandCeiling(score: number): number {
-  return BAND_CEILINGS.find((c) => c >= score) ?? DEFAULT_MAX_RISK
+function clampCeiling(score: number): number {
+  return Math.min(Math.max(Math.round(score), MIN_RISK), MAX_RISK)
 }
 
-/** Parse a `riskTolerance` value (numeric 1-5, or low/medium/high) → score, or null. */
+/** Parse a `riskTolerance` value (numeric 1-6, or low/medium/high/compromised) → score, or null. */
 function parseRiskTolerance(raw: string | null | undefined): number | null {
   if (raw == null) return null
   const trimmed = raw.trim().toLowerCase()
@@ -68,15 +65,16 @@ function parseRiskTolerance(raw: string | null | undefined): number | null {
   if (trimmed === 'low') return 2
   if (trimmed === 'medium' || trimmed === 'med') return 4
   if (trimmed === 'high') return 5
+  if (trimmed === 'compromised') return 6
   const n = parseInt(trimmed, 10)
   if (Number.isNaN(n)) return null
-  return snapToBandCeiling(Math.min(Math.max(n, 1), 5))
+  return clampCeiling(n)
 }
 
 function readStoredMaxRisk(): number {
   try {
     const parsed = parseInt(localStorage.getItem(STORAGE_KEY) ?? '', 10)
-    return Number.isNaN(parsed) ? DEFAULT_MAX_RISK : snapToBandCeiling(parsed)
+    return Number.isNaN(parsed) ? DEFAULT_MAX_RISK : clampCeiling(parsed)
   } catch {
     return DEFAULT_MAX_RISK
   }

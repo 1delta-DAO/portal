@@ -36,7 +36,13 @@ interface Props {
 
 const pct = (n?: number) => (n == null || !Number.isFinite(n) ? EMPTY_VALUE : formatPercent(n))
 
-const RISK_TONE = { low: 'neutral', medium: 'warning', high: 'error', unknown: 'neutral' } as const
+const RISK_TONE = {
+  low: 'neutral',
+  medium: 'warning',
+  high: 'error',
+  compromised: 'critical',
+  unknown: 'neutral',
+} as const
 
 /**
  * Deep link into the Lending tab for rows that ARE a lending market.

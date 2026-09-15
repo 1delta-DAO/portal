@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { marketUidParts, refCollateralIndex, refToken } from '../../../sdk/lending-helper/marketUid'
+import { riskBand } from '../../../sdk/lending-helper/risk'
 import { parseUnits } from 'viem'
 import { usePermissionLadder } from '../../../hooks/usePermissionLadder'
 import { ExecutionLadder } from '../actions/ExecutionLadder'
@@ -49,14 +50,35 @@ function fmtAmt(v: number): string {
   return `${(v / 1_000_000).toFixed(2)}M`
 }
 
-/** Risk label/color from the overall score (worst dimension, ~0–5+). */
+/** Risk label/color from the overall score (worst dimension), banded by
+ *  {@link riskBand} so the line sits where every other badge draws it. */
 function riskLabel(s: number): string {
-  return s >= 5 ? 'high risk' : s >= 3 ? 'med risk' : 'low risk'
+  switch (riskBand(s)) {
+    case 'compromised':
+      return 'compromised'
+    case 'high':
+      return 'high risk'
+    case 'medium':
+      return 'med risk'
+    case 'low':
+      return 'low risk'
+    default:
+      return 'unrated'
+  }
 }
 function riskBadgeClass(s: number): string {
-  if (s >= 5) return 'bg-error/15 text-error'
-  if (s >= 3) return 'bg-warning/15 text-warning'
-  return 'bg-success/15 text-success'
+  switch (riskBand(s)) {
+    case 'compromised':
+      return 'bg-error text-error-content font-semibold'
+    case 'high':
+      return 'bg-error/15 text-error'
+    case 'medium':
+      return 'bg-warning/15 text-warning'
+    case 'low':
+      return 'bg-success/15 text-success'
+    default:
+      return 'bg-base-content/10 text-base-content/70'
+  }
 }
 /** Per-dimension breakdown for the badge tooltip. */
 function riskTooltip(b: { category: string; score: number; label: string }[]): string {

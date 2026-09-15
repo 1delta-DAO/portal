@@ -40,7 +40,13 @@ const WINDOWS = [7, 30, 90] as const
 
 const pct = (v?: number) => (v == null || !Number.isFinite(v) ? EMPTY_VALUE : formatPercent(v))
 
-const RISK_TONE = { low: 'neutral', medium: 'warning', high: 'error', unknown: 'neutral' } as const
+const RISK_TONE = {
+  low: 'neutral',
+  medium: 'warning',
+  high: 'error',
+  compromised: 'critical',
+  unknown: 'neutral',
+} as const
 
 /**
  * The inspector for one selected row: identity, what it pays, the action, then
