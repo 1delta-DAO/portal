@@ -6,6 +6,15 @@ import { LIST_OVERRIDES } from '@1delta/providers'
 const LOCAL_RPC_OVERRIDES: Record<string, string[]> = {
   // Robinhood Chain
   '4663': ['https://rpc.mainnet.chain.robinhood.com'],
+  // Ink — absent from LIST_OVERRIDES through providers 0.0.68, so the
+  // x-chain balance scan reported it "unreachable" on every load. Added to
+  // providers' rpcOverrides.ts 2026-09-14; drop this once that ships.
+  '57073': [
+    'https://rpc-gel.inkonchain.com',
+    'https://ink.gateway.tenderly.co',
+    'https://rpc-qnd.inkonchain.com',
+    'https://ink.rpc.thirdweb.com',
+  ],
 }
 
 export function getRpcUrlByIndex(chainId: string, index: number): string {

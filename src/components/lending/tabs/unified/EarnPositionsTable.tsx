@@ -210,43 +210,308 @@ export const EarnPositionsTable: React.FC<Props> = ({
     })
 
   return (
-    <div className="overflow-x-auto">
-      <table className="table table-sm w-full table-fixed [&_td]:overflow-hidden [&_th]:overflow-hidden [&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:border-b [&_th]:border-base-300 [&_th]:bg-base-100">
-        <thead>
-          <tr>
-            <th className="w-[30%]">Venue</th>
-            <th className="w-[14%] text-right">Net</th>
-            <th className="w-[12%] text-right">APR</th>
-            <th className="w-[10%]">Health</th>
-            <th className="w-[34%]">Positions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.length === 0 && <TableEmptyRow colSpan={5}>No open positions</TableEmptyRow>}
-          {items.map((row) =>
-            isVaultPosition(row) ? (
-              <VaultRow
-                key={row.positionUid}
-                row={row}
-                vocab={vocab}
-                tokens={tokensByChain?.[row.chainId]}
-                onSelectEarnUid={onSelectEarnUid}
-                selected={!!selectedEarnUid && selectedEarnUid === row.earnUid}
-              />
-            ) : (
-              <LendingRows
-                key={row.positionUid}
-                row={row}
-                vocab={vocab}
-                tokens={tokensByChain?.[row.chainId]}
-                expanded={expanded.has(row.positionUid)}
-                onToggle={() => toggle(row.positionUid)}
-                onSelectEarnUid={onSelectEarnUid}
-              />
-            )
-          )}
-        </tbody>
-      </table>
+    <>
+      <div className="hidden md:block overflow-x-auto">
+        <table className="table table-sm w-full table-fixed [&_td]:overflow-hidden [&_th]:overflow-hidden [&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:border-b [&_th]:border-base-300 [&_th]:bg-base-100">
+          <thead>
+            <tr>
+              <th className="w-[30%]">Venue</th>
+              <th className="w-[14%] text-right">Net</th>
+              <th className="w-[12%] text-right">APR</th>
+              <th className="w-[10%]">Health</th>
+              <th className="w-[34%]">Positions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.length === 0 && <TableEmptyRow colSpan={5}>No open positions</TableEmptyRow>}
+            {items.map((row) =>
+              isVaultPosition(row) ? (
+                <VaultRow
+                  key={row.positionUid}
+                  row={row}
+                  vocab={vocab}
+                  tokens={tokensByChain?.[row.chainId]}
+                  onSelectEarnUid={onSelectEarnUid}
+                  selected={!!selectedEarnUid && selectedEarnUid === row.earnUid}
+                />
+              ) : (
+                <LendingRows
+                  key={row.positionUid}
+                  row={row}
+                  vocab={vocab}
+                  tokens={tokensByChain?.[row.chainId]}
+                  expanded={expanded.has(row.positionUid)}
+                  onToggle={() => toggle(row.positionUid)}
+                  onSelectEarnUid={onSelectEarnUid}
+                />
+              )
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Mobile: stacked cards. Five columns of which one is a tile strip
+        does not fit a phone; the cards keep the same facts in the same order,
+        with the tiles on their own full-width line. ───────────────────── */}
+      <div className="md:hidden divide-y divide-base-300">
+        {items.length === 0 && (
+          <div className="py-6 text-center text-sm text-base-content/50">No open positions</div>
+        )}
+        {items.map((row) =>
+          isVaultPosition(row) ? (
+            <VaultCard
+              key={row.positionUid}
+              row={row}
+              vocab={vocab}
+              tokens={tokensByChain?.[row.chainId]}
+              onSelectEarnUid={onSelectEarnUid}
+              selected={!!selectedEarnUid && selectedEarnUid === row.earnUid}
+            />
+          ) : (
+            <LendingCard
+              key={row.positionUid}
+              row={row}
+              vocab={vocab}
+              tokens={tokensByChain?.[row.chainId]}
+              expanded={expanded.has(row.positionUid)}
+              onToggle={() => toggle(row.positionUid)}
+              onSelectEarnUid={onSelectEarnUid}
+            />
+          )
+        )}
+      </div>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Shared cell content — one copy for the row and the card, so the two never
+// disagree about a tooltip or a fallback.
+// ---------------------------------------------------------------------------
+
+/** Vault identity: logo, name, and the brand · kind · exit sub-line. */
+const VaultIdentity: React.FC<{ row: EarnVaultPosition; vocab: EarnVocabulary }> = ({
+  row,
+  vocab,
+}) => (
+  <div className="flex items-center gap-2 min-w-0">
+    <ChainBadgedLogo
+      src={row.logoURI}
+      alt={row.venue}
+      chainId={row.chainId}
+      size={28}
+      fallbackText={row.brand ?? row.venue}
+    />
+    <div className="min-w-0 leading-tight">
+      <div className="truncate text-xs font-medium" title={row.name}>
+        {row.name || row.brand || row.venue}
+      </div>
+      <div className="truncate text-[10px] text-base-content/50">
+        {row.brand && row.name ? `${row.brand} · ` : ''}
+        {vocabLabel(vocab, 'venueKind', row.venueKind)}
+        {row.exit ? ' · ' : ''}
+        {row.exit && (
+          <span title={vocabDescription(vocab, 'exitMode', row.exit.mode)}>
+            {vocabLabel(vocab, 'exitMode', row.exit.mode)}
+          </span>
+        )}
+      </div>
+    </div>
+  </div>
+)
+
+/**
+ * Vault net value. An unpriced row shows its TOKEN balance rather than $0 — a
+ * vault we could not price is unknown, not empty.
+ */
+const VaultNet: React.FC<{ row: EarnVaultPosition; unpriced: boolean }> = ({ row, unpriced }) =>
+  unpriced ? (
+    <span
+      className="text-base-content/50"
+      title="Underlying is not priced — showing the token balance"
+    >
+      {tokenAmount(row.assets)}
+    </span>
+  ) : (
+    <>{usd(row.netUsd)}</>
+  )
+
+/** Lending account identity: chain-badged lender logo, name, kind · leverage · accounts · flags. */
+const LendingIdentity: React.FC<{
+  row: EarnLendingPosition
+  vocab: EarnVocabulary
+  multi: boolean
+  expanded: boolean
+}> = ({ row, vocab, multi, expanded }) => (
+  <div className="flex items-center gap-2 min-w-0">
+    {/* Chain rides the venue logo: this table interleaves positions from every
+        selected chain, and the same lender on two chains is two positions,
+        not one. */}
+    <ChainBadgedLogo
+      src={row.logoURI}
+      alt={row.venue}
+      chainId={row.chainId}
+      size={28}
+      fallbackText={row.brand ?? row.lender}
+    />
+    <div className="min-w-0 leading-tight">
+      <div className="truncate text-xs font-medium" title={row.lender}>
+        {row.name || row.brand || row.lender}
+      </div>
+      <div className="truncate text-[10px] text-base-content/50">
+        {vocabLabel(vocab, 'venueKind', row.venueKind)}
+        {row.leverage > 1.01 ? ` · ${formatLeverage(row.leverage)}` : ''}
+        {/* A real chevron, not a `▾` glyph — this is the only thing on the
+            row that says it opens. */}
+        {multi && (
+          <span className="ml-1 inline-flex items-center gap-0.5 align-middle text-base-content/70">
+            · {row.subAccounts.length} accounts
+            <Chevron open={expanded} className="h-3 w-3" />
+          </span>
+        )}
+        {row.incomplete ? ' · partial' : ''}
+        {row.stale ? ' · stale' : ''}
+      </div>
+    </div>
+  </div>
+)
+
+const lendingAprTitle = (row: EarnLendingPosition) =>
+  `market ${pct(row.aprBreakdown.market)} ` +
+  `· rewards ${pct(row.aprBreakdown.rewards)} ` +
+  `· intrinsic ${pct(row.aprBreakdown.intrinsic)}\n` +
+  `market legs: supply ${pct(row.depositApr)} · borrow ${pct(row.borrowApr)}`
+
+/** Headline APR plus the intrinsic call-out — see the row for why. */
+const LendingApr: React.FC<{ row: EarnLendingPosition }> = ({ row }) => (
+  <>
+    <div>{pct(row.apr)}</div>
+    {/* The asset's OWN yield, called out when it is what carries the
+        position. On a levered carry trade the market leg is deeply negative
+        and this is the entire reason the trade exists — a bare headline hides
+        which of the two is doing the work. */}
+    {Math.abs(row.aprBreakdown.intrinsic) >= 0.005 && (
+      <div className="text-[10px] font-normal text-base-content/50">
+        {row.aprBreakdown.intrinsic > 0 ? '+' : ''}
+        {formatPercent(row.aprBreakdown.intrinsic)} intrinsic
+      </div>
+    )}
+  </>
+)
+
+const shortAccountId = (id: string) => (id.length > 14 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id)
+
+// ---------------------------------------------------------------------------
+// Mobile cards
+// ---------------------------------------------------------------------------
+
+const VaultCard: React.FC<{
+  row: EarnVaultPosition
+  vocab: EarnVocabulary
+  tokens?: Record<string, RawCurrency>
+  onSelectEarnUid?: (earnUid: string) => void
+  selected?: boolean
+}> = ({ row, vocab, tokens, onSelectEarnUid, selected }) => {
+  const token = tokens?.[row.asset.address?.toLowerCase() ?? '']
+  const symbol = row.asset.symbol ?? token?.symbol ?? shortAddr(row.asset.address)
+  const unpriced = (row.asset.priceUsd ?? 0) === 0
+  return (
+    <div
+      className={`p-3 transition-colors ${onSelectEarnUid ? 'cursor-pointer' : ''} ${
+        selected ? 'bg-primary/10' : 'active:bg-base-200'
+      }`}
+      onClick={() => onSelectEarnUid?.(row.earnUid)}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <VaultIdentity row={row} vocab={vocab} />
+        </div>
+        <div className="shrink-0 text-right leading-tight">
+          <div className="text-sm font-semibold tabular-nums">
+            <VaultNet row={row} unpriced={unpriced} />
+          </div>
+          <div className="text-[10px] tabular-nums text-base-content/50">{pct(row.apr)} APR</div>
+        </div>
+      </div>
+      <div className="mt-2">
+        <PositionTile
+          logoURI={row.asset.logoURI ?? token?.logoURI}
+          symbol={symbol}
+          amountUsd={unpriced ? undefined : row.suppliedUsd}
+          fallbackAmount={tokenAmount(row.assets)}
+          title={`${tokenAmount(row.assets)} ${symbol} · ${tokenAmount(row.shares)} shares`}
+        />
+      </div>
+    </div>
+  )
+}
+
+const LendingCard: React.FC<{
+  row: EarnLendingPosition
+  vocab: EarnVocabulary
+  tokens?: Record<string, RawCurrency>
+  expanded: boolean
+  onToggle: () => void
+  onSelectEarnUid?: (earnUid: string) => void
+}> = ({ row, vocab, tokens, expanded, onToggle, onSelectEarnUid }) => {
+  const multi = !row.crossMargin && row.subAccounts.length > 1
+  return (
+    <div className="p-3">
+      <div
+        className={`flex items-start justify-between gap-3 ${multi ? 'cursor-pointer' : ''}`}
+        onClick={multi ? onToggle : undefined}
+      >
+        <div className="min-w-0 flex-1">
+          <LendingIdentity row={row} vocab={vocab} multi={multi} expanded={expanded} />
+        </div>
+        <div className="shrink-0 text-right leading-tight">
+          <div className="text-sm font-semibold tabular-nums">{usd(row.netUsd)}</div>
+          <div
+            className="text-[10px] tabular-nums text-base-content/50"
+            title={lendingAprTitle(row)}
+          >
+            <LendingApr row={row} />
+          </div>
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/70">
+        <span className="flex items-center gap-1">
+          Health <HealthBadge health={row.health} />
+        </span>
+        {multi && (
+          <span className="text-[10px] text-base-content/50">
+            {expanded ? 'accounts below' : 'tap to expand accounts'}
+          </span>
+        )}
+      </div>
+      {/* For a multi-sub lender the header aggregates accounts that do NOT
+          share a solvency calculation, so its tiles would imply a single
+          position that is not one. The sub-account blocks carry them. */}
+      {!multi && (
+        <div className="mt-2">
+          <LegTiles legs={row.legs} tokens={tokens} onSelect={onSelectEarnUid} />
+        </div>
+      )}
+      {multi && expanded && (
+        <div className="mt-2 space-y-2 border-l-2 border-base-300 pl-2">
+          {row.subAccounts.map((sub) => (
+            <div key={`${row.positionUid}:${sub.accountId}`}>
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-mono text-[10px] text-base-content/70" title={sub.accountId}>
+                  {shortAccountId(sub.accountId)}
+                </span>
+                <span className="flex items-center gap-2">
+                  <HealthBadge health={sub.health} />
+                  <span className="font-medium tabular-nums">{usd(sub.netUsd)}</span>
+                </span>
+              </div>
+              <div className="mt-1">
+                <LegTiles legs={sub.legs} tokens={tokens} onSelect={onSelectEarnUid} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -269,44 +534,10 @@ const VaultRow: React.FC<{
       onClick={() => onSelectEarnUid?.(row.earnUid)}
     >
       <td>
-        <div className="flex items-center gap-2">
-          <ChainBadgedLogo
-            src={row.logoURI}
-            alt={row.venue}
-            chainId={row.chainId}
-            size={28}
-            fallbackText={row.brand ?? row.venue}
-          />
-          <div className="min-w-0 leading-tight">
-            <div className="truncate text-xs font-medium" title={row.name}>
-              {row.name || row.brand || row.venue}
-            </div>
-            <div className="truncate text-[10px] text-base-content/50">
-              {row.brand && row.name ? `${row.brand} · ` : ''}
-              {vocabLabel(vocab, 'venueKind', row.venueKind)}
-              {row.exit ? ' · ' : ''}
-              {row.exit && (
-                <span title={vocabDescription(vocab, 'exitMode', row.exit.mode)}>
-                  {vocabLabel(vocab, 'exitMode', row.exit.mode)}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
+        <VaultIdentity row={row} vocab={vocab} />
       </td>
       <td className="text-right text-xs font-medium tabular-nums">
-        {/* An unpriced row shows its TOKEN balance rather than $0 — a vault we
-            could not price is unknown, not empty. */}
-        {unpriced ? (
-          <span
-            className="text-base-content/50"
-            title="Underlying is not priced — showing the token balance"
-          >
-            {tokenAmount(row.assets)}
-          </span>
-        ) : (
-          usd(row.netUsd)
-        )}
+        <VaultNet row={row} unpriced={unpriced} />
       </td>
       <td className="text-right text-xs tabular-nums">{pct(row.apr)}</td>
       <td className="text-xs text-base-content/40">{EMPTY_VALUE}</td>
@@ -346,59 +577,11 @@ const LendingRows: React.FC<{
     <>
       <tr className={multi ? 'hover cursor-pointer' : ''} onClick={multi ? onToggle : undefined}>
         <td>
-          <div className="flex items-center gap-2">
-            {/* Chain rides the venue logo: this table interleaves positions
-                from every selected chain, and the same lender on two chains is
-                two positions, not one. */}
-            <ChainBadgedLogo
-              src={row.logoURI}
-              alt={row.venue}
-              chainId={row.chainId}
-              size={28}
-              fallbackText={row.brand ?? row.lender}
-            />
-            <div className="min-w-0 leading-tight">
-              <div className="truncate text-xs font-medium" title={row.lender}>
-                {row.name || row.brand || row.lender}
-              </div>
-              <div className="truncate text-[10px] text-base-content/50">
-                {vocabLabel(vocab, 'venueKind', row.venueKind)}
-                {row.leverage > 1.01 ? ` · ${formatLeverage(row.leverage)}` : ''}
-                {/* A real chevron, not a `▾` glyph — this is the only thing on
-                    the row that says it opens. */}
-                {multi && (
-                  <span className="ml-1 inline-flex items-center gap-0.5 align-middle text-base-content/70">
-                    · {row.subAccounts.length} accounts
-                    <Chevron open={expanded} className="h-3 w-3" />
-                  </span>
-                )}
-                {row.incomplete ? ' · partial' : ''}
-                {row.stale ? ' · stale' : ''}
-              </div>
-            </div>
-          </div>
+          <LendingIdentity row={row} vocab={vocab} multi={multi} expanded={expanded} />
         </td>
         <td className="text-right text-xs font-medium tabular-nums">{usd(row.netUsd)}</td>
-        <td
-          className="text-right text-xs tabular-nums"
-          title={
-            `market ${pct(row.aprBreakdown.market)} ` +
-            `· rewards ${pct(row.aprBreakdown.rewards)} ` +
-            `· intrinsic ${pct(row.aprBreakdown.intrinsic)}\n` +
-            `market legs: supply ${pct(row.depositApr)} · borrow ${pct(row.borrowApr)}`
-          }
-        >
-          <div>{pct(row.apr)}</div>
-          {/* The asset's OWN yield, called out when it is what carries the
-              position. On a levered carry trade the market leg is deeply
-              negative and this is the entire reason the trade exists — a bare
-              headline hides which of the two is doing the work. */}
-          {Math.abs(row.aprBreakdown.intrinsic) >= 0.005 && (
-            <div className="text-[10px] font-normal text-base-content/50">
-              {row.aprBreakdown.intrinsic > 0 ? '+' : ''}
-              {formatPercent(row.aprBreakdown.intrinsic)} intrinsic
-            </div>
-          )}
+        <td className="text-right text-xs tabular-nums" title={lendingAprTitle(row)}>
+          <LendingApr row={row} />
         </td>
         <td>
           <HealthBadge health={row.health} />
@@ -422,9 +605,7 @@ const LendingRows: React.FC<{
         row.subAccounts.map((sub) => (
           <tr key={`${row.positionUid}:${sub.accountId}`} className="bg-base-200/40">
             <td className="pl-8 text-[10px] text-base-content/70" title={sub.accountId}>
-              {sub.accountId.length > 14
-                ? `${sub.accountId.slice(0, 8)}…${sub.accountId.slice(-4)}`
-                : sub.accountId}
+              {shortAccountId(sub.accountId)}
             </td>
             <td className="text-right text-xs tabular-nums">{usd(sub.netUsd)}</td>
             <td className="text-right text-xs text-base-content/40">{EMPTY_VALUE}</td>

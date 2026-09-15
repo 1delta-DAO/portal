@@ -69,7 +69,12 @@ exact layout jump the rail was built to remove — the collapse toggle buys the
 same space without it).
 
 Mobile (`< md`) drops the band and the rail, and opens the detail — chart
-included — as a sheet.
+included — as a sheet. Both tables become stacked cards there (the same
+`hidden md:block` / `md:hidden` split the Earn and Optimizer tables use):
+seven columns never fit a phone, and `overflow-x-auto` alone scrolled the APR
+— the one number every row is compared on — off-screen. The opportunities
+list gets a chip row for the sorts the header used to carry. Cell content is
+shared between row and card so the two cannot drift.
 
 ## Files
 

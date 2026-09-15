@@ -4,7 +4,7 @@ import { ChainBadgedLogo } from '../../../common/ChainBadgedLogo'
 import { Badge } from '../../../common/Badge'
 import { RiskFindings } from '../../shared/RiskFindings'
 import { TableEmptyRow } from '../../../common/TableEmptyRow'
-import { SortableHeader } from '../../../common/SortableHeader'
+import { SortableHeader, SortIndicator } from '../../../common/SortableHeader'
 import {
   abbreviateNumber,
   abbreviateUsd,
@@ -142,6 +142,283 @@ function termNote(row: EarnMarket): { label: string; title: string } | null {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Cells
+//
+// Each column's content is a component so the desktop table and the mobile
+// cards render the SAME markup for the same fact — the only thing that differs
+// between the two is where on the screen it lands. Keeping one copy is what
+// stops the card version from drifting (the tooltips and the unpriced-TVL
+// distinction in particular were the kind of thing a second copy would lose).
+// ---------------------------------------------------------------------------
+
+/** Chain-badged logo, market name (+ lending link), and the who/what sub-line. */
+const VenueCell: React.FC<{ row: EarnMarket; size?: number }> = ({ row, size = 24 }) => {
+  const lendingPath = lendingPathForRow(row)
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      {/* Chain badged onto the venue logo — rows from every selected chain
+          are interleaved here, and a row is only actionable on its own. */}
+      <ChainBadgedLogo
+        src={row.logoURI}
+        alt={row.venue}
+        chainId={row.chainId}
+        size={size}
+        fallbackText={row.brand ?? row.venue}
+      />
+      <div className="min-w-0 leading-tight">
+        {/* MARKET first, brand second. The brand is shared by every row of a
+            protocol — Pendle alone has ~50 — so leading with it prints the
+            same word down the whole column while the line that actually
+            distinguishes the rows sits underneath in small grey text. Falls
+            back to the brand when a row has no market name, so the primary
+            line is never empty. */}
+        <div className="flex items-center gap-1 min-w-0">
+          <span className="truncate text-xs font-medium" title={row.name ?? row.venue}>
+            {row.name || row.brand || row.venue}
+          </span>
+          {/* Lending markets only — a vault has no entry there. A real <Link>,
+              so cmd/middle-click opens a tab instead of swallowing the
+              modifier the way an onClick-only anchor does. */}
+          {lendingPath && (
+            <Link
+              to={lendingPath}
+              className="shrink-0 text-base-content/30 hover:text-primary transition-colors"
+              title={`Open ${row.name || row.asset.symbol || 'this market'} in the Lending tab`}
+              aria-label="Open in the Lending tab"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <OpenInIcon />
+            </Link>
+          )}
+        </div>
+        {/* Who runs it · what it runs on · kind — see venueLabel.ts for why
+            the second segment is not always the same field. */}
+        <div className="truncate text-[10px] text-base-content/50" title={row.venue}>
+          {row.subtitle ?? row.brand ?? row.venue}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** The underlying: symbol, short address when unregistered, basket pill. */
+const AssetCell: React.FC<{ row: EarnMarket }> = ({ row }) => (
+  <>
+    {/* A basket row's asset symbol is a half-truth: it is what you hand over,
+        not what you end up holding. The pill is the only thing on the row that
+        says so. */}
+    {row.basket && (
+      <AutoBalancedPill className="mb-0.5" title={basketExplainer(row.basket, row.asset.symbol)} />
+    )}
+    {row.asset.symbol ? (
+      row.asset.symbol
+    ) : row.asset.address ? (
+      // The underlying is not in the token registry. Showing a short address
+      // keeps the row identifiable and makes the gap actionable; "—" reads as
+      // "no underlying", which is never true for a vault.
+      <span
+        className="font-mono text-base-content/40"
+        title={`${row.asset.address} — not in the token registry`}
+      >
+        {row.asset.address.slice(0, 6)}…{row.asset.address.slice(-4)}
+      </span>
+    ) : (
+      <span className="text-base-content/40">{EMPTY_VALUE}</span>
+    )}
+  </>
+)
+
+/** Headline APR with its two qualifiers (term, venue share) underneath. */
+const AprCell: React.FC<{ row: EarnMarket }> = ({ row }) => {
+  const note = venueNote(row)
+  const term = termNote(row)
+  return (
+    <>
+      <div>{pct(row.rate.total)}</div>
+      {/* The TERM qualifies the headline, so it sits directly under it. A
+          fixed rate with no term beside it is the same number whether it runs
+          nine days or five years. */}
+      {term && (
+        <div className="text-[10px] font-normal text-base-content/50" title={term.title}>
+          {term.label}
+        </div>
+      )}
+      {/* The venue's own share, shown ONLY when it differs from the headline —
+          i.e. when part of the yield is the asset's own. As its own column it
+          was empty on the large majority of rows, which read as "this venue
+          pays nothing". */}
+      {note && (
+        <div
+          className={`text-[10px] font-normal ${
+            row.rate.passthrough ? 'text-warning' : 'text-base-content/50'
+          }`}
+          title={
+            row.rate.passthrough
+              ? 'This venue pays nothing of its own — the headline is what the asset already earns in your wallet.'
+              : `Venue ${pct(row.rate.marketOwn)} · asset ${pct(row.rate.intrinsic)}`
+          }
+        >
+          {note}
+        </div>
+      )}
+    </>
+  )
+}
+
+/**
+ * A USD figure, or the TOKEN amount when the row is not priced — abbreviated
+ * and visibly distinguished. Printing a raw decimal in a USD column reads as
+ * dollars and overstates by whatever the token is worth.
+ */
+const UsdOrTokenCell: React.FC<{
+  usd?: number | null
+  formatted?: number | null
+  symbol?: string
+  /** Whether to print the symbol after an unpriced amount. */
+  withSymbol?: boolean
+}> = ({ usd, formatted, symbol, withSymbol }) =>
+  usd != null ? (
+    <>{abbreviateUsd(usd)}</>
+  ) : formatted != null ? (
+    <span
+      className="text-base-content/50"
+      title={`${formatted.toLocaleString()} ${symbol} — not priced in USD`}
+    >
+      {abbreviateNumber(formatted)}
+      {withSymbol && (
+        <>
+          {' '}
+          <span className="text-[10px]">{symbol}</span>
+        </>
+      )}
+    </span>
+  ) : (
+    <span className="text-base-content/40">{EMPTY_VALUE}</span>
+  )
+
+/**
+ * Score (higher is worse) plus ONE icon for everything the score doesn't cover
+ * — losses already taken, an exit that doesn't work, a stale rating. Those are
+ * separate axes: a market can be low-risk on collateral and still be one you
+ * cannot exit, or one whose money is already gone. Details live in the icon's
+ * popover so the cell stays one line.
+ */
+const RiskCell: React.FC<{ row: EarnMarket }> = ({ row }) => (
+  <div className="flex items-center gap-1">
+    {row.risk?.score != null ? (
+      <Badge
+        tone={RISK_TONE[riskBand(row.risk.score)]}
+        // The server's own label where it sent one, else the band this score
+        // falls in — never a third opinion.
+        title={`Risk: ${row.risk.label ?? riskBand(row.risk.score)}`}
+      >
+        {row.risk.score}
+      </Badge>
+    ) : (
+      <span className="text-xs text-base-content/40">{EMPTY_VALUE}</span>
+    )}
+    <RiskFindings risk={row.risk} />
+  </div>
+)
+
+const ExitCell: React.FC<{ row: EarnMarket; vocab: EarnVocabulary }> = ({ row, vocab }) => (
+  <>
+    <Badge title={vocabDescription(vocab, 'exitMode', row.exit.mode)}>
+      {vocabLabel(vocab, 'exitMode', row.exit.mode)}
+    </Badge>
+    {row.exit.cooldownSecs ? (
+      <span className="ml-1 text-[10px] tabular-nums text-base-content/50">
+        {Math.round(row.exit.cooldownSecs / 86400)}d
+      </span>
+    ) : null}
+    {/* Measured: was the money actually able to leave over the last 30 days.
+        Absent on cooldown rows by design — see ExitHistory.tsx. */}
+    <ExitHistoryHint history={row.exit.history} />
+  </>
+)
+
+// ---------------------------------------------------------------------------
+// Mobile
+// ---------------------------------------------------------------------------
+
+/**
+ * The sort options the table header carries, as chips — on mobile there is no
+ * header to click. `rate` and `marketRate` are one chip that toggles between
+ * the two, mirroring the header's total ⇄ venue APR cycle.
+ */
+const MOBILE_SORTS: { key: EarnSortKey; label: string }[] = [
+  { key: 'rate', label: 'APR' },
+  { key: 'marketRate', label: 'Venue APR' },
+  { key: 'tvl', label: 'TVL' },
+  { key: 'liquidity', label: 'Liquidity' },
+]
+
+/**
+ * One opportunity as a card. Same facts as the row, in reading order for a
+ * narrow screen: who and how much (top line), what and how big (middle),
+ * how safe and how to leave (bottom).
+ */
+const MarketCard: React.FC<{
+  row: EarnMarket
+  vocab: EarnVocabulary
+  selected: boolean
+  onClick: () => void
+}> = ({ row, vocab, selected, onClick }) => (
+  <div
+    className={`p-3 cursor-pointer transition-colors ${
+      selected ? 'bg-primary/10' : 'active:bg-base-200'
+    }`}
+    onClick={onClick}
+  >
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <VenueCell row={row} size={28} />
+      </div>
+      <div className="shrink-0 text-right text-sm font-semibold tabular-nums leading-tight">
+        <AprCell row={row} />
+      </div>
+    </div>
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/70">
+      <span className="font-medium text-base-content">
+        <AssetCell row={row} />
+      </span>
+      <span>
+        TVL{' '}
+        <span className="font-medium tabular-nums text-base-content">
+          <UsdOrTokenCell
+            usd={row.tvl.usd}
+            formatted={row.tvl.formatted}
+            symbol={row.asset.symbol}
+            withSymbol
+          />
+        </span>
+      </span>
+      <span>
+        Liq{' '}
+        <span className="font-medium tabular-nums text-base-content">
+          <UsdOrTokenCell
+            usd={row.liquidity?.usd}
+            formatted={row.liquidity?.formatted}
+            symbol={row.asset.symbol}
+          />
+        </span>
+      </span>
+    </div>
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/70">
+      <span className="flex items-center gap-1">
+        Risk <RiskCell row={row} />
+      </span>
+      <span className="flex items-center gap-1">
+        Exit{' '}
+        <span>
+          <ExitCell row={row} vocab={vocab} />
+        </span>
+      </span>
+    </div>
+  </div>
+)
+
 export const EarnMarketsTable: React.FC<Props> = ({
   items,
   vocab,
@@ -150,241 +427,128 @@ export const EarnMarketsTable: React.FC<Props> = ({
   selected,
   onRowClick,
 }) => (
-  <div className="overflow-x-auto">
-    <table className="table table-sm w-full table-fixed [&_td]:overflow-hidden [&_th]:overflow-hidden [&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:border-b [&_th]:border-base-300 [&_th]:bg-base-100">
-      <thead>
-        <tr>
-          <th className="w-[30%]">Venue</th>
-          <th className="w-[10%]">Asset</th>
-          {/* Clicking cycles total ⇄ venue APR. Dropping the Venue APR column
-              must not drop the ability to RANK by it — that ordering is what
-              sinks pass-through rows on their own merit instead of relying on
-              them being filtered out. */}
-          <SortableHeader
-            sortKey={sortKey === 'marketRate' ? 'marketRate' : 'rate'}
-            activeKey={sortKey}
-            activeDir="desc"
-            onToggle={() => onToggleSort(sortKey === 'rate' ? 'marketRate' : 'rate')}
-            className="w-[13%] text-right"
-            title="Click to switch between total APR and the venue's own APR"
-          >
-            {sortKey === 'marketRate' ? 'Venue APR' : 'APR'}
-          </SortableHeader>
-          <SortableHeader
-            sortKey="tvl"
-            activeKey={sortKey}
-            activeDir="desc"
-            onToggle={onToggleSort}
-            className="w-[12%] text-right"
-          >
-            TVL
-          </SortableHeader>
-          <SortableHeader
-            sortKey="liquidity"
-            activeKey={sortKey}
-            activeDir="desc"
-            onToggle={onToggleSort}
-            className="w-[12%] text-right"
-          >
-            Liquidity
-          </SortableHeader>
-          <th className="w-[11%]">Risk</th>
-          <th className="w-[12%]">Exit</th>
-        </tr>
-      </thead>
-      <tbody>
-        {items.length === 0 && <TableEmptyRow colSpan={7}>No earn opportunities</TableEmptyRow>}
-        {items.map((row) => {
-          const isSel = selected?.earnUid === row.earnUid
-          const note = venueNote(row)
-          const term = termNote(row)
-          const lendingPath = lendingPathForRow(row)
-          return (
-            <tr
-              key={row.earnUid}
-              className={`cursor-pointer hover ${isSel ? 'bg-primary/10' : ''}`}
-              onClick={() => onRowClick(row)}
+  <>
+    {/* ── Desktop ─────────────────────────────────────────────────────── */}
+    <div className="hidden md:block overflow-x-auto">
+      <table className="table table-sm w-full table-fixed [&_td]:overflow-hidden [&_th]:overflow-hidden [&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:border-b [&_th]:border-base-300 [&_th]:bg-base-100">
+        <thead>
+          <tr>
+            <th className="w-[30%]">Venue</th>
+            <th className="w-[10%]">Asset</th>
+            {/* Clicking cycles total ⇄ venue APR. Dropping the Venue APR column
+                must not drop the ability to RANK by it — that ordering is what
+                sinks pass-through rows on their own merit instead of relying on
+                them being filtered out. */}
+            <SortableHeader
+              sortKey={sortKey === 'marketRate' ? 'marketRate' : 'rate'}
+              activeKey={sortKey}
+              activeDir="desc"
+              onToggle={() => onToggleSort(sortKey === 'rate' ? 'marketRate' : 'rate')}
+              className="w-[13%] text-right"
+              title="Click to switch between total APR and the venue's own APR"
             >
-              <td>
-                <div className="flex items-center gap-2">
-                  {/* Chain badged onto the venue logo — rows from every
-                      selected chain are interleaved here, and a row is only
-                      actionable on its own. */}
-                  <ChainBadgedLogo
-                    src={row.logoURI}
-                    alt={row.venue}
-                    chainId={row.chainId}
-                    size={24}
-                    fallbackText={row.brand ?? row.venue}
+              {sortKey === 'marketRate' ? 'Venue APR' : 'APR'}
+            </SortableHeader>
+            <SortableHeader
+              sortKey="tvl"
+              activeKey={sortKey}
+              activeDir="desc"
+              onToggle={onToggleSort}
+              className="w-[12%] text-right"
+            >
+              TVL
+            </SortableHeader>
+            <SortableHeader
+              sortKey="liquidity"
+              activeKey={sortKey}
+              activeDir="desc"
+              onToggle={onToggleSort}
+              className="w-[12%] text-right"
+            >
+              Liquidity
+            </SortableHeader>
+            <th className="w-[11%]">Risk</th>
+            <th className="w-[12%]">Exit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.length === 0 && <TableEmptyRow colSpan={7}>No earn opportunities</TableEmptyRow>}
+          {items.map((row) => {
+            const isSel = selected?.earnUid === row.earnUid
+            return (
+              <tr
+                key={row.earnUid}
+                className={`cursor-pointer hover ${isSel ? 'bg-primary/10' : ''}`}
+                onClick={() => onRowClick(row)}
+              >
+                <td>
+                  <VenueCell row={row} />
+                </td>
+                <td className="truncate text-xs">
+                  <AssetCell row={row} />
+                </td>
+                <td className="text-right text-xs font-medium tabular-nums">
+                  <AprCell row={row} />
+                </td>
+                <td className="text-right text-xs tabular-nums">
+                  <UsdOrTokenCell
+                    usd={row.tvl.usd}
+                    formatted={row.tvl.formatted}
+                    symbol={row.asset.symbol}
+                    withSymbol
                   />
-                  <div className="min-w-0 leading-tight">
-                    {/* MARKET first, brand second. The brand is shared by every
-                        row of a protocol — Pendle alone has ~50 — so leading
-                        with it prints the same word down the whole column while
-                        the line that actually distinguishes the rows sits
-                        underneath in small grey text. Falls back to the brand
-                        when a row has no market name, so the primary line is
-                        never empty. */}
-                    <div className="flex items-center gap-1 min-w-0">
-                      <span className="truncate text-xs font-medium" title={row.name ?? row.venue}>
-                        {row.name || row.brand || row.venue}
-                      </span>
-                      {/* Lending markets only — a vault has no entry there. A
-                          real <Link>, so cmd/middle-click opens a tab instead
-                          of swallowing the modifier the way an onClick-only
-                          anchor does. */}
-                      {lendingPath && (
-                        <Link
-                          to={lendingPath}
-                          className="shrink-0 text-base-content/30 hover:text-primary transition-colors"
-                          title={`Open ${
-                            row.name || row.asset.symbol || 'this market'
-                          } in the Lending tab`}
-                          aria-label="Open in the Lending tab"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <OpenInIcon />
-                        </Link>
-                      )}
-                    </div>
-                    {/* Who runs it · what it runs on · kind — see venueLabel.ts
-                        for why the second segment is not always the same
-                        field. */}
-                    <div className="truncate text-[10px] text-base-content/50" title={row.venue}>
-                      {row.subtitle ?? row.brand ?? row.venue}
-                    </div>
-                  </div>
-                </div>
-              </td>
-              <td className="truncate text-xs">
-                {/* A basket row's asset symbol is a half-truth: it is what you
-                    hand over, not what you end up holding. The pill is the only
-                    thing on the row that says so. */}
-                {row.basket && (
-                  <AutoBalancedPill
-                    className="mb-0.5"
-                    title={basketExplainer(row.basket, row.asset.symbol)}
+                </td>
+                <td className="text-right text-xs tabular-nums">
+                  <UsdOrTokenCell
+                    usd={row.liquidity?.usd}
+                    formatted={row.liquidity?.formatted}
+                    symbol={row.asset.symbol}
                   />
-                )}
-                {row.asset.symbol ? (
-                  row.asset.symbol
-                ) : row.asset.address ? (
-                  // The underlying is not in the token registry. Showing a
-                  // short address keeps the row identifiable and makes the gap
-                  // actionable; "—" reads as "no underlying", which is never
-                  // true for a vault.
-                  <span
-                    className="font-mono text-base-content/40"
-                    title={`${row.asset.address} — not in the token registry`}
-                  >
-                    {row.asset.address.slice(0, 6)}…{row.asset.address.slice(-4)}
-                  </span>
-                ) : (
-                  <span className="text-base-content/40">{EMPTY_VALUE}</span>
-                )}
-              </td>
-              <td className="text-right text-xs font-medium tabular-nums">
-                <div>{pct(row.rate.total)}</div>
-                {/* The venue's own share, shown ONLY when it differs from the
-                    headline — i.e. when part of the yield is the asset's own.
-                    As its own column it was empty on the large majority of
-                    rows, which read as "this venue pays nothing". */}
-                {/* The TERM qualifies the headline, so it sits directly under
-                    it. A fixed rate with no term beside it is the same number
-                    whether it runs nine days or five years. */}
-                {term && (
-                  <div className="text-[10px] font-normal text-base-content/50" title={term.title}>
-                    {term.label}
-                  </div>
-                )}
-                {note && (
-                  <div
-                    className={`text-[10px] font-normal ${
-                      row.rate.passthrough ? 'text-warning' : 'text-base-content/50'
-                    }`}
-                    title={
-                      row.rate.passthrough
-                        ? 'This venue pays nothing of its own — the headline is what the asset already earns in your wallet.'
-                        : `Venue ${pct(row.rate.marketOwn)} · asset ${pct(row.rate.intrinsic)}`
-                    }
-                  >
-                    {note}
-                  </div>
-                )}
-              </td>
-              <td className="text-right text-xs tabular-nums">
-                {row.tvl.usd != null ? (
-                  abbreviateUsd(row.tvl.usd)
-                ) : row.tvl.formatted != null ? (
-                  // Not priced: show the TOKEN amount, abbreviated and visibly
-                  // distinguished. Printing a raw decimal in a USD column reads
-                  // as dollars and overstates by whatever the token is worth.
-                  <span
-                    className="text-base-content/50"
-                    title={`${row.tvl.formatted.toLocaleString()} ${row.asset.symbol} — not priced in USD`}
-                  >
-                    {abbreviateNumber(row.tvl.formatted)}{' '}
-                    <span className="text-[10px]">{row.asset.symbol}</span>
-                  </span>
-                ) : (
-                  <span className="text-base-content/40">{EMPTY_VALUE}</span>
-                )}
-              </td>
-              <td className="text-right text-xs tabular-nums">
-                {row.liquidity?.usd != null ? (
-                  abbreviateUsd(row.liquidity.usd)
-                ) : row.liquidity?.formatted != null ? (
-                  <span
-                    className="text-base-content/50"
-                    title={`${row.liquidity.formatted.toLocaleString()} ${row.asset.symbol} — not priced in USD`}
-                  >
-                    {abbreviateNumber(row.liquidity.formatted)}
-                  </span>
-                ) : (
-                  <span className="text-base-content/40">{EMPTY_VALUE}</span>
-                )}
-              </td>
-              <td>
-                {/* Score (higher is worse) plus ONE icon for everything the
-                    score doesn't cover — losses already taken, an exit that
-                    doesn't work, a stale rating. Those are separate axes: a
-                    market can be low-risk on collateral and still be one you
-                    cannot exit, or one whose money is already gone. Details
-                    live in the icon's popover so the column stays one line. */}
-                <div className="flex items-center gap-1">
-                  {row.risk?.score != null ? (
-                    <Badge
-                      tone={RISK_TONE[riskBand(row.risk.score)]}
-                      // The server's own label where it sent one, else the band
-                      // this score falls in — never a third opinion.
-                      title={`Risk: ${row.risk.label ?? riskBand(row.risk.score)}`}
-                    >
-                      {row.risk.score}
-                    </Badge>
-                  ) : (
-                    <span className="text-xs text-base-content/40">{EMPTY_VALUE}</span>
-                  )}
-                  <RiskFindings risk={row.risk} />
-                </div>
-              </td>
-              <td className="truncate">
-                <Badge title={vocabDescription(vocab, 'exitMode', row.exit.mode)}>
-                  {vocabLabel(vocab, 'exitMode', row.exit.mode)}
-                </Badge>
-                {row.exit.cooldownSecs ? (
-                  <span className="ml-1 text-[10px] tabular-nums text-base-content/50">
-                    {Math.round(row.exit.cooldownSecs / 86400)}d
-                  </span>
-                ) : null}
-                {/* Measured: was the money actually able to leave over the
-                    last 30 days. Absent on cooldown rows by design — see
-                    ExitHistory.tsx. */}
-                <ExitHistoryHint history={row.exit.history} />
-              </td>
-            </tr>
-          )
-        })}
-      </tbody>
-    </table>
-  </div>
+                </td>
+                <td>
+                  <RiskCell row={row} />
+                </td>
+                <td className="truncate">
+                  <ExitCell row={row} vocab={vocab} />
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+
+    {/* ── Mobile: sort chips + stacked cards. The table's seven columns do not
+        fit a phone at any font size; `overflow-x-auto` alone made the APR —
+        the one number every row is compared on — scroll off-screen. ──── */}
+    <div className="md:hidden divide-y divide-base-300">
+      {items.length > 0 && (
+        <div className="flex gap-1 overflow-x-auto p-2">
+          {MOBILE_SORTS.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              className={`btn btn-xs whitespace-nowrap ${sortKey === key ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => onToggleSort(key)}
+            >
+              {label}
+              <SortIndicator active={sortKey === key} dir="desc" className="ml-0.5" />
+            </button>
+          ))}
+        </div>
+      )}
+      {items.length === 0 && (
+        <div className="py-6 text-center text-sm text-base-content/50">No earn opportunities</div>
+      )}
+      {items.map((row) => (
+        <MarketCard
+          key={row.earnUid}
+          row={row}
+          vocab={vocab}
+          selected={selected?.earnUid === row.earnUid}
+          onClick={() => onRowClick(row)}
+        />
+      ))}
+    </div>
+  </>
 )

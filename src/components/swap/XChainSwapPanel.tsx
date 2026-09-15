@@ -37,7 +37,7 @@ interface XChainSwapPanelProps {
  * chain costs one client-side eth_call per refresh, and the server caps a
  * prepare request at 30 chains.
  */
-const BALANCE_CHAINS = [
+export const BALANCE_CHAINS = [
   '1',
   '10',
   '56',
