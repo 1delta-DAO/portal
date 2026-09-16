@@ -35,6 +35,7 @@ import { borrowTerms, isBrokeredBorrow } from '../../../../../sdk/lending-helper
 import { deriveMarginSources } from './marginSources'
 import { isFullSheet } from '../../../terms/types'
 import { useTermSheet } from '../../../../../hooks/lending/useTermSheet'
+import { useLoopPayAssets } from '../../../../../hooks/lending/useLoopPayAssets'
 import {
   fetchLoopRangeWithSimulation,
   fetchLoopRange,
@@ -283,25 +284,53 @@ export const LoopAction: React.FC<TradingActionProps> = ({
     [reset]
   )
 
-  // Derive pay currencies from selected pools
-  const payCurrencies = useMemo(() => {
-    const assets: RawCurrency[] = []
+  /**
+   * Which assets may fund the margin — asked of the API, not derived here.
+   *
+   * `/v1/actions/loop/leverage/pay-assets` applies the per-lender rule the
+   * build enforces (collateral only on Curvance / Fraxlend / Resupply / Twyne,
+   * no native on LlamaLend, the debt asset only on Exactly, nothing on Flying
+   * Tulip), so a chip is only ever offered for a margin the open can take.
+   * Before this the panel offered collateral + debt + native everywhere and
+   * the user found out from the build error.
+   */
+  const { data: payAssetsData } = useLoopPayAssets({
+    marketUidIn: debtPool?.marketUid,
+    marketUidOut: collateralPool?.marketUid,
+  })
 
+  // Pay currencies: the server's list once it has answered, with the local
+  // collateral / debt / native derivation as the fallback while loading (or if
+  // the call fails), so the chips never disappear on a hiccup.
+  const payCurrencies = useMemo(() => {
+    const local: RawCurrency[] = []
     if (collateralPool?.asset) {
-      assets.push(collateralPool.asset)
+      local.push(collateralPool.asset)
     }
     if (debtPool?.asset && debtPool.asset.address !== collateralPool?.asset?.address) {
-      assets.push(debtPool.asset)
+      local.push(debtPool.asset)
     }
-
     // Add native token if wrapped native is in the list
-    const hasWrappedNative = assets.some((a) => isWNative(a))
+    const hasWrappedNative = local.some((a) => isWNative(a))
     if (hasWrappedNative && chainTokens[zeroAddress]) {
-      assets.unshift(chainTokens[zeroAddress] as RawCurrency)
+      local.unshift(chainTokens[zeroAddress] as RawCurrency)
     }
 
-    return assets
-  }, [collateralPool, debtPool, chainTokens])
+    if (!payAssetsData) return local
+
+    // The server rows carry token-list metadata; back-fill anything a
+    // non-curated row lacks (decimals above all) from the pool's own currency,
+    // which the row necessarily is — every accepted margin asset is one of the
+    // two market assets or native.
+    const known = new Map<string, RawCurrency>()
+    for (const c of local) known.set(c.address.toLowerCase(), c)
+    for (const c of Object.values(chainTokens) as RawCurrency[])
+      if (c?.address && !known.has(c.address.toLowerCase())) known.set(c.address.toLowerCase(), c)
+    return payAssetsData.payAssets.map((row) => {
+      const base = known.get(row.address.toLowerCase())
+      return { ...(base ?? {}), ...row, address: base?.address ?? row.address } as RawCurrency
+    })
+  }, [collateralPool, debtPool, chainTokens, payAssetsData])
 
   const selectedPayCurrency = payCurrencies.find((c) => c.address === payCurrencyAddress) ?? null
 
@@ -870,11 +899,22 @@ export const LoopAction: React.FC<TradingActionProps> = ({
                 )
               })}
             </div>
+          ) : payAssetsData && collateralPool && debtPool ? (
+            // The lender takes NO margin on a loop (Flying Tulip): the open
+            // deposits only the swap output, so collateral has to be supplied
+            // beforehand. The API says so in `notes`; show it rather than an
+            // empty row.
+            <span className="text-xs text-base-content/60">
+              {payAssetsData.notes[0] ?? 'This lender takes no margin on a leveraged open.'}
+            </span>
           ) : (
             <span className="text-xs text-base-content/50">
               Select collateral & debt pools first
             </span>
           )}
+          {payCurrencies.length > 0 && payAssetsData?.notes?.length ? (
+            <div className="text-[11px] text-base-content/50 mt-1">{payAssetsData.notes[0]}</div>
+          ) : null}
 
           {/* Margin source. Rendered only when a sub-account actually holds the
               pay asset, so the common wallet-only case looks exactly as before.
