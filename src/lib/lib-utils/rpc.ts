@@ -15,6 +15,23 @@ const LOCAL_RPC_OVERRIDES: Record<string, string[]> = {
     'https://rpc-qnd.inkonchain.com',
     'https://ink.rpc.thirdweb.com',
   ],
+  // World Chain
+  '480': [
+    'https://worldchain-mainnet.g.alchemy.com/public',
+    'https://480.rpc.thirdweb.com',
+    'https://worldchain-mainnet.gateway.tenderly.co',
+  ],
+  // Ronin
+  '2020': ['https://api.roninchain.com/rpc'],
+  // Tempo
+  '4217': ['https://rpc.mainnet.tempo.xyz', 'https://rpc.presto.tempo.xyz'],
+  // Arc
+  '5042': [
+    'https://rpc.mainnet.arc.io',
+    'https://rpc.drpc.mainnet.arc.io',
+    'https://rpc.quicknode.mainnet.arc.io',
+    'https://rpc.blockdaemon.mainnet.arc.io',
+  ],
 }
 
 export function getRpcUrlByIndex(chainId: string, index: number): string {

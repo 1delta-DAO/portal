@@ -44,7 +44,7 @@ export function tabFromSlug(slug: string | undefined): SubTab {
  *
  * `/lending/pools` is single-chain server-side, so Earn fans out one request
  * per selected chain — the cap is what keeps that fan-out (and the optimizer's
- * cross-chain ranking) bounded. 48 chains are wired in `wagmi.ts`.
+ * cross-chain ranking) bounded. 53 chains are wired in `wagmi.ts`.
  */
 export const MAX_MULTI_CHAINS = 5
 

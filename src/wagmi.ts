@@ -50,6 +50,10 @@ import {
   scroll,
   katana,
   corn,
+  worldchain,
+  ronin,
+  tempo,
+  ink,
 } from 'viem/chains'
 
 // Chains not present in viem/chains. `@1delta/providers` ships some as
@@ -81,6 +85,29 @@ const robinhood = defineChain({
   },
 })
 
+// Arc (5042) — Circle's L1, native USDC (18-decimal representation). Not yet
+// in viem/chains or @1delta/providers' customChains.
+const arc = defineChain({
+  id: 5042,
+  name: 'Arc',
+  nativeCurrency: { decimals: 18, name: 'USDC', symbol: 'USDC' },
+  rpcUrls: {
+    default: { http: ['https://rpc.mainnet.arc.io'] },
+  },
+  blockExplorers: {
+    default: { name: 'Arc Explorer', url: 'https://explorer.arc.io' },
+  },
+  contracts: {
+    multicall3: {
+      address: '0xcA11bde05977b3631167028862bE2a173976CA11',
+      blockCreated: 1,
+    },
+  },
+})
+
+// Keep this in step with `GET /v1/data/chains` — a chain the backend serves
+// but wagmi does not know is one `switchChainAsync` rejects, and every action
+// on it dead-ends in a "Please switch to chain N" toast.
 export const evmChainWagmi: [Chain, ...Chain[]] = [
   mainnet, // 1
   optimism, // 10
@@ -99,6 +126,7 @@ export const evmChainWagmi: [Chain, ...Chain[]] = [
   fantom, // 250
   zksync, // 324
   pulsechain, // 369
+  worldchain, // 480
   stable, // 988
   hyperEvm, // 999
   metis, // 1088
@@ -108,10 +136,13 @@ export const evmChainWagmi: [Chain, ...Chain[]] = [
   sei, // 1329
   pharos, // 1672
   soneium, // 1868
+  ronin, // 2020
   abstract, // 2741
   morph, // 2818
+  tempo, // 4217
   megaeth, // 4326
   robinhood, // 4663
+  arc, // 5042
   mantle, // 5000
   kaia, // 8217
   base, // 8453
@@ -119,6 +150,7 @@ export const evmChainWagmi: [Chain, ...Chain[]] = [
   mode, // 34443
   arbitrum, // 42161
   celo, // 42220
+  ink, // 57073
   hemi, // 43111
   avalanche, // 43114
   linea, // 59144
