@@ -338,14 +338,13 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
     // that asked for it (`permit=auto`).
   }, [debouncedInputAmount, canFetchQuote, tokenIn, tokenOut, permitEnabled])
 
-  const excludeIn = useMemo(
-    () => (tokenOut && tokenOut.chainId === fromChainId ? [tokenOut.address as Address] : []),
-    [tokenOut, fromChainId]
-  )
-  const excludeOut = useMemo(
-    () => (tokenIn && tokenIn.chainId === toChainId ? [tokenIn.address as Address] : []),
-    [tokenIn, toChainId]
-  )
+  // The other side's token is excluded ON ITS OWN CHAIN only. The modal has
+  // its own chain picker, so it is not necessarily showing `fromChainId` /
+  // `toChainId` — gating on those here left the exclusion applied to whatever
+  // chain the user switched the modal to, and since native is the zero
+  // address everywhere, picking native on one side hid native on the other.
+  const excludeIn = useMemo(() => (tokenOut ? [tokenOut.address as Address] : []), [tokenOut])
+  const excludeOut = useMemo(() => (tokenIn ? [tokenIn.address as Address] : []), [tokenIn])
 
   const handleBalanceRowClick = useCallback(
     (itemChainId: string, item: XChainBalanceItem) => {
@@ -977,6 +976,7 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
         query={tokenQuery}
         onQueryChange={setTokenQuery}
         excludeAddresses={excludeIn}
+        excludeChainId={tokenOut?.chainId}
         showChainSelector={true}
         initialChainId={fromChainId}
       />
@@ -988,6 +988,7 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
         query={tokenQuery}
         onQueryChange={setTokenQuery}
         excludeAddresses={excludeOut}
+        excludeChainId={tokenIn?.chainId}
         showChainSelector={true}
         initialChainId={toChainId}
       />

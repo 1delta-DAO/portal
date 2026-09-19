@@ -41,6 +41,7 @@ import {
   fetchLoopRange,
   type LoopRangeEntry,
 } from '../../../../../sdk/lending-helper/fetchLoopRange'
+import { displaySymbol } from '../../../../../lib/lib-utils/wnative'
 
 function LoopRangeInfo({
   loopRange,
@@ -894,7 +895,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
                       fallbackText={c.symbol}
                       className="rounded-full object-contain w-4 h-4 token-logo"
                     />
-                    <span className="font-medium">{c.symbol}</span>
+                    <span className="font-medium">{displaySymbol(c)}</span>
                   </button>
                 )
               })}
@@ -1014,7 +1015,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
                 <span
                   className={`font-medium ${parseAmount(payBalanceStr) === 0 ? 'text-base-content/40' : ''}`}
                 >
-                  {formatTokenAmount(payBalance.balance)} {selectedPayCurrency.symbol} ($
+                  {formatTokenAmount(payBalance.balance)} {displaySymbol(selectedPayCurrency)} ($
                   {formatUsd(payBalance.balanceUSD)})
                 </span>
               </div>
@@ -1070,7 +1071,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
             {payOverMax && (
               <div className="mt-1">
                 <InsufficientPayBalance
-                  symbol={selectedPayCurrency.symbol}
+                  symbol={displaySymbol(selectedPayCurrency)}
                   balanceStr={payBalanceStr}
                   shortfall={payShortfall}
                 />
@@ -1258,7 +1259,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
               has been picked. */}
           {payOverMax && (
             <InsufficientPayBalance
-              symbol={selectedPayCurrency?.symbol}
+              symbol={selectedPayCurrency ? displaySymbol(selectedPayCurrency) : undefined}
               balanceStr={payBalanceStr}
               shortfall={payShortfall}
             />

@@ -32,3 +32,32 @@ export function isWNative(c?: RawCurrency): boolean {
   const sym = c.symbol?.toUpperCase()
   return !!sym && WNATIVE_SYMBOLS.has(sym)
 }
+
+const ZERO = '0x0000000000000000000000000000000000000000'
+const EEE = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+
+/** The chain's native gas asset (zero / 0xEee sentinel, or the token-list `isNative` flag). */
+export function isNativeCurrency(
+  c?: { address?: string; props?: { [k: string]: any } } | null
+): boolean {
+  if (!c) return false
+  if (c.props?.isNative) return true
+  const a = c.address?.toLowerCase()
+  return a === ZERO || a === EEE
+}
+
+/**
+ * The symbol to RENDER for a currency. The native asset gets a "(native)"
+ * suffix so it is never mistaken for its ERC-20 form — the two are different
+ * things to pay with (msg.value vs approval + transferFrom) and on some chains
+ * are not even the same scale: Arc's native USDC is 18-decimal wei while the
+ * ERC-20 USDC at 0x3600… is 6-decimal. Never feed this back into a lookup;
+ * the stored `symbol` stays untouched.
+ */
+export function displaySymbol(
+  c?: { address?: string; symbol?: string; props?: { [k: string]: any } } | null,
+  fallback = '—'
+): string {
+  const sym = c?.symbol ?? fallback
+  return isNativeCurrency(c) ? `${sym} (native)` : sym
+}

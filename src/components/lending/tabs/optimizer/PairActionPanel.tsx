@@ -41,6 +41,7 @@ import { RiskBadge } from '../../shared/RiskBadge'
 import { AutoBalancedNoticeBody } from '../../shared/SmartVault'
 import { useCombinedAction, gt0, asCurrency, type CombinedAction } from './useCombinedAction'
 import { BandSetterRow } from '../../terms/BandSetterRow'
+import { displaySymbol } from '../../../../lib/lib-utils/wnative'
 
 type Op = 'deposit-borrow' | 'withdraw-repay' | 'loop'
 
@@ -218,7 +219,7 @@ function PrimaryLeg({
   isBalancesFetching?: boolean
   refetchBalances?: () => void
 }) {
-  const spendSymbol = (payNative && nativeToken ? nativeToken.symbol : token.symbol) ?? '—'
+  const spendSymbol = payNative && nativeToken ? displaySymbol(nativeToken) : (token.symbol ?? '—')
   return (
     <div className="form-control">
       {canUseNative && nativeToken && (
@@ -312,7 +313,8 @@ function SecondaryLeg({
   onChange: (v: string) => void
   priceUsd: number
 }) {
-  const deliverSymbol = (receiveNative && nativeToken ? nativeToken.symbol : token.symbol) ?? '—'
+  const deliverSymbol =
+    receiveNative && nativeToken ? displaySymbol(nativeToken) : (token.symbol ?? '—')
   // String comparison, not `Number()` — an 18-decimal amount overflows a
   // float64, so the numeric compare flagged values that were exactly equal.
   const overMax = gt0(value) && isOverMax(value, maxAmount)

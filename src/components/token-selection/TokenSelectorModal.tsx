@@ -16,6 +16,16 @@ type TokenSelectorModalProps = {
   query: string
   onQueryChange: (query: string) => void
   excludeAddresses?: Address[]
+  /**
+   * The chain `excludeAddresses` belongs to. With a chain selector in the
+   * modal the list can be showing a different chain from the one the caller
+   * computed the exclusion for — and an address is only meaningful per chain.
+   * The native asset is the zero address on EVERY chain, so an exclusion
+   * carried across chains hid it from the cross-chain list whenever the other
+   * side held native. Omit to apply the exclusion on whichever chain is shown
+   * (the single-chain callers).
+   */
+  excludeChainId?: string
   showChainSelector?: boolean
   initialChainId?: string
 }
@@ -29,6 +39,7 @@ export function TokenSelectorModal({
   query,
   onQueryChange,
   excludeAddresses,
+  excludeChainId,
   showChainSelector = false,
   initialChainId,
 }: TokenSelectorModalProps) {
@@ -61,6 +72,10 @@ export function TokenSelectorModal({
   }, [open])
 
   const tokenValue = useMemo(() => currency?.address as Address | undefined, [currency?.address])
+
+  // Only exclude on the chain the exclusion was computed for — see the prop.
+  const effectiveExclude =
+    excludeChainId === undefined || excludeChainId === chainId ? excludeAddresses : undefined
 
   const handleTokenSelect = useCallback(
     (addr: Address) => {
@@ -126,7 +141,7 @@ export function TokenSelectorModal({
                 chainId={chainId}
                 value={tokenValue}
                 onChange={handleTokenSelect}
-                excludeAddresses={excludeAddresses}
+                excludeAddresses={effectiveExclude}
                 query={query}
                 onQueryChange={onQueryChange}
                 showSearch={false}
