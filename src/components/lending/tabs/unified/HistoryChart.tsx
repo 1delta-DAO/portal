@@ -4,11 +4,17 @@ import { Badge } from '../../../common/Badge'
 import { Skeleton } from '../../../common/Loader'
 import { EMPTY_VALUE, abbreviateUsd, formatPercent } from '../../../../utils/format'
 
-type Metric = 'apr' | 'tvlUsd' | 'sharePrice'
+type Metric = 'apr' | 'tvlUsd' | 'sharePrice' | 'liquidityUsd'
 
 interface Props {
   points: EarnHistoryPoint[]
   hasSharePrice: boolean
+  /**
+   * Whether the series carries `liquidityUsd` — the withdrawable-at-once
+   * capacity the lockup chart plots. Told by the server; a PT / GM row has
+   * none and gets no tab, rather than a flat line at zero.
+   */
+  hasLiquidity?: boolean
   isLoading?: boolean
   error?: Error | null
   /**
@@ -34,6 +40,10 @@ const METRIC_LABEL: Record<Metric, string> = {
   apr: 'APR',
   tvlUsd: 'TVL',
   sharePrice: 'Share price',
+  // What could have left the venue at once, hour by hour. The lockup chart:
+  // a trough here is the market being lent out, and the digest's "dry" hours
+  // are exactly the points on this line below max($1k, 0.5% of TVL).
+  liquidityUsd: 'Withdrawable',
 }
 
 /** Horizontal gridlines (and their labels), including the two end ticks. */
@@ -84,6 +94,7 @@ const DAY = 86_400_000
 export const HistoryChart: React.FC<Props> = ({
   points,
   hasSharePrice,
+  hasLiquidity = false,
   isLoading,
   error,
   size = 'sm',
@@ -98,7 +109,12 @@ export const HistoryChart: React.FC<Props> = ({
   // Gradient ids must not collide when the rail and the band are both mounted.
   const gradientId = `hist-fill-${useId().replace(/[^a-zA-Z0-9]/g, '')}`
 
-  const metrics: Metric[] = hasSharePrice ? ['apr', 'tvlUsd', 'sharePrice'] : ['apr', 'tvlUsd']
+  const metrics: Metric[] = [
+    'apr',
+    'tvlUsd',
+    ...(hasSharePrice ? (['sharePrice'] as Metric[]) : []),
+    ...(hasLiquidity ? (['liquidityUsd'] as Metric[]) : []),
+  ]
 
   const series = useMemo(
     () => points.map((p) => ({ t: new Date(p.t).getTime(), v: p[metric] })),
@@ -113,7 +129,11 @@ export const HistoryChart: React.FC<Props> = ({
   const geom = useMemo(() => {
     if (defined.length < 2) return null
     const values = defined.map((s) => s.v as number)
-    const min = Math.min(...values)
+    // Withdrawable capacity is the one metric whose zero is the story: a dry
+    // hour is the line touching the floor, and a floating axis would draw a
+    // $10 trough at the same height as a $10M one. Every other metric keeps
+    // the floating axis (see the notes above).
+    const min = metric === 'liquidityUsd' ? Math.min(0, ...values) : Math.min(...values)
     const max = Math.max(...values)
     // A perfectly flat series would divide by zero; give it a band so the line
     // renders through the middle instead of vanishing.
@@ -129,7 +149,7 @@ export const HistoryChart: React.FC<Props> = ({
       (useTime ? (series[i].t - t0) / tSpan : i / Math.max(1, series.length - 1)) * (W - PAD_X * 2)
     const y = (v: number) => H - PAD_Y - ((v - min) / span) * (H - PAD_Y * 2)
     return { min, max, x, y, t0, t1, tSpan: useTime ? tSpan : 0 }
-  }, [defined, series])
+  }, [defined, series, metric])
 
   /**
    * The line and its fill, one sub-path per unbroken run of points. Built
@@ -164,7 +184,7 @@ export const HistoryChart: React.FC<Props> = ({
   const fmt = (v: number | undefined, compact = false) => {
     if (v === undefined || !Number.isFinite(v)) return EMPTY_VALUE
     if (metric === 'apr') return formatPercent(v)
-    if (metric === 'tvlUsd') return abbreviateUsd(v)
+    if (metric === 'tvlUsd' || metric === 'liquidityUsd') return abbreviateUsd(v)
     return v.toLocaleString(undefined, { maximumFractionDigits: compact ? 4 : 6 })
   }
 

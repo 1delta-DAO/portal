@@ -47,7 +47,10 @@ interface Props {
  */
 export const HistoryPanel: React.FC<Props> = ({ row, vocab, open, onToggleOpen }) => {
   const [days, setDays] = useState<(typeof WINDOWS)[number]>(30)
-  const { points, hasSharePrice, isLoading, error } = useEarnHistory(row?.earnUid, days)
+  const { points, hasSharePrice, hasLiquidity, isLoading, error } = useEarnHistory(
+    row?.earnUid,
+    days
+  )
 
   return (
     <div className="rounded-box border border-base-300">
@@ -121,6 +124,7 @@ export const HistoryPanel: React.FC<Props> = ({ row, vocab, open, onToggleOpen }
           <HistoryChart
             points={row ? points : []}
             hasSharePrice={hasSharePrice}
+            hasLiquidity={hasLiquidity}
             isLoading={!!row && isLoading}
             error={row ? error : null}
             size="lg"

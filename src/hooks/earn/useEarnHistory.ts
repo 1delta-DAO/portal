@@ -9,6 +9,12 @@ export interface EarnHistoryPoint {
   tvlUsd?: number
   /** Vault rows only — a lending position has no share price. */
   sharePrice?: number
+  /**
+   * What could be withdrawn at once at that hour, USD — the series the
+   * withdrawability digest (`exit.history`) is computed from. Absent on rows
+   * with no capacity series (a PT, a GM token) and on older origins.
+   */
+  liquidityUsd?: number
 }
 
 export interface EarnHistory {
@@ -19,6 +25,9 @@ export interface EarnHistory {
    * an empty array cannot distinguish them.
    */
   hasSharePrice: boolean
+  /** Same discipline for the capacity series: told by the server, never
+   *  inferred from an empty column. */
+  hasLiquidity: boolean
   isLoading: boolean
   error: Error | null
 }
@@ -36,9 +45,10 @@ export function useEarnHistory(earnUid: string | undefined, days = 30): EarnHist
     queryKey: ['earnHistory', earnUid ?? '', days],
     enabled: !!earnUid,
     queryFn: () =>
-      apiFetch<{ points: EarnHistoryPoint[]; hasSharePrice: boolean }>('/v1/data/earn/history', {
-        params: { earnUid, days },
-      }),
+      apiFetch<{ points: EarnHistoryPoint[]; hasSharePrice: boolean; hasLiquidity?: boolean }>(
+        '/v1/data/earn/history',
+        { params: { earnUid, days } }
+      ),
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     retry: 1,
@@ -47,6 +57,9 @@ export function useEarnHistory(earnUid: string | undefined, days = 30): EarnHist
   return {
     points: data?.points ?? [],
     hasSharePrice: data?.hasSharePrice ?? false,
+    // An origin from before the field is an origin with no capacity series to
+    // show, which is what `false` means here too.
+    hasLiquidity: data?.hasLiquidity ?? false,
     isLoading,
     error: (error as Error) ?? null,
   }

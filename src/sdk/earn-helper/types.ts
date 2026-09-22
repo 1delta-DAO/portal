@@ -114,7 +114,26 @@ export interface EarnExitHistory {
   /** longest dry run, hours; null = never dry */
   worstDrySpellHours: number | null
   currentlyDry: boolean
+  /**
+   * One point per UTC calendar day with at least one sample — the series the
+   * lockup chart draws. A day with no sample is absent, so a gap in the
+   * recording reads as a gap. (`days` above is the window LENGTH.) Older
+   * origins do not send it; treat a missing array as empty.
+   */
+  daily?: EarnExitHistoryDay[]
   lowerBound: true
+}
+
+export interface EarnExitHistoryDay {
+  /** YYYY-MM-DD, UTC */
+  d: string
+  samples: number
+  /** least withdrawable at once in any sampled hour of the day, USD */
+  worstUsd: number | null
+  /** the same as a share of TVL, 0..1; null when TVL read 0 */
+  worstRatio: number | null
+  /** sampled hours below the dry line (max($1k, 0.5% of TVL)) */
+  dryHours: number
 }
 
 export interface EarnAvailability {
@@ -467,6 +486,16 @@ export interface EarnResponse {
   excluded: EarnExclusions
   appliedDefaults?: EarnAppliedDefaults
   facets: EarnFacets
+  /**
+   * Whether the per-row digests were readable at all. `exitHistory.available`
+   * false means the origin could not read its digest table (not "no market
+   * was ever dry"); `rowsOnPage` counts rows on this page carrying
+   * `exit.history`; `refreshedAt` is the digest's own build stamp — a stale
+   * one is a stalled hourly job, not a stable market.
+   */
+  digests?: {
+    exitHistory: { available: boolean; rowsOnPage: number; refreshedAt: string | null }
+  }
 }
 
 export interface EarnExclusions {

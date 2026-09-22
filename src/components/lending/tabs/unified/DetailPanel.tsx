@@ -8,7 +8,7 @@ import { useEarnHistory } from '../../../../hooks/earn/useEarnHistory'
 import { HistoryChart } from './HistoryChart'
 import { EarnActionPanel } from './EarnActionPanel'
 import { TermSheetPanel } from './TermSheetPanel'
-import { exitHistoryFields } from './ExitHistory'
+import { ExitHistoryStrip, exitHistoryFields } from './ExitHistory'
 import { EMPTY_VALUE, abbreviateUsd, formatPercent, riskBand } from '../../../../utils/format'
 import {
   vocabDescription,
@@ -81,7 +81,7 @@ export const DetailPanel: React.FC<Props> = ({
   const [days, setDays] = useState<(typeof WINDOWS)[number]>(30)
   // Not requested at all where the band above the table is already charting it
   // — the same series twice is one HTTP request too many, not just one chart.
-  const { points, hasSharePrice, isLoading, error } = useEarnHistory(
+  const { points, hasSharePrice, hasLiquidity, isLoading, error } = useEarnHistory(
     showHistory ? row.earnUid : undefined,
     days
   )
@@ -270,6 +270,7 @@ export const DetailPanel: React.FC<Props> = ({
           <HistoryChart
             points={points}
             hasSharePrice={hasSharePrice}
+            hasLiquidity={hasLiquidity}
             isLoading={isLoading}
             error={error}
           />
@@ -362,6 +363,7 @@ export const DetailPanel: React.FC<Props> = ({
 
       {row.exit.history && (
         <Section title={`Withdrawability · last ${row.exit.history.days}d`}>
+          <ExitHistoryStrip history={row.exit.history} className="mb-2" />
           <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
             {exitHistoryFields(row.exit.history, Field)}
           </div>
