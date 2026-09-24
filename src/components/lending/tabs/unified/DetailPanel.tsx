@@ -9,6 +9,7 @@ import { HistoryChart } from './HistoryChart'
 import { EarnActionPanel } from './EarnActionPanel'
 import { TermSheetPanel } from './TermSheetPanel'
 import { ExitHistoryStrip, exitHistoryFields } from './ExitHistory'
+import { WithdrawabilityDetail } from './WithdrawabilityPanel'
 import { EMPTY_VALUE, abbreviateUsd, formatPercent, riskBand } from '../../../../utils/format'
 import {
   vocabDescription,
@@ -360,6 +361,14 @@ export const DetailPanel: React.FC<Props> = ({
           {vocabDescription(vocab, 'exitMode', row.exit.mode)}
         </div>
       </Section>
+
+      {/* On mobile there is no band above the table, so the sheet carries the
+          full measurement too — collapsed, since it costs a request. */}
+      {showHistory && (
+        <Section title="How long has it taken to get out?">
+          <WithdrawabilityDetail row={row} />
+        </Section>
+      )}
 
       {row.exit.history && (
         <Section title={`Withdrawability · last ${row.exit.history.days}d`}>

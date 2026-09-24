@@ -107,6 +107,24 @@ shared between row and card so the two cannot drift.
   gaps.
 - [TermSheetPanel.tsx](TermSheetPanel.tsx) — term sheet, typed loosely so a new
   server section is additive.
+- [ExitHistory.tsx](ExitHistory.tsx) — the 30-day withdrawability DIGEST that
+  rides on the row (`exit.history`): the badge in the Exit column, the field list
+  and the daily strip. It costs no request, so it can render the moment a row is
+  selected. Reads `staleHours` before claiming anything in the present tense —
+  `currentlyDry` means "the latest sample is dry", and on a row whose recording
+  stopped that sample can be days old.
+- [WithdrawabilityPanel.tsx](WithdrawabilityPanel.tsx) — the second wide band,
+  and the only thing here that fetches on demand (`/v1/data/earn/metrics`, via
+  `hooks/earn/useEarnMetrics`). It answers what the digest cannot: **at MY size,
+  for how long would I have been unable to get out**, plus the protocol's own
+  withdrawal floor, what an exit does to the rate, the forward chain, and
+  quoted-vs-realized-vs-per-dollar. Three rules it keeps, because breaking them
+  turns a measurement into a promise: lead with `pHorizon` and not `pInst` (a
+  market dry 23 hours in 24 that clears nightly has `pInst ≈ 0.96` and nobody who
+  waited a day was stuck); `coverage` and `asOf` travel in the header with every
+  number; and a block that does not apply says so rather than rendering zeros (a
+  cooldown vault gets no liquidity statistics at all). Collapsed by default and
+  remembered — a collapsed band must not fetch.
 
 ## Conventions
 

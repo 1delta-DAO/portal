@@ -18,10 +18,28 @@ import type { EarnExitHistory, EarnExitHistoryDay } from '../../../../sdk/earn-h
 
 const hours = (h: number): string => (h >= 48 ? `${Math.round(h / 24)}d` : `${Math.round(h)}h`)
 
+/**
+ * The recorder's outage cap. Past it the digest's newest sample is not "now"
+ * any more, so `currentlyDry` — which means "the latest SAMPLE is dry" — stops
+ * being a statement about the present.
+ */
+const STALE_AFTER_HOURS = 6
+
+/** `currentlyDry`, but only where "currently" is still true. */
+export function isDryNow(h: EarnExitHistory): boolean {
+  if (!h.currentlyDry) return false
+  return (h.staleHours ?? 0) < STALE_AFTER_HOURS
+}
+
+/** Was dry when last seen, and last seen was a while ago. */
+export function isStale(h: EarnExitHistory): boolean {
+  return (h.staleHours ?? 0) >= STALE_AFTER_HOURS
+}
+
 /** Severity for the badge: dry right now > a day-long or frequent dry spell >
- *  any dry spell at all > never dry. */
+ *  any dry spell at all > never dry. A stale digest cannot claim the first. */
 export function exitHistoryTone(h: EarnExitHistory): BadgeTone {
-  if (h.currentlyDry) return 'error'
+  if (isDryNow(h)) return 'error'
   if ((h.worstDrySpellHours ?? 0) >= 24 || (h.dryShare ?? 0) >= 0.1) return 'warning'
   if (h.dryEpisodes > 0) return 'info'
   return 'success'
@@ -35,10 +53,13 @@ export function exitHistoryTitle(h: EarnExitHistory): string {
     `  95% of hours ≥ ${cap.p05 != null ? abbreviateUsd(cap.p05) : '—'}`,
     `  median ${cap.median != null ? abbreviateUsd(cap.median) : '—'}`,
     h.dryEpisodes > 0
-      ? `Dry (< max($1k, 0.5% of TVL)) ${formatPercent((h.dryShare ?? 0) * 100, 1)} of the time — ${h.dryEpisodes} spell${h.dryEpisodes === 1 ? '' : 's'}, longest ${hours(h.worstDrySpellHours ?? 0)}${h.currentlyDry ? ', dry right now' : ''}`
+      ? `Dry (< max($1k, 0.5% of TVL)) ${formatPercent((h.dryShare ?? 0) * 100, 1)} of the time — ${h.dryEpisodes} spell${h.dryEpisodes === 1 ? '' : 's'}, longest ${hours(h.worstDrySpellHours ?? 0)}${h.currentlyDry ? (isStale(h) ? ', and dry at the last sample' : ', dry right now') : ''}`
       : 'Never dry in the window',
+    isStale(h)
+      ? `NOT CURRENT: last sampled ${hours(h.staleHours ?? 0)} ago${h.lastSampleAt ? ` (${h.lastSampleAt})` : ''} — this row's liquidity is no longer being recorded, so everything above describes the past.`
+      : null,
     'Every figure is a lower bound: a trough shorter than an hour is not sampled.',
-  ]
+  ].filter(Boolean)
   return lines.join('\n')
 }
 
@@ -49,7 +70,7 @@ export const ExitHistoryHint: React.FC<{ history?: EarnExitHistory }> = ({ histo
   const label =
     history.dryEpisodes === 0
       ? `liquid ${history.days}d`
-      : history.currentlyDry
+      : isDryNow(history)
         ? `dry now · ${hours(history.worstDrySpellHours ?? 0)} worst`
         : `dry ${formatPercent((history.dryShare ?? 0) * 100, 0)} · ${hours(history.worstDrySpellHours ?? 0)} worst`
   return (
@@ -96,7 +117,7 @@ export function exitHistoryFields(
         value={
           h.dryEpisodes === 0
             ? 'none'
-            : `${h.dryEpisodes} · longest ${hours(h.worstDrySpellHours ?? 0)}${h.currentlyDry ? ' · dry now' : ''}`
+            : `${h.dryEpisodes} · longest ${hours(h.worstDrySpellHours ?? 0)}${h.currentlyDry ? (isStale(h) ? ' · dry at last sample' : ' · dry now') : ''}`
         }
         warn={h.currentlyDry || (h.worstDrySpellHours ?? 0) >= 24}
         hint="Maximal runs of consecutive dry hours. A spell that reaches the window edge is still counted."
@@ -105,6 +126,19 @@ export function exitHistoryFields(
         label="Observed"
         value={`${Math.round(h.coverage * 100)}% of ${h.days}d`}
         hint="Share of the window with an hourly sample. Every figure above is a LOWER bound — a trough shorter than an hour is not sampled."
+      />
+      {/* An age, not a freshness claim: a digest whose newest sample is days old
+          describes the past, and `Dry spells · dry now` would otherwise assert
+          the present off it. */}
+      <Field
+        label="Last sample"
+        value={h.staleHours == null ? 'unknown' : `${hours(h.staleHours)} ago`}
+        warn={isStale(h)}
+        hint={
+          isStale(h)
+            ? `This row's liquidity has not been recorded for ${hours(h.staleHours ?? 0)} — the figures above are historical.${h.lastSampleAt ? ` Last sample ${h.lastSampleAt}.` : ''}`
+            : 'Age of the newest hourly sample behind these figures.'
+        }
       />
     </>
   )

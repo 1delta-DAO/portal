@@ -235,13 +235,43 @@ const AssetCell: React.FC<{ row: EarnMarket }> = ({ row }) => (
   </>
 )
 
+/**
+ * Marks a rate that is no longer being observed.
+ *
+ * Deliberately next to the RATE and not in some metadata column: every
+ * latest-state table upstream is upsert-only, so a market that drops out of the
+ * sweep keeps its last rate forever — and since this table sorts by rate, a
+ * frozen number keeps the place it won on the day it froze. Two chain-1 Morpho
+ * vaults sat at the top of the Ethereum listing at ~100 % APR for five days
+ * after their last snapshot. Threshold is the recorder's own outage cap (6 h),
+ * so an ordinary late cycle does not raise it.
+ */
+const STALE_AFTER_HOURS = 6
+
+const StaleMark: React.FC<{ row: EarnMarket }> = ({ row }) => {
+  const age = row.staleHours
+  if (age == null || age < STALE_AFTER_HOURS) return null
+  const label = age >= 48 ? `${Math.round(age / 24)}d` : `${Math.round(age)}h`
+  return (
+    <Badge
+      tone={age >= 24 ? 'error' : 'warning'}
+      title={`Last observed ${label} ago${row.asOf ? ` (${row.asOf})` : ''}. This row is no longer being updated, so the rate, size and withdrawable figures are all historical — and it keeps whatever rank they earned.`}
+    >
+      {label} old
+    </Badge>
+  )
+}
+
 /** Headline APR with its two qualifiers (term, venue share) underneath. */
 const AprCell: React.FC<{ row: EarnMarket }> = ({ row }) => {
   const note = venueNote(row)
   const term = termNote(row)
   return (
     <>
-      <div>{pct(row.rate.total)}</div>
+      <div className="flex items-baseline justify-end gap-1">
+        {pct(row.rate.total)}
+        <StaleMark row={row} />
+      </div>
       {/* The TERM qualifies the headline, so it sits directly under it. A
           fixed rate with no term beside it is the same number whether it runs
           nine days or five years. */}

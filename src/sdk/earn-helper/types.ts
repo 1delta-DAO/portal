@@ -113,7 +113,17 @@ export interface EarnExitHistory {
   dryEpisodes: number
   /** longest dry run, hours; null = never dry */
   worstDrySpellHours: number | null
+  /**
+   * The LATEST sample of the window is dry. Read it with `staleHours`: on a row
+   * whose recording has stopped, "currently" means as of `lastSampleAt`, so a
+   * renderer that says "dry right now" off this alone can be days out of date.
+   */
   currentlyDry: boolean
+  /** ISO of the newest sample behind these figures. Older origins omit it. */
+  lastSampleAt?: string | null
+  /** Age of `lastSampleAt`, hours. Past the 6 h outage cap this row's
+   *  liquidity is no longer being observed at all. */
+  staleHours?: number | null
   /**
    * One point per UTC calendar day with at least one sample — the series the
    * lockup chart draws. A day with no sample is absent, so a gap in the
@@ -422,6 +432,22 @@ export interface EarnMarket {
    */
   maturity?: MaturityTerms
   providerMeta?: Record<string, unknown>
+
+  /**
+   * ISO timestamp of when this row's state was last OBSERVED — not when the
+   * response was built.
+   *
+   * Origin-only; the SDK/edge path reads live and leaves it absent. It matters
+   * because every latest-state table upstream is upsert-only: a market that
+   * stops being fetched is served unchanged and indefinitely, which on a
+   * listing sorted by rate means an unearnable rate keeps its place at the top.
+   * Two chain-1 Morpho vaults did exactly that for five days at ~100 % APR.
+   * Absent ⇒ unknown, never "now".
+   */
+  asOf?: string
+  /** Age of {@link asOf} in hours. Past a few hours, every figure on the row —
+   *  rate, TVL, withdrawable — is history. */
+  staleHours?: number
 }
 
 export interface EarnFacetBucket {

@@ -19,6 +19,7 @@ import { EarnMarketsTable, type EarnSortKey } from './EarnMarketsTable'
 import { EarnPositionsTable } from './EarnPositionsTable'
 import { PortfolioSummary } from './PortfolioSummary'
 import { HistoryPanel } from './HistoryPanel'
+import { WithdrawabilityPanel } from './WithdrawabilityPanel'
 import { DetailPanel, DetailPlaceholder } from './DetailPanel'
 import { isVaultPosition, portfolioNetApr } from '../../../../sdk/earn-helper'
 import type { EarnMarket, EarnVaultPosition } from '../../../../sdk/earn-helper'
@@ -123,6 +124,10 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
     // `as boolean` so the generic infers a togglable flag, not the literal
     // `true` (which makes `setFilter('chartOpen', false)` a type error).
     chartOpen: true as boolean,
+    // The withdrawability band starts CLOSED: it costs a request per selected
+    // row, and it answers a question most browsing does not ask. Opening it is
+    // remembered, so a user who does care pays the click once.
+    lockupOpen: false as boolean,
   })
   const pageSize = PAGE_SIZES.includes(filters.pageSize as (typeof PAGE_SIZES)[number])
     ? (filters.pageSize as number)
@@ -384,6 +389,19 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
               vocab={vocab}
               open={!!filters.chartOpen}
               onToggleOpen={() => setFilter('chartOpen', !filters.chartOpen)}
+            />
+          )}
+
+          {/* The measured exit picture for the selected row, at a size — the
+              digest on the row answers "was it liquid", this answers "would I
+              have got out, and how long would I have waited". Its own band
+              because it needs the width of the matrix, and its own collapse
+              because it costs a request. */}
+          {!isMobile && (
+            <WithdrawabilityPanel
+              row={selected}
+              open={!!filters.lockupOpen}
+              onToggleOpen={() => setFilter('lockupOpen', !filters.lockupOpen)}
             />
           )}
 
