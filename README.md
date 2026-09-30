@@ -194,10 +194,11 @@ these scoped dependency choices when upgrading wallet packages, and check the
 production wallet picker as well as the build before changing them. A
 WalletConnect/Reown project ID is still required for mobile wallet connections.
 
-The repository-wide formatting check currently flags 14 existing source/docs
-files; it must pass before CI can merge a PR. The local wallet picker can be
-tested without signing, but a real wallet extension or valid Reown project ID
-is needed to verify an end-to-end connection.
+Prettier is pinned to the original 3.8.1 release: newer formatting changed four
+untouched files. The repository-wide check still flags 10 files under the
+original formatter; it must pass before CI can merge a PR. The local wallet
+picker can be tested without signing, but a real wallet extension or valid
+Reown project ID is needed to verify an end-to-end connection.
 
 ## Supported Protocols
 
