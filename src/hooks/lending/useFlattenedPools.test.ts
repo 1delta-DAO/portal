@@ -16,7 +16,14 @@ function page(n: number): { items: PoolEntry[] } {
 /** Drain the generator into the shape the reducer would produce. */
 async function drain(): Promise<{ items: PoolEntry[]; truncated: boolean }> {
   let acc = { items: [] as PoolEntry[], truncated: false }
-  for await (const chunk of streamPoolsForChain('1', undefined, 4, PAGE_SIZE, undefined, undefined)) {
+  for await (const chunk of streamPoolsForChain(
+    '1',
+    undefined,
+    4,
+    PAGE_SIZE,
+    undefined,
+    undefined
+  )) {
     acc = mergeChunk(acc, chunk)
   }
   return acc

@@ -74,7 +74,8 @@ export function PermitSignCard({
       </div>
       <p className="text-[11px] text-base-content/60">
         One signature replaces the ERC-20 approval — it executes inside the swap transaction, so
-        there is one less transaction to send{offer.unscoped ? '' : ' and it is scoped to this exact amount'}.
+        there is one less transaction to send
+        {offer.unscoped ? '' : ' and it is scoped to this exact amount'}.
       </p>
       <button
         type="button"

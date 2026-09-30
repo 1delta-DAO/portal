@@ -8,10 +8,8 @@ vi.mock('../../sdk/http', () => ({
 const getTokenFromCache = vi.fn()
 const registerResolvedToken = vi.fn((_chainId: string, t: any) => t)
 vi.mock('./tokenListsCache', () => ({
-  getTokenFromCache: (chainId: string, address: string) =>
-    getTokenFromCache(chainId, address),
-  registerResolvedToken: (chainId: string, token: any) =>
-    registerResolvedToken(chainId, token),
+  getTokenFromCache: (chainId: string, address: string) => getTokenFromCache(chainId, address),
+  registerResolvedToken: (chainId: string, token: any) => registerResolvedToken(chainId, token),
 }))
 
 const UNLISTED = '0x00000000000000000000000000000000f0f0f001'

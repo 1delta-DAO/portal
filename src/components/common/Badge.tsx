@@ -1,6 +1,13 @@
 import React from 'react'
 
-export type BadgeTone = 'success' | 'error' | 'critical' | 'warning' | 'info' | 'primary' | 'neutral'
+export type BadgeTone =
+  | 'success'
+  | 'error'
+  | 'critical'
+  | 'warning'
+  | 'info'
+  | 'primary'
+  | 'neutral'
 
 interface BadgeProps {
   tone?: BadgeTone
