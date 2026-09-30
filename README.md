@@ -184,6 +184,21 @@ adding both a `lazy()` element and its flag test.
 | `pnpm format`  | Format code with Prettier   |
 | `pnpm test`    | Run the unit tests (vitest) |
 
+### Dependency security and compatibility
+
+CI installs the committed lockfile with pnpm 10 on Node 22 and runs typecheck,
+lint, formatting, tests, and a production build. The lockfile resolves patched
+`query-string` 9 for WalletConnect utilities and `uuid` 11 for wallet SDK
+consumers; the application does not import either package directly. Preserve
+these scoped dependency choices when upgrading wallet packages, and check the
+production wallet picker as well as the build before changing them. A
+WalletConnect/Reown project ID is still required for mobile wallet connections.
+
+The repository-wide formatting check currently flags existing source files and
+the generated `pnpm-lock.yaml`; it must pass before CI can merge a PR. The
+local wallet picker can be tested without signing, but a real wallet extension
+or valid Reown project ID is needed to verify an end-to-end connection.
+
 ## Supported Protocols
 
 Any lending protocol in the 1delta lender registry, including AAVE V2/V3, Morpho Blue, Euler V2, Compound V2/V3, and others.
