@@ -804,12 +804,15 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
                       {permitEnabled && signatures.length === 0 && !permitApplied && (
                         <PermitSkippedHint skipped={permitSkipped} />
                       )}
-                      {permitApplied && !isSpotFallback && selectedQuote && !selectedQuote.permitApplied && (
-                        <div className="text-[10px] text-base-content/40 px-1">
-                          This route is paid through its own bridge router, which accepts no
-                          permit — the approval below still applies.
-                        </div>
-                      )}
+                      {permitApplied &&
+                        !isSpotFallback &&
+                        selectedQuote &&
+                        !selectedQuote.permitApplied && (
+                          <div className="text-[10px] text-base-content/40 px-1">
+                            This route is paid through its own bridge router, which accepts no
+                            permit — the approval below still applies.
+                          </div>
+                        )}
                       {selectedPermissions.map((tx, i) => (
                         <button
                           key={`perm-${i}`}

@@ -25,20 +25,19 @@ export const TermMaxOpenNotice: React.FC<{ symbol?: string }> = ({ symbol }) => 
   <div className="space-y-2 rounded-lg border border-info/30 bg-info/5 p-3">
     <div className="text-sm font-medium">No position on this market</div>
     <p className="text-xs leading-relaxed text-base-content/70">
-      Borrowing {symbol ? `${symbol} ` : ''}here raises the debt on a fixed-term
-      position you already hold. Opening a new one takes the collateral and the
-      borrow together in a single transaction, so it starts from a different
-      screen.
+      Borrowing {symbol ? `${symbol} ` : ''}here raises the debt on a fixed-term position you
+      already hold. Opening a new one takes the collateral and the borrow together in a single
+      transaction, so it starts from a different screen.
     </p>
     <ul className="ml-4 list-disc space-y-1 text-xs text-base-content/70">
       <li>
-        <span className="font-medium text-base-content">Optimizer</span> — deposit
-        collateral and borrow in one step.
+        <span className="font-medium text-base-content">Optimizer</span> — deposit collateral and
+        borrow in one step.
       </li>
     </ul>
     <p className="text-[10px] leading-tight text-base-content/50">
-      TermMax debt is a fixed face value due at the market&apos;s maturity — the
-      rate is locked at open and does not accrue.
+      TermMax debt is a fixed face value due at the market&apos;s maturity — the rate is locked at
+      open and does not accrue.
     </p>
   </div>
 )
