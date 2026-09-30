@@ -194,10 +194,10 @@ these scoped dependency choices when upgrading wallet packages, and check the
 production wallet picker as well as the build before changing them. A
 WalletConnect/Reown project ID is still required for mobile wallet connections.
 
-The repository-wide formatting check currently flags existing source files and
-the generated `pnpm-lock.yaml`; it must pass before CI can merge a PR. The
-local wallet picker can be tested without signing, but a real wallet extension
-or valid Reown project ID is needed to verify an end-to-end connection.
+The repository-wide formatting check currently flags 14 existing source/docs
+files; it must pass before CI can merge a PR. The local wallet picker can be
+tested without signing, but a real wallet extension or valid Reown project ID
+is needed to verify an end-to-end connection.
 
 ## Supported Protocols
 
