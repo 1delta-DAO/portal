@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import type { Address } from 'viem'
-import { zeroAddress } from 'viem'
 import { useTokenLists } from '../../hooks/useTokenLists'
 import { useBalanceQuery } from '../../hooks/balances/useBalanceQuery'
 import { usePriceQuery } from '../../hooks/prices/usePriceQuery'
 import { useChainsRegistry } from '../../hooks/useChainsRegistry'
 import { SupportedChainId } from '../../sdk/types'
 import { getCurrency } from '../../lib/trade-helpers/utils'
+import { nativeAddressFor } from '../../lib/native'
 import type { RawCurrency } from '../../types/currency'
 import { TokenSelectorDropdownMode } from './Dropdown'
 import { TokenSelectorListMode } from './ListMode'
@@ -103,6 +103,16 @@ export function TokenSelector({
 
   const queryIsAddress = isTokenAddress(searchQuery)
 
+  // A pasted address that IS listed but excluded (the token already picked on
+  // the other leg) yields no rows, and "no token at this address" would then
+  // read as a missing listing.
+  const queryExcludedSymbol = useMemo(() => {
+    if (!queryIsAddress || !excludeAddresses?.length) return undefined
+    const q = searchQuery.trim().toLowerCase()
+    if (!excludeAddresses.some((a) => a.toLowerCase() === q)) return undefined
+    return curatedMap[q]?.symbol ?? 'This token'
+  }, [queryIsAddress, excludeAddresses, searchQuery, curatedMap])
+
   const { token: resolvedToken, isLoading: resolvingToken } = useResolvedToken(
     chainId,
     searchQuery,
@@ -156,12 +166,12 @@ export function TokenSelector({
 
   const mainAndUserTokensSet = useMemo(() => {
     const set = new Set<string>(mainTokensSet)
-    set.add(zeroAddress.toLowerCase())
+    set.add(nativeAddressFor(chainId).toLowerCase())
     for (const addr of userTokensForChain) {
       set.add(addr.toLowerCase())
     }
     return set
-  }, [mainTokensSet, userTokensForChain])
+  }, [mainTokensSet, userTokensForChain, chainId])
 
   const balanceCurrencies = useMemo(() => {
     if (!userAddress) return []
@@ -170,7 +180,7 @@ export function TokenSelector({
 
     const addressesToFetch = new Set<string>()
 
-    addressesToFetch.add(zeroAddress.toLowerCase())
+    addressesToFetch.add(nativeAddressFor(chainId).toLowerCase())
 
     for (const addr of mainTokensSet) {
       addressesToFetch.add(addr.toLowerCase())
@@ -194,8 +204,9 @@ export function TokenSelector({
       }
     }
 
-    const nativeCurrency = getCurrency(chainId, zeroAddress)
-    if (nativeCurrency && !seenAddresses.has(zeroAddress.toLowerCase())) {
+    const nativeAddress = nativeAddressFor(chainId)
+    const nativeCurrency = getCurrency(chainId, nativeAddress)
+    if (nativeCurrency && !seenAddresses.has(nativeAddress.toLowerCase())) {
       currencies.push(nativeCurrency)
     }
 
@@ -204,7 +215,9 @@ export function TokenSelector({
 
   const { data: balances, isLoading: balancesLoading } = useBalanceQuery({
     currencies: balanceCurrencies,
-    enabled: balanceCurrencies.length > 0 && Boolean(userAddress),
+    // The connected wallet is EVM: it holds nothing on Solana (offered as a
+    // destination only), so there is no balance to ask for.
+    enabled: balanceCurrencies.length > 0 && Boolean(userAddress) && chainId !== 'solana',
   })
 
   const relevant = useMemo(() => {
@@ -226,8 +239,8 @@ export function TokenSelector({
       }
     }
 
-    // Native
-    relevantTokens.push(zeroAddress as Address)
+    // Native — the zero address on EVM, the System Program id on Solana
+    relevantTokens.push(nativeAddressFor(chainId) as Address)
 
     const wrappedEntry = Object.entries(tokensMap).find(
       ([addr, t]: [string, any]) => t?.props?.wnative === true && !isAlreadyIncluded(addr)
@@ -501,6 +514,7 @@ export function TokenSelector({
         pricesLoading={pricesLoading}
         resolvingToken={resolvingToken}
         queryIsAddress={queryIsAddress}
+        queryExcludedSymbol={queryExcludedSymbol}
         userAddress={userAddress}
         listsLoading={listsLoading}
         onChange={handleTokenChange}
@@ -525,6 +539,7 @@ export function TokenSelector({
       pricesLoading={pricesLoading}
       resolvingToken={resolvingToken}
       queryIsAddress={queryIsAddress}
+      queryExcludedSymbol={queryExcludedSymbol}
       userAddress={userAddress}
       searchQuery={searchQuery}
       setSearchQuery={setSearchQuery}

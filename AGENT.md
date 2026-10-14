@@ -252,6 +252,7 @@ pnpm format     # Prettier
 | `VITE_BRIDGE_UI_ENABLED`    | on                         | Cross-Chain (bridge) tab, shown by default with a "Beta" pill — set `false` to hide it                                                                                           |
 | `VITE_UNIFIED_EARN_ENABLED` | on                         | Unified Earn tab redesign (`tabs/unified/`), shown by default — set `false` to hide it                                                                                           |
 | `VITE_USER_POSITIONS_RPC`   | off                        | `true` fetches user positions for every chain via the client-side prepare → `eth_call` → parse flow instead of the API. Per-chain overrides in `useUserData.ts` apply either way |
+| `VITE_SOLANA_DESTINATION_ENABLED` | on in `vite dev`, off in builds | TEST: Solana as a DESTINATION chain in the Cross-Chain swap panel (receive-side chain selector + a base58 recipient input; the pay side stays EVM, so the flip button is disabled while Solana is the destination). `true` forces it on in a build, `false` forces it off in dev |
 
 ## Chain Selection
 

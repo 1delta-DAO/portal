@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { useWalletClient } from 'wagmi'
+import type { Address, Hex } from 'viem'
 import { apiFetchEnvelope, ApiError } from '../sdk/http'
 import {
   signPermitOffer,
@@ -28,7 +29,38 @@ export interface XChainSwapQuote {
    * carry it; router-spender bridges keep their approve.
    */
   permitApplied?: boolean
+  /**
+   * Tracking key for bridges that do not track by source tx hash (Mayan's
+   * order id, NEAR Intents' per-quote deposit address) — passed to
+   * `/v1/data/bridge/status` as `orderId`.
+   */
+  orderId?: string
+  /** Destination gas this route delivers when `destinationGas` was asked for. */
+  destinationGas?: DestinationGas
   tx: SpotSwapTx
+}
+
+/**
+ * The `destinationGas` block of an x-chain quote row (worker-api
+ * `destinationGas.ts`). `native-drop`: the bridge drops it inside the route's
+ * own transaction. `batch`: a NEAR Intents deposit (`transaction`) rides
+ * beside the route — sent with it in one `wallet_sendCalls` where the wallet
+ * supports it, right after it otherwise.
+ */
+export interface DestinationGas {
+  /** destination native, base units */
+  amount: string
+  decimals: number
+  mode: 'native-drop' | 'batch'
+  /** `output`: out of the bridged amount · `value`: in the route's msg.value · `gas-leg`: a separate deposit */
+  paidFrom: 'output' | 'value' | 'gas-leg'
+  /** source native, when known */
+  cost?: { amount: string; decimals: number; usd?: number }
+  bridge?: string
+  /** batch only: the gas leg's status key */
+  orderId?: string
+  /** batch only: the gas leg's transaction (EVM `{to,data,value}`) */
+  transaction?: SpotSwapTx & { description?: string; chainType?: string }
 }
 
 /** `data` half of the `/v1/actions/swap/x-chain` response. */
@@ -44,6 +76,8 @@ interface XChainQuoteData {
     approvalTarget?: string
     approvalRequired?: boolean
     permitApplied?: boolean
+    orderId?: string
+    destinationGas?: DestinationGas
     /** Same-chain spot fallback only, under `permit=auto`. */
     buildId?: string
   }>
@@ -77,7 +111,8 @@ interface XChainSwapState {
   loading: boolean
   executing: boolean
   error: string | null
-  txSuccess: { hash?: string } | null
+  /** `batchId` when sent as one EIP-5792 batch; `gasHash` for a separately sent gas leg */
+  txSuccess: { hash?: string; batchId?: string; gasHash?: string } | null
 }
 
 export interface XChainSwapParams {
@@ -90,6 +125,8 @@ export interface XChainSwapParams {
   account?: string
   receiver?: string
   order?: 'CHEAPEST' | 'FASTEST'
+  /** destination native to deliver with the transfer (decimal, or `auto` on Solana) */
+  destinationGas?: string
 }
 
 const EMPTY_STATE: XChainSwapState = {
@@ -163,6 +200,8 @@ export function useXChainSwapQuote(params: {
         approvalTarget: q.approvalTarget,
         approvalRequired: q.approvalRequired,
         permitApplied: q.permitApplied,
+        orderId: q.orderId,
+        destinationGas: q.destinationGas,
         tx: alternatives[i] ?? { to: '', data: '', value: '0' },
       }))
 
@@ -222,6 +261,7 @@ export function useXChainSwapQuote(params: {
         if (swapParams.account) qs.set('account', swapParams.account)
         if (swapParams.receiver) qs.set('receiver', swapParams.receiver)
         if (swapParams.order) qs.set('order', swapParams.order)
+        if (swapParams.destinationGas) qs.set('destinationGas', swapParams.destinationGas)
         if (permitEnabledRef.current && swapParams.account) qs.set('permit', 'auto')
 
         const query = Object.fromEntries(qs)
@@ -353,13 +393,64 @@ export function useXChainSwapQuote(params: {
 
     setState((s) => ({ ...s, executing: true, error: null }))
     const quote = state.quotes[state.selectedIndex]
-    const { ok, error: txError, hash } = await send(quote.tx as LendingTx)
-    if (ok) {
-      setState((s) => ({ ...s, executing: false, txSuccess: { hash } }))
-    } else {
-      setState((s) => ({ ...s, executing: false, error: txError ?? 'Swap execution failed' }))
+    const gasTx = quote.destinationGas?.mode === 'batch' ? quote.destinationGas.transaction : undefined
+
+    // A route with a separate gas leg: try ONE batched signature (EIP-5792
+    // `wallet_sendCalls`), and fall back to two transactions — the bridge
+    // first, then the gas leg — where the wallet does not batch.
+    if (gasTx && !gasTx.chainType && walletClient) {
+      try {
+        const { id } = await walletClient.sendCalls({
+          account: walletClient.account!,
+          chain: walletClient.chain,
+          calls: [quote.tx, gasTx].map((t) => ({
+            to: t.to as Address,
+            data: (t.data || '0x') as Hex,
+            value: BigInt(t.value || 0),
+          })),
+        })
+        // The bridge's status tracker keys on the source tx hash: read it off
+        // the batch's receipt (one transaction on an atomic 7702 batch).
+        let hash: string | undefined
+        try {
+          const status = await walletClient.waitForCallsStatus({ id, timeout: 120_000 })
+          hash = status.receipts?.[0]?.transactionHash
+        } catch {
+          // the batch was submitted; only its receipt could not be read here
+        }
+        setState((s) => ({ ...s, executing: false, txSuccess: { hash, batchId: id } }))
+        return
+      } catch (e: any) {
+        // 4200 / 'method not found' = no EIP-5792 support → sequential below;
+        // a user rejection ends here
+        if (e?.code === 4001 || /reject|denied/i.test(e?.shortMessage ?? e?.message ?? '')) {
+          setState((s) => ({ ...s, executing: false, error: 'Rejected in wallet' }))
+          return
+        }
+      }
     }
-  }, [state.selectedIndex, state.quotes, send])
+
+    const { ok, error: txError, hash } = await send(quote.tx as LendingTx)
+    if (!ok) {
+      setState((s) => ({ ...s, executing: false, error: txError ?? 'Swap execution failed' }))
+      return
+    }
+    if (gasTx && !gasTx.chainType) {
+      const gas = await send(gasTx as LendingTx)
+      if (!gas.ok) {
+        setState((s) => ({
+          ...s,
+          executing: false,
+          txSuccess: { hash },
+          error: `Bridge sent, but the destination gas deposit failed: ${gas.error ?? 'unknown error'}`,
+        }))
+        return
+      }
+      setState((s) => ({ ...s, executing: false, txSuccess: { hash, gasHash: gas.hash } }))
+      return
+    }
+    setState((s) => ({ ...s, executing: false, txSuccess: { hash } }))
+  }, [state.selectedIndex, state.quotes, send, walletClient])
 
   const dismissSuccess = useCallback(() => {
     setState((s) => ({

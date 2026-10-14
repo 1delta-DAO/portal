@@ -4,7 +4,7 @@ import { ChainFilterSelect } from '../lending/shared/ChainFilter'
 import { TokenSelector } from './index'
 import type { RawCurrency } from '../../types/currency'
 import { getCurrency } from '../../lib/trade-helpers/utils'
-import { useChains } from '../../hooks/useChains'
+import { useChains, type ChainMeta } from '../../hooks/useChains'
 import { ModalHeader } from '../common/ModalHeader'
 
 type TokenSelectorModalProps = {
@@ -28,6 +28,13 @@ type TokenSelectorModalProps = {
   excludeChainId?: string
   showChainSelector?: boolean
   initialChainId?: string
+  /**
+   * Chains offered in the selector beyond what `/v1/data/chains` serves —
+   * today only Solana as a cross-chain DESTINATION (behind
+   * `SOLANA_DESTINATION_ENABLED`). The data endpoint lists lending chains,
+   * which Solana's bridge support does not depend on.
+   */
+  extraChains?: ChainMeta[]
 }
 
 export function TokenSelectorModal({
@@ -42,8 +49,16 @@ export function TokenSelectorModal({
   excludeChainId,
   showChainSelector = false,
   initialChainId,
+  extraChains,
 }: TokenSelectorModalProps) {
-  const { chains } = useChains()
+  const { chains: apiChains } = useChains()
+  const chains = useMemo(
+    () =>
+      extraChains?.length
+        ? [...apiChains, ...extraChains.filter((x) => !apiChains.some((c) => c.chainId === x.chainId))]
+        : apiChains,
+    [apiChains, extraChains]
+  )
   const [chainId, setChainId] = useState<string | undefined>(
     initialChainId ?? currency?.chainId ?? '137'
   )

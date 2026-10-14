@@ -29,7 +29,6 @@ import {
   moonbeam,
   sei,
   soneium,
-  abstract,
   morph,
   megaeth,
   mantle,
@@ -44,7 +43,6 @@ import {
   linea,
   bob,
   berachain,
-  blast,
   plumeMainnet,
   taiko,
   scroll,
@@ -137,7 +135,6 @@ export const evmChainWagmi: [Chain, ...Chain[]] = [
   pharos, // 1672
   soneium, // 1868
   ronin, // 2020
-  abstract, // 2741
   morph, // 2818
   tempo, // 4217
   megaeth, // 4326
@@ -156,7 +153,6 @@ export const evmChainWagmi: [Chain, ...Chain[]] = [
   linea, // 59144
   bob, // 60808
   berachain, // 80094
-  blast, // 81457
   plumeMainnet, // 98866
   taiko, // 167000
   scroll, // 534352

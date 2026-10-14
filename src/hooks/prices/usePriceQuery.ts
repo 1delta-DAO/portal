@@ -31,7 +31,9 @@ export function usePriceQuery({ currencies, enabled = true }: UsePriceQueryParam
       for (const c of currencies) {
         const chain = c.chainId
         if (!byChain[chain]) byChain[chain] = []
-        byChain[chain].push(c.address.toLowerCase())
+        // base58 is case-significant: a lower-cased Solana mint is a different
+        // (non-existent) account. Results are still KEYED lower-case below.
+        byChain[chain].push(chain === 'solana' ? c.address : c.address.toLowerCase())
       }
 
       const result: PriceData = {}

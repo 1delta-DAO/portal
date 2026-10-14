@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useSpyAccount } from '../../contexts/SpyMode'
-import { parseUnits, zeroAddress, type Address } from 'viem'
+import { formatUnits, parseUnits, zeroAddress, type Address } from 'viem'
 import type { RawCurrency } from '../../types/currency'
 import { useXChainSwapQuote, type XChainSwapQuote } from '../../hooks/useXChainSwapQuote'
 import {
@@ -21,12 +21,29 @@ import { WalletConnect } from '../connect'
 import { getCurrency } from '../../lib/trade-helpers/utils'
 import { useDebounce } from '../../hooks/useDebounce'
 import { Logo } from '../common/Logo'
+import { SOLANA_CHAIN_ID, SOLANA_DESTINATION_ENABLED } from '../../config/flags'
+import { chainLogoUrl } from '../../config/assets'
+import { nativeAddressFor } from '../../lib/native'
+import type { ChainMeta } from '../../hooks/useChains'
 import {
   PermitAppliedChip,
   PermitSignCard,
   PermitSkippedHint,
   PermitToggle,
 } from './PermitControls'
+
+/**
+ * Solana in the RECEIVE-side chain selector, behind
+ * `SOLANA_DESTINATION_ENABLED`. Destination only: the connected wallet is
+ * EVM, so it can pay on an EVM chain and name a Solana recipient, but it
+ * cannot sign a Solana deposit.
+ */
+const DESTINATION_EXTRA_CHAINS: ChainMeta[] = SOLANA_DESTINATION_ENABLED
+  ? [{ chainId: SOLANA_CHAIN_ID, name: 'Solana', logoURI: chainLogoUrl(SOLANA_CHAIN_ID) }]
+  : []
+
+/** A Solana public key: 32–44 base58 characters (no 0, O, I, l). */
+const isSolanaAddress = (v: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v)
 
 interface XChainSwapPanelProps {
   chainId: string
@@ -95,6 +112,7 @@ function XChainQuoteCard({
   onClick,
   inSymbol,
   outSymbol,
+  gasSymbol,
 }: {
   quote: XChainSwapQuote
   index: number
@@ -102,8 +120,11 @@ function XChainQuoteCard({
   onClick: () => void
   inSymbol?: string
   outSymbol?: string
+  /** the destination's native symbol, for the destination-gas line */
+  gasSymbol?: string
 }) {
   const duration = fmtDuration(quote.estimatedDuration)
+  const gas = quote.destinationGas
   return (
     <button
       type="button"
@@ -132,6 +153,18 @@ function XChainQuoteCard({
           </span>
         </span>
       </div>
+      {gas && (
+        <div className="mt-1 text-[10px] text-base-content/60">
+          + {fmtTradeAmount(Number(formatUnits(BigInt(gas.amount), gas.decimals)))} {gasSymbol}{' '}
+          gas on arrival ·{' '}
+          {gas.mode === 'native-drop'
+            ? gas.paidFrom === 'output'
+              ? 'dropped by the bridge, out of the amount'
+              : 'dropped by the bridge, in the fee'
+            : `separate deposit via ${gas.bridge ?? 'NEAR Intents'}`}
+          {gas.cost?.usd !== undefined && ` (${fmtUsd(gas.cost.usd)})`}
+        </div>
+      )}
     </button>
   )
 }
@@ -151,6 +184,15 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
 
   const fromChainId = tokenIn?.chainId ?? chainId
   const toChainId = tokenOut?.chainId ?? chainId
+
+  // A Solana destination needs a base58 recipient: the EVM account cannot
+  // receive there, and the API refuses to default `receiver` across VMs.
+  const isSolanaDestination = toChainId === SOLANA_CHAIN_ID
+  const destinationNativeSymbol =
+    getCurrency(toChainId, nativeAddressFor(toChainId))?.symbol ??
+    (isSolanaDestination ? 'SOL' : 'native')
+  const [solanaRecipient, setSolanaRecipient] = useState('')
+  const solanaRecipientValid = isSolanaAddress(solanaRecipient.trim())
   const isWrongChain = !!account && currentChainId !== Number(fromChainId)
 
   const chainName = useCallback(
@@ -207,6 +249,12 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
   // The permit switch (two-call gasless-approval flow, see sdk/permits.ts)
   const [permitEnabled, setPermitEnabled] = useState(false)
 
+  // Destination gas: native delivered on arrival with the transfer, so a
+  // token that is not the destination's gas token can be moved. `auto` is
+  // defined for Solana only (0.005 SOL); an EVM destination takes an amount.
+  const [gasEnabled, setGasEnabled] = useState(false)
+  const [gasAmount, setGasAmount] = useState('')
+
   const {
     quotes,
     selectedIndex,
@@ -239,6 +287,7 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
   // Live settlement tracking after a bridge submit (not for same-chain spot)
   const { data: bridgeStatus } = useBridgeStatus({
     bridge: selectedQuote?.label,
+    orderId: selectedQuote?.orderId,
     fromChainId,
     toChainId,
     txHash: txSuccess?.hash,
@@ -287,7 +336,11 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
     [reset]
   )
 
+  // The pay side must stay EVM (see DESTINATION_EXTRA_CHAINS).
+  const canSwapDirection = tokenOut?.chainId !== SOLANA_CHAIN_ID
+
   const handleSwapDirection = useCallback(() => {
+    if (tokenOut?.chainId === SOLANA_CHAIN_ID) return
     setTokenIn(tokenOut)
     setTokenOut(tokenIn)
     setInputAmount('')
@@ -302,7 +355,16 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
     [reset]
   )
 
-  const canFetchQuote = !!tokenIn && !!tokenOut && !!inputAmount
+  const canFetchQuote =
+    !!tokenIn && !!tokenOut && !!inputAmount && (!isSolanaDestination || solanaRecipientValid)
+
+  const destinationGasParam = !gasEnabled
+    ? undefined
+    : gasAmount.trim()
+      ? gasAmount.trim()
+      : toChainId === SOLANA_CHAIN_ID
+        ? 'auto'
+        : undefined
 
   const handleFetchQuote = useCallback(() => {
     if (!tokenIn || !tokenOut) return
@@ -322,11 +384,28 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
       amount: amountWei,
       slippage: (parseFloat(slippage) || 0.5) * 100,
       account,
+      ...(isSolanaDestination && solanaRecipientValid
+        ? { receiver: solanaRecipient.trim() }
+        : {}),
+      ...(destinationGasParam ? { destinationGas: destinationGasParam } : {}),
     })
-  }, [tokenIn, tokenOut, inputAmount, slippage, account, fetchQuote])
+  }, [
+    destinationGasParam,
+    tokenIn,
+    tokenOut,
+    inputAmount,
+    slippage,
+    account,
+    fetchQuote,
+    isSolanaDestination,
+    solanaRecipient,
+    solanaRecipientValid,
+  ])
 
   // Auto-quote with debounce
   const debouncedInputAmount = useDebounce(inputAmount, 500)
+  const debouncedRecipient = useDebounce(solanaRecipient, 500)
+  const debouncedGas = useDebounce(destinationGasParam, 500)
   const handleFetchQuoteRef = useRef(handleFetchQuote)
   handleFetchQuoteRef.current = handleFetchQuote
 
@@ -336,7 +415,15 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
     handleFetchQuoteRef.current()
     // `permitEnabled` re-quotes on toggle: the offer only exists on a quote
     // that asked for it (`permit=auto`).
-  }, [debouncedInputAmount, canFetchQuote, tokenIn, tokenOut, permitEnabled])
+  }, [
+    debouncedInputAmount,
+    canFetchQuote,
+    tokenIn,
+    tokenOut,
+    permitEnabled,
+    debouncedRecipient,
+    debouncedGas,
+  ])
 
   // The other side's token is excluded ON ITS OWN CHAIN only. The modal has
   // its own chain picker, so it is not necessarily showing `fromChainId` /
@@ -425,6 +512,16 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
               {txSuccess.hash && (
                 <p className="text-[10px] text-base-content/40 font-mono truncate max-w-full px-2">
                   {txSuccess.hash}
+                </p>
+              )}
+              {txSuccess.batchId && (
+                <p className="text-[10px] text-base-content/50 px-2">
+                  Bridge and destination gas sent as one batch.
+                </p>
+              )}
+              {txSuccess.gasHash && (
+                <p className="text-[10px] text-base-content/50 font-mono truncate max-w-full px-2">
+                  Gas deposit: {txSuccess.gasHash}
                 </p>
               )}
               <button
@@ -571,7 +668,12 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
                   type="button"
                   className="btn btn-circle btn-sm bg-base-100 border-base-300 shadow-sm hover:bg-base-200"
                   onClick={handleSwapDirection}
-                  title="Switch sides"
+                  disabled={!canSwapDirection}
+                  title={
+                    canSwapDirection
+                      ? 'Switch sides'
+                      : 'Solana is a destination only — your wallet cannot pay from it'
+                  }
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -643,6 +745,29 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
                   })()}
                   {tokenOut && <div className="text-xs text-base-content/40">{tokenOut.name}</div>}
                 </div>
+                {isSolanaDestination && (
+                  <div className="mt-2 space-y-1">
+                    <input
+                      type="text"
+                      className={`input input-bordered input-sm w-full font-mono text-xs ${
+                        solanaRecipient && !solanaRecipientValid ? 'input-error' : ''
+                      }`}
+                      placeholder="Solana recipient address"
+                      spellCheck={false}
+                      autoComplete="off"
+                      value={solanaRecipient}
+                      onChange={(e) => {
+                        setSolanaRecipient(e.target.value)
+                        reset()
+                      }}
+                    />
+                    <div className="text-[10px] text-base-content/40 px-1">
+                      {solanaRecipient && !solanaRecipientValid
+                        ? 'Not a Solana address (base58, 32–44 characters).'
+                        : 'Funds are delivered to this Solana address. Test feature.'}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Insufficient balance warning */}
@@ -694,6 +819,50 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
                 />
               </div>
 
+              {/* Destination gas — native on arrival, in the same transaction
+                  (Mayan / LayerZero) or as a batched NEAR Intents deposit */}
+              <div className="pt-1 space-y-1">
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="toggle toggle-xs"
+                    checked={gasEnabled}
+                    onChange={(e) => {
+                      setGasEnabled(e.target.checked)
+                      reset()
+                    }}
+                  />
+                  <span>
+                    Add {destinationNativeSymbol} for gas on {chainName(toChainId)}
+                  </span>
+                </label>
+                {gasEnabled && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      className="input input-bordered input-xs w-32 font-mono"
+                      placeholder={toChainId === SOLANA_CHAIN_ID ? 'auto (0.005)' : 'e.g. 0.0005'}
+                      value={gasAmount}
+                      onChange={(e) => {
+                        const v = sanitizeAmountInput(e.target.value)
+                        if (v !== null) {
+                          setGasAmount(v)
+                          reset()
+                        }
+                      }}
+                    />
+                    <span className="text-[10px] text-base-content/50">
+                      {toChainId === SOLANA_CHAIN_ID
+                        ? 'min 0.00089 SOL — a new wallet must be rent-exempt'
+                        : !gasAmount
+                          ? `enter an amount of ${destinationNativeSymbol}`
+                          : ''}
+                    </span>
+                  </div>
+                )}
+              </div>
+
               {loading && (
                 <div className="flex items-center justify-center gap-2 py-1 text-xs text-base-content/50">
                   <span className="loading loading-spinner loading-xs" />
@@ -741,6 +910,7 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
                       onClick={() => selectQuote(i)}
                       inSymbol={tokenIn?.symbol}
                       outSymbol={tokenOut?.symbol}
+                      gasSymbol={destinationNativeSymbol}
                     />
                   ))}
                 </div>
@@ -991,6 +1161,7 @@ export function XChainSwapPanel({ chainId }: XChainSwapPanelProps) {
         excludeChainId={tokenIn?.chainId}
         showChainSelector={true}
         initialChainId={toChainId}
+        extraChains={DESTINATION_EXTRA_CHAINS}
       />
     </div>
   )

@@ -1,5 +1,6 @@
 import type { RawCurrency } from '../lib-utils'
 import { getTokenFromCache } from '../data/tokenListsCache'
+import { nativeAddressFor } from '../native'
 import { zeroAddress } from 'viem'
 
 /**
@@ -8,16 +9,14 @@ import { zeroAddress } from 'viem'
  * using the cached data if available.
  */
 export function getCurrency(chainId: string, address: string): RawCurrency | undefined {
-  const lower = address.toLowerCase()
-
-  // Check cache directly
-  const cached = getTokenFromCache(chainId, lower)
+  // The cache keys per chain (lower-case on EVM, verbatim base58 on Solana).
+  const cached = getTokenFromCache(chainId, address)
   if (cached) return cached
 
-  // For native token (zero address), try to build a synthetic entry
-  if (lower === zeroAddress.toLowerCase()) {
-    // Many lists include the zero address already; if not, return undefined
-    return getTokenFromCache(chainId, zeroAddress)
+  // A caller asking for "native" with the EVM zero address on a chain whose
+  // native lives elsewhere (Solana's System Program id) gets that row.
+  if (address.toLowerCase() === zeroAddress.toLowerCase()) {
+    return getTokenFromCache(chainId, nativeAddressFor(chainId))
   }
 
   return undefined

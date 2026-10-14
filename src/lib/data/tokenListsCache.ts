@@ -1,5 +1,6 @@
 import { RawCurrency } from '../lib-utils'
 import { tokenListUrl } from '../../config/assets'
+import { tokenKey } from '../native'
 
 export type TokenListsRecord = Record<string, Record<string, RawCurrency>>
 export interface DeltaTokenList {
@@ -61,7 +62,7 @@ export function loadTokenListForChain(
 
     const normalized: Record<string, RawCurrency> = {}
     for (const [address, token] of Object.entries(list.list)) {
-      normalized[address.toLowerCase()] = token
+      normalized[tokenKey(chainId, address)] = token
     }
     cachedTokenLists[chainId] = normalized
 
@@ -90,7 +91,7 @@ export function getChainTokensCache(chainId: string): Record<string, RawCurrency
 }
 
 export function getTokenFromCache(chainId: string, address: string): RawCurrency | undefined {
-  return cachedTokenLists[chainId]?.[address.toLowerCase()]
+  return cachedTokenLists[chainId]?.[tokenKey(chainId, address)]
 }
 
 /**
@@ -111,7 +112,7 @@ export function getTokenFromCache(chainId: string, address: string): RawCurrency
  *   a collision, otherwise the one just registered.
  */
 export function registerResolvedToken(chainId: string, token: RawCurrency): RawCurrency {
-  const address = token.address.toLowerCase()
+  const address = tokenKey(chainId, token.address)
   const existing = cachedTokenLists[chainId]?.[address]
   if (existing) return existing
 

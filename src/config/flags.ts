@@ -18,3 +18,15 @@ export const UNIFIED_EARN_ENABLED = import.meta.env.VITE_UNIFIED_EARN_ENABLED !=
 // state server-side. The per-chain lists in `hooks/lending/useUserData.ts`
 // apply either way.
 export const USER_POSITIONS_RPC = import.meta.env.VITE_USER_POSITIONS_RPC === 'true'
+
+// TEST: offer Solana as a DESTINATION chain in the Cross-Chain swap panel
+// (EVM wallet pays, a base58 recipient receives — Relay / Mayan / NEAR
+// Intents / DZap / LI.FI routes). On by default in `vite dev` so local runs
+// can exercise it; off in builds unless VITE_SOLANA_DESTINATION_ENABLED=true.
+// `false` disables it everywhere, dev included.
+export const SOLANA_DESTINATION_ENABLED =
+  import.meta.env.VITE_SOLANA_DESTINATION_ENABLED === 'true' ||
+  (import.meta.env.DEV && import.meta.env.VITE_SOLANA_DESTINATION_ENABLED !== 'false')
+
+/** Our chain id for Solana — a string, not an EIP-155 number. */
+export const SOLANA_CHAIN_ID = 'solana'

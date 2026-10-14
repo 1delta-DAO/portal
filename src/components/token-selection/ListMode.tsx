@@ -21,6 +21,8 @@ interface TokenSelectorListModeProps {
   resolvingToken?: boolean
   /** The current query is a well-formed address. */
   queryIsAddress?: boolean
+  /** The query is an excluded (already selected) token's address. */
+  queryExcludedSymbol?: string
   onChange: (address: Address) => void
 }
 
@@ -29,6 +31,7 @@ export const TokenSelectorListMode: React.FC<TokenSelectorListModeProps> = ({
   listsLoading,
   resolvingToken,
   queryIsAddress,
+  queryExcludedSymbol,
   onChange,
 }) => {
   // A chain whose list is still being fetched has no rows yet — saying "no
@@ -57,7 +60,11 @@ export const TokenSelectorListMode: React.FC<TokenSelectorListModeProps> = ({
     // answers as an ERC-20 on this chain — usually a wrong-chain paste.
     return (
       <div className="text-center py-6 text-base-content/50 text-sm">
-        {queryIsAddress ? 'No token at this address on this chain' : 'No tokens found'}
+        {queryExcludedSymbol
+          ? `${queryExcludedSymbol} is already selected on the other side`
+          : queryIsAddress
+            ? 'No token at this address on this chain'
+            : 'No tokens found'}
       </div>
     )
   }

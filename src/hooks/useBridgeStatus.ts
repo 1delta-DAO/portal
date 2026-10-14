@@ -32,6 +32,7 @@ export function useBridgeStatus({
   txHash,
   tokenIn,
   tokenOut,
+  orderId,
   enabled = true,
 }: {
   bridge?: string
@@ -40,10 +41,12 @@ export function useBridgeStatus({
   txHash?: string
   tokenIn?: string
   tokenOut?: string
+  /** Required by NEAR Intents (its deposit address); Mayan's order id. */
+  orderId?: string
   enabled?: boolean
 }) {
   return useQuery<BridgeStatusData>({
-    queryKey: ['bridgeStatus', bridge, fromChainId, txHash],
+    queryKey: ['bridgeStatus', bridge, fromChainId, txHash, orderId],
     enabled: enabled && !!bridge && !!fromChainId && !!toChainId && !!txHash,
     refetchInterval: (query) => (TERMINAL.has(query.state.data?.status ?? '') ? false : 10_000),
     queryFn: async () => {
@@ -56,7 +59,7 @@ export function useBridgeStatus({
       if (tokenIn) qs.set('tokenIn', tokenIn)
       if (tokenOut) qs.set('tokenOut', tokenOut)
       return apiFetch<BridgeStatusData>('/v1/data/bridge/status', {
-        params: { bridge, fromChainId, toChainId, txHash, tokenIn, tokenOut },
+        params: { bridge, fromChainId, toChainId, txHash, tokenIn, tokenOut, orderId },
       })
     },
   })

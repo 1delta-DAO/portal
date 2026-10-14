@@ -28,6 +28,8 @@ interface TokenSelectorDropdownModeProps {
   resolvingToken?: boolean
   /** The current query is a well-formed address. */
   queryIsAddress?: boolean
+  /** The query is an excluded (already selected) token's address. */
+  queryExcludedSymbol?: string
   selected: RawCurrency | undefined
   onChange: (address: Address) => void
 }
@@ -43,6 +45,7 @@ export const TokenSelectorDropdownMode: React.FC<TokenSelectorDropdownModeProps>
   listsLoading,
   resolvingToken,
   queryIsAddress,
+  queryExcludedSymbol,
   selected,
   onChange,
 }) => {
@@ -105,7 +108,11 @@ export const TokenSelectorDropdownMode: React.FC<TokenSelectorDropdownModeProps>
               </div>
             ) : rows.length === 0 ? (
               <div className="text-center py-4 text-base-content/50 text-sm">
-                {queryIsAddress ? 'No token at this address on this chain' : 'No tokens found'}
+                {queryExcludedSymbol
+                  ? `${queryExcludedSymbol} is already selected on the other side`
+                  : queryIsAddress
+                    ? 'No token at this address on this chain'
+                    : 'No tokens found'}
               </div>
             ) : (
               <div className="space-y-0.5">
