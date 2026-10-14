@@ -281,7 +281,8 @@ export function useSpotSwapQuote(params: {
       }
       ingestEnvelope(envelope.data ?? {}, envelope.actions, { permitApplied: true })
     } catch (e: any) {
-      const stale = e instanceof ApiError && (e.code === 'PERMIT_STALE' || e.code === 'PERMIT_EXPIRED')
+      const stale =
+        e instanceof ApiError && (e.code === 'PERMIT_STALE' || e.code === 'PERMIT_EXPIRED')
       setState((s) => ({
         ...s,
         signing: false,

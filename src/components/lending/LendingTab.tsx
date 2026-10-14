@@ -10,7 +10,13 @@ import { useLendingLatest, useLenders } from '../../hooks/lending/usePoolData'
 import type { LenderInfoMap } from '../../sdk/lending-helper/marketTypes'
 import { useLendingBalancesMultiChain } from '../../hooks/lending/useLendingBalances'
 import { useTokenListsMultiChain } from '../../hooks/useTokenLists'
-import { tabFromSlug, slugToLender, buildPath, TAB_CHAIN_MODE, TAB_HAS_LENDER } from '../../utils/routes'
+import {
+  tabFromSlug,
+  slugToLender,
+  buildPath,
+  TAB_CHAIN_MODE,
+  TAB_HAS_LENDER,
+} from '../../utils/routes'
 import type { SubTab } from '../../utils/routes'
 import { useChainSelection, usePersistChainSelection } from '../../hooks/useChainSelection'
 import { Badge } from '../common/Badge'
@@ -213,7 +219,14 @@ export function LenderTab() {
     if (autoSelectedForChain.current === effectiveChainId) return
     autoSelectedForChain.current = effectiveChainId
     setSelectedLender(activeLender)
-  }, [tabHasLender, activeLender, initialLender, lenderSummaries, effectiveChainId, setSelectedLender])
+  }, [
+    tabHasLender,
+    activeLender,
+    initialLender,
+    lenderSummaries,
+    effectiveChainId,
+    setSelectedLender,
+  ])
 
   useEffect(() => {
     autoSelectedForChain.current = null
