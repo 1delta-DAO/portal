@@ -109,7 +109,8 @@ export const LendingPoolsTable: React.FC<LendingPoolsTableProps> = ({
       maxDebtUsd: '',
       minLiquidityUsd: '',
       maxLiquidityUsd: '',
-      maxRiskScore: '4',
+      // '' follows the app-wide ceiling (`useRiskMode`); a value only lowers it
+      maxRiskScore: '',
       // Fixed-rate earn markets (Midnight / Term / Exactly) are hidden by default.
       showFixedTerm: false,
     }),

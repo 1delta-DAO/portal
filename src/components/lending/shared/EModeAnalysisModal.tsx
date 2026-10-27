@@ -15,6 +15,14 @@ import { ErrorAlert } from '../../common/ErrorAlert'
 import { EmptyState } from '../../common/EmptyState'
 import { Spinner } from '../../common/Loader'
 
+/**
+ * Every config, compromised included: these read the modes of a position the
+ * user already HOLDS, so the app-wide ceiling does not apply. At the hook's
+ * default (4) a mode in a config scoring 5 came back missing and the badge fell
+ * back to a bare number.
+ */
+const POSITION_RISK_CEILING = 6
+
 // ============================================================================
 // Mode Button — shows current borrow mode, opens the analysis modal on click
 // ============================================================================
@@ -46,7 +54,7 @@ export const EModeBadge: React.FC<EModeBadgeProps> = ({
 }) => {
   const [open, setOpen] = useState(false)
   const mode = subAccount.userConfig.selectedMode
-  const { data: configGroups } = usePoolConfigData(chainId, lender)
+  const { data: configGroups } = usePoolConfigData(chainId, lender, POSITION_RISK_CEILING)
 
   const modeLabel = useMemo(() => {
     const modeNum = Number(mode)
@@ -149,7 +157,7 @@ const EModeAnalysisModal: React.FC<EModeAnalysisModalProps> = ({
   const [switchSuccess, setSwitchSuccess] = useState<number | null>(null)
 
   // Pool config data — already cached by react-query, used as fallback source for e-mode categories
-  const { data: configGroups } = usePoolConfigData(chainId, lender)
+  const { data: configGroups } = usePoolConfigData(chainId, lender, POSITION_RISK_CEILING)
 
   // Derive e-mode categories from pool config groups (no extra API call needed)
   const derivedCategories = useMemo(() => {

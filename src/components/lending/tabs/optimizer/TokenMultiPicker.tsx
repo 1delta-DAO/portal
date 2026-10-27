@@ -19,6 +19,8 @@ const STABLE_GROUPS = new Set([
   'CRVUSD',
   'PYUSD',
   'TUSD',
+  // Flying Tulip USD (ftUSD) — compared upper-cased, so one key covers Ethereum's FTUSD and Sonic's ftUSD
+  'FLYING TULIP USD::FTUSD',
 ])
 const MAJOR_GROUPS = new Set(['ETH', 'BTC', 'WBTC', 'WETH', 'SOL'])
 

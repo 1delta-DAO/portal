@@ -246,7 +246,8 @@ export function LenderTab() {
   const { lenderData, lenderInfoMap, isPublicDataLoading } = useLendingLatest(
     effectiveChainId,
     lenderKeysToFetch,
-    singleChainFetchEnabled
+    singleChainFetchEnabled,
+    maxRiskScore
   )
   // The heavy fetch above is scoped to the single active lender, so its
   // lenderInfoMap has exactly one entry. The earn positions table renders

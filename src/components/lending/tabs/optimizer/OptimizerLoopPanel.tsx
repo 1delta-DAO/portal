@@ -31,7 +31,10 @@ export function OptimizerLoopPanel({ row, account }: { row: OptimizerPairRow; ac
   const lender = row.lenderKey
 
   // Heavy per-market fetch — lazy: this component only mounts on the Loop tab.
-  const { lenderData, isPublicDataLoading } = useLendingLatest(chainId, [lender], true)
+  // Every market of the lender, whatever it scores: the row was already
+  // admitted under the user's ceiling, and a market of it missing here would
+  // leave the loop panel without its pools.
+  const { lenderData, isPublicDataLoading } = useLendingLatest(chainId, [lender], true, 6)
   const allPools = useMemo(() => lenderData?.[lender] ?? [], [lenderData, lender])
 
   // Resolve the pair's pools — marketUid first, underlying address as the
