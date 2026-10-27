@@ -59,6 +59,9 @@ export type TermTag = Open<
   | 'intrinsic-yield'
   | 'no-market-interest'
   | 'oracle-flagged'
+  /** Collateral is a redeemable claim priced off its MARKET, not its redemption
+   *  rate — a wick or a manipulated thin market can liquidate (API tags.ts). */
+  | 'oracle-market-priced'
   | 'no-oracle'
 >
 

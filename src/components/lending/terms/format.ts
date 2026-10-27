@@ -268,6 +268,7 @@ const TAG_LABEL: Record<string, string> = {
   'intrinsic-yield': 'Mostly asset yield',
   'no-market-interest': 'Market pays no interest',
   'oracle-flagged': 'Oracle flagged',
+  'oracle-market-priced': 'Market-priced oracle',
   'no-oracle': 'No oracle',
 }
 

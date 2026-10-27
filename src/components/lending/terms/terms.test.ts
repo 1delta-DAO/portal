@@ -471,3 +471,20 @@ describe('native capability — allow by default, deny only where impossible', (
     expect(lenderSupportsNative('CURVE_LEND')).toBe(true)
   })
 })
+
+describe('oracle-market-priced — a warn finding, never a signature gate', () => {
+  const digest = (tags: string[]): AnyTermSheet =>
+    ({ borrow: { headline: 'Variable 8.43%', tags } }) as unknown as AnyTermSheet
+
+  it('ranks as warn with its own label', () => {
+    expect(severityOfTag('oracle-market-priced')).toBe('warn')
+    expect(tagLabel('oracle-market-priced')).toBe('Market-priced oracle')
+  })
+
+  it('lands in the secondary findings with prose on a digest', () => {
+    const { criticals, secondary } = splitFindings(digest(['oracle-market-priced']), 'borrow')
+    expect(criticals).toEqual([])
+    const f = secondary.find((x) => x.id === 'borrow-oracle-market-priced')
+    expect(f?.message).toMatch(/trading market/)
+  })
+})

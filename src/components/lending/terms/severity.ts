@@ -53,6 +53,7 @@ const WARN_TAGS = new Set<TermTag>([
   'nav-attested',
   'no-timelock',
   'oracle-flagged',
+  'oracle-market-priced',
   'cap-full',
   'permissioned',
   'prepaid-interest',
@@ -97,6 +98,8 @@ const TAG_MESSAGE: Partial<Record<string, string>> = {
     'The share price is published by an operator; there is no on-chain solvency invariant.',
   'no-timelock': 'Parameters can be changed with no notice period.',
   'oracle-flagged': 'This market’s price oracle is flagged as risky.',
+  'oracle-market-priced':
+    'The collateral is priced off its trading market, not its redemption value — a price wick or a manipulated thin market can trigger liquidations although the backing has not moved.',
   'cap-full': 'The cap is full — new positions cannot be opened right now.',
   permissioned: 'This market is not permissionless.',
   'prepaid-interest':
