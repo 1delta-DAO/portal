@@ -121,6 +121,8 @@ export interface DepositAndBorrowParams {
    * opened from this panel before the control existed.
    */
   bands?: number
+  /** User-set-rate lenders: the rate as a WAD fraction. Omit for the recommended pick. */
+  interestRate?: string
   /** Fixed-term broker id (Lista) — enables the atomic composer open; absent =
    *  flex/dynamic borrow (falls back to the sequential path server-side). */
   debtTermId?: number
@@ -158,6 +160,7 @@ export async function fetchDepositAndBorrow(
   if (p.accountId) qs.set('accountId', p.accountId)
   if (p.modeId) qs.set('modeId', p.modeId)
   if (p.bands != null) qs.set('bands', String(p.bands))
+  if (p.interestRate) qs.set('interestRate', p.interestRate)
   if (p.debtTermId != null) qs.set('debtTermId', String(p.debtTermId))
   if (p.receiveAsset) qs.set('receiveAsset', p.receiveAsset)
   // The second leg of each smart side. `*Amount1` is sent only WITH its

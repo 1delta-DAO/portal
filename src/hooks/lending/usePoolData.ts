@@ -23,7 +23,7 @@ import type {
  */
 export function useLenders(chainId: string, enabled = true, maxRiskScore = 6) {
   const { data, isLoading, isFetching, error } = useQuery<LenderSummary[]>({
-    queryKey: ['lendingLenders', chainId],
+    queryKey: ['lendingLenders', chainId, maxRiskScore],
     enabled: enabled && !!chainId,
     queryFn: () => fetchLenders(chainId, maxRiskScore),
     refetchInterval: 5 * 60 * 1000,
@@ -61,7 +61,9 @@ export function useLendingLatest(
     lenderData: LenderData
     lenderInfoMap: LenderInfoMap
   }>({
-    queryKey: ['lendingPublic', chainId, sortedKeysCsv],
+    // The ceiling is part of the answer: without it, an empty response cached
+    // under a lower ceiling stays served after the user raises it.
+    queryKey: ['lendingPublic', chainId, sortedKeysCsv, maxRiskScore],
     enabled: enabled && !!chainId && sortedKeys.length > 0,
     queryFn: () => fetchLendingLatest(chainId, sortedKeys, maxRiskScore),
     refetchInterval: 5 * 60 * 1000,

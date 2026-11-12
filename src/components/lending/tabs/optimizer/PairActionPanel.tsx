@@ -41,6 +41,7 @@ import { RiskBadge } from '../../shared/RiskBadge'
 import { AutoBalancedNoticeBody } from '../../shared/SmartVault'
 import { useCombinedAction, gt0, asCurrency, type CombinedAction } from './useCombinedAction'
 import { BandSetterRow } from '../../terms/BandSetterRow'
+import { RateSetterRow } from '../../terms/RateSetterRow'
 import { displaySymbol } from '../../../../lib/lib-utils/wnative'
 
 type Op = 'deposit-borrow' | 'withdraw-repay' | 'loop'
@@ -719,6 +720,10 @@ function CombinedForm({
           onChange={a.setBandState}
           variant="field"
         />
+      )}
+
+      {a.rateTerms && (
+        <RateSetterRow rate={a.rateTerms} value={a.rateValue} onChange={a.setRateState} />
       )}
 
       <SecondaryLeg

@@ -1,3 +1,4 @@
+import { isLiquityFamily } from '@1delta/lender-registry'
 import type { FixedTermDetails } from '../shared/fixedTerm'
 
 /** Lenders that support multiple sub-accounts per user */
@@ -9,6 +10,9 @@ export function lenderSupportsSubAccounts(lender?: string): boolean {
     MULTI_ACCOUNT_LENDERS.has(lender) ||
     lender.startsWith('FLUID_') ||
     lender.startsWith('GEARBOX_') ||
+    // A trove is a position: many per user per market, `accountId` = trove id.
+    lender.startsWith('FLEX_') ||
+    isLiquityFamily(lender) ||
     // TermMax positions are GT NFTs — one sub-account per GT, `accountId` =
     // the decimal gtId. The server's borrow/repay/withdraw builders REQUIRE it
     // as `posId` (a user can hold many GTs per market), so without the

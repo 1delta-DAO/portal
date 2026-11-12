@@ -1,4 +1,5 @@
 import { parseUnits } from 'viem'
+import { isFlex } from '@1delta/lender-registry'
 import { apiFetch, errorMessage } from '../http'
 import type { LendingActionResult } from './fetchLendingAction'
 
@@ -106,33 +107,34 @@ export interface LiquitySetRateParams {
 }
 
 /**
- * Change an existing trove's interest rate.
- *
- * Returns the same `{ transactions, permissions }` envelope as the generic
- * lending actions so it can be executed by the same path.
+ * Change a user-set rate on either family. The routes differ, the contract
+ * does not: same body, same WAD rate, same `{ transactions, permissions }`.
  */
-export async function fetchLiquitySetRate(
-  params: LiquitySetRateParams
-): Promise<LendingActionResult> {
-  return postLiquity('set-rate', {
-    chainId: params.chainId,
-    lender: params.lender,
-    troveId: params.troveId,
-    interestRate: aprPercentToWad(params.aprPercent),
-    ...(params.maxUpfrontFee ? { maxUpfrontFee: params.maxUpfrontFee } : {}),
-  })
+export async function fetchSetRate(params: LiquitySetRateParams): Promise<LendingActionResult> {
+  return postLiquity(
+    'set-rate',
+    {
+      chainId: params.chainId,
+      lender: params.lender,
+      troveId: params.troveId,
+      interestRate: aprPercentToWad(params.aprPercent),
+      ...(params.maxUpfrontFee ? { maxUpfrontFee: params.maxUpfrontFee } : {}),
+    },
+    isFlex(params.lender) ? 'flex' : 'liquity'
+  )
 }
 
-/** Shared POST + envelope unwrap for the Liquity action routes. */
+/** Shared POST + envelope unwrap for the Liquity and Flex action routes. */
 async function postLiquity(
   action: 'open' | 'set-rate',
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  family: 'liquity' | 'flex' = 'liquity'
 ): Promise<LendingActionResult> {
   try {
-    // Note: the Liquity routes put the transactions under `data`, not under
-    // the usual `actions` envelope key.
+    // Note: these routes put the transactions under `data`, not under the
+    // usual `actions` envelope key.
     const data = await apiFetch<{ transactions?: unknown[]; permissions?: unknown[] }>(
-      `/v1/actions/liquity/${action}`,
+      `/v1/actions/${family}/${action}`,
       { body }
     )
     return {

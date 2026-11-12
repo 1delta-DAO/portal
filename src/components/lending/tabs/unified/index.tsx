@@ -7,8 +7,9 @@ import { useRiskMode } from '../../../../contexts/RiskMode'
 import { useTokenListsMultiChain } from '../../../../hooks/useTokenLists'
 import { useIsMobile } from '../../../../hooks/useIsMobile'
 import {
+  useServerPagination,
   useTablePagination,
-  type TablePagination as PaginationState,
+  type ServerPagination,
 } from '../../../../hooks/useTablePagination'
 import { usePersistedFilters } from '../../../../hooks/usePersistedFilters'
 import { TablePagination } from '../../../common/TablePagination'
@@ -46,8 +47,9 @@ type View = 'markets' | 'positions'
 const EMPTY_CHAINS: string[] = []
 
 /**
- * The Unified Earn tab — one fetch of `GET /v1/data/earn` covering lending
- * markets and vaults together.
+ * The Unified Earn tab — `GET /v1/data/earn`, covering lending markets and
+ * vaults together, one PAGE at a time: the server filters, sorts and pages, and
+ * this tab holds only the rows on screen.
  *
  * ## Layout
  *
@@ -143,6 +145,14 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
   // Labels for every server enum — fetched, never embedded.
   const vocab = useEarnVocabulary()
 
+  // Everything that makes "page 3" a different page 3. The listing is paged by
+  // the SERVER, so a change here has to restart at the first page.
+  const selectionKey = JSON.stringify(selection)
+  const marketsPager = useServerPagination(
+    pageSize,
+    JSON.stringify([sortKey, selectionKey, pageSize, maxRiskScore, [...chainIds].sort()])
+  )
+
   const {
     items,
     facets,
@@ -150,12 +160,12 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
     excluded,
     appliedDefaults,
     total,
-    pendingChains,
-    failedChains,
     isLoading,
     isFetching,
+    isPlaceholderData,
     error,
     refetch,
+    findRow,
   } = useEarnCatalog({
     chainIds,
     protocol: selection.protocols.length ? selection.protocols : undefined,
@@ -176,6 +186,8 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
     sort: sortKey,
     // The panel renders prose and counterparty terms the digest omits.
     terms: 'full',
+    page: marketsPager.page,
+    pageSize,
     enabled,
   })
 
@@ -196,9 +208,16 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
   // the Lending tab already loads it for these chains, so it costs nothing.
   const { data: tokensByChain } = useTokenListsMultiChain(account ? chainIds : EMPTY_CHAINS)
 
-  const selectionKey = JSON.stringify(selection)
-  const marketsPage = useTablePagination(items, pageSize, [sortKey, selectionKey, pageSize])
+  const marketsPage = marketsPager.paginate(total)
   const positionsPage = useTablePagination(positions.items, pageSize, [pageSize])
+
+  // The listing shrank under the current page (a refetch, not a filter change
+  // — those restart at page 0): step back to the last page that still exists.
+  const lastPage = marketsPage.totalPages - 1
+  const setMarketsPage = marketsPager.setPage
+  useEffect(() => {
+    if (!isPlaceholderData && !isFetching && marketsPager.page > lastPage) setMarketsPage(lastPage)
+  }, [isPlaceholderData, isFetching, marketsPager.page, lastPage, setMarketsPage])
 
   /**
    * Open on the portfolio when there is one — once per account.
@@ -236,9 +255,27 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
    * row to open. Quietly doing nothing read as a dead click, and quietly
    * opening a different row would be worse — so it says which, and offers the
    * one action that fixes it.
+   *
+   * The row is usually NOT on the page in hand — the listing is paged by the
+   * server — so it is looked up under the same filters, narrowed to the
+   * position's own chain and deposit token.
    */
-  const openByEarnUid = (earnUid: string) => {
-    const match = items.find((m) => m.earnUid === earnUid)
+  const openingUid = useRef<string | null>(null)
+  const openByEarnUid = async (earnUid: string) => {
+    openingUid.current = earnUid
+    let match = items.find((m) => m.earnUid === earnUid)
+    if (!match) {
+      const held = positions.items.find(
+        (p): p is EarnVaultPosition => isVaultPosition(p) && p.earnUid === earnUid
+      )
+      if (held) {
+        // A failed lookup reads as "not listed" — the rail says so and offers
+        // the way out, which beats a click that does nothing.
+        match = await findRow(earnUid, held.chainId, held.asset.address).catch(() => undefined)
+      }
+      // A later click overtook this lookup; its row is the one to show.
+      if (openingUid.current !== earnUid) return
+    }
     if (match) openRow(match)
     else {
       setSelected(null)
@@ -318,7 +355,7 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
       }
     />
   ) : (
-    <DetailPlaceholder hasRows={items.length > 0} />
+    <DetailPlaceholder hasRows={total > 0} />
   )
 
   return (
@@ -413,7 +450,7 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
                   active={view === 'markets'}
                   onClick={() => setView('markets')}
                   label="Opportunities"
-                  count={isLoading ? undefined : items.length}
+                  count={isLoading ? undefined : total}
                 />
                 {account && (
                   <ViewTab
@@ -469,27 +506,6 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
               </div>
             )}
 
-            {/* The listing is shown while it is still filling: chains resolve
-                independently and each one's pages stream in. Say so — a table
-                that is quietly still growing reads as a complete answer, and
-                "no results on Base" is a different statement from "Base hasn't
-                answered yet". */}
-            {view === 'markets' && (pendingChains.length > 0 || items.length < total) && (
-              <div className="flex items-center gap-2 border-b border-base-300 px-3 py-1.5 text-xs text-base-content/60">
-                <span className="loading loading-spinner loading-xs" />
-                {pendingChains.length > 0
-                  ? `Loading ${pendingChains.length} more chain${pendingChains.length > 1 ? 's' : ''}…`
-                  : `Loading ${total - items.length} more opportunities…`}
-              </div>
-            )}
-
-            {view === 'markets' && failedChains.length > 0 && (
-              <div className="border-b border-base-300 px-3 py-1.5 text-xs text-warning">
-                No results from chain {failedChains.join(', ')} — rows from{' '}
-                {failedChains.length > 1 ? 'those chains are' : 'that chain is'} missing.
-              </div>
-            )}
-
             {view === 'markets' ? (
               isLoading ? (
                 <div className="flex justify-center py-10">
@@ -497,18 +513,23 @@ export function UnifiedEarnTab({ chainIds, enabled = true }: UnifiedTabProps) {
                 </div>
               ) : (
                 <>
-                  <EarnMarketsTable
-                    items={marketsPage.pagedItems}
-                    vocab={vocab}
-                    sortKey={sortKey}
-                    onToggleSort={setSortKey}
-                    selected={selected}
-                    onRowClick={(row) => openRow(selected?.earnUid === row.earnUid ? null : row)}
-                  />
+                  {/* Dimmed while the rows are still the previous page's or
+                      filter's — they stay up so the table does not jump, but
+                      they are not the answer to what was just asked. */}
+                  <div className={isPlaceholderData ? 'opacity-50 transition-opacity' : undefined}>
+                    <EarnMarketsTable
+                      items={items}
+                      vocab={vocab}
+                      sortKey={sortKey}
+                      onToggleSort={setSortKey}
+                      selected={selected}
+                      onRowClick={(row) => openRow(selected?.earnUid === row.earnUid ? null : row)}
+                    />
+                  </div>
                   <ListFooter
                     pagination={marketsPage}
-                    total={items.length}
-                    noun={items.length === 1 ? 'opportunity' : 'opportunities'}
+                    total={total}
+                    noun={total === 1 ? 'opportunity' : 'opportunities'}
                   />
                 </>
               )
@@ -603,7 +624,7 @@ function ListFooter({
   total,
   noun,
 }: {
-  pagination: PaginationState<unknown>
+  pagination: ServerPagination
   total: number
   noun: string
 }) {

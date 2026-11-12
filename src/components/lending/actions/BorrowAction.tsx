@@ -21,9 +21,10 @@ import { useTermSheet } from '../../../hooks/lending/useTermSheet'
 import { useTokenLists } from '../../../hooks/useTokenLists'
 import { resolveSmartLeg, SmartLegInput, type SmartLegState } from '../shared/SmartLegInput'
 import type { RateSetterState } from '../terms/RateSetterRow'
-import { aprPercentToWad } from '../../../sdk/lending-helper/fetchLiquityRate'
+import { aprPercentToWad, fetchSetRate } from '../../../sdk/lending-helper/fetchLiquityRate'
+import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
 import { borrowTerms, isBrokeredBorrow } from '../../../sdk/lending-helper/marketSides'
-import { isLiquityFamily, isLlamaLend } from '@1delta/lender-registry'
+import { isFlex, isLiquityFamily, isLlamaLend } from '@1delta/lender-registry'
 import { LiquityOpenPanel } from './LiquityOpenPanel'
 import { LlamaLendOpenNotice } from './LlamaLendOpenNotice'
 import { TermMaxOpenNotice } from './TermMaxOpenNotice'
@@ -77,7 +78,7 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
   // act on, so hand over to the open panel rather than building a request the
   // endpoint will reject.
   const lenderOfPool = pool?.marketUid?.split(':')[0] ?? ''
-  const isLiquity = isLiquityFamily(lenderOfPool)
+  const isLiquity = isLiquityFamily(lenderOfPool) || isFlex(lenderOfPool)
   const hasTrove = (subAccounts?.length ?? 0) > 0 || Number(userPosition?.debt ?? 0) > 0
   const needsOpen = isLiquity && !hasTrove
 
@@ -168,6 +169,37 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
     subAccount,
   })
   const { simulation, rateImpact, loading, error, txSuccess, resetState, dismissSuccess } = exec
+
+  // Changing the rate of an open trove is its own transaction, not a borrow.
+  const { send } = useSendLendingTransaction({ chainId, account })
+  const [settingRate, setSettingRate] = useState(false)
+  const [setRateError, setSetRateError] = useState<string | null>(null)
+  const commitRate = async (aprPercent: number) => {
+    if (!selectedAccountId) return
+    setSettingRate(true)
+    setSetRateError(null)
+    try {
+      const res = await fetchSetRate({
+        chainId: String(chainId),
+        lender: lenderOfPool,
+        troveId: selectedAccountId,
+        aprPercent,
+      })
+      if (!res.success || !res.data) {
+        setSetRateError(res.error ?? 'Could not build the rate change')
+        return
+      }
+      for (const tx of [...(res.data.permissions ?? []), ...(res.data.transactions ?? [])]) {
+        const r = await send(tx)
+        if (!r.ok) {
+          setSetRateError(r.error ?? 'Transaction failed')
+          return
+        }
+      }
+    } finally {
+      setSettingRate(false)
+    }
+  }
 
   // Reset when pool changes
   useEffect(() => {
@@ -626,7 +658,21 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
         sheet={termSheet}
         side="borrow"
         termsLoading={termsLoading}
-        rateEdit={userSet?.required ? { value: chosenRatePct, onChange: setRateState } : undefined}
+        rateEdit={
+          userSet?.required
+            ? {
+                value: chosenRatePct,
+                onChange: setRateState,
+                ...(selectedAccountId
+                  ? {
+                      onCommit: commitRate,
+                      committing: settingRate,
+                      commitLabel: "Change this trove's rate",
+                    }
+                  : {}),
+              }
+            : undefined
+        }
         /* `/lending/borrow` only ever INCREASES debt on a loan that already
            exists — opening one needs collateral, debt and the band count
            together, which is the loop/deposit-and-borrow path. The no-loan case
@@ -634,6 +680,12 @@ export const BorrowAction: React.FC<ActionPanelProps> = ({
            is fixed: read-only is the truth, not a fallback. */
         bandEdit={{ mode: 'locked' }}
       />
+
+      {setRateError ? (
+        <div className="rounded-lg border border-error/30 bg-error/10 px-2 py-1.5 text-[11px] text-error">
+          {setRateError}
+        </div>
+      ) : null}
 
       {rateBlocks ? (
         <div className="rounded-lg border border-error/30 bg-error/10 px-2 py-1.5 text-[11px] text-error">

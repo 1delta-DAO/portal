@@ -4,6 +4,7 @@ import { TermsChips } from './TermsChips'
 import { RateModelRows } from './RateModelRows'
 import { RateSetterRow, type RateSetterState } from './RateSetterRow'
 import { BandSetterRow, type BandSetterState, type BandSetterMode } from './BandSetterRow'
+import type { UserSetRateBook } from '../../../hooks/lending/useRateQueue'
 import {
   atMaturityLabel,
   badDebtLabel,
@@ -223,6 +224,7 @@ function BorrowRows({
             onCommit={rateEdit?.onCommit}
             committing={rateEdit?.committing}
             commitLabel={rateEdit?.commitLabel}
+            queue={rateEdit?.queue}
           />
         ) : null}
         <TermRow
@@ -631,6 +633,8 @@ export interface TermsRateEdit {
   onCommit?: (aprPercent: number) => void
   committing?: boolean
   commitLabel?: string
+  /** The live redemption queue at the ticket's size. */
+  queue?: UserSetRateBook
 }
 
 /**

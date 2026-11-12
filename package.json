@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@1delta/chain-registry": "^0.0.5",
-    "@1delta/lender-registry": "^0.0.42",
+    "@1delta/lender-registry": "^0.0.56",
     "@1delta/providers": "^0.0.59",
     "@rainbow-me/rainbowkit": "^2.2.10",
     "@tailwindcss/postcss": "^4.2.2",

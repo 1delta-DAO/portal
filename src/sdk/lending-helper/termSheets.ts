@@ -132,6 +132,14 @@ export interface RateTerms {
     max?: number
     /** What the protocol applies if the caller omits a rate. Pre-fill this. */
     default?: number
+    /** The pickable rates of the redemption queue, cheapest first. */
+    picks?: RatePick[]
+    recommended?: Open<'cheapest' | 'balanced' | 'protected'>
+    pressure?: {
+      driver: Open<'below-peg' | 'lender-liquidity'>
+      signal: number | null
+      level: Open<'low' | 'elevated' | 'high'>
+    }
     adjustable: boolean
     adjustmentCostNote?: string
     adjustmentCooldownSecs?: number
@@ -139,6 +147,16 @@ export interface RateTerms {
   rewards?: RewardTerm[]
   menu?: RateMenuEntry[]
   quote?: { assets: number; basis: Open<'marginal' | 'average'> }
+}
+
+/** One pickable rate: its debt ahead, and what a new borrow at it can take where the rate decides the fill. */
+export interface RatePick {
+  id: Open<'cheapest' | 'balanced' | 'protected'>
+  apr: number
+  debtAhead: number
+  share: number
+  upfrontFeePct: number
+  capacity?: number
 }
 
 export interface MaturityTerms {

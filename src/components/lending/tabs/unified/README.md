@@ -60,6 +60,12 @@ the arrangement is the answer to what each one is _for_:
 - **One pagination and one page size** for both tables, from the shared
   `useTablePagination` / `<TablePagination>`, instead of two hand-rolled
   controls at 50 and 25. Default 15, selectable 15/25/50/100, persisted.
+  The opportunities list is paged by the **server** (`useServerPagination`):
+  the tab requests the page on screen, across every selected chain in one
+  call, and never holds the catalogue. A filter, sort, chain or page-size
+  change restarts at page 1; the previous rows stay up, dimmed, while the new
+  page loads. A clicked position is looked up on demand (`findRow`), since its
+  market is usually on another page.
 
 Rejected: a modal for the detail (hides the list you are comparing against, and
 comparison is the whole job); tabs _inside_ the rail (buries the action behind a

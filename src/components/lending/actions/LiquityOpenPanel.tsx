@@ -6,7 +6,10 @@ import { useTermsAcknowledgement, TermsDisclosure } from '../terms/TermsDisclosu
 import type { RateSetterState } from '../terms/RateSetterRow'
 import { isFullSheet } from '../terms/types'
 import type { AnyTermSheet } from '../terms/types'
-import { fetchLiquityOpen } from '../../../sdk/lending-helper/fetchLiquityRate'
+import { aprPercentToWad, fetchLiquityOpen } from '../../../sdk/lending-helper/fetchLiquityRate'
+import { fetchDepositAndBorrow } from '../../../sdk/lending-helper/fetchCombinedAction'
+import { useRateQueue } from '../../../hooks/lending/useRateQueue'
+import { isFlex } from '@1delta/lender-registry'
 import { useSendLendingTransaction } from '../../../hooks/useSendLendingTransaction'
 import { formatTokenAmount } from './format'
 import type { PoolDataItem } from '../../../sdk/lending-helper/marketTypes'
@@ -31,7 +34,7 @@ export const LiquityOpenPanel: React.FC<{
    * ONE collateral by construction, so the sheet already knows it and there is
    * nothing to plumb.
    */
-  collateralAsset?: { symbol?: string; decimals?: number }
+  collateralAsset?: { address?: string; symbol?: string; decimals?: number }
   /** Wallet balance of that collateral, decimal string. Omit to disable presets. */
   collateralBalance?: string
   termSheet: AnyTermSheet | undefined
@@ -51,7 +54,17 @@ export const LiquityOpenPanel: React.FC<{
 
   const borrow = isFullSheet(termSheet) ? termSheet.borrow : undefined
   const userSet = borrow?.rate.userSet
-  const ratePct = rateState?.aprPercent ?? userSet?.default
+  const lender = pool.marketUid.split(':')[0]
+  const debtNum = Number(debtAmount || '0')
+  const rateQueue = useRateQueue({
+    marketUid: pool.marketUid,
+    size: debtNum,
+    enabled: userSet?.required === true,
+  })
+  const ratePct =
+    rateState?.aprPercent ??
+    rateQueue.data?.picks.find((p) => p.id === rateQueue.data?.recommended)?.apr ??
+    userSet?.default
 
   const collateralBalanceStr = collateralBalance ?? '0'
   const debtDecimals = pool.asset?.decimals ?? 18
@@ -65,7 +78,6 @@ export const LiquityOpenPanel: React.FC<{
     return Number.isFinite(n) ? n : undefined
   }, [minDebtRaw, debtDecimals])
 
-  const debtNum = Number(debtAmount || '0')
   const collNum = Number(collAmount || '0')
   const belowMin = minDebtHuman != null && debtNum > 0 && debtNum < minDebtHuman
   const rateInvalid = userSet?.required === true && rateState?.valid === false
@@ -78,15 +90,28 @@ export const LiquityOpenPanel: React.FC<{
     setBusy(true)
     setError(null)
     try {
-      const res = await fetchLiquityOpen({
-        chainId,
-        lender: pool.marketUid.split(':')[0],
-        account,
-        collAmount: parseUnits(collAmount || '0', collDecimals).toString(),
-        amount: parseUnits(debtAmount || '0', debtDecimals).toString(),
-        // Omitted ⇒ the branch average, which is also what we pre-filled.
-        aprPercent: ratePct,
-      })
+      const collRaw = parseUnits(collAmount || '0', collDecimals).toString()
+      const debtRaw = parseUnits(debtAmount || '0', debtDecimals).toString()
+      // Flex has no open route of its own: a trove opens through the generic
+      // deposit-and-borrow, which serves it up to the Lender's idle cash.
+      const res = isFlex(lender)
+        ? await fetchDepositAndBorrow({
+            collateralMarketUid: `${lender}:${chainId}:${collateralAsset?.address}`,
+            debtMarketUid: pool.marketUid,
+            operator: account,
+            collateralAmount: collRaw,
+            borrowAmount: debtRaw,
+            interestRate: ratePct != null ? aprPercentToWad(ratePct) : undefined,
+          })
+        : await fetchLiquityOpen({
+            chainId,
+            lender,
+            account,
+            collAmount: collRaw,
+            amount: debtRaw,
+            // Omitted ⇒ the recommended pick, which is also what we pre-filled.
+            aprPercent: ratePct,
+          })
       if (!res.success || !res.data) {
         setError(res.error ?? 'Could not build the transaction')
         return
@@ -117,8 +142,11 @@ export const LiquityOpenPanel: React.FC<{
   return (
     <div className="space-y-3">
       <div className="rounded-lg border border-base-300 px-2 py-1.5 text-[11px] text-base-content/60">
-        You have no position in this market yet. Opening one deposits collateral and mints debt in a
+        You have no position in this market yet. Opening one deposits collateral and borrows in a
         single transaction, at a rate you choose.
+        {isFlex(lender)
+          ? ' A loan above the idle cash in this market opens from the Loop tab, where it fills by redeeming loans paying less.'
+          : ''}
       </div>
 
       <AmountInput
@@ -149,7 +177,11 @@ export const LiquityOpenPanel: React.FC<{
         sheet={termSheet}
         side="borrow"
         defaultOpen
-        rateEdit={userSet?.required ? { value: ratePct, onChange: setRateState } : undefined}
+        rateEdit={
+          userSet?.required
+            ? { value: ratePct, onChange: setRateState, queue: rateQueue.data }
+            : undefined
+        }
       />
 
       {!ack.cleared ? (

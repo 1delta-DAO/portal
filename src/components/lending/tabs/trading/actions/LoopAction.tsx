@@ -29,6 +29,9 @@ import { FixedTermDetailsRows } from '../../../shared/FixedTermDetails'
 import { MidnightOrderBook } from '../../../shared/MidnightOrderBook'
 import { AutoBalancedNotice } from '../../../shared/SmartVault'
 import { TermsSummary, type BandSetterState } from '../../../terms'
+import type { RateSetterState } from '../../../terms/RateSetterRow'
+import { aprPercentToWad } from '../../../../../sdk/lending-helper/fetchLiquityRate'
+import { useRateQueue } from '../../../../../hooks/lending/useRateQueue'
 import { BandSetterRow } from '../../../terms/BandSetterRow'
 import { openLoanBandCount } from '../../../../../sdk/lending-helper/userPositionTypes'
 import { borrowTerms, isBrokeredBorrow } from '../../../../../sdk/lending-helper/marketSides'
@@ -207,6 +210,7 @@ export const LoopAction: React.FC<TradingActionProps> = ({
    * only meaningful on markets whose term sheet advertises the parameter.
    */
   const [bands, setBands] = useState<BandSetterState | undefined>(undefined)
+  const [rateState, setRateState] = useState<RateSetterState | undefined>(undefined)
 
   // A loop signs the user up to BOTH sides at once — it supplies into the
   // collateral market and borrows out of the debt market — so one sheet cannot
@@ -255,6 +259,25 @@ export const LoopAction: React.FC<TradingActionProps> = ({
 
   // Quotes
   const tradingQuotes = useTradingQuotes({ chainId, account })
+
+  // A rate the borrower sets (Liquity family, Flex). On a market that fills
+  // borrows out of the queue it also caps the size, so the picks follow the debt.
+  const userSetRate =
+    debtTermSheet && isFullSheet(debtTermSheet) ? debtTermSheet.borrow?.rate.userSet : undefined
+  const rateQueue = useRateQueue({
+    marketUid: debtPool?.marketUid,
+    size: Number(debtAmount || 0),
+    enabled: !!userSetRate?.required,
+  })
+  const rateQueueDefault = rateQueue.data?.picks.find(
+    (p) => p.id === rateQueue.data?.recommended
+  )?.apr
+  const onRateChange = useCallback((next: RateSetterState) => {
+    setRateState((prev) => {
+      if (prev?.aprPercent === next.aprPercent && prev?.valid === next.valid) return prev
+      return next
+    })
+  }, [])
   const {
     quotes,
     rateImpact,
@@ -631,6 +654,11 @@ export const LoopAction: React.FC<TradingActionProps> = ({
         // NEVER sent over an open loan: `N` is fixed at open and every later
         // borrow inherits it, so a value here could only mislead.
         ...(lockedBandCount == null && bands?.dirty && bands.valid ? { bands: bands.bands } : {}),
+        // Same rule for a rate the borrower sets: a NEW trove only, and absent
+        // means the server picks the rate that fills this size.
+        ...(!activeSubAccount && rateState?.dirty && rateState.valid
+          ? { interestRate: aprPercentToWad(rateState.aprPercent) }
+          : {}),
         ...(selectedPayCurrency ? { payAsset: selectedPayCurrency.address } : {}),
         ...(selectedPayCurrency && payAmount
           ? { payAmount: parseUnits(payAmount, selectedPayCurrency.decimals).toString() }
@@ -1245,6 +1273,15 @@ export const LoopAction: React.FC<TradingActionProps> = ({
                 value: lockedBandCount ?? bands?.bands,
                 mode: lockedBandCount != null ? 'locked' : 'mirror',
               }}
+              rateEdit={
+                userSetRate?.required && !activeSubAccount
+                  ? {
+                      value: rateState?.aprPercent ?? rateQueueDefault ?? userSetRate.default,
+                      onChange: onRateChange,
+                      queue: rateQueue.data,
+                    }
+                  : undefined
+              }
             />
           ) : null}
         </div>

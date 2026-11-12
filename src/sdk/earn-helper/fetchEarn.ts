@@ -132,7 +132,15 @@ export interface EarnPage {
   last: boolean
 }
 
-async function fetchEarnPage(
+/**
+ * ONE page of the listing, as the server sorted and cut it.
+ *
+ * This is what the Unified tab asks for: the endpoint filters, sorts across
+ * every chain in the CSV and pages on its own, so the screen needs `limit` rows
+ * and not the catalogue. `total` and the facets describe the whole filtered
+ * listing regardless of the page.
+ */
+export async function fetchEarnPage(
   params: FetchEarnParams,
   start: number,
   limit: number,

@@ -25,6 +25,8 @@ import {
 import { useTermSheet } from '../../../../hooks/lending/useTermSheet'
 import { isFullSheet } from '../../../lending/terms/types'
 import type { BandSetterState } from '../../../lending/terms/BandSetterRow'
+import type { RateSetterState } from '../../../lending/terms/RateSetterRow'
+import { aprPercentToWad } from '../../../../sdk/lending-helper/fetchLiquityRate'
 import { useVaultLegs } from '../../../../hooks/lending/useVaultLegs'
 import { resolveSmartLeg, type SmartLegState } from '../../shared/SmartLegInput'
 
@@ -174,6 +176,14 @@ export function useCombinedAction({
   const openParameter =
     isOpen && debtSheet && isFullSheet(debtSheet)
       ? debtSheet.borrow?.liquidation?.openParameter
+      : undefined
+  // A rate the borrower sets: a term like the band count, chosen at open.
+  const userSetRate =
+    isOpen && debtSheet && isFullSheet(debtSheet) ? debtSheet.borrow?.rate.userSet : undefined
+  const [rateState, setRateState] = useState<RateSetterState | undefined>(undefined)
+  const interestRateForRequest =
+    userSetRate?.required && rateState?.dirty && rateState.valid
+      ? aprPercentToWad(rateState.aprPercent)
       : undefined
   /** Only forward a band count when this market actually takes one. */
   const bandsForRequest =
@@ -339,6 +349,7 @@ export function useCombinedAction({
             receiveAsset,
             modeId,
             bands: bandsForRequest,
+            interestRate: interestRateForRequest,
             accountId,
             debtTermId: isDebtBrokered && termId != null ? Number(termId) : undefined,
             collateralAsset1: collateralLegState.asset1,
@@ -385,6 +396,7 @@ export function useCombinedAction({
     isOpen,
     modeId,
     bandsForRequest,
+    interestRateForRequest,
     payAsset,
     receiveAsset,
     accountId,
@@ -536,6 +548,11 @@ export function useCombinedAction({
       isOpen && debtSheet && isFullSheet(debtSheet) ? debtSheet.borrow?.liquidation : undefined,
     bandValue: bandState?.bands,
     setBandState,
+    // the rate a user-set-rate market asks for; `undefined` on every other one
+    rateTerms:
+      userSetRate?.required && isFullSheet(debtSheet!) ? debtSheet.borrow?.rate : undefined,
+    rateValue: rateState?.aprPercent,
+    setRateState,
     // Fluid smart legs — null on every ordinary market, so the form renders
     // exactly as before.
     collateralRow,
