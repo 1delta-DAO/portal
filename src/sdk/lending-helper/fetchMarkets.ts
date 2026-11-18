@@ -226,7 +226,7 @@ export function rawMarketToPoolDataItem(raw: RawMarket, entry?: LenderEntryRaw):
  *
  * Endpoint: `GET /v1/data/lending/lenders?chains=<chains>`
  */
-export async function fetchLenders(chains: string, maxRiskScore = 6): Promise<LenderSummary[]> {
+export async function fetchLenders(chains: string, maxRiskScore = 7): Promise<LenderSummary[]> {
   const data = await apiFetch<{ items: LenderSummary[] }>(endpointLendingLenders, {
     params: { chains, maxRiskScore },
   })

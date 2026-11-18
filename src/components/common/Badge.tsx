@@ -30,7 +30,7 @@ const TONE_CLASS: Record<BadgeTone, string> = {
   success: 'bg-success/15 text-success',
   error: 'bg-error/15 text-error',
   // Solid, not tinted: the one tone that must not read as "a redder red".
-  // Used for risk score 6 (compromised) only.
+  // Used for risk score 7 (compromised) only.
   critical: 'bg-error text-error-content',
   warning: 'bg-warning/15 text-warning',
   info: 'bg-info/15 text-info',

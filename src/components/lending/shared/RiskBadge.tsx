@@ -205,6 +205,7 @@ function riskTextColor(label: string): string {
       return 'text-warning'
     case 'high':
       return 'text-error'
+    case 'defunct':
     case 'compromised':
       return 'text-error font-semibold'
     case 'unknown':

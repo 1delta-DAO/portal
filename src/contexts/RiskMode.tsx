@@ -12,8 +12,8 @@ import { useSearchParams } from 'react-router-dom'
 import { riskSyncStep } from './riskUrlSync'
 
 /**
- * App-wide risk ceiling. A single `maxRiskScore` (1–6, every integer a real
- * cut; 6 = compromised) that gates how much risk any tab is allowed to surface.
+ * App-wide risk ceiling. A single `maxRiskScore` (1–7, every integer a real
+ * cut; 6 = defunct, 7 = compromised) that gates how much risk any tab is allowed to surface.
  * Lending and Looping follow it directly; Earn may override it *downwards*
  * (never above).
  *
@@ -40,24 +40,24 @@ const URL_PARAM = 'riskTolerance'
 const DEFAULT_MAX_RISK = 5
 
 /**
- * The ceilings `RiskSelect` offers: every integer 1–6 (see `riskBand`: 1–2
- * low, 3–4 medium, 5 high, 6 compromised). Each is a distinct server-side cut
+ * The ceilings `RiskSelect` offers: every integer 1–7 (see `riskBand`: 1–2
+ * low, 3–4 medium, 5 high, 6 defunct, 7 compromised). Each is a distinct server-side cut
  * (`risk_score <= n`), so nothing is snapped to a band any more — the selector
  * shows exactly the number that is being served. Out-of-range values (an old
  * link's `100`, a hand-typed 0) are clamped, not defaulted, so a stored
  * preference survives.
  *
- * 6 is deliberately reachable only by asking for it: no band word maps to it
- * except `compromised` itself, and the default stays 5.
+ * 6 and 7 are deliberately reachable only by asking for them: no band word maps
+ * to them except `defunct` / `compromised` themselves, and the default stays 5.
  */
 const MIN_RISK = 1
-const MAX_RISK = 6
+const MAX_RISK = 7
 
 function clampCeiling(score: number): number {
   return Math.min(Math.max(Math.round(score), MIN_RISK), MAX_RISK)
 }
 
-/** Parse a `riskTolerance` value (numeric 1-6, or low/medium/high/compromised) → score, or null. */
+/** Parse a `riskTolerance` value (numeric 1-7, or low/medium/high/defunct/compromised) → score, or null. */
 function parseRiskTolerance(raw: string | null | undefined): number | null {
   if (raw == null) return null
   const trimmed = raw.trim().toLowerCase()
@@ -65,7 +65,8 @@ function parseRiskTolerance(raw: string | null | undefined): number | null {
   if (trimmed === 'low') return 2
   if (trimmed === 'medium' || trimmed === 'med') return 4
   if (trimmed === 'high') return 5
-  if (trimmed === 'compromised') return 6
+  if (trimmed === 'defunct') return 6
+  if (trimmed === 'compromised') return 7
   const n = parseInt(trimmed, 10)
   if (Number.isNaN(n)) return null
   return clampCeiling(n)

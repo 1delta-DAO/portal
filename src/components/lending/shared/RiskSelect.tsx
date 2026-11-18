@@ -2,13 +2,13 @@ import React, { useEffect, useRef, useState } from 'react'
 import { riskDotColor } from '../tabs/earn/helpers'
 
 /**
- * One ceiling per score, 1–6. The value is sent verbatim as `maxRiskScore` and
+ * One ceiling per score, 1–7. The value is sent verbatim as `maxRiskScore` and
  * the server filters `risk_score <= n`, so every integer is a real, distinct
  * cut — a 3 admits the score-3 rows and hides the 4s that wear the same
- * "medium" chip. That is the point of offering all six instead of the three
+ * "medium" chip. That is the point of offering every score instead of the three
  * bands this used to collapse to: a user who wants "medium but not 4" can say
- * so, and one who wants 6 (`compromised` — drained / insolvent / abandoned, see
- * `riskBand`) has to ask for it by name. The band name next to each number is
+ * so, and one who wants 6 (`defunct` — abandoned / sunset) or 7 (`compromised`
+ * — drained / insolvent, see `riskBand`) has to ask for it by name. The band name next to each number is
  * `riskBand`'s, so the dot colour matches the chip the row will carry.
  */
 const OPTIONS = [
@@ -17,7 +17,8 @@ const OPTIONS = [
   { value: 3, label: 'Risk ≤ 3', dropdownLabel: '3 · medium', risk: 'medium' },
   { value: 4, label: 'Risk ≤ 4', dropdownLabel: '4 · medium', risk: 'medium' },
   { value: 5, label: 'Risk ≤ 5', dropdownLabel: '5 · high', risk: 'high' },
-  { value: 6, label: 'Risk ≤ 6', dropdownLabel: '6 · compromised', risk: 'compromised' },
+  { value: 6, label: 'Risk ≤ 6', dropdownLabel: '6 · defunct', risk: 'defunct' },
+  { value: 7, label: 'Risk ≤ 7', dropdownLabel: '7 · compromised', risk: 'compromised' },
 ] as const
 
 interface RiskSelectProps {

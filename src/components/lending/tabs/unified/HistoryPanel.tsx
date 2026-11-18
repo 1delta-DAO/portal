@@ -13,6 +13,7 @@ const RISK_TONE = {
   low: 'neutral',
   medium: 'warning',
   high: 'error',
+  defunct: 'error',
   compromised: 'critical',
   unknown: 'neutral',
 } as const

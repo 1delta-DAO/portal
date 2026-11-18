@@ -16,19 +16,23 @@
  * under a ceiling that claimed to admit medium. On Avalanche/Euler that was
  * all 33 medium configs and the table came back empty.
  *
- * **6 is `compromised`, not "very high".** The backend (migration 0145) reserves
- * it for objects that are currently drained, insolvent or abandoned — an exit
- * scam, an unremediated exploit, an asset whose backing is gone — and for every
- * config that accepts such an asset as collateral. 5 is the ceiling for a venue
- * that is risky but functioning. Render 6 as its own thing; the API's own
- * label for it is `compromised`.
+ * **6 and 7 are not "very high".** 5 is the ceiling for a venue that is risky
+ * but functioning. The backend (migrations 0201/0202) reserves the two levels
+ * above it for venues nobody should enter:
+ * - 6 `defunct`: abandoned or sunset. No operator and no future, but no loss
+ *   assumed and withdrawals are expected to work.
+ * - 7 `compromised`: currently drained or insolvent — an exit scam, an
+ *   unremediated exploit, an asset whose backing is gone — and every config
+ *   that accepts such an asset as collateral.
+ * Render each as its own thing; these are the API's own labels.
  */
-export type RiskBand = 'low' | 'medium' | 'high' | 'compromised' | 'unknown'
+export type RiskBand = 'low' | 'medium' | 'high' | 'defunct' | 'compromised' | 'unknown'
 
 export function riskBand(score: number | null | undefined): RiskBand {
   if (score == null || score === 0) return 'unknown'
   if (score <= 2) return 'low'
   if (score <= 4) return 'medium'
   if (score <= 5) return 'high'
+  if (score <= 6) return 'defunct'
   return 'compromised'
 }

@@ -21,7 +21,7 @@ import { Spinner } from '../../common/Loader'
  * default (4) a mode in a config scoring 5 came back missing and the badge fell
  * back to a bare number.
  */
-const POSITION_RISK_CEILING = 6
+const POSITION_RISK_CEILING = 7
 
 // ============================================================================
 // Mode Button — shows current borrow mode, opens the analysis modal on click

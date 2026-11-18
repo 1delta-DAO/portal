@@ -21,7 +21,7 @@ import type {
  * drive the lender dropdown without paying the cost of fetching full
  * per-market data for every lender.
  */
-export function useLenders(chainId: string, enabled = true, maxRiskScore = 6) {
+export function useLenders(chainId: string, enabled = true, maxRiskScore = 7) {
   const { data, isLoading, isFetching, error } = useQuery<LenderSummary[]>({
     queryKey: ['lendingLenders', chainId, maxRiskScore],
     enabled: enabled && !!chainId,

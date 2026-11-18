@@ -56,6 +56,8 @@ function riskLabel(s: number): string {
   switch (riskBand(s)) {
     case 'compromised':
       return 'compromised'
+    case 'defunct':
+      return 'defunct'
     case 'high':
       return 'high risk'
     case 'medium':
@@ -70,6 +72,8 @@ function riskBadgeClass(s: number): string {
   switch (riskBand(s)) {
     case 'compromised':
       return 'bg-error text-error-content font-semibold'
+    case 'defunct':
+      return 'bg-error/15 text-error font-semibold'
     case 'high':
       return 'bg-error/15 text-error'
     case 'medium':
